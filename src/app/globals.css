@@ -139,4 +139,22 @@ body {
     box-shadow: none !important;
     break-inside: avoid;
   }
+  .tag-bill-print,
+  .wing-summary-print,
+  .month-ledger-print {
+    display: block !important;
+  }
+  .staff-payout-print.print-this,
+  .transfer-sheet-print.print-this {
+    display: block !important;
+  }
+  .transfer-sheet-print.print-this {
+    size: landscape;
+  }
+  .month-ledger-print {
+    size: landscape;
+  }
+  @page {
+    margin: 12mm;
+  }
 }

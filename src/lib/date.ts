@@ -81,6 +81,13 @@ export function previousISODate(date: string) {
   return todayISOFrom(d);
 }
 
+/** Next calendar day as ISO `YYYY-MM-DD`. */
+export function nextISODate(date: string) {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + 1);
+  return todayISOFrom(d);
+}
+
 /** All ISO dates from day 1 of current month through today. */
 export function monthDatesThroughToday() {
   const today = todayISO();

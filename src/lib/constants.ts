@@ -42,6 +42,37 @@ export const RANKS = [
 
 export const WINGS = ["Alpha", "Bravo", "Charlie", "Delta", "HQ", "Support"];
 
+/** Org header for Consume print bills (prototype defaults). */
+export const CONSUME_REPORT_META = {
+  orgName: "RAB Forces Headquarters",
+  orgNameBn: "র‍্যাব ফোর্সেস সদর দপ্তর",
+  station: "Kurmitola, Dhaka",
+  stationBn: "কুর্মিটোলা, ঢাকা",
+  wing: "Administration & Finance Wing",
+  wingBn: "প্রশাসন ও অর্থ উইং",
+  formNo: "Bangladesh Form No-5211",
+} as const;
+
+/** Extra fuel ৳/day for FR bill print (0 hides fuel columns until set). */
+export const FR_FUEL_RATE_PER_DAY = 50;
+
+/** Org / letter defaults for Ration Accounts print & transfer export. */
+export const RATION_REPORT_META = {
+  orgName: "RAB Forces Headquarters",
+  orgNameBn: "র‍্যাব ফোর্সেস সদর দপ্তর",
+  govLine: "Government of the People's Republic of Bangladesh",
+  policeLine: "Bangladesh Police",
+  station: "Kurmitola, Dhaka",
+  stationBn: "কুর্মিটোলা, ঢাকা",
+  institute: "RAB HQ",
+  currency: "BDT",
+  transferType: "C",
+  entryDescription: "Fresh Money Bill",
+  paymentInfo: "Fresh Money",
+  refPrefix: "RAB HQ/Finance/S33/Pay",
+  subjectFreshMoney: "Disbursement of Fresh Money Bill {month}",
+} as const;
+
 export const SESSION_COOKIE = "mess_session";
 export const SESSION_STORAGE_KEY = "mess_session_v1";
 export const STORE_KEY = "mess_proto_v1";

@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconArrowLeft,
@@ -10,12 +15,14 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconDownload,
+  IconPrinter,
   IconSearch,
   IconUsers,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { TagBillPrint } from "@/components/consume/tag-bill-print";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,7 +36,7 @@ import { useStore } from "@/hooks/use-store";
 import { DAILY_TAGS, RANKS, WINGS } from "@/lib/constants";
 import { previousMonthKey, shiftMonthKey } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
-import { buildConsumeMonth, formatBdt } from "@/lib/reports";
+import { buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -76,51 +83,27 @@ export default function ConsumeTagMembersClient() {
     router.replace(`${pathname}?${next.toString()}`);
   }, [tag, rawMonth, defaultMonth, pathname, router, searchParams]);
 
-  const report = useMemo(
-    () => buildConsumeMonth(month),
-    [state.assignments, state.users, state.rates, month],
+  const bill = useMemo(
+    () => (tag ? buildTagBill(month, tag) : null),
+    [state.assignments, state.users, state.rates, month, tag],
   );
 
-  const rate = useMemo(() => {
-    if (!tag) return 0;
-    return state.rates.find((r) => r.tag === tag)?.amount_per_day ?? 0;
-  }, [state.rates, tag]);
-
-  const tagAgg = useMemo(() => {
-    if (!tag) return null;
-    return report.byTag.find((row) => row.tag === tag) ?? null;
-  }, [report.byTag, tag]);
-
   const members = useMemo(() => {
-    if (!tag) return [];
+    if (!bill) return [];
     const query = q.trim().toLowerCase();
-    return report.rows
-      .map((row) => {
-        const days = row.tagDays[tag] ?? 0;
-        if (!days) return null;
-        return {
-          user: row.user,
-          days,
-          amount: days * rate,
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row))
-      .filter((row) => {
-        if (rank !== "all" && row.user.rank !== rank) return false;
-        if (wing !== "all" && row.user.wing !== wing) return false;
-        if (!query) return true;
-        return [row.user.name, row.user.rab_id, row.user.wing, row.user.rank]
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
-      })
-      .sort(
-        (a, b) => b.amount - a.amount || a.user.name.localeCompare(b.user.name),
-      );
-  }, [report.rows, tag, rate, q, rank, wing]);
+    return bill.rows.filter((row) => {
+      if (rank !== "all" && row.user.rank !== rank) return false;
+      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!query) return true;
+      return [row.user.name, row.user.rab_id, row.user.wing, row.user.rank]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [bill, q, rank, wing]);
 
   const filteredTotal = useMemo(
-    () => members.reduce((sum, row) => sum + row.amount, 0),
+    () => members.reduce((sum, row) => sum + row.grandTotal, 0),
     [members],
   );
 
@@ -132,38 +115,63 @@ export default function ConsumeTagMembersClient() {
   }
 
   function onExport() {
-    if (!tag) return;
+    if (!tag || !bill) return;
+    const showFuel = bill.fuelRate > 0;
+    const header = [
+      t("consume.colSl"),
+      t("consume.colId"),
+      t("consume.colRank"),
+      t("consume.colName"),
+      tag,
+      t("consume.colFreshAmount"),
+      ...(showFuel ? [t("consume.colFuelAmount")] : []),
+      t("consume.colGrandTotal"),
+      t("consume.colRemarks"),
+    ];
     const rows = [
-      [
-        t("cc.fields.name"),
-        t("cc.fields.rabId"),
-        t("consume.tagDays"),
-        t("consume.tagAmount"),
-      ],
-      ...members.map((r) => [
-        r.user.name,
+      header,
+      ...bill.rows.map((r) => [
+        String(r.sl),
         r.user.rab_id,
+        r.user.rank,
+        r.user.name,
         String(r.days),
         String(r.amount),
+        ...(showFuel ? [String(r.fuelAmount)] : []),
+        String(r.grandTotal),
+        r.remarks,
       ]),
     ];
-    downloadCsv(`consume-${month}-${tag}.csv`, rows);
+    downloadCsv(`consume-bill-${month}-${tag}.csv`, rows);
   }
 
   const fieldClass =
     "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
-  if (!tag) return null;
+  if (!tag || !bill) return null;
 
   const label = tagLabel(tag, locale);
   const backHref = `/consume/monthly?month=${month}`;
+  const showFuel = bill.fuelRate > 0;
 
   return (
-    <PagePane className="gap-5">
+    <PagePane className="gap-5 print:border-0 print:p-0">
+      <TagBillPrint
+        month={month}
+        tag={tag}
+        tagLabel={label}
+        rows={bill.rows}
+        totalDays={bill.totalDays}
+        totalAmount={bill.totalAmount}
+        totalFuel={bill.totalFuel}
+        grandTotal={bill.grandTotal}
+        showFuel={showFuel}
+      />
+
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-5 no-print"
       >
         <div>
           <Button
@@ -181,16 +189,28 @@ export default function ConsumeTagMembersClient() {
             title={t("pages.consumeTag.title", { tag, label })}
             subtitle={t("pages.consumeTag.subtitle", { tag, month })}
             actions={
-              <Button
-                variant="cta"
-                size="sm"
-                className="rounded-xl"
-                onClick={onExport}
-                disabled={!members.length}
-              >
-                <IconDownload className="h-3.5 w-3.5" />
-                {t("consume.exportCsv")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={onExport}
+                  disabled={!bill.rows.length}
+                >
+                  <IconDownload className="h-3.5 w-3.5" />
+                  {t("consume.exportCsv")}
+                </Button>
+                <Button
+                  variant="cta"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => window.print()}
+                  disabled={!bill.rows.length}
+                >
+                  <IconPrinter className="h-3.5 w-3.5" />
+                  {t("consume.printBill")}
+                </Button>
+              </div>
             }
           />
         </div>
@@ -198,16 +218,16 @@ export default function ConsumeTagMembersClient() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <StatChip
             label={t("consume.tagAmount")}
-            value={formatBdt(tagAgg?.amount ?? 0)}
+            value={formatBdt(bill.grandTotal)}
             accent
           />
           <StatChip
             label={t("consume.tagDays")}
-            value={String(tagAgg?.days ?? 0)}
+            value={String(bill.totalDays)}
           />
           <StatChip
             label={t("consume.statMembers")}
-            value={String(tagAgg?.users ?? 0)}
+            value={String(bill.rows.length)}
             className="col-span-2 lg:col-span-1"
           />
         </div>
@@ -302,7 +322,7 @@ export default function ConsumeTagMembersClient() {
           </div>
         </div>
 
-        {!tagAgg ? (
+        {bill.rows.length === 0 ? (
           <EmptyState title={t("consume.tagEmpty")} />
         ) : members.length === 0 ? (
           <EmptyState title={t("common.noResults")} />
@@ -314,13 +334,14 @@ export default function ConsumeTagMembersClient() {
                 {t("consume.perUser")}
               </span>
               <span className="ml-auto text-[11px] tabular-nums text-neutral-400">
-                {members.length}/{tagAgg.users}
+                {members.length}/{bill.rows.length}
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="sticky top-0 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
                   <tr>
+                    <th className="px-4 py-3">{t("consume.colSl")}</th>
                     <th className="px-4 py-3">{t("cc.fields.name")}</th>
                     <th className="px-4 py-3 text-right">
                       {t("consume.tagDays")}
@@ -336,6 +357,9 @@ export default function ConsumeTagMembersClient() {
                       key={row.user.id}
                       className="border-t border-neutral-100 transition-colors hover:bg-primary/[0.03] dark:border-neutral-800 dark:hover:bg-primary/5"
                     >
+                      <td className="px-4 py-3 tabular-nums text-neutral-400">
+                        {row.sl}
+                      </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-neutral-900 dark:text-white">
                           {row.user.name}
@@ -351,14 +375,17 @@ export default function ConsumeTagMembersClient() {
                         {row.days}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums text-primary">
-                        {formatBdt(row.amount)}
+                        {formatBdt(row.grandTotal)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-neutral-200 bg-neutral-50/80 dark:border-neutral-700 dark:bg-neutral-900/80">
-                    <td className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                    <td
+                      colSpan={2}
+                      className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500"
+                    >
                       {t("consume.statAmount")}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-600">

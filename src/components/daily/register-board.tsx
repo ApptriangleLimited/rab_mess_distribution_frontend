@@ -35,6 +35,8 @@ const TAG_CELL: Record<DailyTag, string> = {
   TRG: "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-100",
 };
 
+export { TAG_CELL };
+
 type DragStroke = {
   userId: string;
   clear: boolean;

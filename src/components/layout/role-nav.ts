@@ -60,6 +60,18 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       icon: IconChartBar,
       chip: "purple",
     },
+    {
+      href: "/consume/monthly/summary",
+      labelKey: "nav.consumeSummary",
+      icon: IconFileReport,
+      chip: "indigo",
+    },
+    {
+      href: "/consume/monthly/ledger",
+      labelKey: "nav.consumeLedger",
+      icon: IconTags,
+      chip: "teal",
+    },
   ],
   ration: [
     {
@@ -103,3 +115,17 @@ export const CHIP_CLASS: Record<string, string> = {
   red: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300",
   neutral: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
 };
+
+/** Longest matching href wins — avoids `/consume/monthly` stealing summary/ledger. */
+export function isNavActive(
+  pathname: string,
+  href: string,
+  candidates: string[],
+) {
+  const matches = candidates.filter(
+    (h) => pathname === h || pathname.startsWith(`${h}/`),
+  );
+  if (matches.length === 0) return false;
+  const best = matches.reduce((a, b) => (a.length >= b.length ? a : b));
+  return best === href;
+}

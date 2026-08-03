@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { IconCheck, IconCircle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import type { MessEater } from "@/lib/store/mess";
 import { useT } from "@/i18n/provider";
@@ -18,9 +18,9 @@ export function MessTodayList({
   const t = useT();
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-neutral-200 print:border-neutral-400 dark:border-neutral-700">
+    <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm">
-        <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 print:bg-white">
+        <thead className="sticky top-0 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900 print:bg-white">
           <tr>
             <th className="px-4 py-3">#</th>
             <th className="px-4 py-3">{t("mess.colName")}</th>
@@ -38,37 +38,51 @@ export function MessTodayList({
               <tr
                 key={user.id}
                 className={cn(
-                  "border-t border-neutral-100 dark:border-neutral-800",
-                  served && "bg-primary/5",
+                  "border-t border-neutral-100 transition-colors dark:border-neutral-800",
+                  served
+                    ? "bg-primary/[0.04] hover:bg-primary/[0.07]"
+                    : "hover:bg-neutral-50 dark:hover:bg-neutral-900/60",
                 )}
               >
-                <td className="px-4 py-3 text-neutral-500">{i + 1}</td>
-                <td className="px-4 py-3 font-medium text-neutral-900 dark:text-white">
-                  {user.name}
+                <td className="px-4 py-3 tabular-nums text-neutral-400">
+                  {i + 1}
                 </td>
-                <td className="px-4 py-3 font-mono text-xs">{user.rab_id}</td>
-                <td className="px-4 py-3">{user.rank}</td>
-                <td className="px-4 py-3">{user.wing}</td>
-                <td className="px-4 py-3">{user.phone || "—"}</td>
+                <td className="px-4 py-3">
+                  <p className="font-medium text-neutral-900 dark:text-white">
+                    {user.name}
+                  </p>
+                </td>
+                <td className="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">
+                  {user.rab_id}
+                </td>
+                <td className="px-4 py-3 text-neutral-700 dark:text-neutral-200">
+                  {user.rank}
+                </td>
+                <td className="px-4 py-3 text-neutral-700 dark:text-neutral-200">
+                  {user.wing}
+                </td>
+                <td className="px-4 py-3 tabular-nums text-neutral-600 dark:text-neutral-300">
+                  {user.phone || "—"}
+                </td>
                 <td className="px-4 py-3 no-print">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      className={
-                        served
-                          ? "bg-primary/10 text-primary"
-                          : "bg-neutral-100 text-neutral-600"
-                      }
-                    >
-                      {served ? t("mess.served") : "—"}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant={served ? "outline" : "cta"}
-                      onClick={() => onToggleServed(user.id)}
-                    >
-                      {served ? t("mess.unmarkServed") : t("mess.markServed")}
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    variant={served ? "outline" : "cta"}
+                    className={cn(
+                      "h-9 rounded-xl",
+                      served &&
+                        "border-primary/30 bg-primary/[0.06] text-primary hover:bg-primary/10 hover:text-primary",
+                    )}
+                    onClick={() => onToggleServed(user.id)}
+                    aria-pressed={served}
+                  >
+                    {served ? (
+                      <IconCheck className="h-3.5 w-3.5" />
+                    ) : (
+                      <IconCircle className="h-3.5 w-3.5" />
+                    )}
+                    {served ? t("mess.unmarkServed") : t("mess.markServed")}
+                  </Button>
                 </td>
               </tr>
             );

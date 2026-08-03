@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
 import { previousMonthKey, shiftMonthKey } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
-import { buildConsumeMonth, formatBdt } from "@/lib/reports";
+import { buildConsumeMonth, buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -66,12 +66,6 @@ export default function ConsumeMonthlyClient() {
     [report.byTag],
   );
 
-  const rateByTag = useMemo(() => {
-    const map = new Map<DailyTag, number>();
-    for (const r of state.rates) map.set(r.tag, r.amount_per_day);
-    return map;
-  }, [state.rates]);
-
   function setMonth(next: string) {
     if (!MONTH_RE.test(next)) return;
     const params = new URLSearchParams(searchParams.toString());
@@ -82,15 +76,19 @@ export default function ConsumeMonthlyClient() {
   function onExport() {
     const rows = [
       [
-        t("cc.fields.name"),
-        t("cc.fields.rabId"),
+        t("consume.colSl"),
+        t("consume.colId"),
+        t("consume.colRank"),
+        t("consume.colName"),
         t("consume.totalDays"),
         t("consume.allowanceDays"),
         t("consume.amount"),
       ],
-      ...report.rows.map((r) => [
-        r.user.name,
+      ...report.rows.map((r, i) => [
+        String(i + 1),
         r.user.rab_id,
+        r.user.rank,
+        r.user.name,
         String(r.totalDays),
         String(r.allowanceDays),
         String(r.amount),
@@ -100,35 +98,33 @@ export default function ConsumeMonthlyClient() {
   }
 
   function onExportTag(tag: DailyTag) {
-    const rate = rateByTag.get(tag) ?? 0;
-    const members = report.rows
-      .map((row) => {
-        const days = row.tagDays[tag] ?? 0;
-        if (!days) return null;
-        return {
-          name: row.user.name,
-          rabId: row.user.rab_id,
-          days,
-          amount: days * rate,
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
-
+    const bill = buildTagBill(month, tag);
+    const showFuel = bill.fuelRate > 0;
     const rows = [
       [
-        t("cc.fields.name"),
-        t("cc.fields.rabId"),
-        t("consume.tagDays"),
-        t("consume.tagAmount"),
+        t("consume.colSl"),
+        t("consume.colId"),
+        t("consume.colRank"),
+        t("consume.colName"),
+        tag,
+        t("consume.colFreshAmount"),
+        ...(showFuel ? [t("consume.colFuelAmount")] : []),
+        t("consume.colGrandTotal"),
+        t("consume.colRemarks"),
       ],
-      ...members.map((r) => [
-        r.name,
-        r.rabId,
+      ...bill.rows.map((r) => [
+        String(r.sl),
+        r.user.rab_id,
+        r.user.rank,
+        r.user.name,
         String(r.days),
         String(r.amount),
+        ...(showFuel ? [String(r.fuelAmount)] : []),
+        String(r.grandTotal),
+        r.remarks,
       ]),
     ];
-    downloadCsv(`consume-${month}-${tag}.csv`, rows);
+    downloadCsv(`consume-bill-${month}-${tag}.csv`, rows);
   }
 
   const fieldClass =
@@ -180,6 +176,26 @@ export default function ConsumeMonthlyClient() {
                   <IconChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-xl"
+              >
+                <Link href={`/consume/monthly/summary${monthQuery}`}>
+                  {t("consume.wingSummary")}
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-xl"
+              >
+                <Link href={`/consume/monthly/ledger${monthQuery}`}>
+                  {t("consume.ledger")}
+                </Link>
+              </Button>
               <Button
                 variant="cta"
                 size="sm"

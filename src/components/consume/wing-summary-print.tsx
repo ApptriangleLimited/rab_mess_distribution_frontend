@@ -1,0 +1,119 @@
+"use client";
+
+import { CONSUME_REPORT_META } from "@/lib/constants";
+import type { DailyTag } from "@/lib/types";
+import type { WingSummaryRow } from "@/lib/reports";
+import { useT } from "@/i18n/provider";
+
+type Props = {
+  month: string;
+  tagCodes: DailyTag[];
+  rows: WingSummaryRow[];
+  totals: {
+    manpower: number;
+    tagDays: Partial<Record<DailyTag, number>>;
+    totalDays: number;
+  };
+};
+
+export function WingSummaryPrint({ month, tagCodes, rows, totals }: Props) {
+  const t = useT();
+
+  return (
+    <div className="wing-summary-print hidden print:block">
+      <header className="mb-4 text-center text-black">
+        <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgNameBn}</p>
+        <p className="text-xs">{CONSUME_REPORT_META.stationBn}</p>
+        <p className="mt-2 text-base font-bold">
+          {t("consume.wingSummaryTitle", { month })}
+        </p>
+      </header>
+
+      <table className="w-full border-collapse text-[10px] text-black">
+        <thead>
+          <tr className="border border-black bg-neutral-100">
+            <th className="border border-black px-1 py-1 text-left">
+              {t("consume.colWing")}
+            </th>
+            <th className="border border-black px-1 py-1">
+              {t("consume.colManpower")}
+            </th>
+            {tagCodes.map((code) => (
+              <th key={code} className="border border-black px-1 py-1">
+                {code}
+              </th>
+            ))}
+            <th className="border border-black px-1 py-1">
+              {t("consume.colTotalDays")}
+            </th>
+            <th className="border border-black px-1 py-1">
+              {t("consume.colRemarks")}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.wing}>
+              <td className="border border-black px-1 py-1 text-left">
+                {row.wing}
+              </td>
+              <td className="border border-black px-1 py-1 text-center tabular-nums">
+                {row.manpower}
+              </td>
+              {tagCodes.map((code) => (
+                <td
+                  key={code}
+                  className="border border-black px-1 py-1 text-center tabular-nums"
+                >
+                  {row.tagDays[code] ?? 0}
+                </td>
+              ))}
+              <td className="border border-black px-1 py-1 text-center tabular-nums font-medium">
+                {row.totalDays}
+              </td>
+              <td className="border border-black px-1 py-1" />
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="font-semibold">
+            <td className="border border-black px-1 py-1.5 text-right">
+              {t("consume.billTotal")}
+            </td>
+            <td className="border border-black px-1 py-1.5 text-center tabular-nums">
+              {totals.manpower}
+            </td>
+            {tagCodes.map((code) => (
+              <td
+                key={code}
+                className="border border-black px-1 py-1.5 text-center tabular-nums"
+              >
+                {totals.tagDays[code] ?? 0}
+              </td>
+            ))}
+            <td className="border border-black px-1 py-1.5 text-center tabular-nums">
+              {totals.totalDays}
+            </td>
+            <td className="border border-black px-1 py-1.5" />
+          </tr>
+        </tfoot>
+      </table>
+
+      <footer className="mt-10 grid grid-cols-2 gap-8 text-center text-[11px] text-black sm:grid-cols-4">
+        {(
+          [
+            "consume.signConsumeSi",
+            "consume.signScheduleSi",
+            "consume.signSeniorDad",
+            "consume.signMessPresident",
+          ] as const
+        ).map((key) => (
+          <div key={key} className="pt-10">
+            <div className="mx-auto mb-2 h-px w-28 bg-black" />
+            <p>{t(key)}</p>
+          </div>
+        ))}
+      </footer>
+    </div>
+  );
+}

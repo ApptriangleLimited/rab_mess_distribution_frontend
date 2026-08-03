@@ -10,6 +10,7 @@ import {
   CHIP_CLASS,
   NAV_BY_ROLE,
   SHARED_NAV,
+  isNavActive,
   type NavItem,
 } from "@/components/layout/role-nav";
 import type { Role } from "@/lib/types";
@@ -99,6 +100,8 @@ function SidebarNav({ role, collapsed }: { role: Role; collapsed: boolean }) {
   const t = useT();
   const main = NAV_BY_ROLE[role];
   const shared = SHARED_NAV;
+  const mainHrefs = main.map((item) => item.href);
+  const sharedHrefs = shared.map((item) => item.href);
 
   return (
     <div
@@ -118,7 +121,7 @@ function SidebarNav({ role, collapsed }: { role: Role; collapsed: boolean }) {
             key={item.href}
             item={item}
             collapsed={collapsed}
-            active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+            active={isNavActive(pathname, item.href, mainHrefs)}
           />
         ))}
       </nav>
@@ -139,7 +142,7 @@ function SidebarNav({ role, collapsed }: { role: Role; collapsed: boolean }) {
               key={item.href}
               item={item}
               collapsed={collapsed}
-              active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+              active={isNavActive(pathname, item.href, sharedHrefs)}
             />
           ))}
         </nav>
@@ -184,6 +187,7 @@ export function MobileDrawer({
   const t = useT();
   const { locale } = useI18n();
   const items = [...NAV_BY_ROLE[role], ...SHARED_NAV];
+  const hrefs = items.map((item) => item.href);
 
   if (!open) return null;
 
@@ -217,9 +221,7 @@ export function MobileDrawer({
                 <NavLink
                   item={item}
                   collapsed={false}
-                  active={
-                    pathname === item.href || pathname.startsWith(`${item.href}/`)
-                  }
+                  active={isNavActive(pathname, item.href, hrefs)}
                 />
               </div>
             ))}

@@ -1,5 +1,13 @@
 import { DAILY_TAGS } from "@/lib/constants";
-import { monthDatesThroughToday, nowISO, todayISO } from "@/lib/date";
+import {
+  dateInMonth,
+  daysInMonth,
+  monthDatesThroughToday,
+  monthKey,
+  nowISO,
+  shiftMonthKey,
+  todayISO,
+} from "@/lib/date";
 import type {
   AllowanceRate,
   AppState,
@@ -12,6 +20,22 @@ import type {
 function id(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 }
+
+/** Previous N full months + current month through today (demo Consume/Ration). */
+function seedDemoDates(previousMonths = 3): string[] {
+  const out: string[] = [];
+  const current = monthKey();
+  for (let i = previousMonths; i >= 1; i--) {
+    const month = shiftMonthKey(current, -i);
+    const last = daysInMonth(month);
+    for (let day = 1; day <= last; day++) {
+      out.push(dateInMonth(month, day));
+    }
+  }
+  out.push(...monthDatesThroughToday());
+  return out;
+}
+
 
 function user(
   partial: Omit<User, "created_at" | "updated_at" | "documents"> & {
@@ -321,36 +345,110 @@ export function createSeedState(): AppState {
     }),
   ];
 
-  const dates = monthDatesThroughToday();
-  const pattern: { user_id: string; tag: DailyTag }[] = [
-    { user_id: "u_ms_1", tag: "MS" },
-    { user_id: "u_ms_2", tag: "MS" },
-    { user_id: "u_ms_3", tag: "MS" },
-    { user_id: "u_ms_4", tag: "MS" },
-    { user_id: "u_ms_5", tag: "MS" },
-    { user_id: "u_fr_1", tag: "FR" },
-    { user_id: "u_fr_2", tag: "FR" },
-    { user_id: "u_cl_1", tag: "CL" },
-    { user_id: "u_med_1", tag: "MED" },
-    { user_id: "u_trg_1", tag: "TRG" },
-    { user_id: "u_wr_1", tag: "WR" },
-    { user_id: "u_cd_1", tag: "CD" },
+  const dates = seedDemoDates(3);
+
+  /** Base tag + mid-month overlays so ledger shows mixed tags per member. */
+  type MemberPlan = {
+    user_id: string;
+    base: DailyTag;
+    spans?: { tag: DailyTag; from: number; to: number }[];
+  };
+
+  const memberPlans: MemberPlan[] = [
+    {
+      user_id: "u_ms_1",
+      base: "MS",
+      spans: [{ tag: "CL", from: 10, to: 13 }],
+    },
+    {
+      user_id: "u_ms_2",
+      base: "MS",
+      spans: [{ tag: "TRG", from: 15, to: 18 }],
+    },
+    {
+      user_id: "u_ms_3",
+      base: "MS",
+      spans: [{ tag: "WIT", from: 5, to: 6 }],
+    },
+    {
+      user_id: "u_ms_4",
+      base: "MS",
+      spans: [{ tag: "MED", from: 22, to: 24 }],
+    },
+    {
+      user_id: "u_ms_5",
+      base: "MS",
+      spans: [{ tag: "PL", from: 1, to: 3 }],
+    },
+    {
+      user_id: "u_fr_1",
+      base: "FR",
+      spans: [{ tag: "CL", from: -4, to: -1 }],
+    },
+    {
+      user_id: "u_fr_2",
+      base: "FR",
+      spans: [{ tag: "TRG", from: 8, to: 12 }],
+    },
+    {
+      user_id: "u_cl_1",
+      base: "FR",
+      spans: [{ tag: "CL", from: -5, to: -1 }],
+    },
+    {
+      user_id: "u_med_1",
+      base: "FR",
+      spans: [{ tag: "MED", from: 1, to: 7 }],
+    },
+    {
+      user_id: "u_trg_1",
+      base: "TRG",
+      spans: [{ tag: "CD", from: 20, to: 25 }],
+    },
+    {
+      user_id: "u_wr_1",
+      base: "WR",
+      spans: [{ tag: "MS", from: 14, to: 16 }],
+    },
+    {
+      user_id: "u_cd_1",
+      base: "CD",
+      spans: [
+        { tag: "TRG", from: 3, to: 7 },
+        { tag: "CL", from: 28, to: 31 },
+      ],
+    },
   ];
+
+  function resolveDayBound(bound: number, lastDay: number) {
+    if (bound < 0) return lastDay + bound + 1;
+    return bound;
+  }
+
+  function tagForPlan(plan: MemberPlan, day: number, lastDay: number): DailyTag {
+    for (const span of plan.spans ?? []) {
+      const from = Math.max(1, resolveDayBound(span.from, lastDay));
+      const to = Math.min(lastDay, resolveDayBound(span.to, lastDay));
+      if (from <= to && day >= from && day <= to) return span.tag;
+    }
+    return plan.base;
+  }
 
   const assignments: DailyAssignment[] = [];
   for (const date of dates) {
-    for (const row of pattern) {
-      // CL only on a short leave span near month end
-      if (row.tag === "CL") {
-        const day = Number(date.slice(8, 10));
-        const last = Number(today.slice(8, 10));
-        if (day < Math.max(1, last - 3) || day > last) continue;
-      }
+    const day = Number(date.slice(8, 10));
+    const month = date.slice(0, 7);
+    const lastDay =
+      month === monthKey()
+        ? Number(today.slice(8, 10))
+        : daysInMonth(month);
+
+    for (const plan of memberPlans) {
       assignments.push({
         id: id("a"),
-        user_id: row.user_id,
+        user_id: plan.user_id,
         date,
-        tag: row.tag,
+        tag: tagForPlan(plan, day, lastDay),
         updated_by: "daily",
         updated_at: nowISO(),
       });
@@ -402,6 +500,6 @@ export function createSeedState(): AppState {
     rates,
     approved_dates: [],
     suppressed_carries: [],
-    version: 2,
+    version: 4,
   };
 }

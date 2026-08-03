@@ -1,21 +1,35 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconDownload,
+} from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/hooks/use-store";
-import { monthKey, parseMonthInput } from "@/lib/date";
+import {
+  parseMonthInput,
+  previousMonthKey,
+  shiftMonthKey,
+} from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
 import { buildRationMonth, formatBdt } from "@/lib/reports";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
+import { cn } from "@/lib/utils";
+
+const fieldClass =
+  "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
 export default function RationMonthlyClient() {
   const t = useT();
@@ -24,7 +38,9 @@ export default function RationMonthlyClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const month = parseMonthInput(searchParams.get("month") ?? monthKey());
+  const month = parseMonthInput(
+    searchParams.get("month") ?? previousMonthKey(),
+  );
 
   const report = useMemo(
     () => buildRationMonth(month),
@@ -64,27 +80,65 @@ export default function RationMonthlyClient() {
   }
 
   return (
-    <PagePane>
+    <PagePane className="gap-5">
       <PageHeader
         title={t("pages.rationMonthly.title")}
         subtitle={t("pages.rationMonthly.subtitle", { month })}
         actions={
-          <Button variant="outline" onClick={onExport} disabled={!report.rows.length}>
-            {t("ration.exportCsv")}
-          </Button>
+          <>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-label={t("ration.prevMonth")}
+                onClick={() => setMonth(shiftMonthKey(month, -1))}
+              >
+                <IconChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="relative w-[11rem] shrink-0">
+                <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <Input
+                  type="month"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  aria-label={t("ration.month")}
+                  className={cn(fieldClass, "h-9 w-[11rem] pl-8")}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-label={t("ration.nextMonth")}
+                onClick={() => setMonth(shiftMonthKey(month, 1))}
+              >
+                <IconChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl"
+              onClick={onExport}
+              disabled={!report.rows.length}
+            >
+              <IconDownload className="h-3.5 w-3.5" />
+              {t("ration.exportCsv")}
+            </Button>
+            <Button asChild variant="cta" size="sm" className="h-9 rounded-xl">
+              <Link href={`/ration/report?month=${month}`}>
+                {t("ration.openReport")}
+              </Link>
+            </Button>
+          </>
         }
       />
 
       <SectionCard>
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="max-w-xs space-y-2">
-            <Label>{t("ration.month")}</Label>
-            <Input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
           <Badge className="bg-primary/10 text-primary">
             {t("ration.totalPayout")}: {formatBdt(report.totalAmount)}
           </Badge>
@@ -95,7 +149,7 @@ export default function RationMonthlyClient() {
       <SectionCard>
         <h2 className="mb-3 text-base font-semibold">{t("consume.byTag")}</h2>
         {report.byTag.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t("ration.empty")}</p>
+          <p className="text-sm text-neutral-500">{t("ration.emptyNoEligible")}</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {report.byTag.map((row) => (
@@ -109,7 +163,7 @@ export default function RationMonthlyClient() {
       </SectionCard>
 
       {report.rows.length === 0 ? (
-        <EmptyState title={t("ration.empty")} />
+        <EmptyState title={t("ration.emptyNoEligible")} />
       ) : (
         <SectionCard>
           <h2 className="mb-3 text-base font-semibold">{t("ration.perUser")}</h2>
