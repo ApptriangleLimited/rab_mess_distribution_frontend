@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  IconArrowLeft,
   IconCalendar,
   IconDownload,
   IconPrinter,
@@ -15,6 +13,7 @@ import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
+import { ConsumeTabs } from "@/components/layout/consume-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,7 +26,8 @@ import {
 import { useStore } from "@/hooks/use-store";
 import { RANKS, WINGS } from "@/lib/constants";
 import { previousMonthKey } from "@/lib/date";
-import { downloadCsv } from "@/lib/csv";
+import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildMonthLedger } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,8 @@ export default function ConsumeLedgerClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
 
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -76,15 +78,6 @@ export default function ConsumeLedgerClient() {
     });
   }, [ledger.rows, q, rank, wing]);
 
-  const taggedCells = useMemo(
-    () =>
-      rows.reduce(
-        (n, row) => n + row.days.filter((d) => Boolean(d)).length,
-        0,
-      ),
-    [rows],
-  );
-
   function setMonth(next: string) {
     if (!MONTH_RE.test(next)) return;
     const params = new URLSearchParams(searchParams.toString());
@@ -92,43 +85,44 @@ export default function ConsumeLedgerClient() {
     router.replace(`${pathname}?${params.toString()}`);
   }
 
-  function onExport() {
-    const dayHeaders = Array.from({ length: ledger.dayCount }, (_, i) =>
-      String(i + 1),
-    );
-    const header = [
-      t("consume.colSl"),
-      t("consume.colId"),
-      t("consume.colRank"),
-      t("consume.colName"),
-      ...dayHeaders,
-      ...ledger.tagCodes,
-    ];
-    const data = [
-      header,
-      ...rows.map((r, i) => [
-        String(i + 1),
-        r.user.rab_id,
-        r.user.rank,
-        r.user.name,
-        ...r.days.map((d) => d || ""),
-        ...ledger.tagCodes.map((code) => String(r.tagCounts[code] ?? "")),
-      ]),
-    ];
-    downloadCsv(`consume-ledger-${month}.csv`, data);
+  function onExportPdf() {
+    if (!rows.length) return;
+    downloadConsumeLedgerPdf({
+      month,
+      dayCount: ledger.dayCount,
+      tagCodes: ledger.tagCodes,
+      rows,
+      filename: `consume-ledger-${month}.pdf`,
+    });
+  }
+
+  async function onPrint() {
+    const el = printRef.current;
+    if (!el || !ledger.rows.length) return;
+    setPrinting(true);
+    try {
+      await printLetterElement(el, `consume-ledger-${month}.pdf`, "landscape");
+    } finally {
+      setPrinting(false);
+    }
   }
 
   const fieldClass =
-    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+    "h-8 rounded-md border-neutral-200 bg-white text-xs shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
     <PagePane className="gap-5 print:border-0 print:p-0">
-      <MonthLedgerPrint
-        month={month}
-        dayCount={ledger.dayCount}
-        tagCodes={ledger.tagCodes}
-        rows={ledger.rows}
-      />
+      {/* Off-screen letter for print capture (filtered rows). */}
+      <div className="pointer-events-none fixed left-[-10000px] top-0 w-[1400px]">
+        <MonthLedgerPrint
+          ref={printRef}
+          month={month}
+          dayCount={ledger.dayCount}
+          tagCodes={ledger.tagCodes}
+          rows={rows}
+          preview
+        />
+      </div>
 
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
@@ -136,47 +130,33 @@ export default function ConsumeLedgerClient() {
         className="flex flex-col gap-5 no-print"
       >
         <div>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="mb-2 -ml-2 rounded-xl text-neutral-500"
-          >
-            <Link href={`/consume/monthly?month=${month}`}>
-              <IconArrowLeft className="h-4 w-4" />
-              {t("consume.backToTags")}
-            </Link>
-          </Button>
           <PageHeader
             title={t("pages.consumeLedger.title")}
             subtitle={t("pages.consumeLedger.subtitle", { month })}
+            center={<ConsumeTabs />}
             actions={
               <div className="flex flex-wrap items-center gap-2.5">
                 <MiniStat
-                  label={t("daily.rosterStatShowing")}
+                  label={t("daily.rosterStatAll")}
                   value={String(rows.length)}
                   accent
-                />
-                <MiniStat
-                  label={t("daily.taggedCells")}
-                  value={String(taggedCells)}
                 />
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-11 rounded-xl"
-                  onClick={onExport}
+                  className="h-auto rounded-lg px-2.5 py-1.5"
+                  onClick={onExportPdf}
                   disabled={!rows.length}
                 >
                   <IconDownload className="h-4 w-4" />
-                  {t("consume.exportCsv")}
+                  {t("consume.exportPdf")}
                 </Button>
                 <Button
                   variant="cta"
                   size="sm"
-                  className="h-11 rounded-xl"
-                  onClick={() => window.print()}
-                  disabled={!ledger.rows.length}
+                  className="h-auto rounded-lg px-2.5 py-1.5"
+                  onClick={() => void onPrint()}
+                  disabled={!ledger.rows.length || printing}
                 >
                   <IconPrinter className="h-4 w-4" />
                   {t("mess.print")}
@@ -186,8 +166,8 @@ export default function ConsumeLedgerClient() {
           />
         </div>
 
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-          <div className="min-w-[12rem] flex-1 space-y-1.5 sm:min-w-[16rem]">
+        <div className="flex w-full flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
+          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96 space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("common.search")}
             </p>
@@ -195,10 +175,10 @@ export default function ConsumeLedgerClient() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={t("cc.searchPlaceholder")}
-              className={fieldClass}
+              className={cn(fieldClass, "w-full")}
             />
           </div>
-          <div className="w-auto space-y-1.5">
+          <div className="w-40 shrink-0 space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("daily.month")}
             </p>
@@ -208,16 +188,16 @@ export default function ConsumeLedgerClient() {
                 type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
-                className={cn(fieldClass, "pl-9")}
+                className={cn(fieldClass, "w-full pl-9")}
               />
             </div>
           </div>
-          <div className="w-[14rem] space-y-1.5">
+          <div className="w-32 shrink-0 space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("cc.filterRank")}
             </p>
             <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={fieldClass}>
+              <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
               </SelectTrigger>
               <SelectContent>
@@ -230,12 +210,12 @@ export default function ConsumeLedgerClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[14rem] space-y-1.5">
+          <div className="w-32 shrink-0 space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("cc.filterWing")}
             </p>
             <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={fieldClass}>
+              <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectWing")} />
               </SelectTrigger>
               <SelectContent>
@@ -279,23 +259,23 @@ function MiniStat({
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-1.5",
+        "inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5",
         accent
-          ? "border-primary/20 bg-primary/[0.06]"
-          : "border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900",
+          ? "border-primary/20 bg-primary/[0.08]"
+          : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
       )}
     >
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
         {label}
-      </p>
-      <p
+      </span>
+      <span
         className={cn(
           "text-sm font-semibold tabular-nums",
           accent ? "text-primary" : "text-neutral-900 dark:text-white",
         )}
       >
         {value}
-      </p>
+      </span>
     </div>
   );
 }

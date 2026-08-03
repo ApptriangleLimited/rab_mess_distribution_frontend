@@ -47,6 +47,8 @@ export function ConfirmDialog({
   danger,
   tone,
   children,
+  panelClassName,
+  rootClassName,
   onConfirm,
   onCancel,
 }: {
@@ -57,6 +59,9 @@ export function ConfirmDialog({
   danger?: boolean;
   tone?: Tone;
   children?: React.ReactNode;
+  panelClassName?: string;
+  /** Applied to fixed overlay root (e.g. no-print). */
+  rootClassName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -89,7 +94,10 @@ export function ConfirmDialog({
     <AnimatePresence>
       {open ? (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          className={cn(
+            "fixed inset-0 z-[200] flex items-center justify-center p-4",
+            rootClassName,
+          )}
           role="presentation"
         >
           <motion.button
@@ -114,6 +122,7 @@ export function ConfirmDialog({
               "dark:border-neutral-700 dark:bg-neutral-950",
               "ring-1",
               meta.ring,
+              panelClassName,
             )}
           >
             <div className={cn("h-1 w-full bg-gradient-to-r", meta.bar)} />

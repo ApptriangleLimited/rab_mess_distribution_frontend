@@ -11,6 +11,7 @@ import {
   IconEye,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
+import { RationTabs } from "@/components/layout/ration-tabs";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
 import {
   parseMonthInput,
-  previousMonthKey,
+  monthKey,
   shiftMonthKey,
 } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
@@ -44,7 +45,7 @@ export default function RationReportClient() {
   const searchParams = useSearchParams();
 
   const rawMonth = searchParams.get("month");
-  const defaultMonth = previousMonthKey();
+  const defaultMonth = monthKey();
   const month =
     rawMonth && MONTH_RE.test(rawMonth)
       ? parseMonthInput(rawMonth)
@@ -205,6 +206,7 @@ export default function RationReportClient() {
       <PageHeader
         title={t("pages.rationReport.title")}
         subtitle={t("pages.rationReport.subtitle", { month })}
+        center={<RationTabs />}
         actions={
           <>
             <div className="flex items-center gap-1.5">
@@ -288,7 +290,7 @@ export default function RationReportClient() {
           title={t("ration.emptySenders")}
           action={
             <Button asChild variant="cta" className="rounded-xl">
-              <Link href="/ration/senders">{t("ration.openSenders")}</Link>
+              <Link href="/settings">{t("ration.openSenders")}</Link>
             </Button>
           }
         />
@@ -299,7 +301,7 @@ export default function RationReportClient() {
           title={t("ration.emptyAllUnmapped")}
           action={
             <Button asChild variant="cta" className="rounded-xl">
-              <Link href="/ration/senders">{t("ration.openSenders")}</Link>
+              <Link href="/settings">{t("ration.openSenders")}</Link>
             </Button>
           }
         />
@@ -414,7 +416,7 @@ export default function RationReportClient() {
             ))}
           </ul>
           <Button asChild variant="outline" size="sm" className="mt-3 rounded-xl">
-            <Link href="/ration/senders">{t("ration.openSenders")}</Link>
+            <Link href="/settings">{t("ration.openSenders")}</Link>
           </Button>
         </section>
       ) : null}

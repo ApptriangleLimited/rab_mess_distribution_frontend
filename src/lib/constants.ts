@@ -3,9 +3,9 @@ import type { MessageKey } from "@/i18n";
 
 export const ROLE_HOMES: Record<Role, string> = {
   cc: "/cc/users",
-  daily: "/daily/approvals",
+  daily: "/daily/tags",
   mess: "/mess/today",
-  consume: "/consume/monthly",
+  consume: "/consume/monthly/ledger",
   ration: "/ration/monthly",
 };
 
@@ -48,6 +48,7 @@ export const CONSUME_REPORT_META = {
   orgNameBn: "র‍্যাব ফোর্সেস সদর দপ্তর",
   station: "Kurmitola, Dhaka",
   stationBn: "কুর্মিটোলা, ঢাকা",
+  campBn: "র‍্যাব ফোর্সেস সদর দপ্তর ক্যাম্প, কুর্মিটোলা ঢাকা",
   wing: "Administration & Finance Wing",
   wingBn: "প্রশাসন ও অর্থ উইং",
   formNo: "Bangladesh Form No-5211",
@@ -70,7 +71,12 @@ export const RATION_REPORT_META = {
   entryDescription: "Fresh Money Bill",
   paymentInfo: "Fresh Money",
   refPrefix: "RAB HQ/Finance/S33/Pay",
+  refPrefixPayAllce: "RAB HQ/Finance/S33/Pay & Allce",
   subjectFreshMoney: "Disbursement of Fresh Money Bill {month}",
+  subjectTagBill:
+    "Disbursement of Payment Fresh Money Bill-{monthLabel} Transfer BEFTN to {bank}.",
+  subjectFreshMoneyTransfer:
+    "Disbursement of Fresh Money Bill {monthLabel} transfer to {bank}.",
 } as const;
 
 export const SESSION_COOKIE = "mess_session";

@@ -11,6 +11,13 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Docker (from repo root)
+
+```bash
+docker compose up --build
+# or hot-reload: docker compose --profile dev up --build web-dev
+```
+
 ## Demo
 
 See [../docs/DEMO.md](../docs/DEMO.md) for the full walkthrough.

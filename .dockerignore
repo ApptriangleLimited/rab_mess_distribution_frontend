@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+AGENTS.md
+CLAUDE.md
+.tsbuildinfo
+next-env.d.ts
+eslint.config.mjs
+.DS_Store
+npm-debug.log*

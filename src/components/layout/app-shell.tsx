@@ -57,19 +57,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const hideSidebar =
+    session.role === "cc" ||
+    session.role === "daily" ||
+    session.role === "consume" ||
+    session.role === "ration";
+
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
-      <Sidebar role={session.role} collapsed={collapsed} />
-      <MobileDrawer
-        role={session.role}
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="flex h-dvh overflow-hidden bg-page-canvas">
+      {!hideSidebar ? (
+        <>
+          <Sidebar role={session.role} collapsed={collapsed} />
+          <MobileDrawer
+            role={session.role}
+            open={mobileOpen}
+            onClose={() => setMobileOpen(false)}
+          />
+        </>
+      ) : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-page-canvas">
         <div className="relative z-40 shrink-0">
           <HeaderBar
             session={session}
             sidebarCollapsed={collapsed}
+            hideSidebarControls={hideSidebar}
             onToggleSidebar={toggleCollapsed}
             onMenu={() => setMobileOpen(true)}
             onLogout={() => {

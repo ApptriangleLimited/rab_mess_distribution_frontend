@@ -1,7 +1,6 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,11 +13,15 @@ import { RANKS, WINGS } from "@/lib/constants";
 import type { ApprovalStatus, UserStatus } from "@/lib/types";
 import type { UserFilters } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
+import { cn } from "@/lib/utils";
 
 type Props = {
   value: UserFilters;
   onChange: (next: UserFilters) => void;
 };
+
+const fieldClass =
+  "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
 export function UserFiltersBar({ value, onChange }: Props) {
   const t = useT();
@@ -28,28 +31,35 @@ export function UserFiltersBar({ value, onChange }: Props) {
   }
 
   return (
-    <SectionCard>
-      <h2 className="mb-4 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-        {t("cc.filters")}
-      </h2>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <div className="space-y-2 lg:col-span-2">
-          <Label>{t("common.search")}</Label>
+    <SectionCard className="p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+          {t("cc.filters")}
+        </h2>
+      </div>
+      <div className="flex flex-nowrap items-end gap-3 overflow-x-auto pb-0.5">
+        <div className="min-w-[14rem] flex-1 space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("common.search")}
+          </p>
           <Input
             value={value.q ?? ""}
             onChange={(e) => patch({ q: e.target.value })}
             placeholder={t("cc.searchPlaceholder")}
+            className={fieldClass}
           />
         </div>
-        <div className="space-y-2">
-          <Label>{t("cc.filterStatus")}</Label>
+        <div className="w-[9.5rem] shrink-0 space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("cc.filterStatus")}
+          </p>
           <Select
             value={value.status ?? "all"}
             onValueChange={(v) =>
               patch({ status: v as UserStatus | "all" })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger className={fieldClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -59,15 +69,17 @@ export function UserFiltersBar({ value, onChange }: Props) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>{t("cc.filterApproval")}</Label>
+        <div className="w-[10.5rem] shrink-0 space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("cc.filterApproval")}
+          </p>
           <Select
             value={value.approval ?? "all"}
             onValueChange={(v) =>
               patch({ approval: v as ApprovalStatus | "all" })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger className={fieldClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -79,13 +91,15 @@ export function UserFiltersBar({ value, onChange }: Props) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>{t("cc.filterWing")}</Label>
+        <div className="w-[9rem] shrink-0 space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("cc.filterWing")}
+          </p>
           <Select
             value={value.wing ?? "all"}
             onValueChange={(v) => patch({ wing: v })}
           >
-            <SelectTrigger>
+            <SelectTrigger className={fieldClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -98,13 +112,15 @@ export function UserFiltersBar({ value, onChange }: Props) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>{t("cc.filterRank")}</Label>
+        <div className="w-[10rem] shrink-0 space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("cc.filterRank")}
+          </p>
           <Select
             value={value.rank ?? "all"}
             onValueChange={(v) => patch({ rank: v })}
           >
-            <SelectTrigger>
+            <SelectTrigger className={cn(fieldClass)}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

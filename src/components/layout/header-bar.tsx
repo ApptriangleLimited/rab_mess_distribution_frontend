@@ -34,12 +34,14 @@ export function HeaderBar({
   onMenu,
   sidebarCollapsed,
   onToggleSidebar,
+  hideSidebarControls = false,
 }: {
   session: Session;
   onLogout: () => void;
   onMenu: () => void;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  hideSidebarControls?: boolean;
 }) {
   const t = useT();
   const { locale } = useI18n();
@@ -47,6 +49,11 @@ export function HeaderBar({
   const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const hideSettings =
+    session.role === "cc" ||
+    session.role === "daily" ||
+    session.role === "consume" ||
+    session.role === "ration";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -83,40 +90,48 @@ export function HeaderBar({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary-light/60 to-transparent" />
 
       <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
-        <div className="flex items-center gap-2">
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white transition hover:bg-white/15 md:hidden"
-            onClick={onMenu}
-            aria-label={t("common.openMenu")}
-          >
-            <IconMenu2 className="h-5 w-5" />
-          </motion.button>
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-            className="hidden h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white transition hover:bg-white/15 md:inline-flex"
-            onClick={onToggleSidebar}
-            aria-label={
-              sidebarCollapsed
-                ? t("common.expandSidebar")
-                : t("common.collapseSidebar")
-            }
-            title={
-              sidebarCollapsed
-                ? t("common.expandSidebar")
-                : t("common.collapseSidebar")
-            }
-          >
-            {sidebarCollapsed ? (
-              <IconLayoutSidebarLeftExpand className="h-5 w-5" />
-            ) : (
-              <IconLayoutSidebarLeftCollapse className="h-5 w-5" />
-            )}
-          </motion.button>
+        <div className="flex min-w-0 items-center gap-2">
+          {!hideSidebarControls ? (
+            <>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white transition hover:bg-white/15 md:hidden"
+                onClick={onMenu}
+                aria-label={t("common.openMenu")}
+              >
+                <IconMenu2 className="h-5 w-5" />
+              </motion.button>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="hidden h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white transition hover:bg-white/15 md:inline-flex"
+                onClick={onToggleSidebar}
+                aria-label={
+                  sidebarCollapsed
+                    ? t("common.expandSidebar")
+                    : t("common.collapseSidebar")
+                }
+                title={
+                  sidebarCollapsed
+                    ? t("common.expandSidebar")
+                    : t("common.collapseSidebar")
+                }
+              >
+                {sidebarCollapsed ? (
+                  <IconLayoutSidebarLeftExpand className="h-5 w-5" />
+                ) : (
+                  <IconLayoutSidebarLeftCollapse className="h-5 w-5" />
+                )}
+              </motion.button>
+            </>
+          ) : (
+            <p className="truncate text-sm font-semibold tracking-wide text-white/90">
+              {t("common.productName")}
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
@@ -190,18 +205,20 @@ export function HeaderBar({
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      router.push("/settings");
-                    }}
-                  >
-                    <IconSettings className="h-4 w-4 text-neutral-500" />
-                    {t("common.settings")}
-                  </button>
+                  {!hideSettings ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        router.push("/settings");
+                      }}
+                    >
+                      <IconSettings className="h-4 w-4 text-neutral-500" />
+                      {t("common.settings")}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     role="menuitem"

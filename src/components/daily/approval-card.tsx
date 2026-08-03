@@ -1,59 +1,80 @@
 "use client";
 
-import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { User } from "@/lib/types";
 import { useT } from "@/i18n/provider";
+import { cn, initials } from "@/lib/utils";
+import { IconCheck, IconX } from "@tabler/icons-react";
 
-export function ApprovalCard({
+/** Pending member row for Members table — Approve / Reject in Actions. */
+export function ApprovalRow({
   user,
   onApprove,
   onReject,
-  onEnd,
 }: {
   user: User;
   onApprove: () => void;
   onReject: () => void;
-  onEnd: () => void;
 }) {
   const t = useT();
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
-            {user.name}
-          </h3>
-          <p className="mt-1 font-mono text-xs text-neutral-500">{user.rab_id}</p>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-600">
-            <span>{user.rank}</span>
-            <span>·</span>
-            <span>{user.wing}</span>
-            <span>·</span>
-            <span>{user.phone || "—"}</span>
+    <tr className="border-t border-amber-100/80 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/20">
+      <td className="px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/90 text-xs font-bold text-white">
+            {initials(user.name) || "M"}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
+              {user.name}
+            </div>
+            <div className="font-mono text-xs text-neutral-500">{user.rab_id}</div>
           </div>
         </div>
-        <Badge className="bg-amber-50 text-amber-800">
+      </td>
+      <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+        {user.rank || "—"}
+      </td>
+      <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+        {user.wing || "—"}
+      </td>
+      <td className="px-4 py-3">
+        <Badge
+          className={cn(
+            "rounded-md px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide",
+            "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+          )}
+        >
           {t("cc.approvalPending")}
         </Badge>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="cta" size="sm" onClick={onApprove}>
-          {t("daily.approve")}
-        </Button>
-        <Button variant="outline" size="sm" onClick={onReject}>
-          {t("daily.reject")}
-        </Button>
-        <Button variant="danger" size="sm" onClick={onEnd}>
-          {t("daily.endEntry")}
-        </Button>
-      </div>
-    </motion.div>
+      </td>
+      <td className="px-4 py-3">
+        <div
+          className="flex flex-wrap items-center justify-end gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Button
+            variant="cta"
+            size="sm"
+            className="rounded-lg"
+            onClick={onApprove}
+          >
+            <IconCheck className="h-3.5 w-3.5" />
+            {t("daily.approve")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            onClick={onReject}
+          >
+            <IconX className="h-3.5 w-3.5" />
+            {t("daily.reject")}
+          </Button>
+        </div>
+      </td>
+    </tr>
   );
 }

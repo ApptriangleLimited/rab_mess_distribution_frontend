@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -9,27 +8,39 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconDownload,
-  IconEye,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { EmptyState } from "@/components/shared/empty-state";
+import { AllConsumePanel } from "@/components/consume/all-consume-panel";
+import { TagBillPanel } from "@/components/consume/tag-bill-panel";
+import { ConsumeTabs } from "@/components/layout/consume-tabs";
+import {
+  ConsumeTagTabs,
+  type ConsumeTagTab,
+} from "@/components/layout/consume-tag-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
+import { DAILY_TAGS } from "@/lib/constants";
 import { previousMonthKey, shiftMonthKey } from "@/lib/date";
-import { downloadCsv } from "@/lib/csv";
-import { buildConsumeMonth, buildTagBill, formatBdt } from "@/lib/reports";
+import { downloadConsumeMonthPdf } from "@/lib/download-consume-pdfs";
+import { buildConsumeMonth } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
-import { tagLabel } from "@/i18n";
-import { useI18n, useT } from "@/i18n/provider";
+import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
+function parseTagTab(raw: string | null): ConsumeTagTab | null {
+  if (!raw) return null;
+  if (raw === "all") return "all";
+  return DAILY_TAGS.some((item) => item.code === raw)
+    ? (raw as DailyTag)
+    : null;
+}
+
 export default function ConsumeMonthlyClient() {
   const t = useT();
-  const { locale } = useI18n();
   const state = useStore();
   const router = useRouter();
   const pathname = usePathname();
@@ -41,324 +52,151 @@ export default function ConsumeMonthlyClient() {
   const month =
     rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : defaultMonth;
 
-  useEffect(() => {
-    if (rawMonth && MONTH_RE.test(rawMonth)) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("month", defaultMonth);
-    router.replace(`${pathname}?${params.toString()}`);
-  }, [rawMonth, defaultMonth, pathname, router, searchParams]);
-
   const report = useMemo(
     () => buildConsumeMonth(month),
     [state.assignments, state.users, state.rates, month],
   );
+
+  const tagStats = useMemo(() => [...report.byTag], [report.byTag]);
+
+  const tag = parseTagTab(searchParams.get("tag")) ?? "all";
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    let dirty = false;
+    if (!(rawMonth && MONTH_RE.test(rawMonth))) {
+      params.set("month", defaultMonth);
+      dirty = true;
+    }
+    if (!parseTagTab(searchParams.get("tag"))) {
+      params.set("tag", "all");
+      dirty = true;
+    }
+    if (!dirty) return;
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [rawMonth, defaultMonth, pathname, router, searchParams]);
 
   const allowanceDays = useMemo(
     () => report.rows.reduce((sum, row) => sum + row.allowanceDays, 0),
     [report.rows],
   );
 
-  const tagRows = useMemo(
-    () =>
-      [...report.byTag].sort(
-        (a, b) => b.amount - a.amount || b.days - a.days,
-      ),
-    [report.byTag],
-  );
-
-  function setMonth(next: string) {
-    if (!MONTH_RE.test(next)) return;
+  function patchQuery(patch: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("month", next);
+    for (const [k, v] of Object.entries(patch)) params.set(k, v);
     router.replace(`${pathname}?${params.toString()}`);
   }
 
-  function onExport() {
-    const rows = [
-      [
-        t("consume.colSl"),
-        t("consume.colId"),
-        t("consume.colRank"),
-        t("consume.colName"),
-        t("consume.totalDays"),
-        t("consume.allowanceDays"),
-        t("consume.amount"),
-      ],
-      ...report.rows.map((r, i) => [
-        String(i + 1),
-        r.user.rab_id,
-        r.user.rank,
-        r.user.name,
-        String(r.totalDays),
-        String(r.allowanceDays),
-        String(r.amount),
-      ]),
-    ];
-    downloadCsv(`consume-${month}.csv`, rows);
+  function setMonth(next: string) {
+    if (!MONTH_RE.test(next)) return;
+    patchQuery({ month: next });
   }
 
-  function onExportTag(tag: DailyTag) {
-    const bill = buildTagBill(month, tag);
-    const showFuel = bill.fuelRate > 0;
-    const rows = [
-      [
-        t("consume.colSl"),
-        t("consume.colId"),
-        t("consume.colRank"),
-        t("consume.colName"),
-        tag,
-        t("consume.colFreshAmount"),
-        ...(showFuel ? [t("consume.colFuelAmount")] : []),
-        t("consume.colGrandTotal"),
-        t("consume.colRemarks"),
-      ],
-      ...bill.rows.map((r) => [
-        String(r.sl),
-        r.user.rab_id,
-        r.user.rank,
-        r.user.name,
-        String(r.days),
-        String(r.amount),
-        ...(showFuel ? [String(r.fuelAmount)] : []),
-        String(r.grandTotal),
-        r.remarks,
-      ]),
-    ];
-    downloadCsv(`consume-bill-${month}-${tag}.csv`, rows);
+  function setTag(next: ConsumeTagTab) {
+    patchQuery({ tag: next });
+  }
+
+  function onExport() {
+    downloadConsumeMonthPdf({
+      month,
+      rows: report.rows,
+      filename: `consume-${month}.pdf`,
+    });
   }
 
   const fieldClass =
-    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
-
-  const monthQuery = `?month=${month}`;
+    "h-9 rounded-lg border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
-    <PagePane className="gap-5">
+    <PagePane className="gap-5 print:border-0 print:p-0">
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
-        <PageHeader
-          title={t("pages.consumeMonthly.title")}
-          subtitle={t("pages.consumeMonthly.subtitle", { month })}
-          actions={
-            <>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-xl"
-                  aria-label={t("consume.prevMonth")}
-                  onClick={() => setMonth(shiftMonthKey(month, -1))}
-                >
-                  <IconChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="relative w-[11rem] shrink-0">
-                  <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-                  <Input
-                    type="month"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                    aria-label={t("consume.month")}
-                    className={cn(fieldClass, "h-9 w-[11rem] pl-8")}
-                  />
+        <div className="no-print">
+          <PageHeader
+            title={t("pages.consumeMonthly.title")}
+            subtitle={t("pages.consumeMonthly.subtitle", { month })}
+            center={<ConsumeTabs />}
+            actions={
+              <>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 rounded-lg"
+                    aria-label={t("consume.prevMonth")}
+                    onClick={() => setMonth(shiftMonthKey(month, -1))}
+                  >
+                    <IconChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="relative w-40 shrink-0">
+                    <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
+                    <Input
+                      type="month"
+                      value={month}
+                      onChange={(e) => setMonth(e.target.value)}
+                      aria-label={t("consume.month")}
+                      className={cn(fieldClass, "w-40 pl-8")}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 rounded-lg"
+                    aria-label={t("consume.nextMonth")}
+                    onClick={() => setMonth(shiftMonthKey(month, 1))}
+                  >
+                    <IconChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
                 <Button
-                  type="button"
                   variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-xl"
-                  aria-label={t("consume.nextMonth")}
-                  onClick={() => setMonth(shiftMonthKey(month, 1))}
+                  size="sm"
+                  className="h-9 rounded-lg"
+                  onClick={onExport}
+                  disabled={!report.rows.length}
                 >
-                  <IconChevronRight className="h-4 w-4" />
+                  <IconDownload className="h-3.5 w-3.5" />
+                  {t("consume.exportPdf")}
                 </Button>
-              </div>
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-xl"
-              >
-                <Link href={`/consume/monthly/summary${monthQuery}`}>
-                  {t("consume.wingSummary")}
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-xl"
-              >
-                <Link href={`/consume/monthly/ledger${monthQuery}`}>
-                  {t("consume.ledger")}
-                </Link>
-              </Button>
-              <Button
-                variant="cta"
-                size="sm"
-                className="h-9 rounded-xl"
-                onClick={onExport}
-                disabled={!report.rows.length}
-              >
-                <IconDownload className="h-3.5 w-3.5" />
-                {t("consume.exportCsv")}
-              </Button>
-            </>
-          }
-        />
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatChip
-            label={t("consume.statAmount")}
-            value={formatBdt(report.totalAmount)}
-            accent
-          />
-          <StatChip
-            label={t("consume.statDays")}
-            value={String(report.assignmentCount)}
-          />
-          <StatChip
-            label={t("consume.statMembers")}
-            value={String(report.rows.length)}
-          />
-          <StatChip
-            label={t("consume.statAllowance")}
-            value={String(allowanceDays)}
+              </>
+            }
           />
         </div>
 
-        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
-          <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-4 py-2.5 dark:border-neutral-800">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+        {/* Bill desk — tags + panel as one composition */}
+        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950 print:border-0 print:shadow-none">
+          <div className="border-b border-neutral-100 bg-neutral-50/70 px-4 py-3 no-print dark:border-neutral-800 dark:bg-neutral-900/50">
+            <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
               {t("consume.byTag")}
-            </span>
-            <span className="text-[11px] text-neutral-400">
-              {t("consume.openTag")}
-            </span>
-          </div>
-          {tagRows.length === 0 ? (
-            <EmptyState
-              title={t("consume.empty")}
-              description={t("consume.emptyHint")}
+            </p>
+            <ConsumeTagTabs
+              value={tag}
+              onChange={setTag}
+              stats={tagStats}
             />
-          ) : (
-            <>
-              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {tagRows.map((row) => (
-                  <li
-                    key={row.tag}
-                    className="flex items-stretch gap-1 px-2 py-1.5 sm:px-3"
-                  >
-                    <Link
-                      href={`/consume/monthly/tag/${row.tag}${monthQuery}`}
-                      className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-primary/[0.04] sm:grid-cols-[minmax(0,1fr)_5rem_5rem_7rem] dark:hover:bg-primary/10"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-mono text-sm font-semibold text-neutral-900 dark:text-white">
-                          {row.tag}
-                        </p>
-                        <p className="truncate text-xs text-neutral-500">
-                          {tagLabel(row.tag, locale)}
-                        </p>
-                      </div>
-                      <p className="text-right text-sm tabular-nums text-neutral-600 dark:text-neutral-300">
-                        {row.days}
-                        <span className="ml-1 text-[10px] uppercase text-neutral-400">
-                          {t("consume.days")}
-                        </span>
-                      </p>
-                      <p className="hidden text-right text-sm tabular-nums text-neutral-600 sm:block dark:text-neutral-300">
-                        {row.users}
-                        <span className="ml-1 text-[10px] uppercase text-neutral-400">
-                          {t("consume.users")}
-                        </span>
-                      </p>
-                      <p className="text-right text-sm font-semibold tabular-nums text-neutral-900 dark:text-white">
-                        {formatBdt(row.amount)}
-                      </p>
-                    </Link>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="my-auto h-9 shrink-0 rounded-xl px-2.5"
-                      aria-label={`${t("consume.exportTag")} ${row.tag}`}
-                      title={t("consume.exportTag")}
-                      onClick={() => onExportTag(row.tag)}
-                    >
-                      <IconDownload className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">
-                        {t("consume.exportCsv")}
-                      </span>
-                    </Button>
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="my-auto h-9 shrink-0 rounded-xl border-primary/30 bg-primary/[0.06] px-2.5 text-primary hover:bg-primary/10 hover:text-primary"
-                    >
-                      <Link
-                        href={`/consume/monthly/tag/${row.tag}${monthQuery}`}
-                        aria-label={t("consume.openTag")}
-                        title={t("consume.openTag")}
-                      >
-                        <IconEye className="h-4 w-4" />
-                        <span className="hidden sm:inline">
-                          {t("consume.openTag")}
-                        </span>
-                      </Link>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex items-center justify-between gap-3 border-t-2 border-neutral-200 bg-neutral-50/80 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900/80">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                  {t("consume.statAmount")}
-                </p>
-                <p className="text-base font-semibold tabular-nums text-primary">
-                  {formatBdt(report.totalAmount)}
-                </p>
-              </div>
-            </>
-          )}
+          </div>
+
+          <div className="p-4 sm:p-5 print:p-0">
+            {tag === "all" ? (
+              <AllConsumePanel
+                key={`${month}-all`}
+                month={month}
+                rows={report.rows}
+                totalAmount={report.totalAmount}
+                assignmentCount={report.assignmentCount}
+                allowanceDays={allowanceDays}
+              />
+            ) : (
+              <TagBillPanel key={`${month}-${tag}`} month={month} tag={tag} />
+            )}
+          </div>
         </section>
       </motion.div>
     </PagePane>
-  );
-}
-
-function StatChip({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border px-4 py-3",
-        accent
-          ? "border-primary/20 bg-gradient-to-br from-primary/[0.08] to-transparent"
-          : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
-      )}
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl",
-          accent ? "text-primary" : "text-neutral-900 dark:text-white",
-        )}
-      >
-        {value}
-      </p>
-    </div>
   );
 }

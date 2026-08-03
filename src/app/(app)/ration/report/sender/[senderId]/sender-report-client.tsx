@@ -21,6 +21,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { RationTabs } from "@/components/layout/ration-tabs";
 import { StaffPayoutPrint } from "@/components/ration/staff-payout-print";
 import { TransferSheetPrint } from "@/components/ration/transfer-sheet-print";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ import { useStore } from "@/hooks/use-store";
 import { RANKS } from "@/lib/constants";
 import {
   parseMonthInput,
-  previousMonthKey,
+  monthKey,
   shiftMonthKey,
 } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
@@ -72,7 +73,7 @@ export default function RationSenderReportClient() {
   const [printKind, setPrintKind] = useState<PrintKind>("staff");
 
   const rawMonth = searchParams.get("month");
-  const defaultMonth = previousMonthKey();
+  const defaultMonth = monthKey();
   const month =
     rawMonth && MONTH_RE.test(rawMonth)
       ? parseMonthInput(rawMonth)
@@ -280,6 +281,7 @@ export default function RationSenderReportClient() {
               month,
               bank: staffSheet.sender.bank_name,
             })}
+            center={<RationTabs />}
             actions={
               <div className="flex flex-wrap gap-2">
                 <Button

@@ -84,6 +84,32 @@ export function updateUser(id: string, input: UserInput): User | null {
   return updated;
 }
 
+/** Patch member bank fields only (ration desk). */
+export function updateUserBank(
+  id: string,
+  bank: Pick<
+    User,
+    "bank_name" | "account_name" | "account_number" | "routing" | "branch"
+  >,
+): User | null {
+  const existing = getUser(id);
+  if (!existing) return null;
+  const updated: User = {
+    ...existing,
+    bank_name: bank.bank_name.trim(),
+    account_name: bank.account_name.trim(),
+    account_number: bank.account_number.trim(),
+    routing: bank.routing.trim(),
+    branch: bank.branch.trim(),
+    updated_at: nowISO(),
+  };
+  setState((prev) => ({
+    ...prev,
+    users: prev.users.map((u) => (u.id === id ? updated : u)),
+  }));
+  return updated;
+}
+
 export type UserFilters = {
   q?: string;
   status?: UserStatus | "all";

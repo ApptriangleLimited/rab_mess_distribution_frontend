@@ -2,11 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconCheck, IconX } from "@tabler/icons-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -39,9 +34,18 @@ export { TAG_CELL };
 
 type DragStroke = {
   userId: string;
-  clear: boolean;
   startDay: number;
   endDay: number;
+};
+
+type RangeMenu = {
+  userId: string;
+  userName: string;
+  dates: string[];
+  anchorDay: number;
+  /** Single-cell ghost carry (accept) */
+  ghostTag?: DailyTag;
+  storedTag?: DailyTag;
 };
 
 export function RegisterBoard({
@@ -50,8 +54,8 @@ export function RegisterBoard({
   dayCount,
   assignments,
   todayISO,
-  paintTag,
-  onPaintTagChange,
+  paintTag: _paintTag,
+  onPaintTagChange: _onPaintTagChange,
   onTagChange,
   onPaintRange,
   priorByUser,
@@ -79,6 +83,9 @@ export function RegisterBoard({
   dayApproved: boolean;
   canApprove: boolean;
 }) {
+  void _paintTag;
+  void _onPaintTagChange;
+
   const t = useT();
   const { locale } = useI18n();
   const days = useMemo(
@@ -105,26 +112,103 @@ export function RegisterBoard({
 
   const [drag, setDrag] = useState<DragStroke | null>(null);
   const dragRef = useRef<DragStroke | null>(null);
+  const [rangeMenu, setRangeMenu] = useState<RangeMenu | null>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+  const closeRangeMenu = useCallback(() => {
+    setRangeMenu(null);
+    setDrag(null);
+    dragRef.current = null;
+  }, []);
+
+  function isPastDate(date: string) {
+    return date < todayISO;
+  }
+
+  function isPastDay(day: number) {
+    return isPastDate(dateInMonth(month, day));
+  }
+
+  const openRangeMenu = useCallback(
+    (stroke: DragStroke) => {
+      const user = users.find((u) => u.id === stroke.userId);
+      if (!user) {
+        setDrag(null);
+        return;
+      }
+      const lo = Math.min(stroke.startDay, stroke.endDay);
+      const hi = Math.max(stroke.startDay, stroke.endDay);
+      const dates: string[] = [];
+      for (let d = lo; d <= hi; d++) {
+        const date = dateInMonth(month, d);
+        if (date < todayISO) continue;
+        dates.push(date);
+      }
+      if (dates.length === 0) {
+        setDrag(null);
+        return;
+      }
+
+      const anchorDay = stroke.endDay;
+      const anchorDate = dateInMonth(month, anchorDay);
+      // Prefer last editable day in range for menu anchor
+      const menuDay =
+        anchorDate >= todayISO
+          ? anchorDay
+          : Number(dates[dates.length - 1].slice(8, 10));
+      const menuDate = dateInMonth(month, menuDay);
+      const storedTag = byUserDate.get(`${stroke.userId}|${menuDate}`);
+
+      let ghostTag: DailyTag | undefined;
+      if (!storedTag && dates.length === 1) {
+        let rolling = priorByUser.get(stroke.userId);
+        for (let d = 1; d < menuDay; d++) {
+          const s = byUserDate.get(`${stroke.userId}|${dateInMonth(month, d)}`);
+          if (s) rolling = s;
+        }
+        const key = `${stroke.userId}|${menuDate}`;
+        if (!suppressedSet.has(key) && rolling) ghostTag = rolling;
+      }
+
+      const el = document.querySelector(
+        `[data-reg-user="${stroke.userId}"][data-reg-day="${menuDay}"]`,
+      ) as HTMLElement | null;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const width = 224;
+        const left = Math.min(
+          Math.max(8, rect.left + rect.width / 2 - width / 2),
+          window.innerWidth - width - 8,
+        );
+        const top = Math.min(rect.bottom + 6, window.innerHeight - 280);
+        setMenuPos({ top, left });
+      }
+
+      setDrag({ ...stroke, endDay: menuDay });
+      setRangeMenu({
+        userId: stroke.userId,
+        userName: user.name,
+        dates,
+        anchorDay: menuDay,
+        ghostTag,
+        storedTag,
+      });
+    },
+    [byUserDate, month, priorByUser, suppressedSet, todayISO, users],
+  );
 
   const commitDrag = useCallback(() => {
     const stroke = dragRef.current;
     dragRef.current = null;
-    setDrag(null);
-    if (!stroke || !paintTag) return;
-    const lo = Math.min(stroke.startDay, stroke.endDay);
-    const hi = Math.max(stroke.startDay, stroke.endDay);
-    const dates: string[] = [];
-    for (let d = lo; d <= hi; d++) {
-      const date = dateInMonth(month, d);
-      if (date > todayISO) continue;
-      dates.push(date);
+    if (!stroke) {
+      setDrag(null);
+      return;
     }
-    if (dates.length === 0) return;
-    onPaintRange(stroke.userId, dates, stroke.clear ? "" : paintTag);
-  }, [month, onPaintRange, paintTag, todayISO]);
+    openRangeMenu(stroke);
+  }, [openRangeMenu]);
 
   useEffect(() => {
-    if (!paintTag) return;
+    if (rangeMenu) return;
 
     const onMove = (e: PointerEvent) => {
       const stroke = dragRef.current;
@@ -137,7 +221,7 @@ export function RegisterBoard({
       const userId = cell.dataset.regUser;
       const day = Number(cell.dataset.regDay);
       if (!userId || !day || userId !== stroke.userId) return;
-      if (dateInMonth(month, day) > todayISO) return;
+      if (dateInMonth(month, day) < todayISO) return;
       if (stroke.endDay === day) return;
       const next = { ...stroke, endDay: day };
       dragRef.current = next;
@@ -156,17 +240,21 @@ export function RegisterBoard({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [paintTag, commitDrag, month, todayISO]);
+  }, [commitDrag, rangeMenu, month, todayISO]);
 
-  function startPaint(userId: string, day: number, current?: DailyTag) {
-    if (!paintTag) return;
-    if (dateInMonth(month, day) > todayISO) return;
-    const stroke: DragStroke = {
-      userId,
-      clear: current === paintTag,
-      startDay: day,
-      endDay: day,
-    };
+  useEffect(() => {
+    if (!rangeMenu) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeRangeMenu();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [rangeMenu, closeRangeMenu]);
+
+  function startDrag(userId: string, day: number) {
+    if (rangeMenu) return;
+    if (isPastDay(day)) return;
+    const stroke: DragStroke = { userId, startDay: day, endDay: day };
     dragRef.current = stroke;
     setDrag(stroke);
   }
@@ -178,41 +266,45 @@ export function RegisterBoard({
     return day >= lo && day <= hi;
   }
 
+  function applyRangeTag(tag: DailyTag | "") {
+    if (!rangeMenu) return;
+    if (rangeMenu.dates.length === 1) {
+      onTagChange(rangeMenu.userId, rangeMenu.dates[0], tag);
+    } else {
+      onPaintRange(rangeMenu.userId, rangeMenu.dates, tag);
+    }
+    closeRangeMenu();
+  }
+
+  const rangeLabel = rangeMenu
+    ? rangeMenu.dates.length === 1
+      ? rangeMenu.dates[0]
+      : `${rangeMenu.dates[0]} → ${rangeMenu.dates[rangeMenu.dates.length - 1]}`
+    : "";
+
   return (
     <div className="relative">
-      {/* File-folder tab — protrudes top-right */}
-      <div className="relative z-20 flex justify-end pr-0">
+      {/* File-folder paint tab — kept for restore; unused (drag opens tag dropdown) */}
+      <div className="relative z-20 hidden justify-end pr-0" aria-hidden>
         <div
           className={cn(
             "relative flex items-center gap-2 border border-b-0 px-2.5 py-1.5 shadow-sm",
             "rounded-t-md border-neutral-300 bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-800",
-            "before:absolute before:-left-3 before:bottom-0 before:h-full before:w-3",
-            "before:bg-neutral-100 dark:before:bg-neutral-800",
-            "before:[clip-path:polygon(100%_0,100%_100%,0_100%)]",
-            "before:border-l before:border-t before:border-neutral-300 dark:before:border-neutral-600",
           )}
         >
-          <span className="hidden text-[9px] font-semibold uppercase tracking-[0.14em] text-neutral-500 sm:inline dark:text-neutral-400">
-            {t("daily.paintStamp")}
-          </span>
-          <FolderPaintSelect
-            paintTag={paintTag}
-            onPaintTagChange={onPaintTagChange}
-          />
+          <PaintTagSelect paintTag="" onPaintTagChange={() => {}} />
         </div>
       </div>
 
       <div
         className={cn(
-          "relative z-10 overflow-hidden rounded-xl rounded-tr-none border shadow-sm",
+          "relative z-10 overflow-hidden rounded-xl border shadow-sm",
           "border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950",
         )}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
           <p className="min-w-0 flex-1 truncate text-xs text-neutral-500 dark:text-neutral-400">
-            {paintTag
-              ? t("daily.paintOnHint", { tag: paintTag })
-              : t("daily.carryHint")}
+            {t("daily.dragFillHint")}
           </p>
           {canApprove ? (
             <Button
@@ -233,7 +325,7 @@ export function RegisterBoard({
         <div
           className={cn(
             "max-h-[min(72vh,760px)] overflow-auto bg-white dark:bg-neutral-950",
-            paintTag && drag && "select-none",
+            drag && "select-none",
           )}
         >
           <table className="w-max min-w-full border-collapse text-left text-sm">
@@ -248,12 +340,12 @@ export function RegisterBoard({
                 <th className="sticky left-[128px] z-40 w-[96px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
                   {t("cc.fields.rank")}
                 </th>
-                <th className="sticky left-[224px] z-40 min-w-[140px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
+                <th className="sticky left-[224px] z-40 w-[173px] min-w-[173px] max-w-[173px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
                   {t("cc.fields.name")}
                 </th>
                 {days.map((d) => {
                   const isToday = todayDay === d;
-                  const isFuture = dateInMonth(month, d) > todayISO;
+                  const past = isPastDay(d);
                   return (
                     <th
                       key={d}
@@ -261,7 +353,7 @@ export function RegisterBoard({
                         "w-9 min-w-9 border-b border-r border-neutral-300 px-0 py-2 text-center dark:border-neutral-700",
                         isToday &&
                           "bg-primary/15 text-primary dark:bg-primary/25",
-                        isFuture &&
+                        past &&
                           "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/50 dark:text-neutral-600",
                       )}
                     >
@@ -284,15 +376,9 @@ export function RegisterBoard({
                   day: number;
                   stored?: DailyTag;
                   ghost?: DailyTag;
-                  future: boolean;
                 }[] = [];
                 for (const d of days) {
                   const date = dateInMonth(month, d);
-                  const future = date > todayISO;
-                  if (future) {
-                    rowMeta.push({ date, day: d, future: true });
-                    continue;
-                  }
                   const key = `${user.id}|${date}`;
                   const stored = byUserDate.get(key);
                   if (stored) rolling = stored;
@@ -302,7 +388,6 @@ export function RegisterBoard({
                     day: d,
                     stored,
                     ghost: stored || suppressed ? undefined : rolling,
-                    future: false,
                   });
                 }
 
@@ -341,74 +426,40 @@ export function RegisterBoard({
                     </td>
                     <td
                       className={cn(
-                        "sticky left-[224px] z-20 max-w-[160px] truncate border-b border-r border-neutral-200 px-2 py-0 text-xs font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
+                        "sticky left-[224px] z-20 w-[173px] min-w-[173px] max-w-[173px] truncate border-b border-r border-neutral-200 px-2 py-0 text-xs font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
                         stickyBg,
                       )}
                     >
                       {user.name}
                     </td>
                     {rowMeta.map((cell, cellIdx) => {
-                      const { date, day: d, stored, ghost, future } = cell;
-                      if (future) {
-                        return (
-                          <td
-                            key={date}
-                            className="h-9 w-9 min-w-9 border-b border-r border-neutral-200 bg-neutral-50/80 p-0 dark:border-neutral-800 dark:bg-neutral-900/40"
-                            aria-hidden
-                          />
-                        );
-                      }
-
+                      const { date, day: d, stored, ghost } = cell;
                       const preview = inDragPreview(user.id, d);
                       let tag = stored;
                       let isGhost = false;
-                      if (preview && paintTag) {
-                        tag = drag?.clear ? undefined : paintTag;
-                        isGhost = false;
-                      } else if (!stored && ghost) {
+                      if (!stored && ghost) {
                         tag = ghost;
                         isGhost = true;
                       }
 
                       const prevMeta = rowMeta[cellIdx - 1];
                       const nextMeta = rowMeta[cellIdx + 1];
-                      const displayPrev = (() => {
-                        if (prevMeta?.future) return undefined;
-                        if (
-                          preview &&
-                          prevMeta &&
-                          inDragPreview(user.id, prevMeta.day) &&
-                          paintTag
-                        ) {
-                          return drag?.clear ? undefined : paintTag;
-                        }
-                        return prevMeta?.stored ?? prevMeta?.ghost;
-                      })();
-                      const displayNext = (() => {
-                        if (nextMeta?.future) return undefined;
-                        if (
-                          preview &&
-                          nextMeta &&
-                          inDragPreview(user.id, nextMeta.day) &&
-                          paintTag
-                        ) {
-                          return drag?.clear ? undefined : paintTag;
-                        }
-                        return nextMeta?.stored ?? nextMeta?.ghost;
-                      })();
+                      const displayPrev =
+                        prevMeta?.stored ?? prevMeta?.ghost;
+                      const displayNext =
+                        nextMeta?.stored ?? nextMeta?.ghost;
                       const contL = Boolean(
                         tag &&
-                        !isGhost &&
-                        displayPrev === tag &&
-                        prevMeta?.stored,
+                          !isGhost &&
+                          displayPrev === tag &&
+                          prevMeta?.stored,
                       );
                       const contR = Boolean(
                         tag &&
-                        !isGhost &&
-                        displayNext === tag &&
-                        nextMeta?.stored,
+                          !isGhost &&
+                          displayNext === tag &&
+                          nextMeta?.stored,
                       );
-                      const isToday = todayDay === d;
 
                       return (
                         <RegisterCell
@@ -419,17 +470,13 @@ export function RegisterBoard({
                           ghost={isGhost}
                           date={date}
                           userName={user.name}
-                          isToday={isToday}
+                          isToday={todayDay === d}
+                          locked={date < todayISO}
                           contL={contL}
                           contR={contR}
-                          paintTag={paintTag}
-                          preview={preview}
-                          clearing={Boolean(preview && drag?.clear)}
+                          preview={preview && date >= todayISO}
                           locale={locale}
-                          onTagChange={(nextTag) =>
-                            onTagChange(user.id, date, nextTag)
-                          }
-                          onPaintStart={() => startPaint(user.id, d, stored)}
+                          onDragStart={() => startDrag(user.id, d)}
                         />
                       );
                     })}
@@ -440,16 +487,49 @@ export function RegisterBoard({
           </table>
         </div>
       </div>
+
+      {rangeMenu ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-[180] cursor-default bg-transparent"
+            aria-label={t("common.cancel")}
+            onClick={closeRangeMenu}
+          />
+          <div
+            className="fixed z-[190] w-56 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl dark:border-neutral-700 dark:bg-neutral-950"
+            style={{ top: menuPos.top, left: menuPos.left }}
+            role="dialog"
+            aria-label={t("daily.tagFor")}
+          >
+            <TagPickerPanel
+              label={`${rangeMenu.userName} · ${rangeLabel}`}
+              ghost={Boolean(rangeMenu.ghostTag)}
+              tag={rangeMenu.storedTag ?? rangeMenu.ghostTag}
+              locale={locale}
+              onAcceptCarry={
+                rangeMenu.ghostTag && rangeMenu.dates.length === 1
+                  ? () => applyRangeTag(rangeMenu.ghostTag!)
+                  : undefined
+              }
+              onPick={(tag) => applyRangeTag(tag)}
+              onClear={() => applyRangeTag("")}
+            />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
 
-function FolderPaintSelect({
+export function PaintTagSelect({
   paintTag,
   onPaintTagChange,
+  triggerClassName,
 }: {
   paintTag: DailyTag | "";
   onPaintTagChange: (tag: DailyTag | "") => void;
+  triggerClassName?: string;
 }) {
   const t = useT();
   const { locale } = useI18n();
@@ -468,6 +548,7 @@ function FolderPaintSelect({
           "h-9 w-[5.5rem] rounded-md border-neutral-300 bg-white px-2 font-mono text-sm font-bold shadow-none",
           "text-neutral-900 dark:border-neutral-600 dark:bg-neutral-950 dark:text-neutral-100",
           "focus:ring-1 focus:ring-primary",
+          triggerClassName,
         )}
       >
         <SelectValue placeholder={t("daily.paintOff")}>
@@ -486,6 +567,72 @@ function FolderPaintSelect({
   );
 }
 
+function TagPickerPanel({
+  label,
+  ghost,
+  tag,
+  locale,
+  onAcceptCarry,
+  onPick,
+  onClear,
+}: {
+  label: string;
+  ghost?: boolean;
+  tag?: DailyTag;
+  locale: Locale;
+  onAcceptCarry?: () => void;
+  onPick: (tag: DailyTag) => void;
+  onClear: () => void;
+}) {
+  const t = useT();
+
+  return (
+    <>
+      <p className="mb-2 truncate px-1 text-[10px] font-medium text-neutral-500">
+        {label}
+        {ghost && tag ? ` · ${t("daily.carried")}` : ""}
+      </p>
+      {onAcceptCarry && ghost && tag ? (
+        <button
+          type="button"
+          onClick={onAcceptCarry}
+          className="mb-2 flex w-full items-center justify-center gap-1 rounded-md bg-primary px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-primary-dark"
+        >
+          <IconCheck className="h-3 w-3" />
+          {t("daily.acceptCarry", { tag })}
+        </button>
+      ) : null}
+      <div className="grid grid-cols-3 gap-1">
+        {DAILY_TAGS.map((item) => (
+          <button
+            key={item.code}
+            type="button"
+            onClick={() => onPick(item.code)}
+            className={cn(
+              "rounded-md px-1.5 py-1.5 font-mono text-[11px] font-bold transition hover:opacity-90",
+              TAG_CELL[item.code],
+              !ghost &&
+                tag === item.code &&
+                "ring-2 ring-primary ring-offset-1",
+            )}
+            title={tagLabel(item.code, locale)}
+          >
+            {item.code}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-neutral-200 px-2 py-1.5 text-[11px] text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      >
+        <IconX className="h-3 w-3" />
+        {t("daily.noTag")}
+      </button>
+    </>
+  );
+}
+
 function RegisterCell({
   day,
   userId,
@@ -494,14 +641,12 @@ function RegisterCell({
   date,
   userName,
   isToday,
+  locked,
   contL,
   contR,
-  paintTag,
   preview,
-  clearing,
   locale,
-  onTagChange,
-  onPaintStart,
+  onDragStart,
 }: {
   day: number;
   userId: string;
@@ -510,21 +655,20 @@ function RegisterCell({
   date: string;
   userName: string;
   isToday: boolean;
+  locked: boolean;
   contL: boolean;
   contR: boolean;
-  paintTag: DailyTag | "";
   preview: boolean;
-  clearing: boolean;
   locale: Locale;
-  onTagChange: (tag: DailyTag | "") => void;
-  onPaintStart: () => void;
+  onDragStart: () => void;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
 
   const cellClass = cn(
-    "flex h-full w-full items-center justify-center font-mono text-[10px] font-bold leading-none transition hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-    paintTag && "cursor-crosshair touch-none",
+    "flex h-full w-full items-center justify-center font-mono text-[10px] font-bold leading-none touch-none transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+    locked
+      ? "cursor-not-allowed opacity-60"
+      : "cursor-pointer hover:ring-1 hover:ring-primary/40",
     tag
       ? cn(
           TAG_CELL[tag],
@@ -533,100 +677,45 @@ function RegisterCell({
           ghost &&
             "opacity-45 ring-1 ring-inset ring-dashed ring-neutral-400/70 dark:ring-neutral-500/70",
         )
-      : "text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-800",
-    preview && !clearing && "ring-1 ring-inset ring-primary/50",
-    preview && clearing && "opacity-40 ring-1 ring-inset ring-rose-400/60",
+      : !locked &&
+          "text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-800",
+    locked && !tag && "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600",
+    preview &&
+      "bg-primary/25 ring-2 ring-inset ring-primary shadow-[inset_0_0_0_1px_rgba(6,121,88,0.55)] dark:bg-primary/40 dark:ring-primary-light",
   );
 
-  const title = tag
-    ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
-    : `${userName} · ${date}`;
+  const title = locked
+    ? `${userName} · ${date} · ${t("daily.pastLocked")}`
+    : tag
+      ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
+      : `${userName} · ${date}`;
 
   return (
     <td
       className={cn(
         "h-9 w-9 min-w-9 border-b border-r border-neutral-200 p-0 dark:border-neutral-800",
-        isToday && "bg-primary/[0.04]",
+        isToday && !preview && "bg-primary/[0.04]",
+        locked && "bg-neutral-50/80 dark:bg-neutral-900/40",
+        preview && "bg-primary/20 dark:bg-primary/35",
       )}
-      data-reg-user={userId}
-      data-reg-day={day}
+      data-reg-user={locked ? undefined : userId}
+      data-reg-day={locked ? undefined : day}
     >
-      {paintTag ? (
-        <button
-          type="button"
-          title={title}
-          className={cellClass}
-          data-reg-user={userId}
-          data-reg-day={day}
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            onPaintStart();
-          }}
-        >
-          {tag ?? "·"}
-        </button>
-      ) : (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" title={title} className={cellClass}>
-              {tag ?? ""}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-2" align="center" sideOffset={6}>
-            <p className="mb-2 truncate px-1 text-[10px] font-medium text-neutral-500">
-              {userName} · {date}
-              {ghost && tag ? ` · ${t("daily.carried")}` : ""}
-            </p>
-            {ghost && tag ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onTagChange(tag);
-                  setOpen(false);
-                }}
-                className="mb-2 flex w-full items-center justify-center gap-1 rounded-md bg-primary px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-primary-dark"
-              >
-                <IconCheck className="h-3 w-3" />
-                {t("daily.acceptCarry", { tag })}
-              </button>
-            ) : null}
-            <div className="grid grid-cols-3 gap-1">
-              {DAILY_TAGS.map((item) => (
-                <button
-                  key={item.code}
-                  type="button"
-                  onClick={() => {
-                    onTagChange(item.code);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "rounded-md px-1.5 py-1.5 font-mono text-[11px] font-bold transition hover:opacity-90",
-                    TAG_CELL[item.code],
-                    !ghost &&
-                      tag === item.code &&
-                      "ring-2 ring-primary ring-offset-1",
-                  )}
-                  title={tagLabel(item.code, locale)}
-                >
-                  {item.code}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                onTagChange("");
-                setOpen(false);
-              }}
-              className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-neutral-200 px-2 py-1.5 text-[11px] text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-            >
-              <IconX className="h-3 w-3" />
-              {t("daily.noTag")}
-            </button>
-          </PopoverContent>
-        </Popover>
-      )}
+      <button
+        type="button"
+        title={title}
+        disabled={locked}
+        className={cellClass}
+        data-reg-user={locked ? undefined : userId}
+        data-reg-day={locked ? undefined : day}
+        onPointerDown={(e) => {
+          if (locked || e.button !== 0) return;
+          e.preventDefault();
+          onDragStart();
+        }}
+      >
+        {tag ?? ""}
+      </button>
     </td>
   );
 }

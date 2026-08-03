@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { IconArrowLeft } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { Button } from "@/components/ui/button";
+import { DailyTabs } from "@/components/layout/daily-tabs";
 import {
   UserForm,
   type UserFormSubmitPayload,
@@ -42,7 +40,7 @@ export default function DailyNewUserPage() {
 
     const { today_tag, ...input } = values;
     const user = createUser(
-      { ...input, status: input.status || "1" },
+      { ...input, status: "1" },
       { approval_status: "approved" },
     );
     setTag(user.id, todayISO(), today_tag);
@@ -60,19 +58,7 @@ export default function DailyNewUserPage() {
         <PageHeader
           title={t("pages.dailyNewUser.title")}
           subtitle={t("pages.dailyNewUser.subtitle")}
-          leading={
-            <Button
-              asChild
-              variant="outline"
-              size="icon"
-              className="rounded-xl"
-              aria-label={t("common.back")}
-            >
-              <Link href="/daily/roster">
-                <IconArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-          }
+          center={<DailyTabs />}
         />
         <UserForm
           mode="create"

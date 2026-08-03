@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  IconArrowLeft,
   IconCalendar,
   IconChevronLeft,
   IconChevronRight,
@@ -16,11 +14,12 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { WingSummaryPrint } from "@/components/consume/wing-summary-print";
+import { ConsumeTabs } from "@/components/layout/consume-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
 import { previousMonthKey, shiftMonthKey } from "@/lib/date";
-import { downloadCsv } from "@/lib/csv";
+import { downloadWingSummaryPdf } from "@/lib/download-consume-pdfs";
 import { buildWingSummary } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -60,33 +59,13 @@ export default function ConsumeSummaryClient() {
   }
 
   function onExport() {
-    const header = [
-      t("consume.colWing"),
-      t("consume.colManpower"),
-      ...summary.tagCodes,
-      t("consume.colTotalDays"),
-      t("consume.colRemarks"),
-    ];
-    const rows = [
-      header,
-      ...summary.rows.map((r) => [
-        r.wing,
-        String(r.manpower),
-        ...summary.tagCodes.map((code) => String(r.tagDays[code] ?? 0)),
-        String(r.totalDays),
-        "",
-      ]),
-      [
-        t("consume.billTotal"),
-        String(summary.totals.manpower),
-        ...summary.tagCodes.map((code) =>
-          String(summary.totals.tagDays[code] ?? 0),
-        ),
-        String(summary.totals.totalDays),
-        "",
-      ],
-    ];
-    downloadCsv(`consume-wing-summary-${month}.csv`, rows);
+    downloadWingSummaryPdf({
+      month,
+      tagCodes: summary.tagCodes,
+      rows: summary.rows,
+      totals: summary.totals,
+      filename: `consume-wing-summary-${month}.pdf`,
+    });
   }
 
   const fieldClass =
@@ -107,20 +86,10 @@ export default function ConsumeSummaryClient() {
         className="flex flex-col gap-5 no-print"
       >
         <div>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="mb-2 -ml-2 rounded-xl text-neutral-500"
-          >
-            <Link href={`/consume/monthly?month=${month}`}>
-              <IconArrowLeft className="h-4 w-4" />
-              {t("consume.backToTags")}
-            </Link>
-          </Button>
           <PageHeader
             title={t("pages.consumeSummary.title")}
             subtitle={t("pages.consumeSummary.subtitle", { month })}
+            center={<ConsumeTabs />}
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
@@ -162,7 +131,7 @@ export default function ConsumeSummaryClient() {
                   disabled={!summary.rows.length}
                 >
                   <IconDownload className="h-3.5 w-3.5" />
-                  {t("consume.exportCsv")}
+                  {t("consume.exportPdf")}
                 </Button>
                 <Button
                   variant="cta"

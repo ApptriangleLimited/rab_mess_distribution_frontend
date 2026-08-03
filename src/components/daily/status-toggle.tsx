@@ -1,13 +1,12 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { DailyTag, User, UserStatus } from "@/lib/types";
+import type { User, UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
-import { tagLabel } from "@/i18n";
-import { useI18n } from "@/i18n/provider";
 import { cn, initials } from "@/lib/utils";
-import { IconPlayerPlay, IconPlayerPause, IconUserOff } from "@tabler/icons-react";
+import { IconPlayerPlay, IconPlayerPause } from "@tabler/icons-react";
 
 export function StatusToggle({
   user,
@@ -38,23 +37,36 @@ export function StatusToggle({
 
 export function RosterRow({
   user,
-  todayTag,
-  onToggle,
-  onEnd,
+  onOpen,
+  actions,
 }: {
   user: User;
-  todayTag?: DailyTag | null;
-  onToggle: (next: UserStatus) => void;
-  onEnd: () => void;
+  onOpen?: () => void;
+  actions?: ReactNode;
 }) {
   const t = useT();
-  const { locale } = useI18n();
   const active = user.status === "1";
+  const clickable = typeof onOpen === "function";
 
   return (
     <tr
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
       className={cn(
-        "border-t border-neutral-100 transition hover:bg-primary/[0.03] dark:border-neutral-800 dark:hover:bg-primary/[0.06]",
+        "border-t border-neutral-100 transition dark:border-neutral-800",
+        clickable &&
+          "cursor-pointer hover:bg-primary/[0.04] dark:hover:bg-primary/[0.08]",
         !active && "opacity-70",
       )}
     >
@@ -85,18 +97,6 @@ export function RosterRow({
         {user.wing || "—"}
       </td>
       <td className="px-4 py-3">
-        {todayTag ? (
-          <Badge className="rounded-md bg-nav-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-nav-accent">
-            {todayTag}
-            <span className="ml-1 font-sans font-normal opacity-80">
-              {tagLabel(todayTag, locale)}
-            </span>
-          </Badge>
-        ) : (
-          <span className="text-xs text-neutral-400">{t("daily.untagged")}</span>
-        )}
-      </td>
-      <td className="px-4 py-3">
         <Badge
           className={cn(
             "rounded-md px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide",
@@ -108,14 +108,14 @@ export function RosterRow({
           {active ? t("cc.statusActive") : t("cc.statusInactive")}
         </Badge>
       </td>
-      <td className="px-4 py-3">
-        <div className="flex flex-wrap gap-2">
-          <StatusToggle user={user} onToggle={onToggle} />
-          <Button size="sm" variant="danger" className="rounded-lg" onClick={onEnd}>
-            <IconUserOff className="h-3.5 w-3.5" />
-            {t("daily.endEntry")}
-          </Button>
-        </div>
+      <td
+        className="px-4 py-3 text-right"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        {actions ?? (
+          <span className="text-xs text-neutral-400">—</span>
+        )}
       </td>
     </tr>
   );

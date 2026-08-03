@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function DailyIndex() {
-  redirect("/daily/approvals");
+  redirect("/daily/tags");
 }

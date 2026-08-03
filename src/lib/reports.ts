@@ -485,18 +485,49 @@ function missingBank(user: User) {
   return !user.account_number?.trim() || !user.routing?.trim();
 }
 
-/** Staff payout rows (PDF p2 shape), rolled per member. Optional sender filter. */
+/** Staff payout rows (PDF p2 shape), rolled per member. Optional sender / tag filter. */
 export function buildRationStaffLines(
   month: string,
   senderId?: string,
+  tag?: DailyTag,
 ): RationStaffSheet[] {
-  const report = buildRationReportClean(month);
-  const groups = senderId
-    ? report.groups.filter((g) => g.sender.id === senderId)
-    : report.groups;
+  // Tag + bank letter: count days for tag even when rate is 0 / tag not on mapped_tags.
+  if (tag && senderId) {
+    const { users, senders, rates } = getState();
+    const sender = senders.find((s) => s.id === senderId);
+    if (!sender) return [];
+    const rate =
+      rates.find((r) => r.tag === tag)?.amount_per_day ?? 0;
+    const daysMap = new Map<string, number>();
+    for (const a of assignmentsInMonth(month)) {
+      if (a.tag !== tag) continue;
+      daysMap.set(a.user_id, (daysMap.get(a.user_id) ?? 0) + 1);
+    }
+    const rolled = [...daysMap.entries()]
+      .map(([userId, days]) => {
+        const user = users.find((u) => u.id === userId);
+        if (!user) return null;
+        return {
+          user,
+          days,
+          amount: days * rate,
+          tags: [tag] as DailyTag[],
+        };
+      })
+      .filter(
+        (
+          row,
+        ): row is {
+          user: User;
+          days: number;
+          amount: number;
+          tags: DailyTag[];
+        } => Boolean(row),
+      )
+      .sort((a, b) => sortUsersForBill(a.user, b.user));
 
-  return groups.map((group) => {
-    const rolled = rollLinesPerUser(group.lines);
+    if (!rolled.length) return [];
+
     const lines: RationStaffLine[] = rolled.map((row, i) => ({
       ser: i + 1,
       user: row.user,
@@ -506,13 +537,45 @@ export function buildRationStaffLines(
       missingBank: missingBank(row.user),
       remarks: "",
     }));
-    return {
-      month,
-      sender: group.sender,
-      lines,
-      total: lines.reduce((s, l) => s + l.amount, 0),
-    };
-  });
+
+    return [
+      {
+        month,
+        sender,
+        lines,
+        total: lines.reduce((s, l) => s + l.amount, 0),
+      },
+    ];
+  }
+
+  const report = buildRationReportClean(month);
+  const groups = senderId
+    ? report.groups.filter((g) => g.sender.id === senderId)
+    : report.groups;
+
+  return groups
+    .map((group) => {
+      const scoped = tag
+        ? group.lines.filter((l) => l.tag === tag)
+        : group.lines;
+      const rolled = rollLinesPerUser(scoped);
+      const lines: RationStaffLine[] = rolled.map((row, i) => ({
+        ser: i + 1,
+        user: row.user,
+        amount: row.amount,
+        tags: row.tags,
+        days: row.days,
+        missingBank: missingBank(row.user),
+        remarks: "",
+      }));
+      return {
+        month,
+        sender: group.sender,
+        lines,
+        total: lines.reduce((s, l) => s + l.amount, 0),
+      };
+    })
+    .filter((sheet) => sheet.lines.length > 0);
 }
 
 /** 14-col bank transfer rows (PDF p1 shape). Optional sender filter. */
@@ -555,6 +618,48 @@ export function buildRationTransferLines(
       reportDate,
     };
   });
+}
+
+/** Single-member FR transfer letter (14-col) for selected bank + member. */
+export function buildFrMemberTransferSheet(
+  month: string,
+  senderId: string,
+  userId: string,
+  reportDate = todayISO(),
+): RationTransferSheet | null {
+  const sheets = buildRationStaffLines(month, senderId, "FR");
+  const sheet = sheets[0];
+  if (!sheet) return null;
+  const row = sheet.lines.find((l) => l.user.id === userId);
+  if (!row) return null;
+
+  const compactDate = reportDate.replace(/-/g, "");
+  const line: RationTransferLine = {
+    ser: 1,
+    date: reportDate,
+    refNo: `${compactDate}${String(1).padStart(6, "0")}`,
+    senderAccountNo: sheet.sender.account_number || "0",
+    receiverRouting: row.user.routing?.trim() || "0",
+    senderRouting: sheet.sender.routing || "0",
+    type: RATION_REPORT_META.transferType,
+    customerAccountName: row.user.account_name?.trim() || row.user.name,
+    customerAccountNo: row.user.account_number?.trim() || "0",
+    amount: row.amount,
+    institute: RATION_REPORT_META.institute,
+    entryDescription: RATION_REPORT_META.entryDescription,
+    paymentInfo: RATION_REPORT_META.paymentInfo,
+    currency: RATION_REPORT_META.currency,
+    user: row.user,
+    missingBank: row.missingBank,
+  };
+
+  return {
+    month,
+    sender: sheet.sender,
+    lines: [line],
+    total: line.amount,
+    reportDate,
+  };
 }
 
 export function formatBdt(amount: number) {

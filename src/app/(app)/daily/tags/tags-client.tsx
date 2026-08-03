@@ -7,6 +7,7 @@ import { IconCalendar, IconEye, IconEyeOff } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RegisterBoard } from "@/components/daily/register-board";
+import { RegisterBoard, PaintTagSelect } from "@/components/daily/register-board";
 import { useStore } from "@/hooks/use-store";
 import { RANKS, WINGS } from "@/lib/constants";
 import {
@@ -170,16 +171,13 @@ export default function TagsPageClient() {
         <PageHeader
           title={t("pages.dailyTags.title")}
           subtitle={t("pages.dailyTags.subtitle", { month })}
+          center={<DailyTabs />}
           actions={
             <div className="flex flex-wrap items-center gap-2.5">
               <MiniStat
-                label={t("daily.rosterStatShowing")}
+                label={t("daily.rosterStatAll")}
                 value={String(users.length)}
                 accent
-              />
-              <MiniStat
-                label={t("daily.taggedCells")}
-                value={String(taggedCells)}
               />
               <MiniStat
                 label={t("daily.registerCapacity")}
@@ -188,7 +186,7 @@ export default function TagsPageClient() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-11 rounded-xl px-3.5"
+                className="h-auto rounded-lg px-2.5 py-1.5"
                 onClick={() => setShowInactive((v) => !v)}
                 aria-pressed={showInactive}
               >
@@ -207,8 +205,8 @@ export default function TagsPageClient() {
           }
         />
 
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-          <div className="w-[12rem] shrink-0 space-y-1.5 sm:w-[50rem]">
+        <div className="flex w-full flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
+          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96 space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("common.search")}
             </p>
@@ -216,10 +214,10 @@ export default function TagsPageClient() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={t("cc.searchPlaceholder")}
-              className={fieldClass}
+              className={cn(fieldClass, "w-full")}
             />
           </div>
-          <div className="w-auto space-y-1.5">
+          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("daily.month")}
             </p>
@@ -229,16 +227,16 @@ export default function TagsPageClient() {
                 type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
-                className={cn(fieldClass, "pl-9")}
+                className={cn(fieldClass, "w-full pl-9")}
               />
             </div>
           </div>
-          <div className="w-[14rem] space-y-1.5">
+          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("cc.filterRank")}
             </p>
             <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={fieldClass}>
+              <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
               </SelectTrigger>
               <SelectContent>
@@ -251,12 +249,12 @@ export default function TagsPageClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[14rem] space-y-1.5">
+          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("cc.filterWing")}
             </p>
             <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={fieldClass}>
+              <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectWing")} />
               </SelectTrigger>
               <SelectContent>
@@ -268,6 +266,16 @@ export default function TagsPageClient() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="hidden w-[10rem] space-y-1.5" aria-hidden>
+            <p className="text-[11px] font-medium text-neutral-400">
+              {t("daily.paintStamp")}
+            </p>
+            <PaintTagSelect
+              paintTag={paintTag}
+              onPaintTagChange={setPaintTag}
+              triggerClassName={cn(fieldClass, "w-full font-mono font-bold")}
+            />
           </div>
         </div>
 
@@ -310,23 +318,23 @@ function MiniStat({
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-2",
+        "inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5",
         accent
-          ? "border-primary/20 bg-primary/[0.06]"
-          : "border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900",
+          ? "border-primary/20 bg-primary/[0.08]"
+          : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
       )}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
         {label}
-      </p>
-      <p
+      </span>
+      <span
         className={cn(
-          "text-lg font-semibold leading-tight tabular-nums",
+          "text-sm font-semibold tabular-nums",
           accent ? "text-primary" : "text-neutral-900 dark:text-white",
         )}
       >
         {value}
-      </p>
+      </span>
     </div>
   );
 }

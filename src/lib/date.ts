@@ -24,6 +24,37 @@ export function monthKey(date = new Date()) {
   return `${y}-${m}`;
 }
 
+/** `YYYY-MM` → `July 2026` (en-US long month). */
+export function formatMonthLong(month: string, locale = "en-US") {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return month;
+  return new Date(y, m - 1, 1).toLocaleString(locale, {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** `2026-06` → `Jun-2026` */
+export function formatMonthBill(month: string) {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return month;
+  const short = new Date(y, m - 1, 1).toLocaleString("en-US", {
+    month: "short",
+  });
+  return `${short}-${y}`;
+}
+
+/** `2026-07-15` → `15 July 2026` */
+export function formatDateLong(iso: string, locale = "en-GB") {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(locale, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 /** Calendar month before `date`, as `YYYY-MM`. */
 export function previousMonthKey(date = new Date()) {
   const d = new Date(date);

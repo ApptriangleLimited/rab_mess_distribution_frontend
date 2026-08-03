@@ -1,14 +1,11 @@
 import type { Role } from "@/lib/types";
 import type { MessageKey } from "@/i18n";
 import {
-  IconUsers,
-  IconChecklist,
   IconUserCheck,
   IconTags,
   IconSoup,
   IconChartBar,
   IconCashBanknote,
-  IconBuildingBank,
   IconFileReport,
   IconSettings,
   type Icon,
@@ -22,27 +19,19 @@ export type NavItem = {
 };
 
 export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
-  cc: [
-    { href: "/cc/users", labelKey: "nav.users", icon: IconUsers, chip: "blue" },
-  ],
+  cc: [],
   daily: [
     {
-      href: "/daily/approvals",
-      labelKey: "nav.approvals",
-      icon: IconChecklist,
-      chip: "orange",
+      href: "/daily/tags",
+      labelKey: "nav.dailyCockpit",
+      icon: IconTags,
+      chip: "teal",
     },
     {
       href: "/daily/roster",
       labelKey: "nav.roster",
       icon: IconUserCheck,
       chip: "indigo",
-    },
-    {
-      href: "/daily/tags",
-      labelKey: "nav.dailyTags",
-      icon: IconTags,
-      chip: "teal",
     },
   ],
   mess: [
@@ -55,6 +44,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   consume: [
     {
+      href: "/consume/monthly/ledger",
+      labelKey: "nav.consumeLedger",
+      icon: IconTags,
+      chip: "teal",
+    },
+    {
       href: "/consume/monthly",
       labelKey: "nav.monthlyConsume",
       icon: IconChartBar,
@@ -66,12 +61,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       icon: IconFileReport,
       chip: "indigo",
     },
-    {
-      href: "/consume/monthly/ledger",
-      labelKey: "nav.consumeLedger",
-      icon: IconTags,
-      chip: "teal",
-    },
   ],
   ration: [
     {
@@ -79,12 +68,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.monthlyRation",
       icon: IconCashBanknote,
       chip: "cyan",
-    },
-    {
-      href: "/ration/senders",
-      labelKey: "nav.senderAccounts",
-      icon: IconBuildingBank,
-      chip: "blue",
     },
     {
       href: "/ration/report",
