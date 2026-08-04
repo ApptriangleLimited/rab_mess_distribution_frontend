@@ -1,1 +1,35 @@
+name: Deploy Frontend
 
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+ deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGE_HOST }}
+          username: ${{ secrets.STAGE_USER }}
+          key: ${{ secrets.STAGE_KEY }}
+          script: |
+            set -e
+
+            FRONTEND_DIR=/var/www/mess/frontend
+
+            cd "$FRONTEND_DIR"
+
+            git checkout develop
+            git pull origin develop
+
+            cd /var/www/mess
+
+            docker compose build
+
+            docker compose up -d
+
+            echo "Deployment completed successfully."
