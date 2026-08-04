@@ -12,7 +12,8 @@ import {
   IconSettings,
   IconUserCircle,
 } from "@tabler/icons-react";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import type { Role, Session } from "@/lib/types";
 import {
   Select,
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useI18n, useT } from "@/i18n/provider";
 import { roleLabel } from "@/i18n";
-import { ROLE_KEYS, ROLE_HOMES } from "@/lib/constants";
+import { ROLE_HOMES, rolesForPicker } from "@/lib/constants";
 import { setSession } from "@/lib/session";
 import { nowISO } from "@/lib/date";
 import { useToast } from "@/components/shared/toast-provider";
@@ -147,7 +148,7 @@ export function HeaderBar({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ROLE_KEYS.map((r) => (
+                {rolesForPicker(session.role).map((r) => (
                   <SelectItem key={r} value={r}>
                     {roleLabel(r, locale)}
                   </SelectItem>
@@ -167,9 +168,7 @@ export function HeaderBar({
               aria-expanded={menuOpen}
               aria-haspopup="menu"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-dark text-xs font-bold shadow-md shadow-primary/30">
-                {initials(session.name) || "U"}
-              </span>
+              <UserAvatar name={session.name} />
               <span className="hidden min-w-0 text-left sm:block">
                 <span className="block max-w-[120px] truncate text-sm font-medium">
                   {session.name}

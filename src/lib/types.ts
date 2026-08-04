@@ -3,7 +3,7 @@ export type Role = "cc" | "daily" | "mess" | "consume" | "ration";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "ended";
 export type UserStatus = "0" | "1";
 
-export type DailyTag =
+export type BuiltInDailyTag =
   | "FR"
   | "CL"
   | "PL"
@@ -13,6 +13,9 @@ export type DailyTag =
   | "MED"
   | "TRG"
   | "MS";
+
+/** Built-in duty tags + custom allowance codes (ration). */
+export type DailyTag = BuiltInDailyTag | (string & {});
 
 export interface DocumentMeta {
   name: string;

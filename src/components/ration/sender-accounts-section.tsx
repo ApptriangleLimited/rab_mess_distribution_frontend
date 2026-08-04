@@ -235,13 +235,17 @@ export function SenderAccountsSection() {
               {t("ration.mappedTags")}
             </Label>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {DAILY_TAGS.map((tag) => {
-                const on = form.mapped_tags.includes(tag.code);
+              {(
+                state.rates.length > 0
+                  ? state.rates.map((r) => r.tag)
+                  : DAILY_TAGS.map((t) => t.code)
+              ).map((code) => {
+                const on = form.mapped_tags.includes(code);
                 return (
                   <button
-                    key={tag.code}
+                    key={code}
                     type="button"
-                    onClick={() => toggleTag(tag.code)}
+                    onClick={() => toggleTag(code)}
                     className={cn(
                       "rounded-md px-2 py-1 font-mono text-[11px] font-semibold tracking-wide transition",
                       on
@@ -249,7 +253,7 @@ export function SenderAccountsSection() {
                         : "border border-neutral-200 bg-white text-neutral-500 hover:border-primary/40 dark:border-neutral-600 dark:bg-neutral-900",
                     )}
                   >
-                    {tag.code}
+                    {code}
                   </button>
                 );
               })}

@@ -1,4 +1,5 @@
 import { nowISO } from "@/lib/date";
+import { RANKS } from "@/lib/constants";
 import { getState, setState } from "@/lib/store";
 import type {
   ApprovalStatus,
@@ -30,6 +31,24 @@ function newId() {
 
 export function listUsers() {
   return getState().users;
+}
+
+/** Member table order: RAB ID → Rank → Name. */
+export function compareUsers(a: User, b: User) {
+  const id = a.rab_id.localeCompare(b.rab_id, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+  if (id !== 0) return id;
+  const ai = RANKS.indexOf(a.rank);
+  const bi = RANKS.indexOf(b.rank);
+  const rd = (ai === -1 ? RANKS.length : ai) - (bi === -1 ? RANKS.length : bi);
+  if (rd !== 0) return rd;
+  return a.name.localeCompare(b.name);
+}
+
+export function sortUsers(users: User[]) {
+  return [...users].sort(compareUsers);
 }
 
 export function getUser(id: string) {
@@ -120,27 +139,29 @@ export type UserFilters = {
 
 export function filterUsers(users: User[], filters: UserFilters) {
   const q = filters.q?.trim().toLowerCase() ?? "";
-  return users.filter((u) => {
-    if (filters.status && filters.status !== "all" && u.status !== filters.status) {
-      return false;
-    }
-    if (
-      filters.approval &&
-      filters.approval !== "all" &&
-      u.approval_status !== filters.approval
-    ) {
-      return false;
-    }
-    if (filters.wing && filters.wing !== "all" && u.wing !== filters.wing) {
-      return false;
-    }
-    if (filters.rank && filters.rank !== "all" && u.rank !== filters.rank) {
-      return false;
-    }
-    if (!q) return true;
-    const hay = [u.name, u.rab_id, u.rfid, u.phone, u.dropdown_no]
-      .join(" ")
-      .toLowerCase();
-    return hay.includes(q);
-  });
+  return users
+    .filter((u) => {
+      if (filters.status && filters.status !== "all" && u.status !== filters.status) {
+        return false;
+      }
+      if (
+        filters.approval &&
+        filters.approval !== "all" &&
+        u.approval_status !== filters.approval
+      ) {
+        return false;
+      }
+      if (filters.wing && filters.wing !== "all" && u.wing !== filters.wing) {
+        return false;
+      }
+      if (filters.rank && filters.rank !== "all" && u.rank !== filters.rank) {
+        return false;
+      }
+      if (!q) return true;
+      const hay = [u.name, u.rab_id, u.rfid, u.phone, u.dropdown_no]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    })
+    .sort(compareUsers);
 }

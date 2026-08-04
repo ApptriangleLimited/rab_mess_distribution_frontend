@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -56,9 +57,9 @@ export function UserTable({
       <table className="min-w-full text-left text-sm">
         <thead className="sticky top-0 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:bg-neutral-800">
           <tr>
-            <th className="px-4 py-3 font-medium">{t("cc.fields.name")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.rabId")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.rank")}</th>
+            <th className="px-4 py-3 font-medium">{t("cc.fields.name")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.wing")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.phone")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.status")}</th>
@@ -72,25 +73,16 @@ export function UserTable({
               key={user.id}
               className="border-t border-neutral-100 dark:border-neutral-800"
             >
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-nav-accent/15 text-xs font-semibold text-nav-accent">
-                    {user.name
-                      .split(/\s+/)
-                      .slice(0, 2)
-                      .map((p) => p[0]?.toUpperCase() ?? "")
-                      .join("")}
-                  </span>
-                  <div>
-                    <p className="font-medium text-neutral-900 dark:text-neutral-50">
-                      {user.name}
-                    </p>
-                    <p className="text-xs text-neutral-500">{user.rfid || "—"}</p>
-                  </div>
-                </div>
-              </td>
               <td className="px-4 py-3 font-mono text-xs">{user.rab_id}</td>
               <td className="px-4 py-3">{user.rank || "—"}</td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <UserAvatar name={user.name} />
+                  <p className="font-medium text-neutral-900 dark:text-neutral-50">
+                    {user.name}
+                  </p>
+                </div>
+              </td>
               <td className="px-4 py-3">{user.wing || "—"}</td>
               <td className="px-4 py-3">{user.phone || "—"}</td>
               <td className="px-4 py-3">

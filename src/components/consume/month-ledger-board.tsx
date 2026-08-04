@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { TAG_CELL } from "@/components/daily/register-board";
+import { tagCellClass } from "@/components/daily/register-board";
 import { dateInMonth, todayISO } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
@@ -388,7 +388,7 @@ export function MonthLedgerBoard({
                                 "flex h-full w-full items-center justify-center font-mono text-[10px] font-bold leading-none",
                                 tag
                                   ? cn(
-                                      TAG_CELL[tag],
+                                      tagCellClass(tag),
                                       contL ? "rounded-l-none" : "rounded-l-sm",
                                       contR ? "rounded-r-none" : "rounded-r-sm",
                                     )

@@ -68,6 +68,8 @@ export function ConfirmDialog({
   const t = useT();
   const titleId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
   const reduceMotion = useReducedMotion();
   const resolvedTone: Tone = tone ?? (danger ? "danger" : "default");
   const meta = TONE[resolvedTone];
@@ -77,7 +79,7 @@ export function ConfirmDialog({
     if (!open) return;
     cancelRef.current?.focus();
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") onCancelRef.current();
     }
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -86,7 +88,7 @@ export function ConfirmDialog({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onCancel]);
+  }, [open]);
 
   if (typeof document === "undefined") return null;
 

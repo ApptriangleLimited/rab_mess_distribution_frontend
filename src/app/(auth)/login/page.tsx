@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ROLE_HOMES, ROLE_KEYS } from "@/lib/constants";
+import { ROLE_HOMES, VISIBLE_ROLE_KEYS } from "@/lib/constants";
 import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/shared/toast-provider";
 import { useI18n, useT } from "@/i18n/provider";
@@ -133,7 +133,7 @@ export default function LoginPage() {
           </p>
 
           <ul className="mt-8 hidden gap-2 sm:flex sm:flex-wrap">
-            {ROLE_KEYS.map((r) => (
+            {VISIBLE_ROLE_KEYS.map((r) => (
               <li
                 key={r}
                 className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-white/55"
@@ -234,7 +234,7 @@ export default function LoginPage() {
                 aria-label={t("login.chooseDuty")}
                 className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"
               >
-                {ROLE_KEYS.map((r) => {
+                {VISIBLE_ROLE_KEYS.map((r) => {
                   const meta = ROLE_META[r];
                   const Icon = meta.icon;
                   const selected = role === r;

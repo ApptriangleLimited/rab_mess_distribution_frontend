@@ -1,11 +1,11 @@
 import { getState } from "@/lib/store";
 import {
-  DAILY_TAGS,
   FR_FUEL_RATE_PER_DAY,
-  RANKS,
   RATION_REPORT_META,
 } from "@/lib/constants";
 import { daysInMonth, todayISO } from "@/lib/date";
+import { listAllTags } from "@/lib/store/rates";
+import { compareUsers } from "@/lib/store/users";
 import type {
   DailyAssignment,
   DailyTag,
@@ -80,19 +80,8 @@ function rateMap() {
   return map;
 }
 
-function rankIndex(rank: string) {
-  const i = RANKS.indexOf(rank);
-  return i === -1 ? RANKS.length : i;
-}
-
 function sortUsersForBill(a: User, b: User) {
-  const rd = rankIndex(a.rank) - rankIndex(b.rank);
-  if (rd !== 0) return rd;
-  const dn = (a.dropdown_no || "").localeCompare(b.dropdown_no || "", undefined, {
-    numeric: true,
-  });
-  if (dn !== 0) return dn;
-  return a.name.localeCompare(b.name);
+  return compareUsers(a, b);
 }
 
 export function buildConsumeMonth(month: string) {
@@ -213,7 +202,7 @@ export function buildWingSummary(month: string): {
   };
 } {
   const consume = buildConsumeMonth(month);
-  const tagCodes = DAILY_TAGS.map((t) => t.code);
+  const tagCodes = listAllTags();
   const byWing = new Map<
     string,
     { userIds: Set<string>; tagDays: Partial<Record<DailyTag, number>> }
@@ -235,7 +224,7 @@ export function buildWingSummary(month: string): {
 
   const rows: WingSummaryRow[] = [...byWing.entries()]
     .map(([wing, v]) => {
-      const totalDays = Object.values(v.tagDays).reduce(
+      const totalDays = Object.values(v.tagDays).reduce<number>(
         (s, n) => s + (n ?? 0),
         0,
       );
@@ -280,7 +269,7 @@ export function buildMonthLedger(month: string): {
   const dayCount = daysInMonth(month);
   const assignments = assignmentsInMonth(month);
   const users = getState().users;
-  const tagCodes = DAILY_TAGS.map((t) => t.code);
+  const tagCodes = listAllTags();
 
   const byUser = new Map<string, Map<number, DailyTag>>();
   const tagCounts = new Map<string, Partial<Record<DailyTag, number>>>();
@@ -308,7 +297,10 @@ export function buildMonthLedger(month: string): {
         days.push(dayMap.get(d) ?? "");
       }
       const counts = tagCounts.get(userId) ?? {};
-      const totalDays = Object.values(counts).reduce((s, n) => s + (n ?? 0), 0);
+      const totalDays = Object.values(counts).reduce<number>(
+        (s, n) => s + (n ?? 0),
+        0,
+      );
       return { user, days, tagCounts: counts, totalDays };
     })
     .filter((row): row is LedgerRow => Boolean(row))
@@ -355,7 +347,10 @@ export function buildDailyRegister(
         days.push(tag);
         if (tag) counts[tag] = (counts[tag] ?? 0) + 1;
       }
-      const totalDays = Object.values(counts).reduce((s, n) => s + (n ?? 0), 0);
+      const totalDays = Object.values(counts).reduce<number>(
+        (s, n) => s + (n ?? 0),
+        0,
+      );
       return { user, days, tagCounts: counts, totalDays };
     });
 

@@ -40,9 +40,9 @@ export default function CcUsersPage() {
           title={t("pages.ccUsers.title")}
           subtitle={t("pages.ccUsers.subtitle", { count: users.length })}
           actions={
-            <Button asChild variant="cta">
+            <Button asChild variant="cta" size="sm" className="rounded-xl">
               <Link href="/cc/users/new">
-                <IconPlus className="h-4 w-4" />
+                <IconPlus className="h-3.5 w-3.5" />
                 {t("cc.newUser")}
               </Link>
             </Button>

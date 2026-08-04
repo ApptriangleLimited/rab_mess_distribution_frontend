@@ -13,8 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
-import { DAILY_TAGS } from "@/lib/constants";
 import { parseMonthInput } from "@/lib/date";
+import { listAllTags } from "@/lib/store/rates";
 import { buildRationStaffLines } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -34,6 +34,7 @@ export function GenerateReportDialog({
   const t = useT();
   const { locale } = useI18n();
   const state = useStore();
+  const tags = listAllTags();
   const [month, setMonth] = useState(defaultMonth);
   const [tag, setTag] = useState<DailyTag | "">("");
   const [senderId, setSenderId] = useState("");
@@ -137,9 +138,9 @@ export function GenerateReportDialog({
               <SelectValue placeholder={t("ration.selectTag")} />
             </SelectTrigger>
             <SelectContent>
-              {DAILY_TAGS.map((opt) => (
-                <SelectItem key={opt.code} value={opt.code}>
-                  {opt.code} — {tagLabel(opt.code, locale)}
+              {tags.map((code) => (
+                <SelectItem key={code} value={code}>
+                  {code} — {tagLabel(code, locale)}
                 </SelectItem>
               ))}
             </SelectContent>

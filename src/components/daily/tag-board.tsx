@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import { tagLabel } from "@/i18n";
-import { cn, initials } from "@/lib/utils";
+import { UserAvatar } from "@/components/shared/user-avatar";
+import { cn } from "@/lib/utils";
 
 export function TagBoard({
   users,
@@ -79,9 +80,7 @@ export function TagBoard({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark text-xs font-bold text-white">
-                        {initials(user.name) || "M"}
-                      </div>
+                      <UserAvatar name={user.name} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
                           {user.name}

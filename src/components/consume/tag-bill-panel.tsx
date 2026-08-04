@@ -3,15 +3,12 @@
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  IconDownload,
-  IconPrinter,
   IconSearch,
   IconUsers,
 } from "@tabler/icons-react";
-import { TAG_CELL } from "@/components/daily/register-board";
+import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TagBillPrint } from "@/components/consume/tag-bill-print";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -21,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RANKS, WINGS } from "@/lib/constants";
-import { downloadTagBillPdf } from "@/lib/download-consume-pdfs";
 import { buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -85,20 +81,6 @@ export function TagBillPanel({ month, tag }: Props) {
   const label = tagLabel(tag, locale);
   const showFuel = tag === "FR" || bill.fuelRate > 0;
 
-  function onExport() {
-    downloadTagBillPdf({
-      month,
-      tag,
-      tagLabel: label,
-      rows: bill.rows,
-      showFuel,
-      totalDays: bill.totalDays,
-      totalAmount: bill.totalAmount,
-      totalFuel: bill.totalFuel,
-      grandTotal: bill.grandTotal,
-      filename: `consume-bill-${month}-${tag}.pdf`,
-    });
-  }
   const fieldClass =
     "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
@@ -123,78 +105,8 @@ export function TagBillPanel({ month, tag }: Props) {
         transition={{ duration: 0.2 }}
         className="flex flex-col gap-4 no-print"
       >
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-neutral-100 pb-4 dark:border-neutral-800">
-          <div className="flex min-w-0 items-start gap-3">
-            <span
-              className={cn(
-                "mt-0.5 shrink-0 rounded-lg px-2.5 py-1.5 font-mono text-sm font-bold tracking-wide",
-                TAG_CELL[tag],
-              )}
-            >
-              {tag}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-neutral-900 dark:text-white">
-                {label}
-              </p>
-              <p className="mt-0.5 text-xs text-neutral-500">
-                {month} · {bill.rows.length} {t("consume.users")}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="hidden items-baseline gap-4 sm:flex">
-              <Metric
-                label={tag}
-                value={String(bill.totalDays)}
-              />
-              <Metric
-                label={t("consume.colFreshAmount")}
-                value={formatBdt(bill.totalAmount)}
-              />
-              {showFuel ? (
-                <Metric
-                  label={t("consume.colFuelAmount")}
-                  value={formatBdt(bill.totalFuel)}
-                />
-              ) : null}
-              <Metric
-                label={t("consume.colGrandTotal")}
-                value={formatBdt(bill.grandTotal)}
-                accent
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-lg"
-                onClick={onExport}
-                disabled={!bill.rows.length}
-              >
-                <IconDownload className="h-3.5 w-3.5" />
-                {t("consume.exportPdf")}
-              </Button>
-              <Button
-                variant="cta"
-                size="sm"
-                className="h-9 rounded-lg"
-                onClick={() => window.print()}
-                disabled={!bill.rows.length}
-              >
-                <IconPrinter className="h-3.5 w-3.5" />
-                {t("consume.printBill")}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex w-full flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96 space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("common.search")}
-            </p>
+        <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
+          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">
             <div className="relative">
               <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
               <Input
@@ -206,10 +118,7 @@ export function TagBillPanel({ month, tag }: Props) {
               />
             </div>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterRank")}
-            </p>
+          <div className="min-w-[10rem] flex-1 basis-[10rem]">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger
                 className={cn(fieldClass, "w-full")}
@@ -218,7 +127,7 @@ export function TagBillPanel({ month, tag }: Props) {
                 <SelectValue placeholder={t("cc.selectRank")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allRank")}</SelectItem>
                 {RANKS.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
@@ -227,10 +136,7 @@ export function TagBillPanel({ month, tag }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterWing")}
-            </p>
+          <div className="min-w-[10rem] flex-1 basis-[10rem]">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger
                 className={cn(fieldClass, "w-full")}
@@ -239,7 +145,7 @@ export function TagBillPanel({ month, tag }: Props) {
                 <SelectValue placeholder={t("cc.selectWing")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allWing")}</SelectItem>
                 {WINGS.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
@@ -248,6 +154,14 @@ export function TagBillPanel({ month, tag }: Props) {
               </SelectContent>
             </Select>
           </div>
+          <ClearFiltersButton
+            disabled={!q.trim() && rank === "all" && wing === "all"}
+            onClick={() => {
+              setQ("");
+              setRank("all");
+              setWing("all");
+            }}
+          />
         </div>
 
         {bill.rows.length === 0 ? (
@@ -362,32 +276,6 @@ export function TagBillPanel({ month, tag }: Props) {
           </section>
         )}
       </motion.div>
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="text-right">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-0.5 font-mono text-sm font-semibold tabular-nums",
-          accent ? "text-primary" : "text-neutral-800 dark:text-neutral-100",
-        )}
-      >
-        {value}
-      </p>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { IconSearch, IconUsers } from "@tabler/icons-react";
+import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,21 +26,11 @@ export type AllConsumeRow = {
 };
 
 type Props = {
-  month: string;
   rows: AllConsumeRow[];
-  totalAmount: number;
-  assignmentCount: number;
-  allowanceDays: number;
 };
 
 /** Month rollup — all tags combined. */
-export function AllConsumePanel({
-  month,
-  rows,
-  totalAmount,
-  assignmentCount,
-  allowanceDays,
-}: Props) {
+export function AllConsumePanel({ rows }: Props) {
   const t = useT();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -73,41 +64,8 @@ export function AllConsumePanel({
 
   return (
     <div className="flex flex-col gap-4 no-print">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-neutral-100 pb-4 dark:border-neutral-800">
-        <div>
-          <p className="text-base font-semibold text-neutral-900 dark:text-white">
-            {t("common.all")}
-          </p>
-          <p className="mt-0.5 text-xs text-neutral-500">
-            {month} · {rows.length} {t("consume.users")}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
-          <MiniStat
-            label={t("consume.statDays")}
-            value={String(assignmentCount)}
-          />
-          <MiniStat
-            label={t("consume.statMembers")}
-            value={String(rows.length)}
-          />
-          <MiniStat
-            label={t("consume.statAllowance")}
-            value={String(allowanceDays)}
-          />
-          <MiniStat
-            label={t("consume.statAmount")}
-            value={formatBdt(totalAmount)}
-            accent
-          />
-        </div>
-      </div>
-
-      <div className="flex w-full flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-        <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96 space-y-1.5">
-          <p className="text-[11px] font-medium text-neutral-400">
-            {t("common.search")}
-          </p>
+      <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
+        <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">
           <div className="relative">
             <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
             <Input
@@ -119,10 +77,7 @@ export function AllConsumePanel({
             />
           </div>
         </div>
-        <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-          <p className="text-[11px] font-medium text-neutral-400">
-            {t("cc.filterRank")}
-          </p>
+        <div className="min-w-[10rem] flex-1 basis-[10rem]">
           <Select value={rank} onValueChange={setRank}>
             <SelectTrigger
               className={cn(fieldClass, "w-full")}
@@ -131,7 +86,7 @@ export function AllConsumePanel({
               <SelectValue placeholder={t("cc.selectRank")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("common.all")}</SelectItem>
+              <SelectItem value="all">{t("common.allRank")}</SelectItem>
               {RANKS.map((r) => (
                 <SelectItem key={r} value={r}>
                   {r}
@@ -140,10 +95,7 @@ export function AllConsumePanel({
             </SelectContent>
           </Select>
         </div>
-        <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-          <p className="text-[11px] font-medium text-neutral-400">
-            {t("cc.filterWing")}
-          </p>
+        <div className="min-w-[10rem] flex-1 basis-[10rem]">
           <Select value={wing} onValueChange={setWing}>
             <SelectTrigger
               className={cn(fieldClass, "w-full")}
@@ -152,7 +104,7 @@ export function AllConsumePanel({
               <SelectValue placeholder={t("cc.selectWing")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("common.all")}</SelectItem>
+              <SelectItem value="all">{t("common.allWing")}</SelectItem>
               {WINGS.map((w) => (
                 <SelectItem key={w} value={w}>
                   {w}
@@ -161,6 +113,14 @@ export function AllConsumePanel({
             </SelectContent>
           </Select>
         </div>
+        <ClearFiltersButton
+          disabled={!q.trim() && rank === "all" && wing === "all"}
+          onClick={() => {
+            setQ("");
+            setRank("all");
+            setWing("all");
+          }}
+        />
       </div>
 
       {rows.length === 0 ? (
@@ -262,32 +222,6 @@ export function AllConsumePanel({
           </div>
         </section>
       )}
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="text-right">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-0.5 font-mono text-sm font-semibold tabular-nums",
-          accent ? "text-primary" : "text-neutral-800 dark:text-neutral-100",
-        )}
-      >
-        {value}
-      </p>
     </div>
   );
 }

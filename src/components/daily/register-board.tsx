@@ -10,15 +10,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DAILY_TAGS } from "@/lib/constants";
 import { dateInMonth } from "@/lib/date";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
+import { useStore } from "@/hooks/use-store";
+import { listAllTags } from "@/lib/store/rates";
 import { cn } from "@/lib/utils";
 
-const TAG_CELL: Record<DailyTag, string> = {
+const TAG_CELL: Record<string, string> = {
   FR: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100",
   MS: "bg-primary/15 text-primary dark:bg-primary/30 dark:text-emerald-100",
   CL: "bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100",
@@ -29,6 +30,13 @@ const TAG_CELL: Record<DailyTag, string> = {
   MED: "bg-rose-100 text-rose-900 dark:bg-rose-900/50 dark:text-rose-100",
   TRG: "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-100",
 };
+
+const TAG_CELL_FALLBACK =
+  "bg-neutral-100 text-neutral-800 dark:bg-neutral-700 dark:text-neutral-100";
+
+export function tagCellClass(tag: string) {
+  return TAG_CELL[tag] ?? TAG_CELL_FALLBACK;
+}
 
 export { TAG_CELL };
 
@@ -533,7 +541,10 @@ export function PaintTagSelect({
 }) {
   const t = useT();
   const { locale } = useI18n();
+  const state = useStore();
+  const tags = listAllTags();
   const current = paintTag || "__none__";
+  void state.rates;
 
   return (
     <Select
@@ -557,9 +568,9 @@ export function PaintTagSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="__none__">{t("daily.paintOff")}</SelectItem>
-        {DAILY_TAGS.map((tag) => (
-          <SelectItem key={tag.code} value={tag.code}>
-            {tag.code} — {tagLabel(tag.code, locale)}
+        {tags.map((code) => (
+          <SelectItem key={code} value={code}>
+            {code} — {tagLabel(code, locale)}
           </SelectItem>
         ))}
       </SelectContent>
@@ -585,6 +596,9 @@ function TagPickerPanel({
   onClear: () => void;
 }) {
   const t = useT();
+  const state = useStore();
+  const tags = listAllTags();
+  void state.rates;
 
   return (
     <>
@@ -603,21 +617,19 @@ function TagPickerPanel({
         </button>
       ) : null}
       <div className="grid grid-cols-3 gap-1">
-        {DAILY_TAGS.map((item) => (
+        {tags.map((code) => (
           <button
-            key={item.code}
+            key={code}
             type="button"
-            onClick={() => onPick(item.code)}
+            onClick={() => onPick(code)}
             className={cn(
               "rounded-md px-1.5 py-1.5 font-mono text-[11px] font-bold transition hover:opacity-90",
-              TAG_CELL[item.code],
-              !ghost &&
-                tag === item.code &&
-                "ring-2 ring-primary ring-offset-1",
+              tagCellClass(code),
+              !ghost && tag === code && "ring-2 ring-primary ring-offset-1",
             )}
-            title={tagLabel(item.code, locale)}
+            title={tagLabel(code, locale)}
           >
-            {item.code}
+            {code}
           </button>
         ))}
       </div>
@@ -671,7 +683,7 @@ function RegisterCell({
       : "cursor-pointer hover:ring-1 hover:ring-primary/40",
     tag
       ? cn(
-          TAG_CELL[tag],
+          tagCellClass(tag),
           contL ? "rounded-l-none" : "rounded-l-sm",
           contR ? "rounded-r-none" : "rounded-r-sm",
           ghost &&

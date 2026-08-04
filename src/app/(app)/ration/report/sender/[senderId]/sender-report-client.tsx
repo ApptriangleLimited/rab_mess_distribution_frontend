@@ -21,6 +21,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { StaffPayoutPrint } from "@/components/ration/staff-payout-print";
 import { TransferSheetPrint } from "@/components/ration/transfer-sheet-print";
@@ -349,47 +350,39 @@ export default function RationSenderReportClient() {
           />
         </div>
 
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("ration.month")}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-xl"
-                aria-label={t("ration.prevMonth")}
-                onClick={() => setMonth(shiftMonthKey(month, -1))}
-              >
-                <IconChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="relative w-[11.5rem]">
-                <IconCalendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-                <Input
-                  type="month"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  className={cn(fieldClass, "pl-9")}
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-xl"
-                aria-label={t("ration.nextMonth")}
-                onClick={() => setMonth(shiftMonthKey(month, 1))}
-              >
-                <IconChevronRight className="h-4 w-4" />
-              </Button>
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-11 w-11 shrink-0 rounded-xl"
+              aria-label={t("ration.prevMonth")}
+              onClick={() => setMonth(shiftMonthKey(month, -1))}
+            >
+              <IconChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="relative w-[11.5rem]">
+              <IconCalendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+              <Input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className={cn(fieldClass, "pl-9")}
+              />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-11 w-11 shrink-0 rounded-xl"
+              aria-label={t("ration.nextMonth")}
+              onClick={() => setMonth(shiftMonthKey(month, 1))}
+            >
+              <IconChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="min-w-[12rem] flex-1 space-y-1.5 sm:min-w-[14rem]">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("common.search")}
-            </p>
+          <div className="min-w-[12rem] flex-1 sm:min-w-[14rem]">
             <div className="relative">
               <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
               <Input
@@ -401,16 +394,13 @@ export default function RationSenderReportClient() {
               />
             </div>
           </div>
-          <div className="w-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterRank")}
-            </p>
+          <div className="w-[10rem]">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger className={fieldClass}>
                 <SelectValue placeholder={t("cc.selectRank")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allRank")}</SelectItem>
                 {RANKS.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
@@ -419,6 +409,13 @@ export default function RationSenderReportClient() {
               </SelectContent>
             </Select>
           </div>
+          <ClearFiltersButton
+            disabled={!q.trim() && rank === "all"}
+            onClick={() => {
+              setQ("");
+              setRank("all");
+            }}
+          />
         </div>
 
         {!hasLines ? (

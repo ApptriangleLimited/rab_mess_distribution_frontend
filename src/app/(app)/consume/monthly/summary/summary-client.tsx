@@ -18,7 +18,7 @@ import { ConsumeTabs } from "@/components/layout/consume-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
-import { previousMonthKey, shiftMonthKey } from "@/lib/date";
+import { monthKey, shiftMonthKey } from "@/lib/date";
 import { downloadWingSummaryPdf } from "@/lib/download-consume-pdfs";
 import { buildWingSummary } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
@@ -35,7 +35,7 @@ export default function ConsumeSummaryClient() {
   const reduceMotion = useReducedMotion();
 
   const rawMonth = searchParams.get("month");
-  const defaultMonth = previousMonthKey();
+  const defaultMonth = monthKey();
   const month =
     rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : defaultMonth;
 

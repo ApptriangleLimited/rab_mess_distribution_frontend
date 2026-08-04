@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { previousMonthKey } from "@/lib/date";
+import { monthKey } from "@/lib/date";
 
 export default function ConsumeIndex() {
-  redirect(`/consume/monthly/ledger?month=${previousMonthKey()}`);
+  redirect(`/consume/monthly/ledger?month=${monthKey()}`);
 }

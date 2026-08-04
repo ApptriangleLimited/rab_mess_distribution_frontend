@@ -64,6 +64,9 @@ export function roleLabel(role: keyof Messages["roles"], locale?: Locale) {
   return t(`roles.${role}`, undefined, locale);
 }
 
-export function tagLabel(tag: keyof Messages["tags"], locale?: Locale) {
-  return t(`tags.${tag}`, undefined, locale);
+export function tagLabel(tag: string, locale?: Locale) {
+  const key = `tags.${tag}`;
+  const fromLocale = getByPath(getMessages(locale ?? DEFAULT_LOCALE), key);
+  const text = fromLocale ?? getByPath(en, key);
+  return text ?? tag;
 }

@@ -7,6 +7,7 @@ import { IconPencil, IconPlus, IconUsers } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { UserConfirmCard } from "@/components/daily/user-confirm-card";
 import { ApprovalRow } from "@/components/daily/approval-card";
@@ -26,9 +27,12 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/shared/toast-provider";
 import { approveUser, rejectUser, setUserStatus } from "@/lib/store/daily";
 import { getAssignment, setTag } from "@/lib/store/assignments";
-import { DAILY_TAGS, RANKS, WINGS } from "@/lib/constants";
+import { compareUsers } from "@/lib/store/users";
+import { listAllTags } from "@/lib/store/rates";
+import { RANKS, WINGS } from "@/lib/constants";
 import { todayISO } from "@/lib/date";
-import { useT } from "@/i18n/provider";
+import { tagLabel } from "@/i18n";
+import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import type { DailyTag, User, UserStatus } from "@/lib/types";
 
@@ -39,7 +43,9 @@ type PendingAction =
 
 export default function RosterPage() {
   const t = useT();
+  const { locale } = useI18n();
   const state = useStore();
+  const tags = listAllTags();
   const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
@@ -79,37 +85,41 @@ export default function RosterPage() {
   const pending = useMemo(() => {
     const query = q.trim().toLowerCase();
     if (status !== "all" || tag !== "all") return [];
-    return pendingAll.filter((u) => {
-      if (rank !== "all" && u.rank !== rank) return false;
-      if (wing !== "all" && u.wing !== wing) return false;
-      if (!query) return true;
-      return [u.name, u.rab_id, u.wing, u.rank, u.phone]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
+    return pendingAll
+      .filter((u) => {
+        if (rank !== "all" && u.rank !== rank) return false;
+        if (wing !== "all" && u.wing !== wing) return false;
+        if (!query) return true;
+        return [u.name, u.rab_id, u.wing, u.rank, u.phone]
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+      })
+      .sort(compareUsers);
   }, [pendingAll, q, rank, wing, status, tag]);
 
   const roster = useMemo(() => {
     const query = q.trim().toLowerCase();
-    return approved.filter((u) => {
-      if (rank !== "all" && u.rank !== rank) return false;
-      if (wing !== "all" && u.wing !== wing) return false;
-      if (status !== "all" && u.status !== status) return false;
-      if (tag !== "all") {
-        const todayTag = getAssignment(u.id, today)?.tag ?? null;
-        if (tag === "none") {
-          if (todayTag) return false;
-        } else if (todayTag !== tag) {
-          return false;
+    return approved
+      .filter((u) => {
+        if (rank !== "all" && u.rank !== rank) return false;
+        if (wing !== "all" && u.wing !== wing) return false;
+        if (status !== "all" && u.status !== status) return false;
+        if (tag !== "all") {
+          const todayTag = getAssignment(u.id, today)?.tag ?? null;
+          if (tag === "none") {
+            if (todayTag) return false;
+          } else if (todayTag !== tag) {
+            return false;
+          }
         }
-      }
-      if (!query) return true;
-      return [u.name, u.rab_id, u.wing, u.rank, u.phone]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
+        if (!query) return true;
+        return [u.name, u.rab_id, u.wing, u.rank, u.phone]
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+      })
+      .sort(compareUsers);
   }, [approved, q, rank, wing, tag, status, today, state.assignments]);
 
   const boardEmpty = pending.length === 0 && roster.length === 0;
@@ -218,11 +228,8 @@ export default function RosterPage() {
           }
         />
 
-        <div className="flex w-full flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96 space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("common.search")}
-            </p>
+        <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
+          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -231,16 +238,13 @@ export default function RosterPage() {
               className={cn(fieldClass, "w-full")}
             />
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterRank")}
-            </p>
+          <div className="min-w-[10rem] flex-1 basis-[10rem]">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allRank")}</SelectItem>
                 {RANKS.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
@@ -249,16 +253,13 @@ export default function RosterPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterWing")}
-            </p>
+          <div className="min-w-[10rem] flex-1 basis-[10rem]">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectWing")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allWing")}</SelectItem>
                 {WINGS.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
@@ -267,40 +268,50 @@ export default function RosterPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("daily.filterTag")}
-            </p>
+          <div className="min-w-[10rem] flex-1 basis-[10rem]">
             <Select value={tag} onValueChange={setTagFilter}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allTag")}</SelectItem>
                 <SelectItem value="none">{t("daily.noTag")}</SelectItem>
-                {DAILY_TAGS.map((item) => (
-                  <SelectItem key={item.code} value={item.code}>
-                    {item.code} — {t(item.labelKey)}
+                {tags.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {code} — {tagLabel(code, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterStatus")}
-            </p>
+          <div className="min-w-[10rem] flex-1 basis-[10rem]">
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allStatus")}</SelectItem>
                 <SelectItem value="1">{t("cc.statusActive")}</SelectItem>
                 <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          <ClearFiltersButton
+            disabled={
+              !q.trim() &&
+              rank === "all" &&
+              wing === "all" &&
+              tag === "all" &&
+              status === "all"
+            }
+            onClick={() => {
+              setQ("");
+              setRank("all");
+              setWing("all");
+              setTagFilter("all");
+              setStatus("all");
+            }}
+          />
         </div>
 
         {boardEmpty ? (
@@ -328,8 +339,9 @@ export default function RosterPage() {
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
                   <tr>
-                    <th className="px-4 py-3">{t("cc.fields.name")}</th>
+                    <th className="px-4 py-3">{t("cc.fields.rabId")}</th>
                     <th className="px-4 py-3">{t("cc.fields.rank")}</th>
+                    <th className="px-4 py-3">{t("cc.fields.name")}</th>
                     <th className="px-4 py-3">{t("cc.fields.wing")}</th>
                     <th className="px-4 py-3">{t("cc.fields.status")}</th>
                     <th className="px-4 py-3 text-right">{t("common.actions")}</th>

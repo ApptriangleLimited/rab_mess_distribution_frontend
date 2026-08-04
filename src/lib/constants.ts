@@ -1,4 +1,4 @@
-import type { DailyTag, Role } from "@/lib/types";
+import type { BuiltInDailyTag, DailyTag, Role } from "@/lib/types";
 import type { MessageKey } from "@/i18n";
 
 export const ROLE_HOMES: Record<Role, string> = {
@@ -12,8 +12,23 @@ export const ROLE_HOMES: Record<Role, string> = {
 /** @deprecated Prefer t(`roles.${role}`) — kept for non-UI code paths. */
 export const ROLE_KEYS = ["cc", "daily", "mess", "consume", "ration"] as const satisfies readonly Role[];
 
+/** Login / switcher pickers — mess kept in ROLE_KEYS but hidden from UI. */
+export const HIDDEN_ROLES = new Set<Role>(["mess"]);
+
+export const VISIBLE_ROLE_KEYS = ROLE_KEYS.filter(
+  (r) => !HIDDEN_ROLES.has(r),
+) as Role[];
+
+/** Picker list: visible roles + current if it is hidden (so switch-away still works). */
+export function rolesForPicker(current?: Role | null): Role[] {
+  if (current && HIDDEN_ROLES.has(current)) {
+    return ROLE_KEYS.filter((r) => !HIDDEN_ROLES.has(r) || r === current);
+  }
+  return VISIBLE_ROLE_KEYS;
+}
+
 export const DAILY_TAGS: {
-  code: DailyTag;
+  code: BuiltInDailyTag;
   labelKey: MessageKey;
   allowance: boolean;
   mess: boolean;

@@ -16,6 +16,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -237,11 +238,8 @@ export default function MessTodayClient() {
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm no-print dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-          <div className="min-w-[12rem] flex-1 space-y-1.5 sm:min-w-[14rem]">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("common.search")}
-            </p>
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm no-print dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
+          <div className="min-w-[12rem] flex-1 sm:min-w-[14rem]">
             <div className="relative">
               <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
               <Input
@@ -253,16 +251,13 @@ export default function MessTodayClient() {
               />
             </div>
           </div>
-          <div className="w-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterRank")}
-            </p>
+          <div className="w-[10rem]">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger className={fieldClass}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allRank")}</SelectItem>
                 {RANKS.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
@@ -271,16 +266,13 @@ export default function MessTodayClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("cc.filterWing")}
-            </p>
+          <div className="w-[10rem]">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger className={fieldClass}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allWing")}</SelectItem>
                 {WINGS.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
@@ -289,10 +281,7 @@ export default function MessTodayClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[10rem] space-y-1.5">
-            <p className="text-[11px] font-medium text-neutral-400">
-              {t("mess.filterServed")}
-            </p>
+          <div className="w-[10rem]">
             <Select value={serveFilter} onValueChange={setServeFilter}>
               <SelectTrigger className={fieldClass}>
                 <SelectValue />
@@ -304,6 +293,20 @@ export default function MessTodayClient() {
               </SelectContent>
             </Select>
           </div>
+          <ClearFiltersButton
+            disabled={
+              !q.trim() &&
+              rank === "all" &&
+              wing === "all" &&
+              serveFilter === "all"
+            }
+            onClick={() => {
+              setQ("");
+              setRank("all");
+              setWing("all");
+              setServeFilter("all");
+            }}
+          />
         </div>
 
         {eaters.length > 0 ? (

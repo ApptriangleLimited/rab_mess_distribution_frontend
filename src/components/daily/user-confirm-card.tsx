@@ -7,7 +7,7 @@ import {
   IconShield,
 } from "@tabler/icons-react";
 import type { User } from "@/lib/types";
-import { initials } from "@/lib/utils";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import { useT } from "@/i18n/provider";
 
 export function UserConfirmCard({ user }: { user: User }) {
@@ -27,9 +27,7 @@ export function UserConfirmCard({ user }: { user: User }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50 to-white dark:border-neutral-700 dark:from-neutral-900 dark:to-neutral-950">
       <div className="flex items-center gap-3 border-b border-neutral-200/80 bg-white/70 px-4 py-3.5 dark:border-neutral-700 dark:bg-neutral-900/60">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-sm font-bold text-white shadow-md shadow-primary/20">
-          {initials(user.name) || "U"}
-        </div>
+        <UserAvatar name={user.name} size="lg" />
         <div className="min-w-0">
           <p className="truncate text-base font-semibold text-neutral-900 dark:text-white">
             {user.name}

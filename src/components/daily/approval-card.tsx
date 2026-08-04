@@ -2,9 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import type { User } from "@/lib/types";
 import { useT } from "@/i18n/provider";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { IconCheck, IconX } from "@tabler/icons-react";
 
 /** Pending member row for Members table — Approve / Reject in Actions. */
@@ -21,21 +22,19 @@ export function ApprovalRow({
 
   return (
     <tr className="border-t border-amber-100/80 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/20">
-      <td className="px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/90 text-xs font-bold text-white">
-            {initials(user.name) || "M"}
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
-              {user.name}
-            </div>
-            <div className="font-mono text-xs text-neutral-500">{user.rab_id}</div>
-          </div>
-        </div>
+      <td className="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-400">
+        {user.rab_id}
       </td>
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
         {user.rank || "—"}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <UserAvatar name={user.name} />
+          <div className="min-w-0 truncate text-sm font-semibold text-neutral-900 dark:text-white">
+            {user.name}
+          </div>
+        </div>
       </td>
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
         {user.wing || "—"}

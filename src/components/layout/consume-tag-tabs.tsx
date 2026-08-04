@@ -1,7 +1,8 @@
 "use client";
 
-import { TAG_CELL } from "@/components/daily/register-board";
-import { DAILY_TAGS } from "@/lib/constants";
+import { tagCellClass } from "@/components/daily/register-board";
+import { useStore } from "@/hooks/use-store";
+import { listAllTags } from "@/lib/store/rates";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -28,7 +29,10 @@ type Props = {
 export function ConsumeTagTabs({ value, onChange, stats, className }: Props) {
   const t = useT();
   const { locale } = useI18n();
+  const state = useStore();
+  const tags = listAllTags();
   const byCode = new Map((stats ?? []).map((s) => [s.tag, s]));
+  void state.rates;
 
   return (
     <nav
@@ -49,8 +53,7 @@ export function ConsumeTagTabs({ value, onChange, stats, className }: Props) {
         {t("common.all")}
       </button>
 
-      {DAILY_TAGS.map((item) => {
-        const code = item.code;
+      {tags.map((code) => {
         const active = value === code;
         const quiet = stats != null && !byCode.has(code);
 
@@ -64,7 +67,7 @@ export function ConsumeTagTabs({ value, onChange, stats, className }: Props) {
             onClick={() => onChange(code)}
             className={cn(
               "rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold tracking-wide transition",
-              TAG_CELL[code],
+              tagCellClass(code),
               active
                 ? "ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-neutral-950"
                 : "opacity-80 hover:opacity-100",

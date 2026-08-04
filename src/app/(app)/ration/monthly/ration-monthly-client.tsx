@@ -9,10 +9,12 @@ import {
   IconChevronRight,
   IconDownload,
   IconFileAnalytics,
+  IconSearch,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
+import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
 import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
@@ -38,7 +40,7 @@ import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 const fieldClass =
-  "h-9 rounded-lg border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+  "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
 export default function RationMonthlyClient() {
   const t = useT();
@@ -175,29 +177,29 @@ export default function RationMonthlyClient() {
           onClose={() => setReportOpen(false)}
         />
 
-        <div className="flex w-full flex-wrap items-end gap-2.5 rounded-xl border border-neutral-200/90 bg-neutral-50/80 p-2.5 dark:border-neutral-700 dark:bg-neutral-900/60">
-          <div className="min-w-56 max-w-sm flex-1 space-y-1">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
-              {t("common.search")}
-            </p>
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t("cc.searchPlaceholder")}
-              aria-label={t("common.search")}
-              className={cn(fieldClass, "w-full")}
-            />
+        <div className="flex w-full flex-wrap items-center gap-2.5 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50">
+          <div className="min-w-[14rem] flex-1">
+            <div className="relative">
+              <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t("cc.searchPlaceholder")}
+                aria-label={t("common.search")}
+                className={cn(fieldClass, "w-full pl-8")}
+              />
+            </div>
           </div>
-          <div className="w-32 space-y-1">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
-              {t("cc.filterRank")}
-            </p>
+          <div className="w-[9.5rem] shrink-0">
             <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
+              <SelectTrigger
+                className={cn(fieldClass, "w-full")}
+                aria-label={t("cc.filterRank")}
+              >
                 <SelectValue placeholder={t("cc.selectRank")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allRank")}</SelectItem>
                 {RANKS.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
@@ -206,16 +208,16 @@ export default function RationMonthlyClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-32 space-y-1">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
-              {t("cc.filterWing")}
-            </p>
+          <div className="w-[9rem] shrink-0">
             <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
+              <SelectTrigger
+                className={cn(fieldClass, "w-full")}
+                aria-label={t("cc.filterWing")}
+              >
                 <SelectValue placeholder={t("cc.selectWing")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="all">{t("common.allWing")}</SelectItem>
                 {WINGS.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
@@ -224,6 +226,14 @@ export default function RationMonthlyClient() {
               </SelectContent>
             </Select>
           </div>
+          <ClearFiltersButton
+            disabled={!q.trim() && rank === "all" && wing === "all"}
+            onClick={() => {
+              setQ("");
+              setRank("all");
+              setWing("all");
+            }}
+          />
         </div>
 
         {ledger.rows.length === 0 ? (

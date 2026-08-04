@@ -7,7 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DAILY_TAGS } from "@/lib/constants";
+import { useStore } from "@/hooks/use-store";
+import { listAllTags } from "@/lib/store/rates";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -25,7 +26,10 @@ export function TagSelector({
 }) {
   const t = useT();
   const { locale } = useI18n();
+  const state = useStore();
+  const tags = listAllTags();
   const current = value ?? "";
+  void state.rates;
 
   return (
     <Select
@@ -39,9 +43,9 @@ export function TagSelector({
         {allowEmpty ? (
           <SelectItem value="__none__">{t("daily.noTag")}</SelectItem>
         ) : null}
-        {DAILY_TAGS.map((tag) => (
-          <SelectItem key={tag.code} value={tag.code}>
-            {tag.code} — {tagLabel(tag.code, locale)}
+        {tags.map((code) => (
+          <SelectItem key={code} value={code}>
+            {code} — {tagLabel(code, locale)}
           </SelectItem>
         ))}
       </SelectContent>
