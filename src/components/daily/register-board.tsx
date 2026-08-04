@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconCheck, IconX } from "@tabler/icons-react";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -68,11 +67,6 @@ export function RegisterBoard({
   onPaintRange,
   priorByUser,
   suppressedCarries,
-  onApproveDay,
-  approvePending,
-  approveEnabled,
-  dayApproved,
-  canApprove,
 }: {
   users: User[];
   month: string;
@@ -85,11 +79,6 @@ export function RegisterBoard({
   onPaintRange: (userId: string, dates: string[], tag: DailyTag | "") => void;
   priorByUser: Map<string, DailyTag>;
   suppressedCarries: string[];
-  onApproveDay: () => void;
-  approvePending: number;
-  approveEnabled: boolean;
-  dayApproved: boolean;
-  canApprove: boolean;
 }) {
   void _paintTag;
   void _onPaintTagChange;
@@ -130,7 +119,7 @@ export function RegisterBoard({
   }, []);
 
   function isPastDate(date: string) {
-    return date < todayISO;
+    return date <= todayISO;
   }
 
   function isPastDay(day: number) {
@@ -149,7 +138,7 @@ export function RegisterBoard({
       const dates: string[] = [];
       for (let d = lo; d <= hi; d++) {
         const date = dateInMonth(month, d);
-        if (date < todayISO) continue;
+        if (date <= todayISO) continue;
         dates.push(date);
       }
       if (dates.length === 0) {
@@ -159,9 +148,8 @@ export function RegisterBoard({
 
       const anchorDay = stroke.endDay;
       const anchorDate = dateInMonth(month, anchorDay);
-      // Prefer last editable day in range for menu anchor
       const menuDay =
-        anchorDate >= todayISO
+        anchorDate > todayISO
           ? anchorDay
           : Number(dates[dates.length - 1].slice(8, 10));
       const menuDate = dateInMonth(month, menuDay);
@@ -229,7 +217,7 @@ export function RegisterBoard({
       const userId = cell.dataset.regUser;
       const day = Number(cell.dataset.regDay);
       if (!userId || !day || userId !== stroke.userId) return;
-      if (dateInMonth(month, day) < todayISO) return;
+      if (dateInMonth(month, day) <= todayISO) return;
       if (stroke.endDay === day) return;
       const next = { ...stroke, endDay: day };
       dragRef.current = next;
@@ -310,25 +298,10 @@ export function RegisterBoard({
           "border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950",
         )}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="flex flex-wrap items-center border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
           <p className="min-w-0 flex-1 truncate text-xs text-neutral-500 dark:text-neutral-400">
             {t("daily.dragFillHint")}
           </p>
-          {canApprove ? (
-            <Button
-              size="sm"
-              variant="cta"
-              className="h-9 shrink-0 rounded-lg px-3 text-sm"
-              onClick={onApproveDay}
-              disabled={!approveEnabled}
-            >
-              <IconCheck className="h-4 w-4" />
-              {dayApproved && approvePending === 0
-                ? t("daily.approvedToday")
-                : t("daily.approveDay")}
-              {approvePending > 0 ? ` (${approvePending})` : ""}
-            </Button>
-          ) : null}
         </div>
         <div
           className={cn(
@@ -452,21 +425,19 @@ export function RegisterBoard({
 
                       const prevMeta = rowMeta[cellIdx - 1];
                       const nextMeta = rowMeta[cellIdx + 1];
-                      const displayPrev =
-                        prevMeta?.stored ?? prevMeta?.ghost;
-                      const displayNext =
-                        nextMeta?.stored ?? nextMeta?.ghost;
+                      const displayPrev = prevMeta?.stored ?? prevMeta?.ghost;
+                      const displayNext = nextMeta?.stored ?? nextMeta?.ghost;
                       const contL = Boolean(
                         tag &&
-                          !isGhost &&
-                          displayPrev === tag &&
-                          prevMeta?.stored,
+                        !isGhost &&
+                        displayPrev === tag &&
+                        prevMeta?.stored,
                       );
                       const contR = Boolean(
                         tag &&
-                          !isGhost &&
-                          displayNext === tag &&
-                          nextMeta?.stored,
+                        !isGhost &&
+                        displayNext === tag &&
+                        nextMeta?.stored,
                       );
 
                       return (
@@ -479,10 +450,10 @@ export function RegisterBoard({
                           date={date}
                           userName={user.name}
                           isToday={todayDay === d}
-                          locked={date < todayISO}
+                          locked={date <= todayISO}
                           contL={contL}
                           contR={contR}
-                          preview={preview && date >= todayISO}
+                          preview={preview && date > todayISO}
                           locale={locale}
                           onDragStart={() => startDrag(user.id, d)}
                         />
@@ -691,7 +662,9 @@ function RegisterCell({
         )
       : !locked &&
           "text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-800",
-    locked && !tag && "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600",
+    locked &&
+      !tag &&
+      "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600",
     preview &&
       "bg-primary/25 ring-2 ring-inset ring-primary shadow-[inset_0_0_0_1px_rgba(6,121,88,0.55)] dark:bg-primary/40 dark:ring-primary-light",
   );

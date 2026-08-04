@@ -37,12 +37,8 @@ import {
   dateInMonth,
 } from "@/lib/date";
 import {
-  approveCarryForward,
   clearTag,
   findPriorTag,
-  getAssignment,
-  isCarrySuppressed,
-  isDateApproved,
   listByMonth,
   setTag,
   setTagRange,
@@ -54,13 +50,11 @@ import { printLetterElement } from "@/lib/print-letter-pdf";
 import { compareUsers } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
-import { useToast } from "@/components/shared/toast-provider";
 import { cn } from "@/lib/utils";
 
 export default function TagsPageClient() {
   const t = useT();
   const state = useStore();
-  const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const router = useRouter();
   const pathname = usePathname();
@@ -69,9 +63,6 @@ export default function TagsPageClient() {
   const month = parseMonthInput(monthParam ?? monthKey());
   const today = todayISO();
   const dayCount = daysInMonth(month);
-  const currentMonth = monthKey();
-  const canApprove = month === currentMonth;
-  const approveDate = canApprove ? today : dateInMonth(month, dayCount);
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
 
@@ -128,30 +119,6 @@ export default function TagsPageClient() {
     return map;
   }, [users, month, state.assignments]);
 
-  const approvePending = useMemo(() => {
-    if (!canApprove) return 0;
-    return users.filter((u) => {
-      const suppressed = isCarrySuppressed(u.id, approveDate);
-      const has = Boolean(getAssignment(u.id, approveDate));
-      if (has && !suppressed) return false;
-      return Boolean(findPriorTag(u.id, approveDate));
-    }).length;
-  }, [
-    users,
-    approveDate,
-    canApprove,
-    state.assignments,
-    state.suppressed_carries,
-  ]);
-
-  const dayApproved = useMemo(
-    () => (canApprove ? isDateApproved(approveDate) : false),
-    [canApprove, approveDate, state.approved_dates],
-  );
-
-  /** Active until Daily confirms today; any edit un-approves. */
-  const approveEnabled = canApprove && (!dayApproved || approvePending > 0);
-
   const taggedCells = useMemo(() => {
     const ids = new Set(users.map((u) => u.id));
     return assignments.filter((a) => ids.has(a.user_id)).length;
@@ -171,19 +138,6 @@ export default function TagsPageClient() {
 
   function onPaintRange(userId: string, dates: string[], tag: DailyTag | "") {
     setTagRange(userId, dates, tag);
-  }
-
-  function onApproveDay() {
-    const count = approveCarryForward(
-      users.map((u) => u.id),
-      approveDate,
-    );
-    toast(
-      count > 0
-        ? t("daily.approveDayToast", { count, date: approveDate })
-        : t("daily.approveDayDone", { date: approveDate }),
-      "success",
-    );
   }
 
   function onExportPdf() {
@@ -375,11 +329,6 @@ export default function TagsPageClient() {
             onPaintRange={onPaintRange}
             priorByUser={priorByUser}
             suppressedCarries={state.suppressed_carries ?? []}
-            onApproveDay={onApproveDay}
-            approvePending={approvePending}
-            approveEnabled={approveEnabled}
-            dayApproved={dayApproved}
-            canApprove={canApprove}
           />
         )}
       </motion.div>

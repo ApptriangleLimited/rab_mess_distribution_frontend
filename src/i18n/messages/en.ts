@@ -369,8 +369,8 @@ export const en = {
     paintOnHint: "Drag across days on one row to set {tag}. Then pick empty or preview cells.",
     paintOffHint: "No paint — click a cell to choose tag.",
     dragFillHint:
-      "Click or drag today/future days, then pick a tag. Past days locked.",
-    pastLocked: "Past day — locked",
+      "Click or drag future days only, then pick a tag. Today and past locked.",
+    pastLocked: "Today / past — locked",
     paintFillTitle: "Fill which cells?",
     paintFillBody: "Apply {tag} only to empty cells, or only to faded preview (carry) cells. Saved tags stay untouched.",
     paintClearTitle: "Clear which cells?",
