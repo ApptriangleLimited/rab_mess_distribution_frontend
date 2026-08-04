@@ -317,6 +317,90 @@ export function buildMonthLedger(month: string): {
   return { month, dayCount, tagCodes, rows };
 }
 
+/**
+ * Daily Cockpit attendance register rows for filtered members.
+ * Includes members with no tags (blank day cells) — like paper register.
+ */
+export function buildDailyRegister(
+  month: string,
+  users: User[],
+): {
+  month: string;
+  dayCount: number;
+  rows: LedgerRow[];
+} {
+  const dayCount = daysInMonth(month);
+  const assignments = assignmentsInMonth(month);
+  const byUser = new Map<string, Map<number, DailyTag>>();
+
+  for (const a of assignments) {
+    const day = Number(a.date.slice(8, 10));
+    if (!day) continue;
+    let dayMap = byUser.get(a.user_id);
+    if (!dayMap) {
+      dayMap = new Map();
+      byUser.set(a.user_id, dayMap);
+    }
+    dayMap.set(day, a.tag);
+  }
+
+  const rows: LedgerRow[] = [...users]
+    .sort(sortUsersForBill)
+    .map((user) => {
+      const dayMap = byUser.get(user.id);
+      const days: LedgerDayCell[] = [];
+      const counts: Partial<Record<DailyTag, number>> = {};
+      for (let d = 1; d <= dayCount; d++) {
+        const tag = dayMap?.get(d) ?? "";
+        days.push(tag);
+        if (tag) counts[tag] = (counts[tag] ?? 0) + 1;
+      }
+      const totalDays = Object.values(counts).reduce((s, n) => s + (n ?? 0), 0);
+      return { user, days, tagCounts: counts, totalDays };
+    });
+
+  return { month, dayCount, rows };
+}
+
+/** Consecutive same-tag runs for register print spans (empty = one cell each). */
+export function registerDayRuns(
+  days: LedgerDayCell[],
+): { tag: LedgerDayCell; len: number }[] {
+  const runs: { tag: LedgerDayCell; len: number }[] = [];
+  let i = 0;
+  while (i < days.length) {
+    const tag = days[i] ?? "";
+    if (!tag) {
+      runs.push({ tag: "", len: 1 });
+      i += 1;
+      continue;
+    }
+    let len = 1;
+    while (i + len < days.length && days[i + len] === tag) len += 1;
+    runs.push({ tag, len });
+    i += len;
+  }
+  return runs;
+}
+
+/** Paper register stroke marks for single-day duty tags. */
+export function registerCellMark(tag: LedgerDayCell, len: number): string {
+  if (!tag) return "";
+  if (len > 1) return tag;
+  if (
+    tag === "FR" ||
+    tag === "CD" ||
+    tag === "MS" ||
+    tag === "WR" ||
+    tag === "TRG" ||
+    tag === "WIT" ||
+    tag === "MED"
+  ) {
+    return "|";
+  }
+  return tag;
+}
+
 export function buildRationMonth(month: string) {
   const consume = buildConsumeMonth(month);
   const rates = rateMap();

@@ -228,13 +228,6 @@ export function UserForm({
               </SelectContent>
             </Select>
           </Field>
-          <Field label={t("cc.fields.dropdownNo")}>
-            <Input
-              value={values.dropdown_no}
-              onChange={(e) => patch("dropdown_no", e.target.value)}
-              className={inputClass}
-            />
-          </Field>
           <Field label={t("cc.fields.phone")}>
             <Input
               value={values.phone}
@@ -260,7 +253,7 @@ export function UserForm({
             </Field>
           ) : null}
           {variant === "daily" && mode === "create" ? (
-            <Field label={t("daily.setTag")}>
+            <Field label={t("daily.defaultTag")}>
               <TagSelector
                 value={todayTag}
                 onChange={(tag) => {

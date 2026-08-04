@@ -105,7 +105,7 @@ export default function ConsumeMonthlyClient() {
   }
 
   const fieldClass =
-    "h-9 rounded-lg border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
     <PagePane className="gap-5 print:border-0 print:p-0">

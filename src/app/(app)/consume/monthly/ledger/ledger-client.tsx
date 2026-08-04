@@ -108,7 +108,7 @@ export default function ConsumeLedgerClient() {
   }
 
   const fieldClass =
-    "h-8 rounded-md border-neutral-200 bg-white text-xs shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
     <PagePane className="gap-5 print:border-0 print:p-0">
@@ -178,7 +178,7 @@ export default function ConsumeLedgerClient() {
               className={cn(fieldClass, "w-full")}
             />
           </div>
-          <div className="w-40 shrink-0 space-y-1.5">
+          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("daily.month")}
             </p>
@@ -192,7 +192,7 @@ export default function ConsumeLedgerClient() {
               />
             </div>
           </div>
-          <div className="w-32 shrink-0 space-y-1.5">
+          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("cc.filterRank")}
             </p>
@@ -210,7 +210,7 @@ export default function ConsumeLedgerClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-32 shrink-0 space-y-1.5">
+          <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
             <p className="text-[11px] font-medium text-neutral-400">
               {t("cc.filterWing")}
             </p>

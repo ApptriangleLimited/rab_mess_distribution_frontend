@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { IconPlus, IconUsers } from "@tabler/icons-react";
+import { IconPencil, IconPlus, IconUsers } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -349,6 +349,21 @@ export default function RosterPage() {
                       key={user.id}
                       user={user}
                       onOpen={() => setDetailUser(user)}
+                      actions={
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="rounded-lg"
+                          >
+                            <Link href={`/daily/users/${user.id}`}>
+                              <IconPencil className="h-3.5 w-3.5" />
+                              {t("common.edit")}
+                            </Link>
+                          </Button>
+                        </div>
+                      }
                     />
                   ))}
                 </tbody>

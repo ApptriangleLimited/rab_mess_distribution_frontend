@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
+import { IconArrowLeft } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { DailyTabs } from "@/components/layout/daily-tabs";
+import { Button } from "@/components/ui/button";
 import {
   UserForm,
   type UserFormSubmitPayload,
@@ -58,7 +60,19 @@ export default function DailyNewUserPage() {
         <PageHeader
           title={t("pages.dailyNewUser.title")}
           subtitle={t("pages.dailyNewUser.subtitle")}
-          center={<DailyTabs />}
+          leading={
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              className="rounded-xl"
+              aria-label={t("common.back")}
+            >
+              <Link href="/daily/roster">
+                <IconArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+          }
         />
         <UserForm
           mode="create"

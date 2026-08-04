@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { IconCalendar, IconEye, IconEyeOff } from "@tabler/icons-react";
+import {
+  IconCalendar,
+  IconDownload,
+  IconEye,
+  IconEyeOff,
+  IconPrinter,
+} from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -18,11 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RegisterBoard, PaintTagSelect } from "@/components/daily/register-board";
+import { MonthRegisterPrint } from "@/components/daily/month-register-print";
 import { useStore } from "@/hooks/use-store";
 import { RANKS, WINGS } from "@/lib/constants";
 import {
   daysInMonth,
   monthKey,
+  nextISODate,
   parseMonthInput,
   todayISO,
   dateInMonth,
@@ -38,6 +46,10 @@ import {
   setTag,
   setTagRange,
 } from "@/lib/store/assignments";
+import { getProjectedMessEaters } from "@/lib/store/mess";
+import { buildDailyRegister } from "@/lib/reports";
+import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { useToast } from "@/components/shared/toast-provider";
@@ -58,6 +70,8 @@ export default function TagsPageClient() {
   const currentMonth = monthKey();
   const canApprove = month === currentMonth;
   const approveDate = canApprove ? today : dateInMonth(month, dayCount);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
 
   const [paintTag, setPaintTag] = useState<DailyTag | "">("");
   const [showInactive, setShowInactive] = useState(false);
@@ -93,6 +107,11 @@ export default function TagsPageClient() {
   const assignments = useMemo(
     () => listByMonth(month),
     [state.assignments, month],
+  );
+
+  const register = useMemo(
+    () => buildDailyRegister(month, users),
+    [month, users, state.assignments],
   );
 
   const priorByUser = useMemo(() => {
@@ -134,6 +153,11 @@ export default function TagsPageClient() {
     return assignments.filter((a) => ids.has(a.user_id)).length;
   }, [assignments, users]);
 
+  const tomorrowMess = useMemo(() => {
+    const date = nextISODate(today);
+    return getProjectedMessEaters(date);
+  }, [today, state.assignments, state.users, state.suppressed_carries]);
+
   const capacity = users.length * dayCount;
 
   function onTagChange(userId: string, date: string, tag: DailyTag | "") {
@@ -158,15 +182,50 @@ export default function TagsPageClient() {
     );
   }
 
+  function onExportPdf() {
+    if (!register.rows.length) return;
+    downloadDailyRegisterPdf({
+      month,
+      dayCount: register.dayCount,
+      rows: register.rows,
+      filename: `attendance-register-${month}.pdf`,
+    });
+  }
+
+  async function onPrint() {
+    const el = printRef.current;
+    if (!el || !register.rows.length) return;
+    setPrinting(true);
+    try {
+      await printLetterElement(
+        el,
+        `attendance-register-${month}.pdf`,
+        "landscape",
+      );
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   const fieldClass =
     "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
-    <PagePane className="gap-5">
+    <PagePane className="gap-5 print:border-0 print:p-0">
+      <div className="pointer-events-none fixed left-[-10000px] top-0 w-[1400px]">
+        <MonthRegisterPrint
+          ref={printRef}
+          month={month}
+          dayCount={register.dayCount}
+          rows={register.rows}
+          preview
+        />
+      </div>
+
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-5 no-print"
       >
         <PageHeader
           title={t("pages.dailyTags.title")}
@@ -182,6 +241,11 @@ export default function TagsPageClient() {
               <MiniStat
                 label={t("daily.registerCapacity")}
                 value={`${taggedCells}/${capacity}`}
+              />
+              <MiniStat
+                label={t("daily.tomorrowMess")}
+                value={String(tomorrowMess.eaters.length)}
+                accent
               />
               <Button
                 variant="outline"
@@ -200,6 +264,26 @@ export default function TagsPageClient() {
                     ? t("daily.hideInactive")
                     : t("daily.showInactive")}
                 </span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-auto rounded-lg px-2.5 py-1.5"
+                onClick={onExportPdf}
+                disabled={!register.rows.length}
+              >
+                <IconDownload className="h-4 w-4" />
+                {t("daily.exportPdf")}
+              </Button>
+              <Button
+                variant="cta"
+                size="sm"
+                className="h-auto rounded-lg px-2.5 py-1.5"
+                onClick={() => void onPrint()}
+                disabled={!register.rows.length || printing}
+              >
+                <IconPrinter className="h-4 w-4" />
+                {t("mess.print")}
               </Button>
             </div>
           }

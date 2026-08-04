@@ -69,7 +69,7 @@ export function AllConsumePanel({
   );
 
   const fieldClass =
-    "h-8 rounded-md border-neutral-200 bg-white text-xs shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
     <div className="flex flex-col gap-4 no-print">
@@ -103,49 +103,64 @@ export function AllConsumePanel({
         </div>
       </div>
 
-      <div className="flex w-full flex-wrap items-end gap-2.5">
-        <div className="relative min-w-68 max-w-lg w-full shrink-0 sm:w-80">
-          <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t("consume.searchPlaceholder")}
-            aria-label={t("common.search")}
-            className={cn(fieldClass, "w-full pl-9")}
-          />
+      <div className="flex w-full flex-wrap items-end gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
+        <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96 space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("common.search")}
+          </p>
+          <div className="relative">
+            <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("consume.searchPlaceholder")}
+              aria-label={t("common.search")}
+              className={cn(fieldClass, "w-full pl-9")}
+            />
+          </div>
         </div>
-        <Select value={rank} onValueChange={setRank}>
-          <SelectTrigger
-            className={cn(fieldClass, "w-32 shrink-0")}
-            aria-label={t("cc.filterRank")}
-          >
-            <SelectValue placeholder={t("cc.selectRank")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("common.all")}</SelectItem>
-            {RANKS.map((r) => (
-              <SelectItem key={r} value={r}>
-                {r}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={wing} onValueChange={setWing}>
-          <SelectTrigger
-            className={cn(fieldClass, "w-32 shrink-0")}
-            aria-label={t("cc.filterWing")}
-          >
-            <SelectValue placeholder={t("cc.selectWing")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("common.all")}</SelectItem>
-            {WINGS.map((w) => (
-              <SelectItem key={w} value={w}>
-                {w}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("cc.filterRank")}
+          </p>
+          <Select value={rank} onValueChange={setRank}>
+            <SelectTrigger
+              className={cn(fieldClass, "w-full")}
+              aria-label={t("cc.filterRank")}
+            >
+              <SelectValue placeholder={t("cc.selectRank")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
+              {RANKS.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-[10rem] flex-1 basis-[10rem] space-y-1.5">
+          <p className="text-[11px] font-medium text-neutral-400">
+            {t("cc.filterWing")}
+          </p>
+          <Select value={wing} onValueChange={setWing}>
+            <SelectTrigger
+              className={cn(fieldClass, "w-full")}
+              aria-label={t("cc.filterWing")}
+            >
+              <SelectValue placeholder={t("cc.selectWing")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
+              {WINGS.map((w) => (
+                <SelectItem key={w} value={w}>
+                  {w}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {rows.length === 0 ? (

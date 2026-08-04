@@ -136,7 +136,12 @@ export const bn = {
     },
     dailyNewUser: {
       title: "নতুন সদস্য",
-      subtitle: "সদস্য সরাসরি অনুমোদিত + সক্রিয়। এই পেজেই আজকের ট্যাগ সেট করুন।",
+      subtitle: "সদস্য সরাসরি অনুমোদিত + সক্রিয়। এই পেজেই ডিফল্ট ট্যাগ সেট করুন।",
+      phase: "ফেজ ২",
+    },
+    dailyEditUser: {
+      title: "সদস্য সম্পাদনা",
+      subtitle: "ডেইলি ডেস্ক থেকে সদস্য প্রোফাইল আপডেট।",
       phase: "ফেজ ২",
     },
     ccEditUser: {
@@ -263,7 +268,7 @@ export const bn = {
       "পেন্ডিং হিসেবে তৈরি হবে। সক্রিয় ডিউটিতে যেতে ডেইলি অনুমোদন লাগবে।",
     dailyCreateTitle: "অনুমোদিত হিসেবে সেভ",
     dailyCreateNote:
-      "অনুমোদন কিউ নেই। নিচে আজকের ট্যাগ বেছে নিন — পরে দৈনিক রিপোর্ট থেকে বদলানো যাবে।",
+      "অনুমোদন কিউ নেই। নিচে ডিফল্ট ট্যাগ বেছে নিন — পরে দৈনিক রিপোর্ট থেকে বদলানো যাবে।",
     dropDocs: "ফাইল ড্রপ করুন বা ক্লিক করে বেছে নিন",
     docsEmpty: "এখনো কোনো ডকুমেন্ট নেই।",
     placeholders: {
@@ -335,6 +340,7 @@ export const bn = {
     filterTag: "ট্যাগ",
     setTag: "আজকের ট্যাগ",
     setTagHint: "আজকের জন্য সেভ। দৈনিক রিপোর্ট থেকে পরে বদলানো যাবে।",
+    defaultTag: "ডিফল্ট ট্যাগ",
     tagRequired: "এগোনোর আগে ট্যাগ বেছে নিন",
     boardHint: "প্রতিদিন প্রতি সদস্যে এক ট্যাগ। নিষ্ক্রিয় ডিফল্টে লুকানো।",
     registerHint:
@@ -365,6 +371,20 @@ export const bn = {
     approveDayEmpty: "অনুমোদনের কিছু নেই — আজ সেট আছে বা আগের ট্যাগ নেই।",
     taggedCells: "মার্ক করা দিন",
     registerCapacity: "ভরাট",
+    tomorrowMess: "আগামীকালের মেস",
+    tomorrowMessHint: "{date} তারিখে MS ভোক্তা — ট্যাগ {tagged}, ক্যারি {carried}",
+    tomorrowMessCount: "{count} জন খাবে",
+    registerTitle: "Attendance Register — {month}",
+    registerTitleBn: "{month} মাসের উপস্থিতি রেজিস্টার",
+    registerColSl: "নং",
+    registerColId: "নম্বর",
+    registerColRank: "পদবী",
+    registerColName: "নাম",
+    registerFooter: "ATTENDANCE REGISTER ({month})",
+    signDailySi: "ডেইলি এসআই",
+    signAdmin: "অ্যাডমিন অফিসার",
+    signCommandant: "কমান্ড্যান্ট",
+    exportPdf: "পিডিএফ ডাউনলোড",
     colSerial: "ক্রঃ",
     colId: "নম্বর",
     untagged: "আনট্যাগড",

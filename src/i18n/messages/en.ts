@@ -135,7 +135,12 @@ export const en = {
     },
     dailyNewUser: {
       title: "New Member",
-      subtitle: "Add member as approved + active. Set today's tag on this page.",
+      subtitle: "Add member as approved + active. Set default tag on this page.",
+      phase: "Phase 2",
+    },
+    dailyEditUser: {
+      title: "Edit Member",
+      subtitle: "Update member profile from Daily desk.",
       phase: "Phase 2",
     },
     ccEditUser: {
@@ -262,7 +267,7 @@ export const en = {
       "Create as pending. Daily must approve before the member is active on duty.",
     dailyCreateTitle: "Saved as approved",
     dailyCreateNote:
-      "No approval queue. Pick today's tag below — change later on Daily Report.",
+      "No approval queue. Pick default tag below — change later on Daily Report.",
     dropDocs: "Drop files or click to browse",
     docsEmpty: "No documents attached yet.",
     placeholders: {
@@ -334,6 +339,7 @@ export const en = {
     filterTag: "Tag",
     setTag: "Today's tag",
     setTagHint: "Saved for today. Change anytime on Daily Report.",
+    defaultTag: "Default tag",
     tagRequired: "Pick a tag before continuing",
     boardHint: "One tag per member per day. Inactive members hidden by default.",
     registerHint:
@@ -363,6 +369,20 @@ export const en = {
     approveDayEmpty: "Nothing to approve — today already set or no prior tags.",
     taggedCells: "Marked days",
     registerCapacity: "Fill",
+    tomorrowMess: "Tomorrow mess",
+    tomorrowMessHint: "MS eaters for {date} — tagged {tagged}, carry {carried}",
+    tomorrowMessCount: "{count} eating",
+    registerTitle: "Attendance Register — {month}",
+    registerTitleBn: "{month} মাসের উপস্থিতি রেজিস্টার",
+    registerColSl: "No.",
+    registerColId: "Number",
+    registerColRank: "Rank",
+    registerColName: "Name",
+    registerFooter: "ATTENDANCE REGISTER ({month})",
+    signDailySi: "Daily SI",
+    signAdmin: "Admin Officer",
+    signCommandant: "Commandant",
+    exportPdf: "Download PDF",
     colSerial: "#",
     colId: "ID",
     untagged: "Untagged",
