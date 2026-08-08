@@ -1,4 +1,3 @@
-Dockerfile
 # Mess Distribution - Next.js production image
 # Uses Next.js standalone output
 
