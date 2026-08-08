@@ -1,25 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  IconCalendar,
-  IconChevronLeft,
-  IconChevronRight,
-  IconDownload,
-  IconFileAnalytics,
-  IconSearch,
-} from "@tabler/icons-react";
+import { IconDownload, IconFileAnalytics } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
 import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,38 +25,69 @@ import {
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
 import { RANKS, WINGS } from "@/lib/constants";
-import {
-  monthKey,
-  parseMonthInput,
-  shiftMonthKey,
-} from "@/lib/date";
+import { monthDateBounds } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
-import { buildMonthLedger } from "@/lib/reports";
+import { buildRangeLedger } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
-const fieldClass =
-  "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+function defaultRange() {
+  return monthDateBounds();
+}
 
 export default function RationMonthlyClient() {
   const t = useT();
   const state = useStore();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
+  const initial = defaultRange();
+
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
   const [reportOpen, setReportOpen] = useState(false);
-  const month = parseMonthInput(
-    searchParams.get("month") ?? monthKey(),
-  );
+  const [dateFrom, setDateFrom] = useState(initial.from);
+  const [dateTo, setDateTo] = useState(initial.to);
 
-  const ledger = useMemo(
-    () => buildMonthLedger(month),
-    [state.assignments, state.users, month],
-  );
+  const month = dateFrom.slice(0, 7) || initial.from.slice(0, 7);
+
+  function applyDateRange(from: string, to: string) {
+    if (!from && !to) {
+      const next = defaultRange();
+      setDateFrom(next.from);
+      setDateTo(next.to);
+      return;
+    }
+    setDateFrom(from);
+    setDateTo(to || from);
+  }
+
+  const rangeBounds = useMemo(() => {
+    return dateFrom <= dateTo
+      ? { from: dateFrom, to: dateTo }
+      : { from: dateTo, to: dateFrom };
+  }, [dateFrom, dateTo]);
+
+  const ledger = useMemo(() => {
+    const range = buildRangeLedger(
+      rangeBounds.from,
+      rangeBounds.to,
+      undefined,
+      { carry: true },
+    );
+    return {
+      month,
+      dayCount: range.dates.length,
+      tagCodes: range.tagCodes,
+      rows: range.rows,
+      columnDates: range.dates,
+    };
+  }, [
+    state.assignments,
+    state.users,
+    state.suppressed_carries,
+    month,
+    rangeBounds,
+  ]);
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -74,12 +101,6 @@ export default function RationMonthlyClient() {
         .includes(query);
     });
   }, [ledger.rows, q, rank, wing]);
-
-  function setMonth(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("month", next);
-    router.replace(`${pathname}?${params.toString()}`);
-  }
 
   function onExport() {
     const header = [
@@ -99,8 +120,18 @@ export default function RationMonthlyClient() {
         ...ledger.tagCodes.map((code) => String(r.tagCounts[code] ?? "")),
       ]),
     ];
-    downloadCsv(`ration-ledger-${month}.csv`, data);
+    downloadCsv(
+      `ration-ledger-${rangeBounds.from}_${rangeBounds.to}.csv`,
+      data,
+    );
   }
+
+  const fieldClass = searchFilterFieldClass;
+  const defaultDates = defaultRange();
+  const datesAreDefault =
+    dateFrom === defaultDates.from && dateTo === defaultDates.to;
+  const filtersActive =
+    rank !== "all" || wing !== "all" || !datesAreDefault;
 
   return (
     <PagePane className="gap-4">
@@ -115,38 +146,6 @@ export default function RationMonthlyClient() {
           center={<RationTabs />}
           actions={
             <>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-lg"
-                  aria-label={t("ration.prevMonth")}
-                  onClick={() => setMonth(shiftMonthKey(month, -1))}
-                >
-                  <IconChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="relative w-44 shrink-0">
-                  <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
-                  <Input
-                    type="month"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                    aria-label={t("ration.month")}
-                    className={cn(fieldClass, "w-44 pl-8")}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-lg"
-                  aria-label={t("ration.nextMonth")}
-                  onClick={() => setMonth(shiftMonthKey(month, 1))}
-                >
-                  <IconChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -177,19 +176,19 @@ export default function RationMonthlyClient() {
           onClose={() => setReportOpen(false)}
         />
 
-        <div className="flex w-full flex-wrap items-center gap-2.5 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-          <div className="min-w-[14rem] flex-1">
-            <div className="relative">
-              <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("cc.searchPlaceholder")}
-                aria-label={t("common.search")}
-                className={cn(fieldClass, "w-full pl-8")}
-              />
-            </div>
-          </div>
+        <SearchFilterBar
+          flat
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder={t("cc.searchPlaceholder")}
+        >
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            maxSpanDays={31}
+            onChange={({ from, to }) => applyDateRange(from, to)}
+            label={t("common.dateRange")}
+          />
           <div className="w-[9.5rem] shrink-0">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger
@@ -227,14 +226,15 @@ export default function RationMonthlyClient() {
             </Select>
           </div>
           <ClearFiltersButton
-            disabled={!q.trim() && rank === "all" && wing === "all"}
+            disabled={!filtersActive && !q.trim()}
             onClick={() => {
               setQ("");
               setRank("all");
               setWing("all");
+              applyDateRange("", "");
             }}
           />
-        </div>
+        </SearchFilterBar>
 
         {ledger.rows.length === 0 ? (
           <EmptyState title={t("consume.ledgerEmpty")} />
@@ -246,6 +246,7 @@ export default function RationMonthlyClient() {
             dayCount={ledger.dayCount}
             tagCodes={ledger.tagCodes}
             rows={rows}
+            columnDates={ledger.columnDates}
           />
         )}
       </motion.div>

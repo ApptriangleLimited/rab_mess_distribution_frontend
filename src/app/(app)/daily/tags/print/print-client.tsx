@@ -17,12 +17,13 @@ import { useStore } from "@/hooks/use-store";
 import {
   dateInMonth,
   daysInMonth,
+  eachISODate,
   formatMonthLong,
   parseMonthInput,
 } from "@/lib/date";
 import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { buildDailyRegister, sliceRegisterRows } from "@/lib/reports";
+import { buildDailyRegisterDates } from "@/lib/reports";
 import { compareUsers } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
 
@@ -60,27 +61,25 @@ export default function DailyRegisterPrintClient() {
       .sort(compareUsers);
   }, [state.users, showInactive, q, rank, wing]);
 
-  const dayNumbers = useMemo(() => {
+  const columnDates = useMemo(() => {
     const from = dateFrom.trim();
     const to = dateTo.trim();
-    const out: number[] = [];
-    for (let d = 1; d <= dayCount; d++) {
-      const date = dateInMonth(month, d);
-      if (from && date < from) continue;
-      if (to && date > to) continue;
-      out.push(d);
-    }
-    return out;
+    if (from && to) return eachISODate(from, to);
+    if (from) return [from];
+    if (to) return [to];
+    return Array.from({ length: dayCount }, (_, i) =>
+      dateInMonth(month, i + 1),
+    );
   }, [month, dayCount, dateFrom, dateTo]);
 
-  const register = useMemo(
-    () => buildDailyRegister(month, users),
-    [month, users, state.assignments],
+  const dayNumbers = useMemo(
+    () => columnDates.map((d) => Number(d.slice(8, 10))),
+    [columnDates],
   );
 
   const printRows = useMemo(
-    () => sliceRegisterRows(register.rows, dayNumbers),
-    [register.rows, dayNumbers],
+    () => buildDailyRegisterDates(columnDates, users).rows,
+    [columnDates, users, state.assignments],
   );
 
   const backHref = useMemo(() => {

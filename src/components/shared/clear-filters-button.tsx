@@ -21,7 +21,7 @@ export function ClearFiltersButton({ onClick, disabled, className }: Props) {
       variant="outline"
       size="icon"
       className={cn(
-        "ml-auto h-10 w-10 shrink-0 rounded-xl text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-100",
+        "h-10 w-10 shrink-0 rounded-xl text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-100",
         className,
       )}
       aria-label={t("common.clearFilters")}

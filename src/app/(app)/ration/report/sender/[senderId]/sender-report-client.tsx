@@ -16,12 +16,15 @@ import {
   IconChevronRight,
   IconDownload,
   IconPrinter,
-  IconSearch,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { StaffPayoutPrint } from "@/components/ration/staff-payout-print";
 import { TransferSheetPrint } from "@/components/ration/transfer-sheet-print";
@@ -52,9 +55,6 @@ import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
-
-const fieldClass =
-  "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
 type PrintKind = "staff" | "transfer";
 
@@ -224,6 +224,8 @@ export default function RationSenderReportClient() {
 
   const backHref = `/ration/report?month=${month}`;
   const hasLines = Boolean(staffSheet?.lines.length);
+  const fieldClass = searchFilterFieldClass;
+  const filtersActive = rank !== "all" || month !== defaultMonth;
 
   if (!senderId) return null;
 
@@ -330,73 +332,66 @@ export default function RationSenderReportClient() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatChip
-            label={t("ration.senderTotal")}
-            value={formatBdt(staffSheet.total)}
-            accent
-          />
-          <StatChip
-            label={t("consume.statMembers")}
-            value={String(staffSheet.lines.length)}
-          />
-          <StatChip
-            label={t("ration.missingBank")}
-            value={String(missingBankCount)}
-          />
-          <StatChip
-            label={t("ration.fromAccount")}
-            value={staffSheet.sender.account_number || "—"}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-          <div className="flex items-center gap-1.5">
+        <SearchFilterBar
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder={t("ration.searchPlaceholder")}
+          tiles={
+            <>
+              <StatChip
+                label={t("ration.senderTotal")}
+                value={formatBdt(staffSheet.total)}
+                accent
+              />
+              <StatChip
+                label={t("consume.statMembers")}
+                value={String(staffSheet.lines.length)}
+              />
+              <StatChip
+                label={t("ration.missingBank")}
+                value={String(missingBankCount)}
+              />
+              <StatChip
+                label={t("ration.fromAccount")}
+                value={staffSheet.sender.account_number || "—"}
+              />
+            </>
+          }
+        >
+          <div className="flex shrink-0 items-center gap-1.5">
             <Button
               type="button"
               variant="outline"
               size="icon"
-              className="h-11 w-11 shrink-0 rounded-xl"
+              className="h-10 w-10 shrink-0 rounded-xl"
               aria-label={t("ration.prevMonth")}
               onClick={() => setMonth(shiftMonthKey(month, -1))}
             >
               <IconChevronLeft className="h-4 w-4" />
             </Button>
             <div className="relative w-[11.5rem]">
-              <IconCalendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+              <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
               <Input
                 type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
-                className={cn(fieldClass, "pl-9")}
+                className={cn(fieldClass, "pl-8")}
               />
             </div>
             <Button
               type="button"
               variant="outline"
               size="icon"
-              className="h-11 w-11 shrink-0 rounded-xl"
+              className="h-10 w-10 shrink-0 rounded-xl"
               aria-label={t("ration.nextMonth")}
               onClick={() => setMonth(shiftMonthKey(month, 1))}
             >
               <IconChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="min-w-[12rem] flex-1 sm:min-w-[14rem]">
-            <div className="relative">
-              <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("ration.searchPlaceholder")}
-                aria-label={t("common.search")}
-                className={cn(fieldClass, "pl-9")}
-              />
-            </div>
-          </div>
-          <div className="w-[10rem]">
+          <div className="w-[9.5rem] shrink-0">
             <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={fieldClass}>
+              <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
               </SelectTrigger>
               <SelectContent>
@@ -410,13 +405,14 @@ export default function RationSenderReportClient() {
             </Select>
           </div>
           <ClearFiltersButton
-            disabled={!q.trim() && rank === "all"}
+            disabled={!filtersActive && !q.trim()}
             onClick={() => {
               setQ("");
               setRank("all");
+              if (month !== defaultMonth) setMonth(defaultMonth);
             }}
           />
-        </div>
+        </SearchFilterBar>
 
         {!hasLines ? (
           <EmptyState title={t("ration.emptyNoEligible")} />
@@ -503,23 +499,23 @@ function StatChip({
   return (
     <div
       className={cn(
-        "rounded-2xl border px-4 py-3",
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5",
         accent
-          ? "border-primary/20 bg-gradient-to-br from-primary/[0.08] to-transparent"
+          ? "border-primary/20 bg-primary/[0.08]"
           : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
       )}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
         {label}
-      </p>
-      <p
+      </span>
+      <span
         className={cn(
-          "mt-1 text-lg font-semibold tracking-tight tabular-nums sm:text-xl",
+          "text-base font-bold tabular-nums",
           accent ? "text-primary" : "text-neutral-900 dark:text-white",
         )}
       >
         {value}
-      </p>
+      </span>
     </div>
   );
 }

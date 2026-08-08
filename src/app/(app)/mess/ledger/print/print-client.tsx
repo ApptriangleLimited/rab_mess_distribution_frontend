@@ -15,37 +15,13 @@ import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
-import {
-  dateInMonth,
-  daysInMonth,
-  formatMonthLong,
-  monthKey,
-} from "@/lib/date";
+import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { buildMonthLedger, type LedgerRow } from "@/lib/reports";
-import type { DailyTag } from "@/lib/types";
+import { buildMonthLedger, buildRangeLedger } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
-
-function narrowRowsToDays(rows: LedgerRow[], days: number[]): LedgerRow[] {
-  if (!days.length) return rows;
-  const daySet = new Set(days);
-  return rows
-    .map((row) => {
-      const counts: Partial<Record<DailyTag, number>> = {};
-      let totalDays = 0;
-      for (const d of daySet) {
-        const tag = row.days[d - 1];
-        if (!tag) continue;
-        counts[tag] = (counts[tag] ?? 0) + 1;
-        totalDays += 1;
-      }
-      return { ...row, tagCounts: counts, totalDays };
-    })
-    .filter((row) => row.totalDays > 0);
-}
 
 export default function MessLedgerPrintClient() {
   const t = useT();
@@ -56,40 +32,55 @@ export default function MessLedgerPrintClient() {
 
   const rawMonth = searchParams.get("month");
   const month = rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : monthKey();
-  const dayCount = daysInMonth(month);
   const q = searchParams.get("q") ?? "";
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
   const dateFrom = searchParams.get("from") ?? "";
   const dateTo = searchParams.get("to") ?? "";
 
-  const ledger = useMemo(
-    () => buildMonthLedger(month, MESS_LEDGER_TAGS),
-    [state.assignments, state.users, month],
-  );
-
-  const visibleDays = useMemo(() => {
+  const rangeBounds = useMemo(() => {
     const from = dateFrom.trim();
     const to = dateTo.trim();
-    if (!from && !to) return undefined;
-    const out: number[] = [];
-    for (let d = 1; d <= dayCount; d++) {
-      const date = dateInMonth(month, d);
-      if (from && !to && date !== from) continue;
-      if (!from && to && date !== to) continue;
-      if (from && to) {
-        const a = from <= to ? from : to;
-        const b = from <= to ? to : from;
-        if (date < a || date > b) continue;
-      }
-      out.push(d);
+    if (!from && !to) return null;
+    if (from && to) {
+      return from <= to ? { from, to } : { from: to, to: from };
     }
-    return out;
-  }, [month, dayCount, dateFrom, dateTo]);
+    const only = from || to;
+    return { from: only, to: only };
+  }, [dateFrom, dateTo]);
+
+  const ledger = useMemo(() => {
+    if (rangeBounds) {
+      const range = buildRangeLedger(
+        rangeBounds.from,
+        rangeBounds.to,
+        MESS_LEDGER_TAGS,
+        { carry: true, previewFuture: true },
+      );
+      return {
+        month,
+        dayCount: range.dates.length,
+        tagCodes: range.tagCodes,
+        rows: range.rows,
+        columnDates: range.dates,
+      };
+    }
+    const monthLedger = buildMonthLedger(month, MESS_LEDGER_TAGS, {
+      carry: true,
+      previewFuture: true,
+    });
+    return { ...monthLedger, columnDates: undefined as string[] | undefined };
+  }, [
+    state.assignments,
+    state.users,
+    state.suppressed_carries,
+    month,
+    rangeBounds,
+  ]);
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
-    let list = ledger.rows.filter((row) => {
+    return ledger.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (wing !== "all" && row.user.wing !== wing) return false;
       if (!query) return true;
@@ -98,11 +89,7 @@ export default function MessLedgerPrintClient() {
         .toLowerCase()
         .includes(query);
     });
-    if (visibleDays?.length) {
-      list = narrowRowsToDays(list, visibleDays);
-    }
-    return list;
-  }, [ledger.rows, q, rank, wing, visibleDays]);
+  }, [ledger.rows, q, rank, wing]);
 
   const backHref = `/mess/ledger?month=${month}`;
   const canAct = rows.length > 0;
@@ -114,7 +101,7 @@ export default function MessLedgerPrintClient() {
       dayCount: ledger.dayCount,
       tagCodes: ledger.tagCodes,
       rows,
-      visibleDays,
+      columnDates: ledger.columnDates,
       filename: `mess-ledger-${month}.pdf`,
     });
   }
@@ -191,7 +178,7 @@ export default function MessLedgerPrintClient() {
             dayCount={ledger.dayCount}
             tagCodes={ledger.tagCodes}
             rows={rows}
-            visibleDays={visibleDays}
+            columnDates={ledger.columnDates}
             preview
           />
         </div>

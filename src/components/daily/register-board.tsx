@@ -9,11 +9,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { dateInMonth } from "@/lib/date";
+import { ListPagination } from "@/components/shared/list-pagination";
+import { dateInMonth, eachISODate } from "@/lib/date";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
+import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { listAllTags } from "@/lib/store/rates";
 import { cn } from "@/lib/utils";
@@ -33,6 +35,21 @@ const TAG_CELL: Record<string, string> = {
 const TAG_CELL_FALLBACK =
   "bg-neutral-100 text-neutral-800 dark:bg-neutral-700 dark:text-neutral-100";
 
+const MONTH_ABBR = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
 export function tagCellClass(tag: string) {
   return TAG_CELL[tag] ?? TAG_CELL_FALLBACK;
 }
@@ -41,15 +58,15 @@ export { TAG_CELL };
 
 type DragStroke = {
   userId: string;
-  startDay: number;
-  endDay: number;
+  startDate: string;
+  endDate: string;
 };
 
 type RangeMenu = {
   userId: string;
   userName: string;
   dates: string[];
-  anchorDay: number;
+  anchorDate: string;
   /** Single-cell ghost carry (accept) */
   ghostTag?: DailyTag;
   storedTag?: DailyTag;
@@ -90,21 +107,29 @@ export function RegisterBoard({
 
   const t = useT();
   const { locale } = useI18n();
-  const allDays = useMemo(
-    () => Array.from({ length: dayCount }, (_, i) => i + 1),
-    [dayCount],
+  /** Full month ISO list — seed for carry roll when no range filter. */
+  const monthDates = useMemo(
+    () =>
+      Array.from({ length: dayCount }, (_, i) => dateInMonth(month, i + 1)),
+    [dayCount, month],
   );
-  const days = useMemo(() => {
+  /** Columns: full selected range (cross-month) or whole open month. */
+  const columnDates = useMemo(() => {
     const from = dateFrom.trim();
     const to = dateTo.trim();
-    if (!from && !to) return allDays;
-    return allDays.filter((d) => {
-      const date = dateInMonth(month, d);
-      if (from && date < from) return false;
-      if (to && date > to) return false;
-      return true;
-    });
-  }, [allDays, month, dateFrom, dateTo]);
+    if (from && to) return eachISODate(from, to);
+    if (from) return [from];
+    if (to) return [to];
+    return monthDates;
+  }, [monthDates, dateFrom, dateTo]);
+
+  const crossMonth = useMemo(() => {
+    if (columnDates.length < 2) return false;
+    return (
+      columnDates[0].slice(0, 7) !==
+      columnDates[columnDates.length - 1].slice(0, 7)
+    );
+  }, [columnDates]);
 
   const suppressedSet = useMemo(
     () => new Set(suppressedCarries),
@@ -119,10 +144,6 @@ export function RegisterBoard({
     return map;
   }, [assignments]);
 
-  const todayDay = todayISO.startsWith(month)
-    ? Number(todayISO.slice(8, 10))
-    : null;
-
   const [drag, setDrag] = useState<DragStroke | null>(null);
   const dragRef = useRef<DragStroke | null>(null);
   const [rangeMenu, setRangeMenu] = useState<RangeMenu | null>(null);
@@ -134,14 +155,6 @@ export function RegisterBoard({
     dragRef.current = null;
   }, []);
 
-  function isPastDate(date: string) {
-    return date <= todayISO;
-  }
-
-  function isPastDay(day: number) {
-    return isPastDate(dateInMonth(month, day));
-  }
-
   const openRangeMenu = useCallback(
     (stroke: DragStroke) => {
       const user = users.find((u) => u.id === stroke.userId);
@@ -149,33 +162,32 @@ export function RegisterBoard({
         setDrag(null);
         return;
       }
-      const lo = Math.min(stroke.startDay, stroke.endDay);
-      const hi = Math.max(stroke.startDay, stroke.endDay);
-      const dates: string[] = [];
-      for (let d = lo; d <= hi; d++) {
-        const date = dateInMonth(month, d);
-        if (date <= todayISO) continue;
-        dates.push(date);
-      }
+      const lo =
+        stroke.startDate <= stroke.endDate
+          ? stroke.startDate
+          : stroke.endDate;
+      const hi =
+        stroke.startDate <= stroke.endDate
+          ? stroke.endDate
+          : stroke.startDate;
+      const dates = eachISODate(lo, hi).filter((date) => date > todayISO);
       if (dates.length === 0) {
         setDrag(null);
         return;
       }
 
-      const anchorDay = stroke.endDay;
-      const anchorDate = dateInMonth(month, anchorDay);
-      const menuDay =
-        anchorDate > todayISO
-          ? anchorDay
-          : Number(dates[dates.length - 1].slice(8, 10));
-      const menuDate = dateInMonth(month, menuDay);
+      const menuDate =
+        stroke.endDate > todayISO
+          ? stroke.endDate
+          : dates[dates.length - 1];
       const storedTag = byUserDate.get(`${stroke.userId}|${menuDate}`);
 
       let ghostTag: DailyTag | undefined;
       if (!storedTag && dates.length === 1) {
         let rolling = priorByUser.get(stroke.userId);
-        for (let d = 1; d < menuDay; d++) {
-          const s = byUserDate.get(`${stroke.userId}|${dateInMonth(month, d)}`);
+        for (const date of columnDates) {
+          if (date >= menuDate) break;
+          const s = byUserDate.get(`${stroke.userId}|${date}`);
           if (s) rolling = s;
         }
         const key = `${stroke.userId}|${menuDate}`;
@@ -183,7 +195,7 @@ export function RegisterBoard({
       }
 
       const el = document.querySelector(
-        `[data-reg-user="${stroke.userId}"][data-reg-day="${menuDay}"]`,
+        `[data-reg-user="${stroke.userId}"][data-reg-date="${menuDate}"]`,
       ) as HTMLElement | null;
       if (el) {
         const rect = el.getBoundingClientRect();
@@ -196,17 +208,17 @@ export function RegisterBoard({
         setMenuPos({ top, left });
       }
 
-      setDrag({ ...stroke, endDay: menuDay });
+      setDrag({ ...stroke, endDate: menuDate });
       setRangeMenu({
         userId: stroke.userId,
         userName: user.name,
         dates,
-        anchorDay: menuDay,
+        anchorDate: menuDate,
         ghostTag,
         storedTag,
       });
     },
-    [byUserDate, month, priorByUser, suppressedSet, todayISO, users],
+    [byUserDate, columnDates, priorByUser, suppressedSet, todayISO, users],
   );
 
   const commitDrag = useCallback(() => {
@@ -227,15 +239,15 @@ export function RegisterBoard({
       if (!stroke) return;
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const cell = el?.closest(
-        "[data-reg-user][data-reg-day]",
+        "[data-reg-user][data-reg-date]",
       ) as HTMLElement | null;
       if (!cell) return;
       const userId = cell.dataset.regUser;
-      const day = Number(cell.dataset.regDay);
-      if (!userId || !day || userId !== stroke.userId) return;
-      if (dateInMonth(month, day) <= todayISO) return;
-      if (stroke.endDay === day) return;
-      const next = { ...stroke, endDay: day };
+      const date = cell.dataset.regDate;
+      if (!userId || !date || userId !== stroke.userId) return;
+      if (date <= todayISO) return;
+      if (stroke.endDate === date) return;
+      const next = { ...stroke, endDate: date };
       dragRef.current = next;
       setDrag(next);
     };
@@ -252,7 +264,7 @@ export function RegisterBoard({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [commitDrag, rangeMenu, month, todayISO]);
+  }, [commitDrag, rangeMenu, todayISO]);
 
   useEffect(() => {
     if (!rangeMenu) return;
@@ -263,19 +275,25 @@ export function RegisterBoard({
     return () => window.removeEventListener("keydown", onKey);
   }, [rangeMenu, closeRangeMenu]);
 
-  function startDrag(userId: string, day: number) {
+  function startDrag(userId: string, date: string) {
     if (rangeMenu) return;
-    if (isPastDay(day)) return;
-    const stroke: DragStroke = { userId, startDay: day, endDay: day };
+    if (date <= todayISO) return;
+    const stroke: DragStroke = {
+      userId,
+      startDate: date,
+      endDate: date,
+    };
     dragRef.current = stroke;
     setDrag(stroke);
   }
 
-  function inDragPreview(userId: string, day: number) {
+  function inDragPreview(userId: string, date: string) {
     if (!drag || drag.userId !== userId) return false;
-    const lo = Math.min(drag.startDay, drag.endDay);
-    const hi = Math.max(drag.startDay, drag.endDay);
-    return day >= lo && day <= hi;
+    const lo =
+      drag.startDate <= drag.endDate ? drag.startDate : drag.endDate;
+    const hi =
+      drag.startDate <= drag.endDate ? drag.endDate : drag.startDate;
+    return date >= lo && date <= hi;
   }
 
   function applyRangeTag(tag: DailyTag | "") {
@@ -293,6 +311,22 @@ export function RegisterBoard({
       ? rangeMenu.dates[0]
       : `${rangeMenu.dates[0]} → ${rangeMenu.dates[rangeMenu.dates.length - 1]}`
     : "";
+
+  const resetKey = useMemo(
+    () =>
+      `${month}|${dateFrom}|${dateTo}|${users.map((u) => u.id).join("|")}`,
+    [month, dateFrom, dateTo, users],
+  );
+  const {
+    page,
+    setPage,
+    totalPages,
+    pageItems,
+    total,
+    from,
+    to,
+    pageSize,
+  } = usePagination(users, resetKey);
 
   return (
     <div className="relative">
@@ -321,7 +355,7 @@ export function RegisterBoard({
         </div>
         <div
           className={cn(
-            "max-h-[min(72vh,760px)] overflow-auto bg-white dark:bg-neutral-950",
+            "overflow-x-auto bg-white dark:bg-neutral-950",
             drag && "select-none",
           )}
         >
@@ -340,55 +374,64 @@ export function RegisterBoard({
                 <th className="sticky left-[224px] z-40 w-[173px] min-w-[173px] max-w-[173px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
                   {t("cc.fields.name")}
                 </th>
-                {days.map((d) => {
-                  const isToday = todayDay === d;
-                  const past = isPastDay(d);
+                {columnDates.map((date, i) => {
+                  const isToday = date === todayISO;
+                  const past = date <= todayISO;
+                  const dayNum = Number(date.slice(8, 10));
+                  const showMonth =
+                    crossMonth &&
+                    (i === 0 || date.slice(8, 10) === "01");
+                  const monthAbbr = showMonth
+                    ? MONTH_ABBR[Number(date.slice(5, 7)) - 1]
+                    : null;
                   return (
                     <th
-                      key={d}
+                      key={date}
+                      title={date}
                       className={cn(
-                        "w-9 min-w-9 border-b border-r border-neutral-300 px-0 py-2 text-center dark:border-neutral-700",
+                        "w-9 min-w-9 border-b border-r border-neutral-300 px-0 py-1 text-center dark:border-neutral-700",
                         isToday &&
                           "bg-primary/15 text-primary dark:bg-primary/25",
                         past &&
                           "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/50 dark:text-neutral-600",
                       )}
                     >
-                      {d}
+                      {monthAbbr ? (
+                        <span className="block text-[8px] font-semibold leading-none tracking-wide opacity-80">
+                          {monthAbbr}
+                        </span>
+                      ) : null}
+                      <span className="leading-tight">{dayNum}</span>
                     </th>
                   );
                 })}
               </tr>
             </thead>
             <tbody>
-              {users.map((user, index) => {
+              {pageItems.map((user, index) => {
+                const ser = (page - 1) * pageSize + index + 1;
                 const odd = index % 2 === 0;
                 const stickyBg = odd
                   ? "bg-white dark:bg-neutral-950"
                   : "bg-neutral-50 dark:bg-neutral-900";
 
                 let rolling: DailyTag | undefined = priorByUser.get(user.id);
-                const fullMeta: {
+                const rowMeta: {
                   date: string;
-                  day: number;
                   stored?: DailyTag;
                   ghost?: DailyTag;
                 }[] = [];
-                for (const d of allDays) {
-                  const date = dateInMonth(month, d);
+                for (const date of columnDates) {
                   const key = `${user.id}|${date}`;
                   const stored = byUserDate.get(key);
                   if (stored) rolling = stored;
                   const suppressed = suppressedSet.has(key);
-                  fullMeta.push({
+                  rowMeta.push({
                     date,
-                    day: d,
                     stored,
                     ghost: stored || suppressed ? undefined : rolling,
                   });
                 }
-                const visibleDaySet = new Set(days);
-                const rowMeta = fullMeta.filter((c) => visibleDaySet.has(c.day));
 
                 return (
                   <tr
@@ -405,7 +448,7 @@ export function RegisterBoard({
                         stickyBg,
                       )}
                     >
-                      {index + 1}
+                      {ser}
                     </td>
                     <td
                       className={cn(
@@ -432,13 +475,15 @@ export function RegisterBoard({
                       {user.name}
                     </td>
                     {rowMeta.map((cell, cellIdx) => {
-                      const { date, day: d, stored, ghost } = cell;
-                      const preview = inDragPreview(user.id, d);
+                      const { date, stored, ghost } = cell;
+                      const preview = inDragPreview(user.id, date);
+                      const locked = date <= todayISO;
                       let tag = stored;
                       let isGhost = false;
                       if (!stored && ghost) {
                         tag = ghost;
-                        isGhost = true;
+                        // Future only — past/today show solid (not preview fade)
+                        isGhost = !locked;
                       }
 
                       const prevMeta = rowMeta[cellIdx - 1];
@@ -449,31 +494,34 @@ export function RegisterBoard({
                         tag &&
                         !isGhost &&
                         displayPrev === tag &&
-                        prevMeta?.stored,
+                        (prevMeta?.stored ||
+                          (prevMeta?.ghost &&
+                            (prevMeta.date ?? "") <= todayISO)),
                       );
                       const contR = Boolean(
                         tag &&
                         !isGhost &&
                         displayNext === tag &&
-                        nextMeta?.stored,
+                        (nextMeta?.stored ||
+                          (nextMeta?.ghost &&
+                            (nextMeta.date ?? "") <= todayISO)),
                       );
 
                       return (
                         <RegisterCell
                           key={date}
-                          day={d}
                           userId={user.id}
                           tag={tag}
                           ghost={isGhost}
                           date={date}
                           userName={user.name}
-                          isToday={todayDay === d}
-                          locked={date <= todayISO}
+                          isToday={date === todayISO}
+                          locked={locked}
                           contL={contL}
                           contR={contR}
                           preview={preview && date > todayISO}
                           locale={locale}
-                          onDragStart={() => startDrag(user.id, d)}
+                          onDragStart={() => startDrag(user.id, date)}
                         />
                       );
                     })}
@@ -483,6 +531,14 @@ export function RegisterBoard({
             </tbody>
           </table>
         </div>
+        <ListPagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          from={from}
+          to={to}
+          onPageChange={setPage}
+        />
       </div>
 
       {rangeMenu ? (
@@ -635,7 +691,6 @@ function TagPickerPanel({
 }
 
 function RegisterCell({
-  day,
   userId,
   tag,
   ghost,
@@ -649,7 +704,6 @@ function RegisterCell({
   locale,
   onDragStart,
 }: {
-  day: number;
   userId: string;
   tag?: DailyTag;
   ghost?: boolean;
@@ -668,27 +722,26 @@ function RegisterCell({
   const cellClass = cn(
     "flex h-full w-full items-center justify-center font-mono text-[10px] font-bold leading-none touch-none transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
     locked
-      ? "cursor-not-allowed opacity-60"
+      ? "cursor-not-allowed"
       : "cursor-pointer hover:ring-1 hover:ring-primary/40",
     tag
       ? cn(
           tagCellClass(tag),
           contL ? "rounded-l-none" : "rounded-l-sm",
           contR ? "rounded-r-none" : "rounded-r-sm",
+          // Faded carry preview = future only
           ghost &&
             "opacity-45 ring-1 ring-inset ring-dashed ring-neutral-400/70 dark:ring-neutral-500/70",
         )
-      : !locked &&
-          "text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-800",
-    locked &&
-      !tag &&
-      "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600",
+      : locked
+        ? "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600"
+        : "text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-800",
     preview &&
       "bg-primary/25 ring-2 ring-inset ring-primary shadow-[inset_0_0_0_1px_rgba(6,121,88,0.55)] dark:bg-primary/40 dark:ring-primary-light",
   );
 
   const title = locked
-    ? `${userName} · ${date} · ${t("daily.pastLocked")}`
+    ? `${userName} · ${date} · ${tag ? `${tag} ${tagLabel(tag, locale)} · ` : ""}${t("daily.pastLocked")}`
     : tag
       ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
       : `${userName} · ${date}`;
@@ -698,11 +751,11 @@ function RegisterCell({
       className={cn(
         "h-9 w-9 min-w-9 border-b border-r border-neutral-200 p-0 dark:border-neutral-800",
         isToday && !preview && "bg-primary/[0.04]",
-        locked && "bg-neutral-50/80 dark:bg-neutral-900/40",
+        locked && !tag && "bg-neutral-50/80 dark:bg-neutral-900/40",
         preview && "bg-primary/20 dark:bg-primary/35",
       )}
       data-reg-user={locked ? undefined : userId}
-      data-reg-day={locked ? undefined : day}
+      data-reg-date={locked ? undefined : date}
     >
       <button
         type="button"
@@ -710,7 +763,7 @@ function RegisterCell({
         disabled={locked}
         className={cellClass}
         data-reg-user={locked ? undefined : userId}
-        data-reg-day={locked ? undefined : day}
+        data-reg-date={locked ? undefined : date}
         onPointerDown={(e) => {
           if (locked || e.button !== 0) return;
           e.preventDefault();

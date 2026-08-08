@@ -7,6 +7,11 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { ListPagination } from "@/components/shared/list-pagination";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { UserConfirmCard } from "@/components/daily/user-confirm-card";
 import { RosterRow } from "@/components/daily/status-toggle";
@@ -21,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/shared/toast-provider";
 import { updateUserBank, compareUsers } from "@/lib/store/users";
@@ -110,6 +116,13 @@ export default function RationMembersPage() {
     ? (state.users.find((u) => u.id === viewUser.id) ?? viewUser)
     : null;
 
+  const resetKey = useMemo(
+    () => `${q}|${rank}|${wing}|${status}|${roster.map((u) => u.id).join(",")}`,
+    [q, rank, wing, status, roster],
+  );
+  const { page, setPage, totalPages, pageItems, total, from, to } =
+    usePagination(roster, resetKey);
+
   function saveBank() {
     if (!bankUser || !bankForm) return;
     const updated = updateUserBank(bankUser.id, bankForm);
@@ -119,8 +132,9 @@ export default function RationMembersPage() {
     }
   }
 
-  const fieldClass =
-    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+  const fieldClass = searchFilterFieldClass;
+  const filtersActive =
+    rank !== "all" || wing !== "all" || status !== "all";
 
   return (
     <PagePane className="gap-5">
@@ -135,7 +149,13 @@ export default function RationMembersPage() {
             count: roster.length,
           })}
           center={<RationTabs />}
-          actions={
+        />
+
+        <SearchFilterBar
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder={t("cc.searchPlaceholder")}
+          tiles={
             <>
               <StatChip
                 label={t("daily.rosterStatAll")}
@@ -152,19 +172,8 @@ export default function RationMembersPage() {
               />
             </>
           }
-        />
-
-        <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t("cc.searchPlaceholder")}
-              aria-label={t("common.search")}
-              className={cn(fieldClass, "w-full")}
-            />
-          </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+        >
+          <div className="w-[9.5rem] shrink-0">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
@@ -179,7 +188,7 @@ export default function RationMembersPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+          <div className="w-[9rem] shrink-0">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectWing")} />
@@ -194,7 +203,7 @@ export default function RationMembersPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+          <div className="w-[9.5rem] shrink-0">
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
@@ -207,9 +216,7 @@ export default function RationMembersPage() {
             </Select>
           </div>
           <ClearFiltersButton
-            disabled={
-              !q.trim() && rank === "all" && wing === "all" && status === "all"
-            }
+            disabled={!filtersActive && !q.trim()}
             onClick={() => {
               setQ("");
               setRank("all");
@@ -217,7 +224,7 @@ export default function RationMembersPage() {
               setStatus("all");
             }}
           />
-        </div>
+        </SearchFilterBar>
 
         {approved.length === 0 ? (
           <EmptyState title={t("daily.emptyRoster")} />
@@ -248,7 +255,7 @@ export default function RationMembersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {roster.map((user) => {
+                  {pageItems.map((user) => {
                     const bankReady = hasBank(user);
                     return (
                       <RosterRow
@@ -287,6 +294,14 @@ export default function RationMembersPage() {
                 </tbody>
               </table>
             </div>
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              from={from}
+              to={to}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </motion.div>
@@ -404,29 +419,26 @@ function StatChip({
   label,
   value,
   accent,
-  className,
 }: {
   label: string;
   value: string;
   accent?: boolean;
-  className?: string;
 }) {
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5",
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5",
         accent
           ? "border-primary/20 bg-primary/[0.08]"
           : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
-        className,
       )}
     >
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
         {label}
       </span>
       <span
         className={cn(
-          "text-sm font-semibold tabular-nums",
+          "text-base font-bold tabular-nums",
           accent ? "text-primary" : "text-neutral-900 dark:text-white",
         )}
       >

@@ -1,10 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { IconSearch, IconUsers } from "@tabler/icons-react";
+import { IconUsers } from "@tabler/icons-react";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { ListPagination } from "@/components/shared/list-pagination";
+import { MonthNav } from "@/components/shared/month-nav";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -12,7 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { usePagination } from "@/hooks/use-pagination";
 import { RANKS, WINGS } from "@/lib/constants";
+import { monthKey } from "@/lib/date";
 import { formatBdt } from "@/lib/reports";
 import type { User } from "@/lib/types";
 import { useT } from "@/i18n/provider";
@@ -27,11 +34,14 @@ export type AllConsumeRow = {
 
 type Props = {
   rows: AllConsumeRow[];
+  month: string;
+  onMonthChange: (month: string) => void;
 };
 
 /** Month rollup — all tags combined. */
-export function AllConsumePanel({ rows }: Props) {
+export function AllConsumePanel({ rows, month, onMonthChange }: Props) {
   const t = useT();
+  const defaultMonth = monthKey();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
@@ -59,25 +69,35 @@ export function AllConsumePanel({ rows }: Props) {
     [members],
   );
 
-  const fieldClass =
-    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+  const resetKey = useMemo(
+    () => `${month}|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
+    [month, q, rank, wing, members],
+  );
+  const {
+    page,
+    setPage,
+    totalPages,
+    pageItems,
+    total,
+    from,
+    to,
+    pageSize,
+  } = usePagination(members, resetKey);
+
+  const fieldClass = searchFilterFieldClass;
+  const filtersActive =
+    rank !== "all" || wing !== "all" || month !== defaultMonth;
 
   return (
     <div className="flex flex-col gap-4 no-print">
-      <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-        <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">
-          <div className="relative">
-            <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t("consume.searchPlaceholder")}
-              aria-label={t("common.search")}
-              className={cn(fieldClass, "w-full pl-9")}
-            />
-          </div>
-        </div>
-        <div className="min-w-[10rem] flex-1 basis-[10rem]">
+      <SearchFilterBar
+        flat
+        search={q}
+        onSearchChange={setQ}
+        searchPlaceholder={t("consume.searchPlaceholder")}
+      >
+        <MonthNav month={month} onChange={onMonthChange} />
+        <div className="w-[9.5rem] shrink-0">
           <Select value={rank} onValueChange={setRank}>
             <SelectTrigger
               className={cn(fieldClass, "w-full")}
@@ -95,7 +115,7 @@ export function AllConsumePanel({ rows }: Props) {
             </SelectContent>
           </Select>
         </div>
-        <div className="min-w-[10rem] flex-1 basis-[10rem]">
+        <div className="w-[9rem] shrink-0">
           <Select value={wing} onValueChange={setWing}>
             <SelectTrigger
               className={cn(fieldClass, "w-full")}
@@ -114,14 +134,15 @@ export function AllConsumePanel({ rows }: Props) {
           </Select>
         </div>
         <ClearFiltersButton
-          disabled={!q.trim() && rank === "all" && wing === "all"}
+          disabled={!filtersActive && !q.trim()}
           onClick={() => {
             setQ("");
             setRank("all");
             setWing("all");
+            if (month !== defaultMonth) onMonthChange(defaultMonth);
           }}
         />
-      </div>
+      </SearchFilterBar>
 
       {rows.length === 0 ? (
         <EmptyState
@@ -168,13 +189,13 @@ export function AllConsumePanel({ rows }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {members.map((row, i) => (
+                {pageItems.map((row, i) => (
                   <tr
                     key={row.user.id}
                     className="border-t border-neutral-100/90 transition-colors hover:bg-primary/[0.03] dark:border-neutral-800/80 dark:hover:bg-primary/5"
                   >
                     <td className="px-3 py-2.5 text-center font-mono text-xs tabular-nums text-neutral-400">
-                      {i + 1}
+                      {(page - 1) * pageSize + i + 1}
                     </td>
                     <td className="px-3 py-2.5 font-mono text-xs text-neutral-600 dark:text-neutral-300">
                       {row.user.rab_id}
@@ -220,6 +241,14 @@ export function AllConsumePanel({ rows }: Props) {
               </tfoot>
             </table>
           </div>
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            from={from}
+            to={to}
+            onPageChange={setPage}
+          />
         </section>
       )}
     </div>

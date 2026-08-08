@@ -1,6 +1,15 @@
 import { getState } from "@/lib/store";
 import { RATION_REPORT_META } from "@/lib/constants";
-import { daysInMonth, todayISO } from "@/lib/date";
+import {
+  dateInMonth,
+  daysInMonth,
+  eachISODate,
+  todayISO,
+} from "@/lib/date";
+import {
+  findPriorTag,
+  isCarrySuppressed,
+} from "@/lib/store/assignments";
 import { getFuelRatePerDay, listAllTags } from "@/lib/store/rates";
 import { compareUsers } from "@/lib/store/users";
 import type {
@@ -258,10 +267,13 @@ export function buildWingSummary(month: string): {
 
 /** Members × day-of-month tag marks for ledger print.
  *  Optional `tags` limits marks + result cols (e.g. Mess MS/CD only).
+ *  `carry: true` fills empty days (≤ today) from prior tag when in `tags`.
+ *  `previewFuture: true` also carries into future days (read-only preview).
  */
 export function buildMonthLedger(
   month: string,
   tags?: readonly DailyTag[],
+  opts?: { carry?: boolean; previewFuture?: boolean },
 ): {
   month: string;
   dayCount: number;
@@ -275,6 +287,9 @@ export function buildMonthLedger(
   const tagCodes = tagFilter
     ? tags!.filter((t, i, arr) => arr.indexOf(t) === i)
     : listAllTags();
+  const today = todayISO();
+  const useCarry = Boolean(opts?.carry);
+  const previewFuture = Boolean(opts?.previewFuture);
 
   const byUser = new Map<string, Map<number, DailyTag>>();
   const tagCounts = new Map<string, Partial<Record<DailyTag, number>>>();
@@ -294,6 +309,32 @@ export function buildMonthLedger(
     tagCounts.set(a.user_id, counts);
   }
 
+  if (useCarry) {
+    const candidates = users.filter(
+      (u) => u.approval_status === "approved" && u.status === "1",
+    );
+    for (const user of candidates) {
+      let dayMap = byUser.get(user.id);
+      if (!dayMap) {
+        dayMap = new Map();
+        byUser.set(user.id, dayMap);
+      }
+      const counts = tagCounts.get(user.id) ?? {};
+      for (let d = 1; d <= dayCount; d++) {
+        if (dayMap.has(d)) continue;
+        const date = dateInMonth(month, d);
+        if (date > today && !previewFuture) continue;
+        if (isCarrySuppressed(user.id, date)) continue;
+        const prior = findPriorTag(user.id, date);
+        if (!prior) continue;
+        if (tagFilter && !tagFilter.has(prior)) continue;
+        dayMap.set(d, prior);
+        counts[prior] = (counts[prior] ?? 0) + 1;
+      }
+      tagCounts.set(user.id, counts);
+    }
+  }
+
   const rows: LedgerRow[] = [...byUser.entries()]
     .map(([userId, dayMap]) => {
       const user = users.find((u) => u.id === userId);
@@ -307,12 +348,100 @@ export function buildMonthLedger(
         (s, n) => s + (n ?? 0),
         0,
       );
+      if (useCarry && totalDays === 0) return null;
       return { user, days, tagCounts: counts, totalDays };
     })
     .filter((row): row is LedgerRow => Boolean(row))
     .sort((a, b) => sortUsersForBill(a.user, b.user));
 
   return { month, dayCount, tagCodes, rows };
+}
+
+/** Members × ISO-date tag marks for a contiguous range (cross-month OK).
+ *  `row.days[i]` aligns with returned `dates[i]`.
+ *  `previewFuture: true` carries MS/CD (etc.) into future days for read-only preview.
+ */
+export function buildRangeLedger(
+  from: string,
+  to: string,
+  tags?: readonly DailyTag[],
+  opts?: { carry?: boolean; previewFuture?: boolean },
+): {
+  dates: string[];
+  tagCodes: DailyTag[];
+  rows: LedgerRow[];
+} {
+  const dates = eachISODate(from, to);
+  const assignments = getState().assignments.filter(
+    (a) => a.date >= (from <= to ? from : to) && a.date <= (from <= to ? to : from),
+  );
+  const users = getState().users;
+  const tagFilter = tags?.length ? new Set<DailyTag>(tags) : null;
+  const tagCodes = tagFilter
+    ? tags!.filter((t, i, arr) => arr.indexOf(t) === i)
+    : listAllTags();
+  const today = todayISO();
+  const useCarry = Boolean(opts?.carry);
+  const previewFuture = Boolean(opts?.previewFuture);
+
+  const byUser = new Map<string, Map<string, DailyTag>>();
+  const tagCounts = new Map<string, Partial<Record<DailyTag, number>>>();
+
+  for (const a of assignments) {
+    if (tagFilter && !tagFilter.has(a.tag)) continue;
+    let dayMap = byUser.get(a.user_id);
+    if (!dayMap) {
+      dayMap = new Map();
+      byUser.set(a.user_id, dayMap);
+    }
+    dayMap.set(a.date, a.tag);
+    const counts = tagCounts.get(a.user_id) ?? {};
+    counts[a.tag] = (counts[a.tag] ?? 0) + 1;
+    tagCounts.set(a.user_id, counts);
+  }
+
+  if (useCarry) {
+    const candidates = users.filter(
+      (u) => u.approval_status === "approved" && u.status === "1",
+    );
+    for (const user of candidates) {
+      let dayMap = byUser.get(user.id);
+      if (!dayMap) {
+        dayMap = new Map();
+        byUser.set(user.id, dayMap);
+      }
+      const counts = tagCounts.get(user.id) ?? {};
+      for (const date of dates) {
+        if (dayMap.has(date)) continue;
+        if (date > today && !previewFuture) continue;
+        if (isCarrySuppressed(user.id, date)) continue;
+        const prior = findPriorTag(user.id, date);
+        if (!prior) continue;
+        if (tagFilter && !tagFilter.has(prior)) continue;
+        dayMap.set(date, prior);
+        counts[prior] = (counts[prior] ?? 0) + 1;
+      }
+      tagCounts.set(user.id, counts);
+    }
+  }
+
+  const rows: LedgerRow[] = [...byUser.entries()]
+    .map(([userId, dayMap]) => {
+      const user = users.find((u) => u.id === userId);
+      if (!user) return null;
+      const days: LedgerDayCell[] = dates.map((d) => dayMap.get(d) ?? "");
+      const counts = tagCounts.get(userId) ?? {};
+      const totalDays = Object.values(counts).reduce<number>(
+        (s, n) => s + (n ?? 0),
+        0,
+      );
+      if (useCarry && totalDays === 0) return null;
+      return { user, days, tagCounts: counts, totalDays };
+    })
+    .filter((row): row is LedgerRow => Boolean(row))
+    .sort((a, b) => sortUsersForBill(a.user, b.user));
+
+  return { dates, tagCodes, rows };
 }
 
 /**
@@ -361,6 +490,52 @@ export function buildDailyRegister(
     });
 
   return { month, dayCount, rows };
+}
+
+/** Daily register rows for arbitrary ISO date columns (cross-month OK).
+ *  `row.days[i]` aligns with `dates[i]`.
+ */
+export function buildDailyRegisterDates(
+  dates: string[],
+  users: User[],
+): {
+  dates: string[];
+  rows: LedgerRow[];
+} {
+  if (!dates.length) return { dates, rows: [] };
+  const lo = dates[0];
+  const hi = dates[dates.length - 1];
+  const assignments = getState().assignments.filter(
+    (a) => a.date >= lo && a.date <= hi,
+  );
+  const byUser = new Map<string, Map<string, DailyTag>>();
+  for (const a of assignments) {
+    let dayMap = byUser.get(a.user_id);
+    if (!dayMap) {
+      dayMap = new Map();
+      byUser.set(a.user_id, dayMap);
+    }
+    dayMap.set(a.date, a.tag);
+  }
+
+  const rows: LedgerRow[] = [...users]
+    .sort(sortUsersForBill)
+    .map((user) => {
+      const dayMap = byUser.get(user.id);
+      const counts: Partial<Record<DailyTag, number>> = {};
+      const days: LedgerDayCell[] = dates.map((date) => {
+        const tag = dayMap?.get(date) ?? "";
+        if (tag) counts[tag] = (counts[tag] ?? 0) + 1;
+        return tag;
+      });
+      const totalDays = Object.values(counts).reduce<number>(
+        (s, n) => s + (n ?? 0),
+        0,
+      );
+      return { user, days, tagCounts: counts, totalDays };
+    });
+
+  return { dates, rows };
 }
 
 /** Slice register rows to calendar day numbers (1-based). */

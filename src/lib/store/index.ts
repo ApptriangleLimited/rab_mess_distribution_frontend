@@ -1,5 +1,5 @@
 import { RATE_ONLY_TAGS, STORE_KEY } from "@/lib/constants";
-import { createSeedState } from "@/lib/store/seed";
+import { createSeedState, SEED_VERSION } from "@/lib/store/seed";
 import type {
   AllowanceRate,
   AppState,
@@ -64,13 +64,20 @@ function writeStorage(state: AppState) {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
 }
 
+function isCurrentSeed(state: AppState | null): state is AppState {
+  return !!state && (state.version ?? 0) >= SEED_VERSION;
+}
+
 export function getState(): AppState {
-  if (memory) return memory;
+  if (isCurrentSeed(memory)) return memory;
+
   const fromDisk = readStorage();
-  if (fromDisk) {
+  if (isCurrentSeed(fromDisk)) {
     memory = normalizeState(fromDisk);
     return memory;
   }
+
+  // Stale / missing seed version → auto restore demo data
   const seeded = createSeedState();
   memory = seeded;
   writeStorage(seeded);

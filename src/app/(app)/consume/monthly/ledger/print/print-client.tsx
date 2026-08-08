@@ -17,10 +17,11 @@ import { useStore } from "@/hooks/use-store";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { buildMonthLedger } from "@/lib/reports";
+import { buildMonthLedger, buildRangeLedger } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function ConsumeLedgerPrintClient() {
   const t = useT();
@@ -34,11 +35,47 @@ export default function ConsumeLedgerPrintClient() {
   const q = searchParams.get("q") ?? "";
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
+  const dateFrom = searchParams.get("from") ?? "";
+  const dateTo = searchParams.get("to") ?? "";
 
-  const ledger = useMemo(
-    () => buildMonthLedger(month),
-    [state.assignments, state.users, month],
-  );
+  const rangeBounds = useMemo(() => {
+    if (DATE_RE.test(dateFrom) && DATE_RE.test(dateTo)) {
+      return dateFrom <= dateTo
+        ? { from: dateFrom, to: dateTo }
+        : { from: dateTo, to: dateFrom };
+    }
+    if (DATE_RE.test(dateFrom) || DATE_RE.test(dateTo)) {
+      const only = DATE_RE.test(dateFrom) ? dateFrom : dateTo;
+      return { from: only, to: only };
+    }
+    return null;
+  }, [dateFrom, dateTo]);
+
+  const ledger = useMemo(() => {
+    if (rangeBounds) {
+      const range = buildRangeLedger(
+        rangeBounds.from,
+        rangeBounds.to,
+        undefined,
+        { carry: true },
+      );
+      return {
+        month,
+        dayCount: range.dates.length,
+        tagCodes: range.tagCodes,
+        rows: range.rows,
+        columnDates: range.dates,
+      };
+    }
+    const monthLedger = buildMonthLedger(month, undefined, { carry: true });
+    return { ...monthLedger, columnDates: undefined as string[] | undefined };
+  }, [
+    state.assignments,
+    state.users,
+    state.suppressed_carries,
+    month,
+    rangeBounds,
+  ]);
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -53,8 +90,18 @@ export default function ConsumeLedgerPrintClient() {
     });
   }, [ledger.rows, q, rank, wing]);
 
-  const backHref = `/consume/monthly/ledger?month=${month}`;
+  const backHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("month", month);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
+    return `/consume/monthly/ledger?${params.toString()}`;
+  }, [month, dateFrom, dateTo]);
+
   const canAct = rows.length > 0;
+  const rangeLabel = rangeBounds
+    ? `${rangeBounds.from} → ${rangeBounds.to}`
+    : formatMonthLong(month);
 
   function onDownload() {
     if (!canAct) return;
@@ -63,6 +110,7 @@ export default function ConsumeLedgerPrintClient() {
       dayCount: ledger.dayCount,
       tagCodes: ledger.tagCodes,
       rows,
+      columnDates: ledger.columnDates,
       filename: `consume-ledger-${month}.pdf`,
     });
   }
@@ -84,7 +132,7 @@ export default function ConsumeLedgerPrintClient() {
         <PageHeader
           title={t("pages.consumeLedgerPrint.title")}
           subtitle={t("pages.consumeLedgerPrint.subtitle", {
-            month: formatMonthLong(month),
+            month: rangeLabel,
             count: rows.length,
           })}
           leading={
@@ -139,6 +187,7 @@ export default function ConsumeLedgerPrintClient() {
             dayCount={ledger.dayCount}
             tagCodes={ledger.tagCodes}
             rows={rows}
+            columnDates={ledger.columnDates}
             preview
           />
         </div>

@@ -75,8 +75,8 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
             <col style={{ width: "6.5%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "9%" }} />
-            {dayNumbers.map((d) => (
-              <col key={d} />
+            {dayNumbers.map((d, i) => (
+              <col key={`${d}-${i}`} />
             ))}
           </colgroup>
           <thead>
@@ -93,8 +93,8 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
               <th className="border border-black px-0 py-0.5 text-left">
                 {t("daily.registerColName")}
               </th>
-              {dayNumbers.map((d) => (
-                <th key={d} className="border border-black px-0 py-0.5">
+              {dayNumbers.map((d, i) => (
+                <th key={`${d}-${i}`} className="border border-black px-0 py-0.5">
                   {dayLabel(d)}
                 </th>
               ))}

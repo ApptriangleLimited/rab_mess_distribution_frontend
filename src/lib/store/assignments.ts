@@ -291,3 +291,53 @@ export function approveCarryForward(
   });
   return filled;
 }
+
+/**
+ * Auto-apply prior tags to empty cells for `date`.
+ * Skips explicit clears (suppressed). Does not rewrite saved tags.
+ */
+export function autoApplyCarryForward(
+  userIds: string[],
+  date: string,
+  updatedBy = "daily",
+) {
+  const prev = getState();
+  const next = [...prev.assignments];
+  const suppressed = prev.suppressed_carries ?? [];
+  const ts = nowISO();
+  let filled = 0;
+
+  for (const userId of userIds) {
+    const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
+    if (idx >= 0) continue;
+    if (suppressed.includes(carryKey(userId, date))) continue;
+
+    let prior: DailyTag | null = null;
+    let cursor = previousISODate(date);
+    for (let i = 0; i < 62; i++) {
+      const stored = next.find(
+        (a) => a.user_id === userId && a.date === cursor,
+      );
+      if (stored) {
+        prior = stored.tag;
+        break;
+      }
+      cursor = previousISODate(cursor);
+    }
+    if (!prior) continue;
+
+    next.push({
+      id: newId(),
+      user_id: userId,
+      date,
+      tag: prior,
+      updated_by: updatedBy,
+      updated_at: ts,
+    });
+    filled += 1;
+  }
+
+  if (filled === 0) return 0;
+  setState({ ...prev, assignments: next });
+  return filled;
+}

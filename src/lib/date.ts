@@ -142,3 +142,39 @@ export function monthDatesThroughToday() {
   }
   return out;
 }
+
+/** First/last ISO date of calendar month (default: current). */
+export function monthDateBounds(month = monthKey()) {
+  return {
+    from: dateInMonth(month, 1),
+    to: dateInMonth(month, daysInMonth(month)),
+  };
+}
+
+/** Inclusive ISO dates from `from` through `to` (order-safe). */
+export function eachISODate(from: string, to: string): string[] {
+  const a = from <= to ? from : to;
+  const b = from <= to ? to : from;
+  if (!a || !b) return [];
+  const out: string[] = [];
+  let cur = a;
+  while (cur <= b) {
+    out.push(cur);
+    cur = nextISODate(cur);
+  }
+  return out;
+}
+
+/** Distinct `YYYY-MM` keys covering inclusive date range. */
+export function monthsCoveringRange(from: string, to: string): string[] {
+  const a = (from <= to ? from : to).slice(0, 7);
+  const b = (from <= to ? to : from).slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(a) || !/^\d{4}-\d{2}$/.test(b)) return [];
+  const out: string[] = [];
+  let m = a;
+  while (m <= b) {
+    out.push(m);
+    m = shiftMonthKey(m, 1);
+  }
+  return out;
+}

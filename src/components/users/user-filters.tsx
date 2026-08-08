@@ -2,7 +2,10 @@
 
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
-import { Input } from "@/components/ui/input";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import {
   Select,
   SelectContent,
@@ -31,8 +34,7 @@ const EMPTY_FILTERS: UserFilters = {
   date_to: "",
 };
 
-const fieldClass =
-  "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+const fieldClass = searchFilterFieldClass;
 
 /** Travel-style range picker for member joining / out dates. */
 export function MemberDateFilter({
@@ -70,8 +72,7 @@ export function UserFiltersBar({ value, onChange }: Props) {
     onChange({ ...value, ...partial });
   }
 
-  const dirty =
-    Boolean(value.q?.trim()) ||
+  const filtersActive =
     (value.status != null && value.status !== "all") ||
     (value.approval != null && value.approval !== "all") ||
     (value.wing != null && value.wing !== "all") ||
@@ -79,16 +80,14 @@ export function UserFiltersBar({ value, onChange }: Props) {
     Boolean(value.date_from?.trim()) ||
     Boolean(value.date_to?.trim());
 
+  const dirty = filtersActive || Boolean(value.q?.trim());
+
   return (
-    <div className="flex w-full flex-nowrap items-center gap-2.5 overflow-x-auto rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-      <div className="min-w-[14rem] flex-1">
-        <Input
-          value={value.q ?? ""}
-          onChange={(e) => patch({ q: e.target.value })}
-          placeholder={t("cc.searchPlaceholder")}
-          className={fieldClass}
-        />
-      </div>
+    <SearchFilterBar
+      search={value.q ?? ""}
+      onSearchChange={(q) => patch({ q })}
+      searchPlaceholder={t("cc.searchPlaceholder")}
+    >
       <div className="w-[9.5rem] shrink-0">
         <Select
           value={value.status ?? "all"}
@@ -168,6 +167,6 @@ export function UserFiltersBar({ value, onChange }: Props) {
         disabled={!dirty}
         onClick={() => onChange({ ...EMPTY_FILTERS })}
       />
-    </div>
+    </SearchFilterBar>
   );
 }

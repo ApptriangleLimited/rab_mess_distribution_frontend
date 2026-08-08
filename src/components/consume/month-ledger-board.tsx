@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { tagCellClass } from "@/components/daily/register-board";
+import { ListPagination } from "@/components/shared/list-pagination";
+import { usePagination } from "@/hooks/use-pagination";
 import { dateInMonth, todayISO } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
@@ -18,6 +20,11 @@ type Props = {
   rows: LedgerRow[];
   /** Subset of day-of-month numbers to show (1-based). Default: 1..dayCount. */
   visibleDays?: number[];
+  /**
+   * Cross-month columns. When set, `row.days[i]` aligns with `columnDates[i]`
+   * (not day-of-month index).
+   */
+  columnDates?: string[];
   /** Hide `{count} · {month}` in board chrome. */
   hideMonthMeta?: boolean;
   /** Hide ID / Rank / Name sticky cols (keep Ser). */
@@ -28,6 +35,8 @@ type Props = {
   showAllColumn?: boolean;
   /** Hide day-of-month tag mark columns (daily result grid). */
   hideDayColumns?: boolean;
+  /** Show future MS/CD (etc.) as muted preview — still read-only. */
+  previewFuture?: boolean;
   /** @deprecated Prefer `density="comfortable"`. */
   comfortable?: boolean;
   /** Table spacing: default (dense) · medium · comfortable. */
@@ -50,7 +59,6 @@ const DENSITY = {
     bodyMono: "text-[11px]",
     bodyText: "text-xs",
     tagHead: "text-[10px]",
-    maxH: "max-h-[min(72vh,760px)]",
   },
   medium: {
     ser: 42,
@@ -67,7 +75,6 @@ const DENSITY = {
     bodyMono: "text-xs",
     bodyText: "text-sm",
     tagHead: "text-[11px]",
-    maxH: "max-h-[min(75vh,820px)]",
   },
   comfortable: {
     ser: 48,
@@ -84,7 +91,6 @@ const DENSITY = {
     bodyMono: "text-sm",
     bodyText: "text-sm",
     tagHead: "text-xs",
-    maxH: "max-h-[min(78vh,900px)]",
   },
 } as const;
 
@@ -94,26 +100,44 @@ export function MonthLedgerBoard({
   tagCodes,
   rows,
   visibleDays,
+  columnDates,
   hideMonthMeta = false,
   hideUserDetails = false,
   hideTagResults = false,
   showAllColumn = false,
   hideDayColumns = false,
+  previewFuture = false,
   comfortable = false,
   density,
 }: Props) {
   const t = useT();
   const { locale } = useI18n();
   const today = todayISO();
-  const days = useMemo(() => {
-    if (hideDayColumns) return [];
-    if (visibleDays?.length) return visibleDays;
-    return Array.from({ length: dayCount }, (_, i) => i + 1);
-  }, [dayCount, hideDayColumns, visibleDays]);
+  const columns = useMemo(() => {
+    if (hideDayColumns) return [] as { date: string; dayNum: number }[];
+    if (columnDates?.length) {
+      return columnDates.map((date) => ({
+        date,
+        dayNum: Number(date.slice(8, 10)),
+      }));
+    }
+    const nums = visibleDays?.length
+      ? visibleDays
+      : Array.from({ length: dayCount }, (_, i) => i + 1);
+    return nums.map((dayNum) => ({
+      date: dateInMonth(month, dayNum),
+      dayNum,
+    }));
+  }, [columnDates, dayCount, hideDayColumns, month, visibleDays]);
 
-  const todayDay = today.startsWith(month)
-    ? Number(today.slice(8, 10))
-    : null;
+  const rangeMode = Boolean(columnDates?.length);
+  const crossMonth = useMemo(() => {
+    if (columns.length < 2) return false;
+    return (
+      columns[0].date.slice(0, 7) !==
+      columns[columns.length - 1].date.slice(0, 7)
+    );
+  }, [columns]);
 
   const resolved: Density =
     density ?? (comfortable ? "comfortable" : "default");
@@ -130,6 +154,22 @@ export function MonthLedgerBoard({
   const resultColCount = visibleTags.length + (showAllColumn ? 1 : 0);
   const cellPad = d.pad;
   const rowH = d.rowH;
+
+  const resetKey = useMemo(
+    () =>
+      `${month}|${columnDates?.join(",") ?? ""}|${rows.map((r) => r.user.id).join("|")}`,
+    [month, columnDates, rows],
+  );
+  const {
+    page,
+    setPage,
+    totalPages,
+    pageItems,
+    total,
+    from,
+    to,
+    pageSize,
+  } = usePagination(rows, resetKey);
 
   return (
     <div
@@ -173,7 +213,7 @@ export function MonthLedgerBoard({
         )}
       </div>
 
-      <div className={cn("overflow-auto bg-white dark:bg-neutral-950", d.maxH)}>
+      <div className="overflow-x-auto bg-white dark:bg-neutral-950">
         <table className={cn("min-w-full border-collapse text-left", d.tableText)}>
           <thead className="sticky top-0 z-30">
             <tr
@@ -251,27 +291,41 @@ export function MonthLedgerBoard({
                   {t("common.all")}
                 </th>
               ) : null}
-              {days.map((dayNum) => {
-                const isToday = todayDay === dayNum;
-                const isFuture = dateInMonth(month, dayNum) > today;
+              {columns.map(({ date, dayNum }, i) => {
+                const isToday = date === today;
+                const isFuture = date > today;
+                const showMonth =
+                  crossMonth && (i === 0 || date.slice(8, 10) === "01");
+                const monthAbbr = showMonth
+                  ? new Date(`${date}T12:00:00`).toLocaleString("en-US", {
+                      month: "short",
+                    })
+                  : null;
                 return (
                   <th
-                    key={dayNum}
+                    key={date}
+                    title={date}
                     className={cn(
-                      "relative z-0 w-9 min-w-9 border-b border-r border-neutral-300 bg-neutral-100 px-0 py-2 text-center dark:border-neutral-700 dark:bg-neutral-900",
+                      "relative z-0 w-9 min-w-9 border-b border-r border-neutral-300 bg-neutral-100 px-0 py-1 text-center dark:border-neutral-700 dark:bg-neutral-900",
                       isToday && "bg-primary/15 text-primary dark:bg-primary/25",
                       isFuture &&
                         "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/50 dark:text-neutral-600",
                     )}
                   >
-                    {dayNum}
+                    {monthAbbr ? (
+                      <span className="block text-[8px] font-semibold leading-none tracking-wide opacity-80">
+                        {monthAbbr}
+                      </span>
+                    ) : null}
+                    <span className="leading-tight">{dayNum}</span>
                   </th>
                 );
               })}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => {
+            {pageItems.map((row, index) => {
+              const ser = (page - 1) * pageSize + index + 1;
               const odd = index % 2 === 0;
               const stickyBg = odd
                 ? "bg-white dark:bg-neutral-950"
@@ -301,7 +355,7 @@ export function MonthLedgerBoard({
                     )}
                     style={{ width: SER_W, minWidth: SER_W, padding: cellPad }}
                   >
-                    {index + 1}
+                    {ser}
                   </td>
                   {!hideUserDetails ? (
                     <>
@@ -391,42 +445,52 @@ export function MonthLedgerBoard({
                     </td>
                   ) : null}
                   {!hideDayColumns
-                    ? days.map((dayNum, vi) => {
-                        const di = dayNum - 1;
-                        const tag = row.days[di] ?? "";
-                        const date = dateInMonth(month, dayNum);
+                    ? columns.map(({ date, dayNum }, vi) => {
+                        const tag = rangeMode
+                          ? (row.days[vi] ?? "")
+                          : (row.days[dayNum - 1] ?? "");
                         const future = date > today;
-                        const isToday = todayDay === dayNum;
+                        const isToday = date === today;
 
-                        if (future) {
+                        if (future && !previewFuture) {
                           return (
                             <td
-                              key={dayNum}
+                              key={date}
                               className="relative z-0 h-9 w-9 min-w-9 border-b border-r border-neutral-200 bg-neutral-50 p-0 dark:border-neutral-800 dark:bg-neutral-900"
                               aria-hidden
                             />
                           );
                         }
 
-                        const prevDay = days[vi - 1];
-                        const nextDay = days[vi + 1];
-                        const prev =
-                          prevDay != null ? row.days[prevDay - 1] : undefined;
-                        const next =
-                          nextDay != null ? row.days[nextDay - 1] : undefined;
+                        const prevCol = columns[vi - 1];
+                        const nextCol = columns[vi + 1];
+                        const prev = prevCol
+                          ? rangeMode
+                            ? row.days[vi - 1]
+                            : row.days[prevCol.dayNum - 1]
+                          : undefined;
+                        const next = nextCol
+                          ? rangeMode
+                            ? row.days[vi + 1]
+                            : row.days[nextCol.dayNum - 1]
+                          : undefined;
                         const contL = Boolean(tag && prev === tag);
                         const contR = Boolean(tag && next === tag);
                         const title = tag
-                          ? `${row.user.name} · ${date} · ${tag} ${tagLabel(tag, locale)}`
+                          ? `${row.user.name} · ${date} · ${tag} ${tagLabel(tag, locale)}${
+                              future ? ` · ${t("mess.futurePreview")}` : ""
+                            }`
                           : `${row.user.name} · ${date}`;
 
                         return (
                           <td
-                            key={dayNum}
+                            key={date}
                             title={title}
                             className={cn(
                               "relative z-0 h-9 w-9 min-w-9 border-b border-r border-neutral-200 bg-white p-0 dark:border-neutral-800 dark:bg-neutral-950",
                               isToday && "bg-primary/[0.04]",
+                              future &&
+                                "bg-neutral-50/80 dark:bg-neutral-900/60",
                             )}
                           >
                             <span
@@ -437,6 +501,7 @@ export function MonthLedgerBoard({
                                       tagCellClass(tag),
                                       contL ? "rounded-l-none" : "rounded-l-sm",
                                       contR ? "rounded-r-none" : "rounded-r-sm",
+                                      future && "opacity-45",
                                     )
                                   : "text-neutral-300 dark:text-neutral-600",
                               )}
@@ -453,6 +518,14 @@ export function MonthLedgerBoard({
           </tbody>
         </table>
       </div>
+      <ListPagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        from={from}
+        to={to}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

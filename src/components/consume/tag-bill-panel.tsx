@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  IconSearch,
-  IconUsers,
-} from "@tabler/icons-react";
+import { IconUsers } from "@tabler/icons-react";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { ListPagination } from "@/components/shared/list-pagination";
+import { MonthNav } from "@/components/shared/month-nav";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -16,7 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { usePagination } from "@/hooks/use-pagination";
 import { RANKS, WINGS } from "@/lib/constants";
+import { monthKey } from "@/lib/date";
 import { buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
@@ -26,13 +30,15 @@ import { cn } from "@/lib/utils";
 type Props = {
   month: string;
   tag: DailyTag;
+  onMonthChange: (month: string) => void;
 };
 
 /** Tag bill body — filters + member table (inline under by-tag tabs). */
-export function TagBillPanel({ month, tag }: Props) {
+export function TagBillPanel({ month, tag, onMonthChange }: Props) {
   const t = useT();
   const state = useStore();
   const reduceMotion = useReducedMotion();
+  const defaultMonth = monthKey();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
@@ -77,8 +83,17 @@ export function TagBillPanel({ month, tag }: Props) {
 
   const showFuel = tag === "FR" || bill.fuelRate > 0;
 
-  const fieldClass =
-    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+  const resetKey = useMemo(
+    () =>
+      `${month}|${tag}|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
+    [month, tag, q, rank, wing, members],
+  );
+  const { page, setPage, totalPages, pageItems, total, from, to } =
+    usePagination(members, resetKey);
+
+  const fieldClass = searchFilterFieldClass;
+  const filtersActive =
+    rank !== "all" || wing !== "all" || month !== defaultMonth;
 
   return (
     <div className="flex flex-col gap-0">
@@ -89,20 +104,14 @@ export function TagBillPanel({ month, tag }: Props) {
         transition={{ duration: 0.2 }}
         className="flex flex-col gap-4"
       >
-        <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">
-            <div className="relative">
-              <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("consume.searchPlaceholder")}
-                aria-label={t("common.search")}
-                className={cn(fieldClass, "w-full pl-9")}
-              />
-            </div>
-          </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+        <SearchFilterBar
+          flat
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder={t("consume.searchPlaceholder")}
+        >
+          <MonthNav month={month} onChange={onMonthChange} />
+          <div className="w-[9.5rem] shrink-0">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger
                 className={cn(fieldClass, "w-full")}
@@ -120,7 +129,7 @@ export function TagBillPanel({ month, tag }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+          <div className="w-[9rem] shrink-0">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger
                 className={cn(fieldClass, "w-full")}
@@ -139,14 +148,15 @@ export function TagBillPanel({ month, tag }: Props) {
             </Select>
           </div>
           <ClearFiltersButton
-            disabled={!q.trim() && rank === "all" && wing === "all"}
+            disabled={!filtersActive && !q.trim()}
             onClick={() => {
               setQ("");
               setRank("all");
               setWing("all");
+              if (month !== defaultMonth) onMonthChange(defaultMonth);
             }}
           />
-        </div>
+        </SearchFilterBar>
 
         {bill.rows.length === 0 ? (
           <EmptyState title={t("consume.tagEmpty")} />
@@ -193,7 +203,7 @@ export function TagBillPanel({ month, tag }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((row) => (
+                  {pageItems.map((row) => (
                     <tr
                       key={row.user.id}
                       className="border-t border-neutral-100/90 transition-colors hover:bg-primary/[0.03] dark:border-neutral-800/80 dark:hover:bg-primary/5"
@@ -257,6 +267,14 @@ export function TagBillPanel({ month, tag }: Props) {
                 </tfoot>
               </table>
             </div>
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              from={from}
+              to={to}
+              onPageChange={setPage}
+            />
           </section>
         )}
       </motion.div>

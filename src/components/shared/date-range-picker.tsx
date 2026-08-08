@@ -70,12 +70,23 @@ function inRange(iso: string, from: string, to: string) {
   return iso >= a && iso <= b;
 }
 
+/** Inclusive calendar-day count between two ISO dates. */
+function inclusiveDaySpan(a: string, b: string): number {
+  const da = parseISO(a);
+  const db = parseISO(b);
+  if (!da || !db) return 0;
+  const ms = Math.abs(db.getTime() - da.getTime());
+  return Math.round(ms / 86_400_000) + 1;
+}
+
 type Props = {
   from: string;
   to: string;
   onChange: (next: { from: string; to: string }) => void;
   min?: string;
   max?: string;
+  /** Max inclusive days in a selection (e.g. 31). Omit = no span cap. */
+  maxSpanDays?: number;
   label?: string;
   className?: string;
   triggerClassName?: string;
@@ -87,6 +98,7 @@ export function DateRangePicker({
   onChange,
   min,
   max,
+  maxSpanDays,
   label,
   className,
   triggerClassName,
@@ -123,6 +135,16 @@ export function DateRangePicker({
   function isDisabled(iso: string) {
     if (min && iso < min) return true;
     if (max && iso > max) return true;
+    // Picking end date: keep within maxSpanDays of start (any month OK).
+    if (
+      maxSpanDays != null &&
+      maxSpanDays > 0 &&
+      draftFrom &&
+      !draftTo &&
+      inclusiveDaySpan(draftFrom, iso) > maxSpanDays
+    ) {
+      return true;
+    }
     return false;
   }
 
@@ -135,6 +157,13 @@ export function DateRangePicker({
     }
     const nextFrom = iso < draftFrom ? iso : draftFrom;
     const nextTo = iso < draftFrom ? draftFrom : iso;
+    if (
+      maxSpanDays != null &&
+      maxSpanDays > 0 &&
+      inclusiveDaySpan(nextFrom, nextTo) > maxSpanDays
+    ) {
+      return;
+    }
     setDraftFrom(nextFrom);
     setDraftTo(nextTo);
     onChange({ from: nextFrom, to: nextTo });
@@ -142,7 +171,20 @@ export function DateRangePicker({
   }
 
   function apply() {
-    onChange({ from: draftFrom, to: draftTo });
+    let nextFrom = draftFrom;
+    let nextTo = draftTo;
+    if (nextFrom && !nextTo) nextTo = nextFrom;
+    if (nextTo && !nextFrom) nextFrom = nextTo;
+    if (
+      nextFrom &&
+      nextTo &&
+      maxSpanDays != null &&
+      maxSpanDays > 0 &&
+      inclusiveDaySpan(nextFrom, nextTo) > maxSpanDays
+    ) {
+      return;
+    }
+    onChange({ from: nextFrom, to: nextTo });
     setOpen(false);
   }
 

@@ -4,12 +4,7 @@ import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  IconCalendar,
-  IconChevronLeft,
-  IconChevronRight,
-  IconPrinter,
-} from "@tabler/icons-react";
+import { IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { AllConsumePanel } from "@/components/consume/all-consume-panel";
@@ -20,10 +15,9 @@ import {
   type ConsumeTagTab,
 } from "@/components/layout/consume-tag-tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
 import { isAllowanceTag, isKnownTag } from "@/lib/store/rates";
-import { monthKey, shiftMonthKey } from "@/lib/date";
+import { monthKey } from "@/lib/date";
 import { buildConsumeMonth, buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
@@ -125,9 +119,6 @@ export default function ConsumeMonthlyClient() {
   const exportDisabled =
     tag === "all" ? !report.rows.length : !tagBill?.rows.length;
 
-  const fieldClass =
-    "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
-
   return (
     <PagePane className="gap-5">
       <motion.div
@@ -140,42 +131,6 @@ export default function ConsumeMonthlyClient() {
             title={t("pages.consumeMonthly.title")}
             subtitle={t("pages.consumeMonthly.subtitle", { month })}
             center={<ConsumePanelTabs />}
-            actions={
-              <>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 rounded-lg"
-                    aria-label={t("consume.prevMonth")}
-                    onClick={() => setMonth(shiftMonthKey(month, -1))}
-                  >
-                    <IconChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <div className="relative w-40 shrink-0">
-                    <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
-                    <Input
-                      type="month"
-                      value={month}
-                      onChange={(e) => setMonth(e.target.value)}
-                      aria-label={t("consume.month")}
-                      className={cn(fieldClass, "w-40 pl-8")}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 rounded-lg"
-                    aria-label={t("consume.nextMonth")}
-                    onClick={() => setMonth(shiftMonthKey(month, 1))}
-                  >
-                    <IconChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </>
-            }
           />
         </div>
 
@@ -256,9 +211,19 @@ export default function ConsumeMonthlyClient() {
 
           <div className="p-4 sm:p-5">
             {tag === "all" ? (
-              <AllConsumePanel key={`${month}-all`} rows={report.rows} />
+              <AllConsumePanel
+                key={`${month}-all`}
+                rows={report.rows}
+                month={month}
+                onMonthChange={setMonth}
+              />
             ) : (
-              <TagBillPanel key={`${month}-${tag}`} month={month} tag={tag} />
+              <TagBillPanel
+                key={`${month}-${tag}`}
+                month={month}
+                tag={tag}
+                onMonthChange={setMonth}
+              />
             )}
           </div>
         </section>

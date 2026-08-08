@@ -9,10 +9,14 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { ListPagination } from "@/components/shared/list-pagination";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import { ApprovalRow } from "@/components/daily/approval-card";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -22,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { RosterRow } from "@/components/daily/status-toggle";
 import { MemberDateFilter } from "@/components/users/user-filters";
+import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { getAssignment } from "@/lib/store/assignments";
 import {
@@ -34,6 +39,7 @@ import { todayISO } from "@/lib/date";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
+import type { User } from "@/lib/types";
 
 export default function RosterPage() {
   const t = useT();
@@ -138,8 +144,33 @@ export default function RosterPage() {
   const boardEmpty = pending.length === 0 && roster.length === 0;
   const showing = pending.length + roster.length;
 
-  const fieldClass =
-    "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+  type BoardRow =
+    | { kind: "pending"; user: User }
+    | { kind: "roster"; user: User };
+
+  const boardRows = useMemo<BoardRow[]>(
+    () => [
+      ...pending.map((user) => ({ kind: "pending" as const, user })),
+      ...roster.map((user) => ({ kind: "roster" as const, user })),
+    ],
+    [pending, roster],
+  );
+
+  const resetKey = useMemo(
+    () => boardRows.map((r) => `${r.kind}:${r.user.id}`).join("|"),
+    [boardRows],
+  );
+  const { page, setPage, totalPages, pageItems, total, from, to } =
+    usePagination(boardRows, resetKey);
+
+  const fieldClass = searchFilterFieldClass;
+  const filtersActive =
+    rank !== "all" ||
+    wing !== "all" ||
+    tag !== "all" ||
+    status !== "all" ||
+    Boolean(dateFrom.trim()) ||
+    Boolean(dateTo.trim());
 
   return (
     <PagePane className="gap-5">
@@ -153,6 +184,25 @@ export default function RosterPage() {
           subtitle={t("pages.roster.subtitle", { count: showing })}
           center={<DailyTabs />}
           actions={
+            <Button
+              asChild
+              variant="cta"
+              size="sm"
+              className="h-9 shrink-0 rounded-xl px-3"
+            >
+              <Link href="/daily/users/new">
+                <IconPlus className="h-3.5 w-3.5" />
+                {t("cc.newUser")}
+              </Link>
+            </Button>
+          }
+        />
+
+        <SearchFilterBar
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder={t("cc.searchPlaceholder")}
+          tiles={
             <>
               <StatChip
                 label={t("daily.rosterStatAll")}
@@ -171,27 +221,10 @@ export default function RosterPage() {
                 label={t("daily.rosterStatInactive")}
                 value={String(inactiveCount)}
               />
-              <Button asChild variant="cta" size="sm" className="rounded-xl">
-                <Link href="/daily/users/new">
-                  <IconPlus className="h-3.5 w-3.5" />
-                  {t("cc.newUser")}
-                </Link>
-              </Button>
             </>
           }
-        />
-
-        <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-gradient-to-br from-neutral-50/80 to-white p-3.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-          <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t("cc.searchPlaceholder")}
-              aria-label={t("common.search")}
-              className={cn(fieldClass, "w-full")}
-            />
-          </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+        >
+          <div className="w-[9.5rem] shrink-0">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
@@ -206,7 +239,7 @@ export default function RosterPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+          <div className="w-[9rem] shrink-0">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectWing")} />
@@ -221,7 +254,7 @@ export default function RosterPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+          <div className="w-[10rem] shrink-0">
             <Select value={tag} onValueChange={setTagFilter}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
@@ -237,7 +270,7 @@ export default function RosterPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[10rem] flex-1 basis-[10rem]">
+          <div className="w-[9.5rem] shrink-0">
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
@@ -256,15 +289,7 @@ export default function RosterPage() {
             onTo={setDateTo}
           />
           <ClearFiltersButton
-            disabled={
-              !q.trim() &&
-              rank === "all" &&
-              wing === "all" &&
-              tag === "all" &&
-              status === "all" &&
-              !dateFrom &&
-              !dateTo
-            }
+            disabled={!filtersActive && !q.trim()}
             onClick={() => {
               setQ("");
               setRank("all");
@@ -275,7 +300,7 @@ export default function RosterPage() {
               setDateTo("");
             }}
           />
-        </div>
+        </SearchFilterBar>
 
         {boardEmpty ? (
           <EmptyState
@@ -312,20 +337,31 @@ export default function RosterPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pending.map((user) => (
-                    <ApprovalRow key={user.id} user={user} />
-                  ))}
-                  {roster.map((user) => (
-                    <RosterRow
-                      key={user.id}
-                      user={user}
-                      showDates
-                      onOpen={() => router.push(`/daily/users/${user.id}`)}
-                    />
-                  ))}
+                  {pageItems.map((row) =>
+                    row.kind === "pending" ? (
+                      <ApprovalRow key={row.user.id} user={row.user} />
+                    ) : (
+                      <RosterRow
+                        key={row.user.id}
+                        user={row.user}
+                        showDates
+                        onOpen={() =>
+                          router.push(`/daily/users/${row.user.id}`)
+                        }
+                      />
+                    ),
+                  )}
                 </tbody>
               </table>
             </div>
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              from={from}
+              to={to}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </motion.div>
@@ -337,29 +373,26 @@ function StatChip({
   label,
   value,
   accent,
-  className,
 }: {
   label: string;
   value: string;
   accent?: boolean;
-  className?: string;
 }) {
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5",
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5",
         accent
           ? "border-primary/20 bg-primary/[0.08]"
           : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
-        className,
       )}
     >
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
         {label}
       </span>
       <span
         className={cn(
-          "text-sm font-semibold tabular-nums",
+          "text-base font-bold tabular-nums",
           accent ? "text-primary" : "text-neutral-900 dark:text-white",
         )}
       >

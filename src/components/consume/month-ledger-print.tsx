@@ -15,6 +15,8 @@ type Props = {
   rows: LedgerRow[];
   /** Subset of day-of-month numbers (1-based). Default: 1..dayCount. */
   visibleDays?: number[];
+  /** Cross-month: `row.days[i]` aligns with `columnDates[i]`. */
+  columnDates?: string[];
   /** Show on screen for iframe print capture; default print-only. */
   preview?: boolean;
 };
@@ -28,14 +30,32 @@ function toBnDigits(n: number) {
 /** Landscape Forces Mess consume ledger — matches BN register print. */
 export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
   function MonthLedgerPrint(
-    { month, dayCount, tagCodes, rows, visibleDays, preview = false },
+    {
+      month,
+      dayCount,
+      tagCodes,
+      rows,
+      visibleDays,
+      columnDates,
+      preview = false,
+    },
     ref,
   ) {
     const t = useT();
     const { locale } = useI18n();
-    const days = visibleDays?.length
-      ? visibleDays
-      : Array.from({ length: dayCount }, (_, i) => i + 1);
+    const rangeMode = Boolean(columnDates?.length);
+    const columns = columnDates?.length
+      ? columnDates.map((date) => ({
+          date,
+          dayNum: Number(date.slice(8, 10)),
+        }))
+      : (visibleDays?.length
+          ? visibleDays
+          : Array.from({ length: dayCount }, (_, i) => i + 1)
+        ).map((dayNum) => ({
+          date: `${month}-${String(dayNum).padStart(2, "0")}`,
+          dayNum,
+        }));
     const monthBn = formatMonthLong(month, "bn-BD");
     const monthEn = formatMonthLong(month);
     const useBn = locale === "bn";
@@ -90,9 +110,9 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               <th className="border border-black px-0.5 py-0.5 text-left">
                 {t("consume.colName")}
               </th>
-              {days.map((d) => (
-                <th key={d} className="border border-black px-0 py-0.5 w-3">
-                  {dayLabel(d)}
+              {columns.map(({ date, dayNum }) => (
+                <th key={date} className="border border-black px-0 py-0.5 w-3">
+                  {dayLabel(dayNum)}
                 </th>
               ))}
               {tagCodes.map((code) => (
@@ -117,11 +137,13 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="border border-black px-0.5 py-0 text-left whitespace-nowrap">
                   {row.user.name}
                 </td>
-                {days.map((d) => {
-                  const cell = row.days[d - 1] ?? "";
+                {columns.map(({ date, dayNum }, vi) => {
+                  const cell = rangeMode
+                    ? (row.days[vi] ?? "")
+                    : (row.days[dayNum - 1] ?? "");
                   return (
                   <td
-                    key={d}
+                    key={date}
                     className="border border-black px-0 py-0 text-center font-mono"
                   >
                     {cell || ""}
@@ -150,8 +172,8 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               >
                 {t("consume.colGrandTotal")}
               </td>
-              {days.map((d) => (
-                <td key={d} className="border border-black px-0 py-1" />
+              {columns.map(({ date }) => (
+                <td key={date} className="border border-black px-0 py-1" />
               ))}
               {tagCodes.map((code) => (
                 <td

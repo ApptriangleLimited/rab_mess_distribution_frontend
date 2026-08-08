@@ -11,6 +11,8 @@ type Args = {
   tagCodes: DailyTag[];
   rows: LedgerRow[];
   visibleDays?: number[];
+  /** Cross-month: `row.days[i]` aligns with `columnDates[i]`. */
+  columnDates?: string[];
   filename?: string;
 };
 
@@ -20,14 +22,18 @@ export function downloadConsumeLedgerPdf({
   tagCodes,
   rows,
   visibleDays,
+  columnDates,
   filename,
 }: Args) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const monthLabel = formatMonthLong(month);
-  const days = visibleDays?.length
-    ? visibleDays
-    : Array.from({ length: dayCount }, (_, i) => i + 1);
+  const rangeMode = Boolean(columnDates?.length);
+  const dayHeaders = columnDates?.length
+    ? columnDates.map((d) => Number(d.slice(8, 10)))
+    : visibleDays?.length
+      ? visibleDays
+      : Array.from({ length: dayCount }, (_, i) => i + 1);
 
   let y = 8;
   doc.setFont("helvetica", "bold");
@@ -53,7 +59,7 @@ export function downloadConsumeLedgerPdf({
     "Ser",
     "Rank",
     "Name",
-    ...days.map(String),
+    ...dayHeaders.map(String),
     ...tagCodes,
     "Total",
   ];
@@ -62,7 +68,9 @@ export function downloadConsumeLedgerPdf({
     String(i + 1),
     row.user.rank,
     row.user.name,
-    ...days.map((d) => row.days[d - 1] || ""),
+    ...(rangeMode
+      ? dayHeaders.map((_, di) => row.days[di] || "")
+      : dayHeaders.map((d) => row.days[d - 1] || "")),
     ...tagCodes.map((code) =>
       row.tagCounts[code] ? String(row.tagCounts[code]) : "",
     ),
@@ -77,7 +85,7 @@ export function downloadConsumeLedgerPdf({
     "",
     "",
     "Grand total",
-    ...days.map(() => ""),
+    ...dayHeaders.map(() => ""),
     ...tagTotals,
     String(grandDays || ""),
   ];
