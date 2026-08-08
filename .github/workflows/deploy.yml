@@ -6,7 +6,7 @@ on:
       - develop
 
 jobs:
- deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,16 +20,33 @@ jobs:
             set -e
 
             FRONTEND_DIR=/var/www/mess/frontend
+            PROJECT_DIR=/var/www/mess
+
+            echo "Starting frontend deployment..."
 
             cd "$FRONTEND_DIR"
 
+            echo "Fetching latest develop branch..."
+            git fetch origin develop
+
+            echo "Switching to develop branch..."
             git checkout develop
-            git pull origin develop
 
-            cd /var/www/mess
+            echo "Resetting local repository to origin/develop..."
+            git reset --hard origin/develop
 
+            echo "Git status:"
+            git status
+
+            cd "$PROJECT_DIR"
+
+            echo "Validating Docker Compose configuration..."
+            docker compose config
+
+            echo "Building Docker images..."
             docker compose build
 
+            echo "Starting containers..."
             docker compose up -d
 
             echo "Deployment completed successfully."
