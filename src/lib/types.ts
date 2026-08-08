@@ -1,4 +1,4 @@
-export type Role = "cc" | "daily" | "mess" | "consume" | "ration";
+export type Role = "cc" | "daily" | "mess" | "consume" | "ration" | "admin";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "ended";
 export type UserStatus = "0" | "1";
@@ -23,6 +23,12 @@ export interface DocumentMeta {
   url?: string;
 }
 
+export interface EmergencyContact {
+  name: string;
+  relation: string;
+  phone: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -40,6 +46,11 @@ export interface User {
   account_number: string;
   routing: string;
   branch: string;
+  /** ISO `YYYY-MM-DD` — when member joined. */
+  joining_date: string;
+  /** ISO `YYYY-MM-DD` — when member left; empty if still active. */
+  out_date: string;
+  emergency_contacts: EmergencyContact[];
   created_at: string;
   updated_at: string;
 }

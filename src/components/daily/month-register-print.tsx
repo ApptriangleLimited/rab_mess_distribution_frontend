@@ -13,9 +13,11 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   month: string;
-  dayCount: number;
+  /** Calendar day numbers shown as columns (1-based). */
+  dayNumbers: number[];
+  /** `row.days` length must match `dayNumbers`. */
   rows: LedgerRow[];
-  /** Show for iframe print capture; default print-only. */
+  /** Show for on-screen review / iframe print capture. */
   preview?: boolean;
 };
 
@@ -27,10 +29,12 @@ function toBnDigits(n: number) {
 
 /** Landscape attendance register — matches paper garrison register layout. */
 export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
-  function MonthRegisterPrint({ month, dayCount, rows, preview = false }, ref) {
+  function MonthRegisterPrint(
+    { month, dayNumbers, rows, preview = false },
+    ref,
+  ) {
     const t = useT();
     const { locale } = useI18n();
-    const days = Array.from({ length: dayCount }, (_, i) => i + 1);
     const monthBn = formatMonthLong(month, "bn-BD");
     const monthEn = formatMonthLong(month);
     const useBn = locale === "bn";
@@ -71,7 +75,7 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
             <col style={{ width: "6.5%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "9%" }} />
-            {days.map((d) => (
+            {dayNumbers.map((d) => (
               <col key={d} />
             ))}
           </colgroup>
@@ -89,7 +93,7 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
               <th className="border border-black px-0 py-0.5 text-left">
                 {t("daily.registerColName")}
               </th>
-              {days.map((d) => (
+              {dayNumbers.map((d) => (
                 <th key={d} className="border border-black px-0 py-0.5">
                   {dayLabel(d)}
                 </th>

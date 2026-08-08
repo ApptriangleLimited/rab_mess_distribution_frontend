@@ -4,6 +4,7 @@ import { getState, setState } from "@/lib/store";
 import type {
   ApprovalStatus,
   DocumentMeta,
+  EmergencyContact,
   User,
   UserStatus,
 } from "@/lib/types";
@@ -23,7 +24,27 @@ export type UserInput = {
   account_number: string;
   routing: string;
   branch: string;
+  joining_date: string;
+  out_date: string;
+  emergency_contacts: EmergencyContact[];
 };
+
+export function emptyEmergencyContact(): EmergencyContact {
+  return { name: "", relation: "", phone: "" };
+}
+
+/** Drop rows with all fields blank. */
+export function cleanEmergencyContacts(
+  contacts: EmergencyContact[],
+): EmergencyContact[] {
+  return contacts
+    .map((c) => ({
+      name: c.name.trim(),
+      relation: c.relation.trim(),
+      phone: c.phone.trim(),
+    }))
+    .filter((c) => c.name || c.relation || c.phone);
+}
 
 function newId() {
   return `u_${Math.random().toString(36).slice(2, 10)}`;
@@ -77,6 +98,7 @@ export function createUser(
     ...input,
     name: input.name.trim(),
     rab_id: input.rab_id.trim(),
+    emergency_contacts: cleanEmergencyContacts(input.emergency_contacts ?? []),
     status: input.status,
     approval_status,
     created_at: ts,
@@ -94,6 +116,7 @@ export function updateUser(id: string, input: UserInput): User | null {
     ...input,
     name: input.name.trim(),
     rab_id: input.rab_id.trim(),
+    emergency_contacts: cleanEmergencyContacts(input.emergency_contacts ?? []),
     updated_at: nowISO(),
   };
   setState((prev) => ({
@@ -135,10 +158,50 @@ export type UserFilters = {
   approval?: ApprovalStatus | "all";
   wing?: string | "all";
   rank?: string | "all";
+  /**
+   * Inclusive ISO `YYYY-MM-DD` window for joining_date or out_date.
+   * One side only = single day; both = range.
+   */
+  date_from?: string;
+  date_to?: string;
 };
+
+/** Normalize single/range date filter. Empty → null (no filter). */
+export function normalizeDateFilter(
+  from: string,
+  to: string,
+): { from: string; to: string } | null {
+  const f = from.trim();
+  const t = to.trim();
+  if (!f && !t) return null;
+  if (f && !t) return { from: f, to: f };
+  if (!f && t) return { from: t, to: t };
+  return f <= t ? { from: f, to: t } : { from: t, to: f };
+}
+
+function dateInWindow(value: string, from: string, to: string) {
+  if (!value) return false;
+  return value >= from && value <= to;
+}
+
+/** True when joining or out date falls in filter (single day or range). */
+export function matchesMemberDateFilter(
+  user: Pick<User, "joining_date" | "out_date">,
+  from: string,
+  to: string,
+) {
+  const range = normalizeDateFilter(from, to);
+  if (!range) return true;
+  return (
+    dateInWindow(user.joining_date ?? "", range.from, range.to) ||
+    dateInWindow(user.out_date ?? "", range.from, range.to)
+  );
+}
 
 export function filterUsers(users: User[], filters: UserFilters) {
   const q = filters.q?.trim().toLowerCase() ?? "";
+  const dateFrom = filters.date_from?.trim() ?? "";
+  const dateTo = filters.date_to?.trim() ?? "";
   return users
     .filter((u) => {
       if (filters.status && filters.status !== "all" && u.status !== filters.status) {
@@ -155,6 +218,9 @@ export function filterUsers(users: User[], filters: UserFilters) {
         return false;
       }
       if (filters.rank && filters.rank !== "all" && u.rank !== filters.rank) {
+        return false;
+      }
+      if (!matchesMemberDateFilter(u, dateFrom, dateTo)) {
         return false;
       }
       if (!q) return true;

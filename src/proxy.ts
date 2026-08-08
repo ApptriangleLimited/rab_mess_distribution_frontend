@@ -4,7 +4,7 @@ import { ROLE_HOMES, SESSION_COOKIE } from "@/lib/constants";
 import { isRoleAllowed, parseSessionCookie } from "@/lib/session";
 import type { Role } from "@/lib/types";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/register"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -6,7 +6,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
 import { resetToSeed } from "@/lib/store";
-import { STORE_KEY, DAILY_TAGS, rolesForPicker } from "@/lib/constants";
+import {
+  STORE_KEY,
+  isProtectedRateTag,
+  isRationFamily,
+  rolesForPicker,
+} from "@/lib/constants";
 import { useSession } from "@/hooks/use-session";
 import { homeForRole, setSession } from "@/lib/session";
 import { nowISO } from "@/lib/date";
@@ -28,7 +33,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { SenderAccountsSection } from "@/components/ration/sender-accounts-section";
+import { RegisterQrSection } from "@/components/settings/register-qr-section";
 import { SectionCard } from "@/components/shared/section-card";
+import { CollapsibleSection } from "@/components/shared/collapsible-section";
 import { IconCoin, IconCurrencyTaka, IconPlus, IconTrash } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
@@ -40,16 +47,19 @@ export default function SettingsPage() {
   const { session } = useSession();
   const t = useT();
   const { locale, setLocale } = useI18n();
-  const [rateDraft, setRateDraft] = useState<Record<string, number>>(() =>
-    Object.fromEntries(state.rates.map((r) => [r.tag, r.amount_per_day])),
+  const [rateDraft, setRateDraft] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      state.rates.map((r) => [r.tag, String(r.amount_per_day)]),
+    ),
   );
   const [resetOpen, setResetOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [newTag, setNewTag] = useState("");
-  const [newAmount, setNewAmount] = useState(0);
+  const [newAmount, setNewAmount] = useState("0");
   const [deleteTag, setDeleteTag] = useState<DailyTag | null>(null);
+  const [ratesOpen, setRatesOpen] = useState(false);
 
-  const isRation = session?.role === "ration";
+  const isRation = isRationFamily(session?.role);
 
   const eligibleCount = useMemo(
     () =>
@@ -86,7 +96,7 @@ export default function SettingsPage() {
   function closeAdd() {
     setAddOpen(false);
     setNewTag("");
-    setNewAmount(0);
+    setNewAmount("0");
   }
 
   function onAddAllowance() {
@@ -105,10 +115,11 @@ export default function SettingsPage() {
       toast(t("settings.allowanceTagDuplicate"), "error");
       return;
     }
-    upsertRate(name as DailyTag, Math.max(0, Number(newAmount) || 0));
+    const amount = Math.max(0, Number(newAmount) || 0);
+    upsertRate(name as DailyTag, amount);
     setRateDraft((prev) => ({
       ...prev,
-      [name]: Math.max(0, Number(newAmount) || 0),
+      [name]: String(amount),
     }));
     toast(t("settings.allowanceAdded"), "success");
     closeAdd();
@@ -128,43 +139,35 @@ export default function SettingsPage() {
   }
 
   const ratesPanel = (
-    <section
-      className={cn(
-        "section-card flex flex-col overflow-hidden p-0",
-        isRation && "min-h-[28rem]",
-      )}
-    >
-      <header className="flex items-start justify-between gap-3 border-b border-neutral-200/90 bg-gradient-to-br from-neutral-50/90 to-white px-5 py-4 dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <IconCoin className="h-4 w-4" stroke={2} />
-            </span>
-            <h2 className="text-base font-semibold tracking-tight text-neutral-900 dark:text-white">
-              {t("settings.rates")}
-            </h2>
-            <span className="rounded-md bg-neutral-900/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-neutral-500 dark:bg-white/10">
-              {eligibleCount}/{state.rates.length}
-            </span>
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-            {t("settings.ratesHint")}
-          </p>
-        </div>
-        {isRation ? (
+    <CollapsibleSection
+      icon={IconCoin}
+      title={t("settings.rates")}
+      hint={t("settings.ratesHint")}
+      open={ratesOpen}
+      onOpenChange={setRatesOpen}
+      badge={
+        <span className="rounded-md bg-neutral-900/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-neutral-500 dark:bg-white/10">
+          {eligibleCount}/{state.rates.length}
+        </span>
+      }
+      headerActions={
+        isRation ? (
           <Button
             type="button"
             variant="cta"
             size="sm"
             className="shrink-0 rounded-lg"
-            onClick={() => setAddOpen(true)}
+            onClick={() => {
+              setRatesOpen(true);
+              setAddOpen(true);
+            }}
           >
             <IconPlus className="h-3.5 w-3.5" />
             {t("settings.addAllowance")}
           </Button>
-        ) : null}
-      </header>
-
+        ) : null
+      }
+    >
       <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
         {state.rates.map((rate) => {
           const amount = Number(rateDraft[rate.tag] ?? rate.amount_per_day) || 0;
@@ -173,7 +176,7 @@ export default function SettingsPage() {
             <li
               key={rate.tag}
               className={cn(
-                "flex items-center gap-3 px-5 py-3 transition",
+                "flex items-center gap-2.5 px-3 py-2 transition",
                 live
                   ? "hover:bg-primary/[0.03] dark:hover:bg-primary/[0.06]"
                   : "opacity-60",
@@ -204,24 +207,27 @@ export default function SettingsPage() {
                 <Input
                   type="number"
                   min={0}
-                  value={rateDraft[rate.tag] ?? rate.amount_per_day}
+                  value={rateDraft[rate.tag] ?? String(rate.amount_per_day)}
                   onChange={(e) =>
                     setRateDraft((prev) => ({
                       ...prev,
-                      [rate.tag]: Number(e.target.value),
+                      [rate.tag]: e.target.value,
                     }))
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                      e.preventDefault();
+                    }
+                  }}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className={cn(
-                    "h-9 rounded-lg pl-7 pr-2 text-right font-mono text-sm tabular-nums",
+                    "h-9 rounded-lg pl-7 pr-2 text-right font-mono text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
                     live && "border-primary/30 focus-visible:border-primary",
                   )}
                   aria-label={`${rate.tag} ${t("settings.amountPerDay")}`}
                 />
               </div>
-              {isRation &&
-              !DAILY_TAGS.some(
-                (t) => t.code.toLowerCase() === rate.tag.toLowerCase(),
-              ) ? (
+              {isRation && !isProtectedRateTag(rate.tag) ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -238,12 +244,12 @@ export default function SettingsPage() {
         })}
       </ul>
 
-      <footer className="mt-auto flex items-center justify-end gap-3 border-t border-neutral-200/90 bg-neutral-50/80 px-5 py-3 dark:border-neutral-700 dark:bg-neutral-900/50">
+      <footer className="mt-auto flex items-center justify-end gap-2 border-t border-neutral-200/90 bg-neutral-50/80 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900/50">
         <Button variant="cta" size="sm" className="rounded-lg" onClick={onSaveRates}>
           {t("common.save")}
         </Button>
       </footer>
-    </section>
+    </CollapsibleSection>
   );
 
   return (
@@ -251,18 +257,24 @@ export default function SettingsPage() {
       <PageHeader
         title={t("settings.title")}
         subtitle={t("settings.subtitle")}
-        center={session?.role === "ration" ? <RationTabs /> : undefined}
+        center={isRation ? <RationTabs /> : undefined}
       />
 
-      {session?.role === "ration" ? (
-        <div className="flex flex-col gap-5">
-          <div id="bank-accounts" className="min-w-0 scroll-mt-6">
+      {isRation ? (
+        <div className="flex flex-col gap-3">
+          <div className="min-w-0">
             <SenderAccountsSection />
           </div>
           <div className="min-w-0">{ratesPanel}</div>
+          <div className="min-w-0">
+            <RegisterQrSection />
+          </div>
         </div>
       ) : (
-        ratesPanel
+        <div className="flex flex-col gap-3">
+          {ratesPanel}
+          <RegisterQrSection />
+        </div>
       )}
 
       {/* Languages — kept for later; hidden for now */}
@@ -360,8 +372,14 @@ export default function SettingsPage() {
                 type="number"
                 min={0}
                 value={newAmount}
-                onChange={(e) => setNewAmount(Number(e.target.value))}
-                className="h-10 rounded-lg pl-7 font-mono tabular-nums"
+                onChange={(e) => setNewAmount(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                    e.preventDefault();
+                  }
+                }}
+                onWheel={(e) => e.currentTarget.blur()}
+                className="h-10 rounded-lg pl-7 font-mono tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
           </div>

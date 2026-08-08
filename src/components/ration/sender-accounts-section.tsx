@@ -8,6 +8,7 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { CollapsibleSection } from "@/components/shared/collapsible-section";
 import { useToast } from "@/components/shared/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,11 +43,13 @@ export function SenderAccountsSection() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<SenderInput>(emptyForm());
   const [showForm, setShowForm] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SenderAccount | null>(null);
 
   function startCreate() {
     setEditingId(null);
     setForm(emptyForm());
+    setSectionOpen(true);
     setShowForm(true);
   }
 
@@ -61,6 +64,7 @@ export function SenderAccountsSection() {
       branch: sender.branch,
       mapped_tags: [...sender.mapped_tags],
     });
+    setSectionOpen(true);
     setShowForm(true);
   }
 
@@ -88,24 +92,21 @@ export function SenderAccountsSection() {
   }
 
   return (
-    <section className="section-card flex min-h-[28rem] flex-col overflow-hidden p-0">
-      <header className="flex items-start justify-between gap-3 border-b border-neutral-200/90 bg-gradient-to-br from-neutral-50/90 to-white px-5 py-4 dark:border-neutral-700 dark:from-neutral-900/80 dark:to-neutral-950">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <IconBuildingBank className="h-4 w-4" stroke={2} />
-            </span>
-            <h2 className="text-base font-semibold tracking-tight text-neutral-900 dark:text-white">
-              {t("pages.senders.title")}
-            </h2>
-            <span className="rounded-md bg-neutral-900/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-neutral-500 dark:bg-white/10">
-              {state.senders.length}
-            </span>
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-            {t("pages.senders.subtitle", { count: state.senders.length })}
-          </p>
-        </div>
+    <>
+    <CollapsibleSection
+      id="bank-accounts"
+      className="scroll-mt-6"
+      icon={IconBuildingBank}
+      title={t("pages.senders.title")}
+      hint={t("pages.senders.subtitle", { count: state.senders.length })}
+      open={sectionOpen}
+      onOpenChange={setSectionOpen}
+      badge={
+        <span className="rounded-md bg-neutral-900/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-neutral-500 dark:bg-white/10">
+          {state.senders.length}
+        </span>
+      }
+      headerActions={
         <Button
           variant="cta"
           size="sm"
@@ -115,11 +116,11 @@ export function SenderAccountsSection() {
           <IconPlus className="h-3.5 w-3.5" />
           {t("ration.newSender")}
         </Button>
-      </header>
-
+      }
+    >
       <div className="flex min-h-0 flex-1 flex-col">
         {state.senders.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 py-12 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-3 py-8 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-400 dark:bg-neutral-800">
               <IconBuildingBank className="h-5 w-5" />
             </span>
@@ -141,9 +142,9 @@ export function SenderAccountsSection() {
             {state.senders.map((sender) => (
               <li
                 key={sender.id}
-                className="group px-5 py-3.5 transition hover:bg-primary/[0.03] dark:hover:bg-primary/[0.06]"
+                className="group px-3 py-2.5 transition hover:bg-primary/[0.03] dark:hover:bg-primary/[0.06]"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
                       {sender.label}
@@ -195,6 +196,7 @@ export function SenderAccountsSection() {
           </ul>
         )}
       </div>
+    </CollapsibleSection>
 
       <ConfirmDialog
         open={showForm}
@@ -279,6 +281,6 @@ export function SenderAccountsSection() {
           setDeleteTarget(null);
         }}
       />
-    </section>
+    </>
   );
 }

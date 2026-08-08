@@ -16,6 +16,7 @@ type Props = {
   sheet: RationTransferSheet;
   /** Member bank shown in SUBJECT “…transfer to {bank}”. */
   transferToBank?: string;
+  className?: string;
 };
 
 function amt(n: number) {
@@ -27,7 +28,7 @@ function amt(n: number) {
 
 /** FR Fresh Money transfer letter (14-col) — letter layout like bank disbursement memo. */
 export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
-  function FrTransferLetterPrint({ sheet, transferToBank }, ref) {
+  function FrTransferLetterPrint({ sheet, transferToBank, className }, ref) {
     const t = useT();
     const monthBill = formatMonthBill(sheet.month);
     const dtLabel = formatMonthLong(sheet.reportDate.slice(0, 7));
@@ -45,7 +46,10 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         className={cn(
           "fr-transfer-letter staff-payout-print text-black",
-          "block overflow-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700",
+          /* A4 landscape sheet — table needs width, not portrait card */
+          "box-border block w-[297mm] min-h-[210mm] max-w-none overflow-visible",
+          "bg-white p-5",
+          className,
         )}
       >
         <section>

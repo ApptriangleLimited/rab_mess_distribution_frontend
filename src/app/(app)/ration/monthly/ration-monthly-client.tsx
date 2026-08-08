@@ -246,9 +246,6 @@ export default function RationMonthlyClient() {
             dayCount={ledger.dayCount}
             tagCodes={ledger.tagCodes}
             rows={rows}
-            hideMonthMeta
-            hideDayColumns
-            density="medium"
           />
         )}
       </motion.div>

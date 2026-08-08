@@ -16,12 +16,16 @@ type Props = {
   dayCount: number;
   tagCodes: DailyTag[];
   rows: LedgerRow[];
+  /** Subset of day-of-month numbers to show (1-based). Default: 1..dayCount. */
+  visibleDays?: number[];
   /** Hide `{count} · {month}` in board chrome. */
   hideMonthMeta?: boolean;
   /** Hide ID / Rank / Name sticky cols (keep Ser). */
   hideUserDetails?: boolean;
   /** Hide per-tag day-count result cols. */
   hideTagResults?: boolean;
+  /** Extra sticky col after tags: All = totalDays. */
+  showAllColumn?: boolean;
   /** Hide day-of-month tag mark columns (daily result grid). */
   hideDayColumns?: boolean;
   /** @deprecated Prefer `density="comfortable"`. */
@@ -89,9 +93,11 @@ export function MonthLedgerBoard({
   dayCount,
   tagCodes,
   rows,
+  visibleDays,
   hideMonthMeta = false,
   hideUserDetails = false,
   hideTagResults = false,
+  showAllColumn = false,
   hideDayColumns = false,
   comfortable = false,
   density,
@@ -99,13 +105,11 @@ export function MonthLedgerBoard({
   const t = useT();
   const { locale } = useI18n();
   const today = todayISO();
-  const days = useMemo(
-    () =>
-      hideDayColumns
-        ? []
-        : Array.from({ length: dayCount }, (_, i) => i + 1),
-    [dayCount, hideDayColumns],
-  );
+  const days = useMemo(() => {
+    if (hideDayColumns) return [];
+    if (visibleDays?.length) return visibleDays;
+    return Array.from({ length: dayCount }, (_, i) => i + 1);
+  }, [dayCount, hideDayColumns, visibleDays]);
 
   const todayDay = today.startsWith(month)
     ? Number(today.slice(8, 10))
@@ -123,6 +127,7 @@ export function MonthLedgerBoard({
   const NAME_LEFT = SER_W + ID_W + RANK_W;
   const TAG_LEFT0 = hideUserDetails ? SER_W : NAME_LEFT + NAME_W;
   const visibleTags = hideTagResults ? [] : tagCodes;
+  const resultColCount = visibleTags.length + (showAllColumn ? 1 : 0);
   const cellPad = d.pad;
   const rowH = d.rowH;
 
@@ -206,7 +211,7 @@ export function MonthLedgerBoard({
                 </>
               ) : null}
               {visibleTags.map((code, i) => {
-                const last = i === visibleTags.length - 1;
+                const last = !showAllColumn && i === visibleTags.length - 1;
                 return (
                   <th
                     key={code}
@@ -228,6 +233,24 @@ export function MonthLedgerBoard({
                   </th>
                 );
               })}
+              {showAllColumn ? (
+                <th
+                  title={t("mess.colAll")}
+                  className={cn(
+                    "sticky z-40 box-border border-b border-r border-neutral-300 bg-emerald-100 text-center font-mono text-emerald-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.22)] dark:border-neutral-700 dark:bg-emerald-950 dark:text-emerald-300",
+                    d.tagHead,
+                  )}
+                  style={{
+                    left: TAG_LEFT0 + visibleTags.length * TAG_W,
+                    width: TAG_W,
+                    minWidth: TAG_W,
+                    maxWidth: TAG_W,
+                    padding: cellPad,
+                  }}
+                >
+                  {t("common.all")}
+                </th>
+              ) : null}
               {days.map((dayNum) => {
                 const isToday = todayDay === dayNum;
                 const isFuture = dateInMonth(month, dayNum) > today;
@@ -273,7 +296,7 @@ export function MonthLedgerBoard({
                       d.bodyMono,
                       stickyBg,
                       hideUserDetails &&
-                        visibleTags.length === 0 &&
+                        resultColCount === 0 &&
                         "shadow-[4px_0_8px_-2px_rgba(0,0,0,0.22)]",
                     )}
                     style={{ width: SER_W, minWidth: SER_W, padding: cellPad }}
@@ -327,7 +350,7 @@ export function MonthLedgerBoard({
                     </>
                   ) : null}
                   {visibleTags.map((code, i) => {
-                    const last = i === visibleTags.length - 1;
+                    const last = !showAllColumn && i === visibleTags.length - 1;
                     return (
                       <td
                         key={code}
@@ -349,9 +372,28 @@ export function MonthLedgerBoard({
                       </td>
                     );
                   })}
+                  {showAllColumn ? (
+                    <td
+                      className={cn(
+                        "sticky z-30 box-border border-b border-r border-neutral-200 text-center font-mono font-semibold tabular-nums text-neutral-900 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.22)] dark:border-neutral-800 dark:text-white",
+                        d.bodyMono,
+                        stickyTagBg,
+                      )}
+                      style={{
+                        left: TAG_LEFT0 + visibleTags.length * TAG_W,
+                        width: TAG_W,
+                        minWidth: TAG_W,
+                        maxWidth: TAG_W,
+                        padding: cellPad,
+                      }}
+                    >
+                      {row.totalDays || "—"}
+                    </td>
+                  ) : null}
                   {!hideDayColumns
-                    ? row.days.map((tag, di) => {
-                        const dayNum = di + 1;
+                    ? days.map((dayNum, vi) => {
+                        const di = dayNum - 1;
+                        const tag = row.days[di] ?? "";
                         const date = dateInMonth(month, dayNum);
                         const future = date > today;
                         const isToday = todayDay === dayNum;
@@ -366,8 +408,12 @@ export function MonthLedgerBoard({
                           );
                         }
 
-                        const prev = row.days[di - 1];
-                        const next = row.days[di + 1];
+                        const prevDay = days[vi - 1];
+                        const nextDay = days[vi + 1];
+                        const prev =
+                          prevDay != null ? row.days[prevDay - 1] : undefined;
+                        const next =
+                          nextDay != null ? row.days[nextDay - 1] : undefined;
                         const contL = Boolean(tag && prev === tag);
                         const contR = Boolean(tag && next === tag);
                         const title = tag

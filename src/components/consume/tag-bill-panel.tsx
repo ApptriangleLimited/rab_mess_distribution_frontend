@@ -8,7 +8,6 @@ import {
 } from "@tabler/icons-react";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { EmptyState } from "@/components/shared/empty-state";
-import { TagBillPrint } from "@/components/consume/tag-bill-print";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,8 +19,7 @@ import {
 import { RANKS, WINGS } from "@/lib/constants";
 import { buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
-import { tagLabel } from "@/i18n";
-import { useI18n, useT } from "@/i18n/provider";
+import { useT } from "@/i18n/provider";
 import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +31,6 @@ type Props = {
 /** Tag bill body — filters + member table (inline under by-tag tabs). */
 export function TagBillPanel({ month, tag }: Props) {
   const t = useT();
-  const { locale } = useI18n();
   const state = useStore();
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
@@ -78,7 +75,6 @@ export function TagBillPanel({ month, tag }: Props) {
     [members],
   );
 
-  const label = tagLabel(tag, locale);
   const showFuel = tag === "FR" || bill.fuelRate > 0;
 
   const fieldClass =
@@ -86,24 +82,12 @@ export function TagBillPanel({ month, tag }: Props) {
 
   return (
     <div className="flex flex-col gap-0">
-      <TagBillPrint
-        month={month}
-        tag={tag}
-        tagLabel={label}
-        rows={bill.rows}
-        totalDays={bill.totalDays}
-        totalAmount={bill.totalAmount}
-        totalFuel={bill.totalFuel}
-        grandTotal={bill.grandTotal}
-        showFuel={showFuel}
-      />
-
       <motion.div
         key={tag}
         initial={reduceMotion ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
-        className="flex flex-col gap-4 no-print"
+        className="flex flex-col gap-4"
       >
         <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/50">
           <div className="min-w-[17rem] max-w-lg w-full shrink-0 sm:w-96">

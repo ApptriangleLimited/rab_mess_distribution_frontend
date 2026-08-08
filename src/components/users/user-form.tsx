@@ -6,6 +6,7 @@ import {
   IconBuildingBank,
   IconFileUpload,
   IconId,
+  IconPhoneCall,
   IconPlus,
   IconTrash,
   IconUserPlus,
@@ -25,7 +26,10 @@ import { SectionCard } from "@/components/shared/section-card";
 import { TagSelector } from "@/components/daily/tag-selector";
 import { RANKS, WINGS } from "@/lib/constants";
 import type { DailyTag, DocumentMeta, User, UserStatus } from "@/lib/types";
-import type { UserInput } from "@/lib/store/users";
+import {
+  emptyEmergencyContact,
+  type UserInput,
+} from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -51,9 +55,16 @@ const emptyValues = (): UserFormValues => ({
   account_number: "",
   routing: "",
   branch: "",
+  joining_date: "",
+  out_date: "",
+  emergency_contacts: [emptyEmergencyContact()],
 });
 
 export function userToFormValues(user: User): UserFormValues {
+  const contacts =
+    user.emergency_contacts?.length > 0
+      ? user.emergency_contacts.map((c) => ({ ...c }))
+      : [emptyEmergencyContact()];
   return {
     name: user.name,
     rab_id: user.rab_id,
@@ -69,6 +80,9 @@ export function userToFormValues(user: User): UserFormValues {
     account_number: user.account_number,
     routing: user.routing,
     branch: user.branch,
+    joining_date: user.joining_date ?? "",
+    out_date: user.out_date ?? "",
+    emergency_contacts: contacts,
   };
 }
 
@@ -90,8 +104,8 @@ export function UserForm({
   mode: "create" | "edit";
   onSubmit: (values: UserFormSubmitPayload) => void;
   onCancel: () => void;
-  /** CC creates pending; Daily creates approved + picks today's tag. */
-  variant?: "cc" | "daily";
+  /** CC/public create pending; Daily creates accepted + picks today's tag. */
+  variant?: "cc" | "daily" | "public";
   initialTag?: DailyTag;
 }) {
   const t = useT();
@@ -128,6 +142,40 @@ export function UserForm({
     }));
   }
 
+  function patchEmergency(
+    index: number,
+    key: "name" | "relation" | "phone",
+    value: string,
+  ) {
+    setValues((prev) => ({
+      ...prev,
+      emergency_contacts: prev.emergency_contacts.map((c, i) =>
+        i === index ? { ...c, [key]: value } : c,
+      ),
+    }));
+  }
+
+  function addEmergency() {
+    setValues((prev) => ({
+      ...prev,
+      emergency_contacts: [
+        ...prev.emergency_contacts,
+        emptyEmergencyContact(),
+      ],
+    }));
+  }
+
+  function removeEmergency(index: number) {
+    setValues((prev) => {
+      const next = prev.emergency_contacts.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        emergency_contacts:
+          next.length > 0 ? next : [emptyEmergencyContact()],
+      };
+    });
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (variant === "daily" && mode === "create") {
@@ -141,6 +189,19 @@ export function UserForm({
     ? undefined
     : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 } };
 
+  const createBannerTitle =
+    variant === "daily"
+      ? t("cc.dailyCreateTitle")
+      : variant === "public"
+        ? t("register.bannerTitle")
+        : t("cc.pendingCreateTitle");
+  const createBannerNote =
+    variant === "daily"
+      ? t("cc.dailyCreateNote")
+      : variant === "public"
+        ? t("register.bannerNote")
+        : t("cc.pendingCreateNote");
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       {mode === "create" ? (
@@ -153,14 +214,9 @@ export function UserForm({
           </span>
           <p className="min-w-0 text-xs text-neutral-600 dark:text-neutral-300">
             <span className="font-semibold text-neutral-900 dark:text-white">
-              {variant === "daily"
-                ? t("cc.dailyCreateTitle")
-                : t("cc.pendingCreateTitle")}
-              .{" "}
+              {createBannerTitle}.{" "}
             </span>
-            {variant === "daily"
-              ? t("cc.dailyCreateNote")
-              : t("cc.pendingCreateNote")}
+            {createBannerNote}
           </p>
         </motion.div>
       ) : null}
@@ -263,11 +319,107 @@ export function UserForm({
               />
             </Field>
           ) : null}
+          <Field label={t("cc.fields.joiningDate")}>
+            <Input
+              type="date"
+              value={values.joining_date}
+              onChange={(e) => patch("joining_date", e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field label={t("cc.fields.outDate")}>
+            <Input
+              type="date"
+              value={values.out_date}
+              onChange={(e) => patch("out_date", e.target.value)}
+              className={inputClass}
+            />
+          </Field>
         </div>
       </FormSection>
 
       <FormSection
         step="02"
+        icon={IconPhoneCall}
+        title={t("cc.sectionEmergency")}
+        hint={t("cc.sectionEmergencyHint")}
+        delay={0.04}
+        reduceMotion={!!reduceMotion}
+      >
+        <div className="flex flex-col gap-3">
+          {values.emergency_contacts.map((contact, index) => (
+            <div
+              key={index}
+              className="rounded-xl border border-neutral-200/90 bg-white/60 p-3 dark:border-neutral-700 dark:bg-neutral-950/40"
+            >
+              <div className="mb-2.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                  {t("cc.emergencyContactN", { n: String(index + 1) })}
+                </p>
+                {values.emergency_contacts.length > 1 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-neutral-400 hover:text-red-600"
+                    onClick={() => removeEmergency(index)}
+                    aria-label={t("cc.removeEmergency")}
+                  >
+                    <IconTrash className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <Field label={t("cc.fields.emergencyName")}>
+                  <Input
+                    value={contact.name}
+                    onChange={(e) =>
+                      patchEmergency(index, "name", e.target.value)
+                    }
+                    className={inputClass}
+                    placeholder={t("cc.placeholders.emergencyName")}
+                  />
+                </Field>
+                <Field label={t("cc.fields.emergencyRelation")}>
+                  <Input
+                    value={contact.relation}
+                    onChange={(e) =>
+                      patchEmergency(index, "relation", e.target.value)
+                    }
+                    className={inputClass}
+                    placeholder={t("cc.placeholders.emergencyRelation")}
+                  />
+                </Field>
+                <Field label={t("cc.fields.emergencyPhone")}>
+                  <Input
+                    value={contact.phone}
+                    onChange={(e) =>
+                      patchEmergency(index, "phone", e.target.value)
+                    }
+                    className={inputClass}
+                    placeholder={t("cc.placeholders.emergencyPhone")}
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={addEmergency}
+            >
+              <IconPlus className="h-3.5 w-3.5" />
+              {t("cc.addEmergency")}
+            </Button>
+          </div>
+        </div>
+      </FormSection>
+
+      <FormSection
+        step="03"
         icon={IconBuildingBank}
         title={t("cc.sectionBank")}
         hint={t("cc.sectionBankHint")}
@@ -314,7 +466,7 @@ export function UserForm({
       </FormSection>
 
       <FormSection
-        step="03"
+        step="04"
         icon={IconFileUpload}
         title={t("cc.sectionDocs")}
         hint={t("cc.docsHint")}
@@ -395,7 +547,9 @@ export function UserForm({
           {mode === "create" ? (
             <>
               <IconPlus className="h-3.5 w-3.5" />
-              {t("cc.createUser")}
+              {variant === "public"
+                ? t("register.submit")
+                : t("cc.createUser")}
             </>
           ) : (
             t("cc.saveUser")
@@ -414,6 +568,7 @@ function FormSection({
   children,
   delay,
   reduceMotion,
+  headerActions,
 }: {
   step: string;
   icon: Icon;
@@ -422,6 +577,7 @@ function FormSection({
   children: React.ReactNode;
   delay: number;
   reduceMotion: boolean;
+  headerActions?: React.ReactNode;
 }) {
   return (
     <motion.div
@@ -445,6 +601,9 @@ function FormSection({
               <span className="truncate text-[11px] text-neutral-400">{hint}</span>
             </div>
           </div>
+          {headerActions ? (
+            <div className="shrink-0">{headerActions}</div>
+          ) : null}
         </div>
         <div className="px-3.5 py-3 md:px-4 md:py-3.5">{children}</div>
       </SectionCard>

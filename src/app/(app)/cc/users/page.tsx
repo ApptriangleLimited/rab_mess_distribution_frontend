@@ -22,6 +22,8 @@ export default function CcUsersPage() {
     approval: "all",
     wing: "all",
     rank: "all",
+    date_from: "",
+    date_to: "",
   });
 
   const users = useMemo(

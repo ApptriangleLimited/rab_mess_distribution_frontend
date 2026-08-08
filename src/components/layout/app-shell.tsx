@@ -60,8 +60,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const hideSidebar =
     session.role === "cc" ||
     session.role === "daily" ||
+    session.role === "mess" ||
     session.role === "consume" ||
-    session.role === "ration";
+    session.role === "ration" ||
+    session.role === "admin";
 
   return (
     <div className="flex h-dvh overflow-hidden bg-page-canvas">

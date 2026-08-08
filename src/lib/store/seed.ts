@@ -1,4 +1,4 @@
-import { DAILY_TAGS } from "@/lib/constants";
+import { DAILY_TAGS, RATE_ONLY_TAGS } from "@/lib/constants";
 import {
   dateInMonth,
   daysInMonth,
@@ -38,13 +38,27 @@ function seedDemoDates(previousMonths = 3): string[] {
 
 
 function user(
-  partial: Omit<User, "created_at" | "updated_at" | "documents"> & {
+  partial: Omit<
+    User,
+    | "created_at"
+    | "updated_at"
+    | "documents"
+    | "joining_date"
+    | "out_date"
+    | "emergency_contacts"
+  > & {
     documents?: User["documents"];
+    joining_date?: string;
+    out_date?: string;
+    emergency_contacts?: User["emergency_contacts"];
   },
 ): User {
   const ts = nowISO();
   return {
     documents: [],
+    joining_date: todayISO(),
+    out_date: "",
+    emergency_contacts: [],
     created_at: ts,
     updated_at: ts,
     ...partial,
@@ -488,10 +502,16 @@ export function createSeedState(): AppState {
     },
   ];
 
-  const rates: AllowanceRate[] = DAILY_TAGS.map((tag) => ({
-    tag: tag.code,
-    amount_per_day: tag.allowance ? (tag.code === "MS" ? 180 : 220) : 0,
-  }));
+  const rates: AllowanceRate[] = [
+    ...DAILY_TAGS.map((tag) => ({
+      tag: tag.code,
+      amount_per_day: tag.allowance ? (tag.code === "MS" ? 180 : 220) : 0,
+    })),
+    ...RATE_ONLY_TAGS.map((tag) => ({
+      tag: tag.code,
+      amount_per_day: tag.defaultAmount,
+    })),
+  ];
 
   return {
     users,

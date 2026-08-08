@@ -1,25 +1,23 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconCalendar,
   IconChevronLeft,
   IconChevronRight,
-  IconDownload,
   IconPrinter,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { WingSummaryPrint } from "@/components/consume/wing-summary-print";
-import { ConsumeTabs } from "@/components/layout/consume-tabs";
+import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
 import { monthKey, shiftMonthKey } from "@/lib/date";
-import { downloadWingSummaryPdf } from "@/lib/download-consume-pdfs";
 import { buildWingSummary } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -58,38 +56,23 @@ export default function ConsumeSummaryClient() {
     router.replace(`${pathname}?${params.toString()}`);
   }
 
-  function onExport() {
-    downloadWingSummaryPdf({
-      month,
-      tagCodes: summary.tagCodes,
-      rows: summary.rows,
-      totals: summary.totals,
-      filename: `consume-wing-summary-${month}.pdf`,
-    });
-  }
+  const printHref = `/consume/monthly/summary/print?month=${month}`;
 
   const fieldClass =
     "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
-    <PagePane className="gap-5 print:border-0 print:p-0">
-      <WingSummaryPrint
-        month={month}
-        tagCodes={summary.tagCodes}
-        rows={summary.rows}
-        totals={summary.totals}
-      />
-
+    <PagePane className="gap-5">
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-5 no-print"
+        className="flex flex-col gap-5"
       >
         <div>
           <PageHeader
             title={t("pages.consumeSummary.title")}
             subtitle={t("pages.consumeSummary.subtitle", { month })}
-            center={<ConsumeTabs />}
+            center={<ConsumePanelTabs />}
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
@@ -123,26 +106,33 @@ export default function ConsumeSummaryClient() {
                     <IconChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 rounded-xl"
-                  onClick={onExport}
-                  disabled={!summary.rows.length}
-                >
-                  <IconDownload className="h-3.5 w-3.5" />
-                  {t("consume.exportPdf")}
-                </Button>
-                <Button
-                  variant="cta"
-                  size="sm"
-                  className="h-9 rounded-xl"
-                  onClick={() => window.print()}
-                  disabled={!summary.rows.length}
-                >
-                  <IconPrinter className="h-3.5 w-3.5" />
-                  {t("mess.print")}
-                </Button>
+                {summary.rows.length > 0 ? (
+                  <Button
+                    asChild
+                    variant="cta"
+                    size="sm"
+                    className="h-9 rounded-xl"
+                  >
+                    <Link
+                      href={printHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <IconPrinter className="h-3.5 w-3.5" />
+                      {t("mess.print")}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="cta"
+                    size="sm"
+                    className="h-9 rounded-xl"
+                    disabled
+                  >
+                    <IconPrinter className="h-3.5 w-3.5" />
+                    {t("mess.print")}
+                  </Button>
+                )}
               </div>
             }
           />

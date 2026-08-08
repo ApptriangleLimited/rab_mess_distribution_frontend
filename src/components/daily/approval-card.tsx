@@ -1,27 +1,32 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import type { User } from "@/lib/types";
+import { formatDateDisplay } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
-import { IconCheck, IconX } from "@tabler/icons-react";
 
-/** Pending member row for Members table — Approve / Reject in Actions. */
-export function ApprovalRow({
-  user,
-  onApprove,
-  onReject,
-}: {
-  user: User;
-  onApprove: () => void;
-  onReject: () => void;
-}) {
+/** Pending member row — click opens detail. */
+export function ApprovalRow({ user }: { user: User }) {
   const t = useT();
+  const router = useRouter();
+  const href = `/daily/users/${user.id}`;
 
   return (
-    <tr className="border-t border-amber-100/80 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/20">
+    <tr
+      role="link"
+      tabIndex={0}
+      onClick={() => router.push(href)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push(href);
+        }
+      }}
+      className="cursor-pointer border-t border-amber-100/80 bg-amber-50/30 transition hover:bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20 dark:hover:bg-amber-950/40"
+    >
       <td className="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-400">
         {user.rab_id}
       </td>
@@ -39,6 +44,12 @@ export function ApprovalRow({
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
         {user.wing || "—"}
       </td>
+      <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+        {formatDateDisplay(user.joining_date) || "—"}
+      </td>
+      <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+        {formatDateDisplay(user.out_date) || "—"}
+      </td>
       <td className="px-4 py-3">
         <Badge
           className={cn(
@@ -48,31 +59,6 @@ export function ApprovalRow({
         >
           {t("cc.approvalPending")}
         </Badge>
-      </td>
-      <td className="px-4 py-3">
-        <div
-          className="flex flex-wrap items-center justify-end gap-2"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Button
-            variant="cta"
-            size="sm"
-            className="rounded-lg"
-            onClick={onApprove}
-          >
-            <IconCheck className="h-3.5 w-3.5" />
-            {t("daily.approve")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-lg"
-            onClick={onReject}
-          >
-            <IconX className="h-3.5 w-3.5" />
-            {t("daily.reject")}
-          </Button>
-        </div>
       </td>
     </tr>
   );

@@ -45,12 +45,20 @@ export function homeForRole(role: Role) {
 
 export function isRoleAllowed(role: Role, pathname: string) {
   if (pathname.startsWith("/settings")) return true;
-  const map: Record<Role, string> = {
+  const map: Record<Role, string | string[]> = {
     cc: "/cc",
     daily: "/daily",
     mess: "/mess",
     consume: "/consume",
-    ration: "/ration",
+    /** Ration also uses Consume panels (ledger / bills / summary). */
+    ration: ["/ration", "/consume"],
+    /** Admin = ration panels + /admin dashboard. */
+    admin: ["/admin", "/ration", "/consume"],
   };
-  return pathname === "/" || pathname.startsWith(map[role]);
+  const allowed = map[role];
+  const prefixes = Array.isArray(allowed) ? allowed : [allowed];
+  return (
+    pathname === "/" ||
+    prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  );
 }

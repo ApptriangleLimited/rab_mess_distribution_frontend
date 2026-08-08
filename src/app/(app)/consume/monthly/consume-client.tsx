@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconCalendar,
   IconChevronLeft,
   IconChevronRight,
-  IconDownload,
   IconPrinter,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { AllConsumePanel } from "@/components/consume/all-consume-panel";
 import { TagBillPanel } from "@/components/consume/tag-bill-panel";
-import { ConsumeTabs } from "@/components/layout/consume-tabs";
+import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import {
   ConsumeTagTabs,
   type ConsumeTagTab,
@@ -24,14 +24,9 @@ import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
 import { isAllowanceTag, isKnownTag } from "@/lib/store/rates";
 import { monthKey, shiftMonthKey } from "@/lib/date";
-import {
-  downloadConsumeMonthPdf,
-  downloadTagBillPdf,
-} from "@/lib/download-consume-pdfs";
 import { buildConsumeMonth, buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
-import { tagLabel } from "@/i18n";
-import { useI18n, useT } from "@/i18n/provider";
+import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -44,7 +39,6 @@ function parseTagTab(raw: string | null): ConsumeTagTab | null {
 
 export default function ConsumeMonthlyClient() {
   const t = useT();
-  const { locale } = useI18n();
   const state = useStore();
   const router = useRouter();
   const pathname = usePathname();
@@ -124,32 +118,10 @@ export default function ConsumeMonthlyClient() {
     patchQuery({ tag: next });
   }
 
-  function onExport() {
-    if (tag === "all") {
-      downloadConsumeMonthPdf({
-        month,
-        rows: report.rows,
-        filename: `consume-${month}.pdf`,
-      });
-      return;
-    }
-    if (!tagBill) return;
-    const label = tagLabel(tag, locale);
-    const showFuel = tag === "FR" || tagBill.fuelRate > 0;
-    downloadTagBillPdf({
-      month,
-      tag,
-      tagLabel: label,
-      rows: tagBill.rows,
-      showFuel,
-      totalDays: tagBill.totalDays,
-      totalAmount: tagBill.totalAmount,
-      totalFuel: tagBill.totalFuel,
-      grandTotal: tagBill.grandTotal,
-      filename: `consume-bill-${month}-${tag}.pdf`,
-    });
-  }
-
+  const printHref =
+    tag === "all"
+      ? ""
+      : `/consume/monthly/print?month=${month}&tag=${tag}`;
   const exportDisabled =
     tag === "all" ? !report.rows.length : !tagBill?.rows.length;
 
@@ -157,17 +129,17 @@ export default function ConsumeMonthlyClient() {
     "h-11 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
-    <PagePane className="gap-5 print:border-0 print:p-0">
+    <PagePane className="gap-5">
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
-        <div className="no-print">
+        <div>
           <PageHeader
             title={t("pages.consumeMonthly.title")}
             subtitle={t("pages.consumeMonthly.subtitle", { month })}
-            center={<ConsumeTabs />}
+            center={<ConsumePanelTabs />}
             actions={
               <>
                 <div className="flex items-center gap-1">
@@ -202,24 +174,14 @@ export default function ConsumeMonthlyClient() {
                     <IconChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 rounded-lg"
-                  onClick={onExport}
-                  disabled={exportDisabled}
-                >
-                  <IconDownload className="h-3.5 w-3.5" />
-                  {t("consume.exportPdf")}
-                </Button>
               </>
             }
           />
         </div>
 
         {/* Bill desk — by-tag tabs left, stats + actions right */}
-        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950 print:border-0 print:shadow-none">
-          <div className="border-b border-neutral-100 bg-neutral-50/70 px-4 py-3 no-print dark:border-neutral-800 dark:bg-neutral-900/50">
+        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
+          <div className="border-b border-neutral-100 bg-neutral-50/70 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
               <div className="min-w-0 flex-1">
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
@@ -259,33 +221,40 @@ export default function ConsumeMonthlyClient() {
                 />
                 {tag !== "all" ? (
                   <div className="flex gap-2 self-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 rounded-lg"
-                      onClick={onExport}
-                      disabled={exportDisabled}
-                    >
-                      <IconDownload className="h-3.5 w-3.5" />
-                      {t("consume.exportPdf")}
-                    </Button>
-                    <Button
-                      variant="cta"
-                      size="sm"
-                      className="h-9 rounded-lg"
-                      onClick={() => window.print()}
-                      disabled={exportDisabled}
-                    >
-                      <IconPrinter className="h-3.5 w-3.5" />
-                      {t("consume.printBill")}
-                    </Button>
+                    {!exportDisabled ? (
+                      <Button
+                        asChild
+                        variant="cta"
+                        size="sm"
+                        className="h-9 rounded-lg"
+                      >
+                        <Link
+                          href={printHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <IconPrinter className="h-3.5 w-3.5" />
+                          {t("consume.printBill")}
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="cta"
+                        size="sm"
+                        className="h-9 rounded-lg"
+                        disabled
+                      >
+                        <IconPrinter className="h-3.5 w-3.5" />
+                        {t("consume.printBill")}
+                      </Button>
+                    )}
                   </div>
                 ) : null}
               </div>
             </div>
           </div>
 
-          <div className="p-4 sm:p-5 print:p-0">
+          <div className="p-4 sm:p-5">
             {tag === "all" ? (
               <AllConsumePanel key={`${month}-all`} rows={report.rows} />
             ) : (

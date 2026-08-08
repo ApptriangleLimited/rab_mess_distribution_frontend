@@ -239,6 +239,8 @@ export default function RationMembersPage() {
                     <th className="px-4 py-3">{t("cc.fields.rank")}</th>
                     <th className="px-4 py-3">{t("cc.fields.name")}</th>
                     <th className="px-4 py-3">{t("cc.fields.wing")}</th>
+                    <th className="px-4 py-3">{t("cc.fields.joiningDate")}</th>
+                    <th className="px-4 py-3">{t("cc.fields.outDate")}</th>
                     <th className="px-4 py-3">{t("cc.fields.status")}</th>
                     <th className="px-4 py-3 text-right">
                       {t("common.actions")}
@@ -252,6 +254,7 @@ export default function RationMembersPage() {
                       <RosterRow
                         key={user.id}
                         user={user}
+                        showDates
                         actions={
                           <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                             <Button

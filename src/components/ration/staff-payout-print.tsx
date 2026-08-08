@@ -34,7 +34,7 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
           !preview && "hidden",
           active && "print-this",
           preview &&
-            "block overflow-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-sm print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none dark:border-neutral-700",
+            "block overflow-auto rounded-xl border border-neutral-200 bg-white p-5 print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none dark:border-neutral-700",
         )}
       >
         {sheets.map((sheet, sheetIndex) => {

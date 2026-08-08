@@ -4,6 +4,7 @@ import { CONSUME_REPORT_META } from "@/lib/constants";
 import type { DailyTag } from "@/lib/types";
 import type { WingSummaryRow } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
+import { cn } from "@/lib/utils";
 
 type Props = {
   month: string;
@@ -14,13 +15,28 @@ type Props = {
     tagDays: Partial<Record<DailyTag, number>>;
     totalDays: number;
   };
+  /** Show on-screen for review; default print-only. */
+  preview?: boolean;
 };
 
-export function WingSummaryPrint({ month, tagCodes, rows, totals }: Props) {
+export function WingSummaryPrint({
+  month,
+  tagCodes,
+  rows,
+  totals,
+  preview = false,
+}: Props) {
   const t = useT();
 
   return (
-    <div className="wing-summary-print hidden print:block">
+    <div
+      className={cn(
+        "wing-summary-print text-black",
+        preview
+          ? "block overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700"
+          : "hidden print:block",
+      )}
+    >
       <header className="mb-4 text-center text-black">
         <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgNameBn}</p>
         <p className="text-xs">{CONSUME_REPORT_META.stationBn}</p>

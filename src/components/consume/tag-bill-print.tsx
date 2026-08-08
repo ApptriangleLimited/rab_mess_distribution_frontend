@@ -16,6 +16,8 @@ type Props = {
   totalFuel: number;
   grandTotal: number;
   showFuel: boolean;
+  /** Show on-screen for review; default print-only. */
+  preview?: boolean;
 };
 
 export function TagBillPrint({
@@ -28,12 +30,20 @@ export function TagBillPrint({
   totalFuel,
   grandTotal,
   showFuel,
+  preview = false,
 }: Props) {
   const t = useT();
   const [year, mon] = month.split("-");
 
   return (
-    <div className="tag-bill-print hidden print:block">
+    <div
+      className={cn(
+        "tag-bill-print text-black",
+        preview
+          ? "block overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700"
+          : "hidden print:block",
+      )}
+    >
       <header className="mb-4 text-center text-black">
         <p className="text-[10px] text-neutral-600">{CONSUME_REPORT_META.formNo}</p>
         <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgNameBn}</p>

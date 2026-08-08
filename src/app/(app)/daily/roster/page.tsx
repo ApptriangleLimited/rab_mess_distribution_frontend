@@ -2,16 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { IconPencil, IconPlus, IconUsers } from "@tabler/icons-react";
+import { IconPlus, IconUsers } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { UserConfirmCard } from "@/components/daily/user-confirm-card";
 import { ApprovalRow } from "@/components/daily/approval-card";
-import { TagSelector } from "@/components/daily/tag-selector";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,42 +20,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RosterRow, StatusToggle } from "@/components/daily/status-toggle";
+import { RosterRow } from "@/components/daily/status-toggle";
+import { MemberDateFilter } from "@/components/users/user-filters";
 import { useStore } from "@/hooks/use-store";
-import { useToast } from "@/components/shared/toast-provider";
-import { approveUser, rejectUser, setUserStatus } from "@/lib/store/daily";
-import { getAssignment, setTag } from "@/lib/store/assignments";
-import { compareUsers } from "@/lib/store/users";
+import { getAssignment } from "@/lib/store/assignments";
+import {
+  compareUsers,
+  matchesMemberDateFilter,
+} from "@/lib/store/users";
 import { listAllTags } from "@/lib/store/rates";
 import { RANKS, WINGS } from "@/lib/constants";
 import { todayISO } from "@/lib/date";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
-import type { DailyTag, User, UserStatus } from "@/lib/types";
-
-type PendingAction =
-  | { type: "approve"; user: User }
-  | { type: "reject"; user: User }
-  | null;
 
 export default function RosterPage() {
   const t = useT();
   const { locale } = useI18n();
+  const router = useRouter();
   const state = useStore();
   const tags = listAllTags();
-  const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
   const [tag, setTagFilter] = useState("all");
   const [status, setStatus] = useState("all");
-  const [detailUser, setDetailUser] = useState<User | null>(null);
-  const [statusUser, setStatusUser] = useState<User | null>(null);
-  const [statusNext, setStatusNext] = useState<UserStatus>("0");
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const [actionTag, setActionTag] = useState<DailyTag>("MS");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const today = todayISO();
 
   const approved = useMemo(
@@ -89,6 +80,7 @@ export default function RosterPage() {
       .filter((u) => {
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
+        if (!matchesMemberDateFilter(u, dateFrom, dateTo)) return false;
         if (!query) return true;
         return [u.name, u.rab_id, u.wing, u.rank, u.phone]
           .join(" ")
@@ -96,7 +88,16 @@ export default function RosterPage() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [pendingAll, q, rank, wing, status, tag]);
+  }, [
+    pendingAll,
+    q,
+    rank,
+    wing,
+    status,
+    tag,
+    dateFrom,
+    dateTo,
+  ]);
 
   const roster = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -105,6 +106,7 @@ export default function RosterPage() {
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
         if (status !== "all" && u.status !== status) return false;
+        if (!matchesMemberDateFilter(u, dateFrom, dateTo)) return false;
         if (tag !== "all") {
           const todayTag = getAssignment(u.id, today)?.tag ?? null;
           if (tag === "none") {
@@ -120,70 +122,21 @@ export default function RosterPage() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [approved, q, rank, wing, tag, status, today, state.assignments]);
+  }, [
+    approved,
+    q,
+    rank,
+    wing,
+    tag,
+    status,
+    today,
+    state.assignments,
+    dateFrom,
+    dateTo,
+  ]);
 
   const boardEmpty = pending.length === 0 && roster.length === 0;
   const showing = pending.length + roster.length;
-
-  function openStatus(user: User, next: UserStatus) {
-    setDetailUser(null);
-    setStatusNext(next);
-    setStatusUser(user);
-  }
-
-  function confirmStatus() {
-    if (!statusUser) return;
-    setUserStatus(statusUser.id, statusNext);
-    toast(
-      statusNext === "1"
-        ? t("daily.activatedToast")
-        : t("daily.deactivatedToast"),
-      "success",
-    );
-    setStatusUser(null);
-  }
-
-  function openApproveAction(type: "approve" | "reject", user: User) {
-    const existing = getAssignment(user.id, todayISO());
-    setActionTag(existing?.tag ?? "MS");
-    setPendingAction({ type, user });
-  }
-
-  function closeApproveAction() {
-    setPendingAction(null);
-  }
-
-  function confirmApproveAction() {
-    if (!pendingAction) return;
-    if (pendingAction.type === "approve") {
-      if (!actionTag) {
-        toast(t("daily.tagRequired"), "error");
-        return;
-      }
-      setTag(pendingAction.user.id, todayISO(), actionTag);
-      approveUser(pendingAction.user.id);
-      toast(t("daily.approvedToast"), "success");
-    } else {
-      rejectUser(pendingAction.user.id);
-      toast(t("daily.rejectedToast"), "success");
-    }
-    closeApproveAction();
-  }
-
-  const approveCopy =
-    pendingAction?.type === "approve"
-      ? {
-          title: t("confirm.approveTitle"),
-          body: t("confirm.approveBodyShort"),
-          label: t("daily.approve"),
-          tone: "success" as const,
-        }
-      : {
-          title: t("confirm.rejectTitle"),
-          body: t("confirm.rejectBodyShort"),
-          label: t("daily.reject"),
-          tone: "danger" as const,
-        };
 
   const fieldClass =
     "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
@@ -296,13 +249,21 @@ export default function RosterPage() {
               </SelectContent>
             </Select>
           </div>
+          <MemberDateFilter
+            from={dateFrom}
+            to={dateTo}
+            onFrom={setDateFrom}
+            onTo={setDateTo}
+          />
           <ClearFiltersButton
             disabled={
               !q.trim() &&
               rank === "all" &&
               wing === "all" &&
               tag === "all" &&
-              status === "all"
+              status === "all" &&
+              !dateFrom &&
+              !dateTo
             }
             onClick={() => {
               setQ("");
@@ -310,6 +271,8 @@ export default function RosterPage() {
               setWing("all");
               setTagFilter("all");
               setStatus("all");
+              setDateFrom("");
+              setDateTo("");
             }}
           />
         </div>
@@ -343,39 +306,21 @@ export default function RosterPage() {
                     <th className="px-4 py-3">{t("cc.fields.rank")}</th>
                     <th className="px-4 py-3">{t("cc.fields.name")}</th>
                     <th className="px-4 py-3">{t("cc.fields.wing")}</th>
+                    <th className="px-4 py-3">{t("cc.fields.joiningDate")}</th>
+                    <th className="px-4 py-3">{t("cc.fields.outDate")}</th>
                     <th className="px-4 py-3">{t("cc.fields.status")}</th>
-                    <th className="px-4 py-3 text-right">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pending.map((user) => (
-                    <ApprovalRow
-                      key={user.id}
-                      user={user}
-                      onApprove={() => openApproveAction("approve", user)}
-                      onReject={() => openApproveAction("reject", user)}
-                    />
+                    <ApprovalRow key={user.id} user={user} />
                   ))}
                   {roster.map((user) => (
                     <RosterRow
                       key={user.id}
                       user={user}
-                      onOpen={() => setDetailUser(user)}
-                      actions={
-                        <div className="flex justify-end gap-1.5">
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="outline"
-                            className="rounded-lg"
-                          >
-                            <Link href={`/daily/users/${user.id}`}>
-                              <IconPencil className="h-3.5 w-3.5" />
-                              {t("common.edit")}
-                            </Link>
-                          </Button>
-                        </div>
-                      }
+                      showDates
+                      onOpen={() => router.push(`/daily/users/${user.id}`)}
                     />
                   ))}
                 </tbody>
@@ -384,95 +329,6 @@ export default function RosterPage() {
           </div>
         )}
       </motion.div>
-
-      <ConfirmDialog
-        open={!!pendingAction}
-        tone={approveCopy.tone}
-        title={approveCopy.title}
-        body={approveCopy.body}
-        confirmLabel={approveCopy.label}
-        onCancel={closeApproveAction}
-        onConfirm={confirmApproveAction}
-      >
-        {pendingAction?.user ? (
-          <div className="space-y-4">
-            <UserConfirmCard user={pendingAction.user} />
-            {pendingAction.type === "approve" ? (
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/60">
-                <div className="mb-2.5">
-                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-                    {t("daily.setTag")}
-                  </p>
-                  <p className="mt-0.5 text-xs text-neutral-500">
-                    {t("daily.setTagHint")}
-                  </p>
-                </div>
-                <TagSelector
-                  value={actionTag}
-                  onChange={(next) => {
-                    if (next) setActionTag(next);
-                  }}
-                  className="h-9 rounded-lg"
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={!!detailUser}
-        tone="default"
-        title={t("daily.manageMember")}
-        body={t("daily.manageMemberHint")}
-        confirmLabel={t("common.done")}
-        onCancel={() => setDetailUser(null)}
-        onConfirm={() => setDetailUser(null)}
-      >
-        {detailUser ? (
-          <div className="space-y-4">
-            <UserConfirmCard user={detailUser} />
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-neutral-50/80 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900/60">
-              <div>
-                <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-                  {t("cc.fields.status")}
-                </p>
-                <p className="text-xs text-neutral-500">
-                  {detailUser.status === "1"
-                    ? t("cc.statusActive")
-                    : t("cc.statusInactive")}
-                </p>
-              </div>
-              <StatusToggle
-                user={detailUser}
-                onToggle={(next) => openStatus(detailUser, next)}
-              />
-            </div>
-          </div>
-        ) : null}
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={!!statusUser}
-        tone={statusNext === "0" ? "danger" : "success"}
-        title={
-          statusNext === "0"
-            ? t("confirm.deactivateTitle")
-            : t("confirm.activateTitle")
-        }
-        body={
-          statusNext === "0"
-            ? t("confirm.deactivateBodyShort")
-            : t("confirm.activateBodyShort")
-        }
-        confirmLabel={
-          statusNext === "0" ? t("daily.deactivate") : t("daily.activate")
-        }
-        onCancel={() => setStatusUser(null)}
-        onConfirm={confirmStatus}
-      >
-        {statusUser ? <UserConfirmCard user={statusUser} /> : null}
-      </ConfirmDialog>
     </PagePane>
   );
 }

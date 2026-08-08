@@ -1,6 +1,7 @@
 "use client";
 
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -26,10 +27,41 @@ const EMPTY_FILTERS: UserFilters = {
   approval: "all",
   wing: "all",
   rank: "all",
+  date_from: "",
+  date_to: "",
 };
 
 const fieldClass =
   "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+
+/** Travel-style range picker for member joining / out dates. */
+export function MemberDateFilter({
+  from,
+  to,
+  onFrom,
+  onTo,
+  className,
+}: {
+  from: string;
+  to: string;
+  onFrom: (v: string) => void;
+  onTo: (v: string) => void;
+  className?: string;
+}) {
+  const t = useT();
+  return (
+    <DateRangePicker
+      from={from}
+      to={to}
+      onChange={({ from: nextFrom, to: nextTo }) => {
+        onFrom(nextFrom);
+        onTo(nextTo);
+      }}
+      label={t("cc.fields.memberDate")}
+      className={className}
+    />
+  );
+}
 
 export function UserFiltersBar({ value, onChange }: Props) {
   const t = useT();
@@ -43,7 +75,9 @@ export function UserFiltersBar({ value, onChange }: Props) {
     (value.status != null && value.status !== "all") ||
     (value.approval != null && value.approval !== "all") ||
     (value.wing != null && value.wing !== "all") ||
-    (value.rank != null && value.rank !== "all");
+    (value.rank != null && value.rank !== "all") ||
+    Boolean(value.date_from?.trim()) ||
+    Boolean(value.date_to?.trim());
 
   return (
     <div className="flex w-full flex-nowrap items-center gap-2.5 overflow-x-auto rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50">
@@ -124,6 +158,12 @@ export function UserFiltersBar({ value, onChange }: Props) {
           </SelectContent>
         </Select>
       </div>
+      <MemberDateFilter
+        from={value.date_from ?? ""}
+        to={value.date_to ?? ""}
+        onFrom={(v) => patch({ date_from: v })}
+        onTo={(v) => patch({ date_to: v })}
+      />
       <ClearFiltersButton
         disabled={!dirty}
         onClick={() => onChange({ ...EMPTY_FILTERS })}

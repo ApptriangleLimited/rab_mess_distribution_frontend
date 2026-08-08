@@ -33,11 +33,7 @@ function writeHeader(doc: jsPDF, y: number) {
   return y + 6;
 }
 
-export function downloadFrTransferPdf(
-  sheet: RationTransferSheet,
-  filename: string,
-) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
   const pageW = doc.internal.pageSize.getWidth();
   let y = writeHeader(doc, 12);
 
@@ -68,7 +64,6 @@ export function downloadFrTransferPdf(
 
   doc.setFont("helvetica", "bold");
   doc.text(`SUBJECT: ${subject}`, 10, y);
-  // underline
   const subW = doc.getTextWidth(`SUBJECT: ${subject}`);
   doc.line(10, y + 1, 10 + subW, y + 1);
   doc.setFont("helvetica", "normal");
@@ -160,7 +155,20 @@ export function downloadFrTransferPdf(
   doc.text("Thanking You", 10, y);
   y += 8;
   doc.text("Sincerely Yours,", 10, y);
+}
 
+export function downloadFrTransferPdf(
+  sheet: RationTransferSheet | RationTransferSheet[],
+  filename: string,
+) {
+  const sheets = Array.isArray(sheet) ? sheet : [sheet];
+  if (sheets.length === 0) return;
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  sheets.forEach((s, i) => {
+    if (i > 0) doc.addPage();
+    writeFrTransferLetter(doc, s);
+  });
   doc.save(filename);
 }
 

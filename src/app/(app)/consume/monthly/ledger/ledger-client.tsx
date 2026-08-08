@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  IconCalendar,
-  IconDownload,
-  IconPrinter,
-} from "@tabler/icons-react";
+import { IconCalendar, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { EmptyState } from "@/components/shared/empty-state";
-import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
-import { ConsumeTabs } from "@/components/layout/consume-tabs";
+import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,8 +23,6 @@ import {
 import { useStore } from "@/hooks/use-store";
 import { RANKS, WINGS } from "@/lib/constants";
 import { monthKey } from "@/lib/date";
-import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
-import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildMonthLedger } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -42,8 +36,6 @@ export default function ConsumeLedgerClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
-  const printRef = useRef<HTMLDivElement>(null);
-  const [printing, setPrinting] = useState(false);
 
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -79,6 +71,15 @@ export default function ConsumeLedgerClient() {
     });
   }, [ledger.rows, q, rank, wing]);
 
+  const printHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("month", month);
+    if (q.trim()) params.set("q", q.trim());
+    if (rank !== "all") params.set("rank", rank);
+    if (wing !== "all") params.set("wing", wing);
+    return `/consume/monthly/ledger/print?${params.toString()}`;
+  }, [month, q, rank, wing]);
+
   function setMonth(next: string) {
     if (!MONTH_RE.test(next)) return;
     const params = new URLSearchParams(searchParams.toString());
@@ -86,55 +87,21 @@ export default function ConsumeLedgerClient() {
     router.replace(`${pathname}?${params.toString()}`);
   }
 
-  function onExportPdf() {
-    if (!rows.length) return;
-    downloadConsumeLedgerPdf({
-      month,
-      dayCount: ledger.dayCount,
-      tagCodes: ledger.tagCodes,
-      rows,
-      filename: `consume-ledger-${month}.pdf`,
-    });
-  }
-
-  async function onPrint() {
-    const el = printRef.current;
-    if (!el || !ledger.rows.length) return;
-    setPrinting(true);
-    try {
-      await printLetterElement(el, `consume-ledger-${month}.pdf`, "landscape");
-    } finally {
-      setPrinting(false);
-    }
-  }
-
   const fieldClass =
     "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
-    <PagePane className="gap-5 print:border-0 print:p-0">
-      {/* Off-screen letter for print capture (filtered rows). */}
-      <div className="pointer-events-none fixed left-[-10000px] top-0 w-[1400px]">
-        <MonthLedgerPrint
-          ref={printRef}
-          month={month}
-          dayCount={ledger.dayCount}
-          tagCodes={ledger.tagCodes}
-          rows={rows}
-          preview
-        />
-      </div>
-
+    <PagePane className="gap-5">
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-5 no-print"
+        className="flex flex-col gap-5"
       >
         <div>
           <PageHeader
             title={t("pages.consumeLedger.title")}
             subtitle={t("pages.consumeLedger.subtitle", { month })}
-            center={<ConsumeTabs />}
+            center={<ConsumePanelTabs />}
             actions={
               <div className="flex flex-wrap items-center gap-2.5">
                 <MiniStat
@@ -142,26 +109,33 @@ export default function ConsumeLedgerClient() {
                   value={String(rows.length)}
                   accent
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-auto rounded-lg px-2.5 py-1.5"
-                  onClick={onExportPdf}
-                  disabled={!rows.length}
-                >
-                  <IconDownload className="h-4 w-4" />
-                  {t("consume.exportPdf")}
-                </Button>
-                <Button
-                  variant="cta"
-                  size="sm"
-                  className="h-auto rounded-lg px-2.5 py-1.5"
-                  onClick={() => void onPrint()}
-                  disabled={!ledger.rows.length || printing}
-                >
-                  <IconPrinter className="h-4 w-4" />
-                  {t("mess.print")}
-                </Button>
+                {rows.length > 0 ? (
+                  <Button
+                    asChild
+                    variant="cta"
+                    size="sm"
+                    className="h-auto rounded-lg px-2.5 py-1.5"
+                  >
+                    <Link
+                      href={printHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <IconPrinter className="h-4 w-4" />
+                      {t("mess.print")}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="cta"
+                    size="sm"
+                    className="h-auto rounded-lg px-2.5 py-1.5"
+                    disabled
+                  >
+                    <IconPrinter className="h-4 w-4" />
+                    {t("mess.print")}
+                  </Button>
+                )}
               </div>
             }
           />

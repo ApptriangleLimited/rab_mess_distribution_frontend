@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import type { User, UserStatus } from "@/lib/types";
+import { formatDateDisplay } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import { IconPlayerPlay, IconPlayerPause } from "@tabler/icons-react";
@@ -40,10 +41,13 @@ export function RosterRow({
   user,
   onOpen,
   actions,
+  showDates = false,
 }: {
   user: User;
   onOpen?: () => void;
   actions?: ReactNode;
+  /** Joining / out date columns (Daily members table). */
+  showDates?: boolean;
 }) {
   const t = useT();
   const active = user.status === "1";
@@ -51,7 +55,7 @@ export function RosterRow({
 
   return (
     <tr
-      role={clickable ? "button" : undefined}
+      role={clickable ? "link" : undefined}
       tabIndex={clickable ? 0 : undefined}
       onClick={onOpen}
       onKeyDown={
@@ -88,6 +92,16 @@ export function RosterRow({
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
         {user.wing || "—"}
       </td>
+      {showDates ? (
+        <>
+          <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+            {formatDateDisplay(user.joining_date) || "—"}
+          </td>
+          <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+            {formatDateDisplay(user.out_date) || "—"}
+          </td>
+        </>
+      ) : null}
       <td className="px-4 py-3">
         <Badge
           className={cn(
@@ -100,15 +114,15 @@ export function RosterRow({
           {active ? t("cc.statusActive") : t("cc.statusInactive")}
         </Badge>
       </td>
-      <td
-        className="px-4 py-3 text-right"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {actions ?? (
-          <span className="text-xs text-neutral-400">—</span>
-        )}
-      </td>
+      {actions !== undefined ? (
+        <td
+          className="px-4 py-3 text-right"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {actions}
+        </td>
+      ) : null}
     </tr>
   );
 }

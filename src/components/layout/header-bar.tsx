@@ -54,7 +54,8 @@ export function HeaderBar({
     session.role === "cc" ||
     session.role === "daily" ||
     session.role === "consume" ||
-    session.role === "ration";
+    session.role === "ration" ||
+    session.role === "admin";
 
   useEffect(() => {
     if (!menuOpen) return;

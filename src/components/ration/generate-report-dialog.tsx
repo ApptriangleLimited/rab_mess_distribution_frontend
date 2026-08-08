@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { MemberSearchSelect } from "@/components/ration/member-search-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,7 +14,6 @@ import {
 import { useStore } from "@/hooks/use-store";
 import { parseMonthInput } from "@/lib/date";
 import { listAllTags } from "@/lib/store/rates";
-import { buildRationStaffLines } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -38,39 +36,16 @@ export function GenerateReportDialog({
   const [month, setMonth] = useState(defaultMonth);
   const [tag, setTag] = useState<DailyTag | "">("");
   const [senderId, setSenderId] = useState("");
-  const [userId, setUserId] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setMonth(defaultMonth);
     setTag("");
     setSenderId("");
-    setUserId("");
   }, [open, defaultMonth]);
 
   const senders = state.senders;
-  const isFr = tag === "FR";
-
-  const frMembers = useMemo(() => {
-    if (!isFr || !senderId) return [];
-    const parsed = parseMonthInput(month);
-    const sheets = buildRationStaffLines(parsed, senderId, "FR");
-    return sheets[0]?.lines.map((l) => l.user) ?? [];
-  }, [isFr, senderId, month, state.assignments, state.users, state.rates]);
-
-  useEffect(() => {
-    if (!isFr) {
-      setUserId("");
-      return;
-    }
-    if (userId && !frMembers.some((u) => u.id === userId)) {
-      setUserId("");
-    }
-  }, [isFr, frMembers, userId]);
-
-  const canGenerate = Boolean(
-    tag && senderId && (!isFr || userId),
-  );
+  const canGenerate = Boolean(tag && senderId);
 
   function senderForTag(nextTag: DailyTag) {
     return (
@@ -82,21 +57,18 @@ export function GenerateReportDialog({
 
   function onTagChange(nextTag: DailyTag) {
     setTag(nextTag);
-    setUserId("");
     const match = senderForTag(nextTag);
     if (match) setSenderId(match.id);
   }
 
   function onGenerate() {
     if (!tag || !senderId) return;
-    if (isFr && !userId) return;
     const parsed = parseMonthInput(month);
     const qs = new URLSearchParams({
       month: parsed,
       tag,
       sender: senderId,
     });
-    if (isFr) qs.set("user", userId);
     window.open(`/ration/report/preview?${qs.toString()}`, "_blank");
     onClose();
   }
@@ -121,10 +93,7 @@ export function GenerateReportDialog({
           <Input
             type="month"
             value={parseMonthInput(month)}
-            onChange={(e) => {
-              setMonth(e.target.value);
-              setUserId("");
-            }}
+            onChange={(e) => setMonth(e.target.value)}
             className="h-10 rounded-lg"
           />
         </div>
@@ -150,10 +119,7 @@ export function GenerateReportDialog({
           <Label>{t("ration.reportBank")}</Label>
           <Select
             value={senderId || undefined}
-            onValueChange={(id) => {
-              setSenderId(id);
-              setUserId("");
-            }}
+            onValueChange={setSenderId}
           >
             <SelectTrigger className="h-10 rounded-lg">
               <SelectValue placeholder={t("ration.selectBank")} />
@@ -168,21 +134,9 @@ export function GenerateReportDialog({
             </SelectContent>
           </Select>
         </div>
-        {isFr ? (
-          <div className="space-y-1.5">
-            <Label>{t("ration.reportMember")}</Label>
-            <MemberSearchSelect
-              users={frMembers}
-              value={userId}
-              onChange={setUserId}
-            />
-          </div>
-        ) : null}
         {!canGenerate ? (
           <p className="text-xs text-neutral-500">
-            {isFr
-              ? `${t("ration.selectTag")} · ${t("ration.selectBank")} · ${t("ration.selectMember")}`
-              : `${t("ration.selectTag")} · ${t("ration.selectBank")}`}
+            {`${t("ration.selectTag")} · ${t("ration.selectBank")}`}
           </p>
         ) : null}
       </div>

@@ -5,7 +5,7 @@ import {
   isCarrySuppressed,
 } from "@/lib/store/assignments";
 import { nextISODate, todayISO } from "@/lib/date";
-import type { User } from "@/lib/types";
+import type { DailyTag, User } from "@/lib/types";
 
 export type MessEater = User & { assignment_id: string };
 
@@ -24,6 +24,63 @@ export function getMessEaters(date: string): MessEater[] {
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** approved + active with explicit tag on date (no carry). */
+export function countTaggedToday(tag: DailyTag, date = todayISO()): number {
+  const { users, assignments } = getState();
+  const activeIds = new Set(
+    users
+      .filter((u) => u.approval_status === "approved" && u.status === "1")
+      .map((u) => u.id),
+  );
+  return assignments.filter(
+    (a) => a.date === date && a.tag === tag && activeIds.has(a.user_id),
+  ).length;
+}
+
+/**
+ * Who holds `tag` on `date`:
+ * explicit tag that day, else carry prior if same and not suppressed.
+ */
+export function getProjectedTagMembers(
+  tag: DailyTag,
+  date = nextISODate(todayISO()),
+): {
+  date: string;
+  tag: DailyTag;
+  members: User[];
+  tagged: number;
+  carried: number;
+} {
+  const { users } = getState();
+  const members: User[] = [];
+  let tagged = 0;
+  let carried = 0;
+
+  for (const user of users) {
+    if (user.approval_status !== "approved") continue;
+    if (user.status !== "1") continue;
+
+    const direct = getAssignment(user.id, date);
+    if (direct) {
+      if (direct.tag === tag) {
+        members.push(user);
+        tagged += 1;
+      }
+      continue;
+    }
+
+    if (isCarrySuppressed(user.id, date)) continue;
+    const prior = findPriorTag(user.id, date);
+    if (prior === tag) {
+      members.push(user);
+      carried += 1;
+    }
+  }
+
+  members.sort((a, b) => a.name.localeCompare(b.name));
+  return { date, tag, members, tagged, carried };
+}
+
 /**
  * Who eats mess on `date` (default tomorrow):
  * explicit MS that day, else carry prior tag if MS and not suppressed.
@@ -34,34 +91,13 @@ export function getProjectedMessEaters(date = nextISODate(todayISO())): {
   tagged: number;
   carried: number;
 } {
-  const { users } = getState();
-  const eaters: User[] = [];
-  let tagged = 0;
-  let carried = 0;
-
-  for (const user of users) {
-    if (user.approval_status !== "approved") continue;
-    if (user.status !== "1") continue;
-
-    const direct = getAssignment(user.id, date);
-    if (direct) {
-      if (direct.tag === "MS") {
-        eaters.push(user);
-        tagged += 1;
-      }
-      continue;
-    }
-
-    if (isCarrySuppressed(user.id, date)) continue;
-    const prior = findPriorTag(user.id, date);
-    if (prior === "MS") {
-      eaters.push(user);
-      carried += 1;
-    }
-  }
-
-  eaters.sort((a, b) => a.name.localeCompare(b.name));
-  return { date, eaters, tagged, carried };
+  const projected = getProjectedTagMembers("MS", date);
+  return {
+    date: projected.date,
+    eaters: projected.members,
+    tagged: projected.tagged,
+    carried: projected.carried,
+  };
 }
 
 export function countByField(eaters: User[], field: "wing" | "rank") {

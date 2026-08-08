@@ -10,6 +10,7 @@ import {
   IconChecklist,
   IconEye,
   IconEyeOff,
+  IconLayoutDashboard,
   IconSoup,
   IconUsers,
   type Icon,
@@ -53,6 +54,11 @@ const ROLE_META: Record<
     icon: IconCashBanknote,
     accent: "from-teal-500/20 to-teal-600/5",
     chip: "bg-teal-500/15 text-teal-800 dark:text-teal-300",
+  },
+  admin: {
+    icon: IconLayoutDashboard,
+    accent: "from-emerald-500/20 to-emerald-600/5",
+    chip: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
   },
 };
 

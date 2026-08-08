@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
+import { formatDateDisplay } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +34,15 @@ const approvalClass: Record<ApprovalStatus, string> = {
 
 export function UserTable({
   users,
+  detailHref = (id: string) => `/cc/users/${id}`,
   onEmptyCreateHref = "/cc/users/new",
 }: {
   users: User[];
+  detailHref?: (id: string) => string;
   onEmptyCreateHref?: string;
 }) {
   const t = useT();
+  const router = useRouter();
 
   if (users.length === 0) {
     return (
@@ -62,52 +67,66 @@ export function UserTable({
             <th className="px-4 py-3 font-medium">{t("cc.fields.name")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.wing")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.phone")}</th>
+            <th className="px-4 py-3 font-medium">{t("cc.fields.joiningDate")}</th>
+            <th className="px-4 py-3 font-medium">{t("cc.fields.outDate")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.status")}</th>
             <th className="px-4 py-3 font-medium">{t("cc.fields.approval")}</th>
-            <th className="px-4 py-3 font-medium">{t("common.actions")}</th>
           </tr>
         </thead>
         <tbody>
-          {users.map((user) => (
-            <tr
-              key={user.id}
-              className="border-t border-neutral-100 dark:border-neutral-800"
-            >
-              <td className="px-4 py-3 font-mono text-xs">{user.rab_id}</td>
-              <td className="px-4 py-3">{user.rank || "—"}</td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <UserAvatar name={user.name} />
-                  <p className="font-medium text-neutral-900 dark:text-neutral-50">
-                    {user.name}
-                  </p>
-                </div>
-              </td>
-              <td className="px-4 py-3">{user.wing || "—"}</td>
-              <td className="px-4 py-3">{user.phone || "—"}</td>
-              <td className="px-4 py-3">
-                <Badge
-                  className={cn(
-                    user.status === "1"
-                      ? "bg-primary/10 text-primary"
-                      : "bg-neutral-100 text-neutral-600",
-                  )}
-                >
-                  {statusLabel(user.status, t)}
-                </Badge>
-              </td>
-              <td className="px-4 py-3">
-                <Badge className={approvalClass[user.approval_status]}>
-                  {approvalLabel(user.approval_status, t)}
-                </Badge>
-              </td>
-              <td className="px-4 py-3">
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/cc/users/${user.id}`}>{t("common.edit")}</Link>
-                </Button>
-              </td>
-            </tr>
-          ))}
+          {users.map((user) => {
+            const href = detailHref(user.id);
+            return (
+              <tr
+                key={user.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(href)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(href);
+                  }
+                }}
+                className="cursor-pointer border-t border-neutral-100 transition hover:bg-primary/[0.04] dark:border-neutral-800 dark:hover:bg-primary/[0.08]"
+              >
+                <td className="px-4 py-3 font-mono text-xs">{user.rab_id}</td>
+                <td className="px-4 py-3">{user.rank || "—"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <UserAvatar name={user.name} />
+                    <p className="font-medium text-neutral-900 dark:text-neutral-50">
+                      {user.name}
+                    </p>
+                  </div>
+                </td>
+                <td className="px-4 py-3">{user.wing || "—"}</td>
+                <td className="px-4 py-3">{user.phone || "—"}</td>
+                <td className="px-4 py-3 text-xs tabular-nums">
+                  {formatDateDisplay(user.joining_date) || "—"}
+                </td>
+                <td className="px-4 py-3 text-xs tabular-nums">
+                  {formatDateDisplay(user.out_date) || "—"}
+                </td>
+                <td className="px-4 py-3">
+                  <Badge
+                    className={cn(
+                      user.status === "1"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-neutral-100 text-neutral-600",
+                    )}
+                  >
+                    {statusLabel(user.status, t)}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge className={approvalClass[user.approval_status]}>
+                    {approvalLabel(user.approval_status, t)}
+                  </Badge>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

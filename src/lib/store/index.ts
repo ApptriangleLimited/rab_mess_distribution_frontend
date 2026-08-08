@@ -1,11 +1,52 @@
-import { STORE_KEY } from "@/lib/constants";
+import { RATE_ONLY_TAGS, STORE_KEY } from "@/lib/constants";
 import { createSeedState } from "@/lib/store/seed";
-import type { AppState } from "@/lib/types";
+import type {
+  AllowanceRate,
+  AppState,
+  EmergencyContact,
+  User,
+} from "@/lib/types";
 
 type Listener = () => void;
 
 let memory: AppState | null = null;
 const listeners = new Set<Listener>();
+
+type LegacyUser = User & {
+  emergency_name?: string;
+  emergency_relation?: string;
+  emergency_phone?: string;
+};
+
+function normalizeEmergencyContacts(u: LegacyUser): EmergencyContact[] {
+  if (Array.isArray(u.emergency_contacts) && u.emergency_contacts.length > 0) {
+    return u.emergency_contacts.map((c) => ({
+      name: c?.name ?? "",
+      relation: c?.relation ?? "",
+      phone: c?.phone ?? "",
+    }));
+  }
+  const name = u.emergency_name ?? "";
+  const relation = u.emergency_relation ?? "";
+  const phone = u.emergency_phone ?? "";
+  if (name || relation || phone) {
+    return [{ name, relation, phone }];
+  }
+  return [];
+}
+
+function ensureRateOnlyRates(rates: AllowanceRate[]): AllowanceRate[] {
+  const next = [...rates];
+  for (const only of RATE_ONLY_TAGS) {
+    const exists = next.some(
+      (r) => r.tag.toLowerCase() === only.code.toLowerCase(),
+    );
+    if (!exists) {
+      next.push({ tag: only.code, amount_per_day: only.defaultAmount });
+    }
+  }
+  return next;
+}
 
 function readStorage(): AppState | null {
   if (typeof window === "undefined") return null;
@@ -39,6 +80,22 @@ export function getState(): AppState {
 function normalizeState(state: AppState): AppState {
   return {
     ...state,
+    users: (state.users ?? []).map((u) => {
+      const legacy = u as LegacyUser;
+      const {
+        emergency_name: _n,
+        emergency_relation: _r,
+        emergency_phone: _p,
+        ...rest
+      } = legacy;
+      return {
+        ...rest,
+        joining_date: legacy.joining_date ?? "",
+        out_date: legacy.out_date ?? "",
+        emergency_contacts: normalizeEmergencyContacts(legacy),
+      };
+    }),
+    rates: ensureRateOnlyRates(state.rates ?? []),
     approved_dates: Array.isArray(state.approved_dates)
       ? state.approved_dates
       : [],

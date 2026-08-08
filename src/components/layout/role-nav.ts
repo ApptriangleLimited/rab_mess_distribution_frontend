@@ -3,7 +3,6 @@ import type { MessageKey } from "@/i18n";
 import {
   IconUserCheck,
   IconTags,
-  IconSoup,
   IconChartBar,
   IconCashBanknote,
   IconFileReport,
@@ -36,10 +35,10 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   mess: [
     {
-      href: "/mess/today",
-      labelKey: "nav.todaysMess",
-      icon: IconSoup,
-      chip: "red",
+      href: "/mess/ledger",
+      labelKey: "nav.messLedger",
+      icon: IconTags,
+      chip: "teal",
     },
   ],
   consume: [
@@ -74,6 +73,45 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.generateReport",
       icon: IconFileReport,
       chip: "emerald",
+    },
+    {
+      href: "/consume/monthly",
+      labelKey: "nav.monthlyConsume",
+      icon: IconChartBar,
+      chip: "purple",
+    },
+    {
+      href: "/consume/monthly/summary",
+      labelKey: "nav.consumeSummary",
+      icon: IconFileReport,
+      chip: "indigo",
+    },
+  ],
+  /** Sidebar unused (tabs UI) — keep for completeness. */
+  admin: [
+    {
+      href: "/admin",
+      labelKey: "nav.adminDashboard",
+      icon: IconFileReport,
+      chip: "teal",
+    },
+    {
+      href: "/ration/monthly",
+      labelKey: "nav.monthlyRation",
+      icon: IconCashBanknote,
+      chip: "cyan",
+    },
+    {
+      href: "/consume/monthly",
+      labelKey: "nav.monthlyConsume",
+      icon: IconChartBar,
+      chip: "purple",
+    },
+    {
+      href: "/consume/monthly/summary",
+      labelKey: "nav.consumeSummary",
+      icon: IconFileReport,
+      chip: "indigo",
     },
   ],
 };

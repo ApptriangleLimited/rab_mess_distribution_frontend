@@ -4,16 +4,24 @@ import type { MessageKey } from "@/i18n";
 export const ROLE_HOMES: Record<Role, string> = {
   cc: "/cc/users",
   daily: "/daily/tags",
-  mess: "/mess/today",
+  mess: "/mess/ledger",
   consume: "/consume/monthly/ledger",
   ration: "/ration/monthly",
+  admin: "/admin",
 };
 
 /** @deprecated Prefer t(`roles.${role}`) — kept for non-UI code paths. */
-export const ROLE_KEYS = ["cc", "daily", "mess", "consume", "ration"] as const satisfies readonly Role[];
+export const ROLE_KEYS = [
+  "cc",
+  "daily",
+  "mess",
+  "consume",
+  "ration",
+  "admin",
+] as const satisfies readonly Role[];
 
-/** Login / switcher pickers — mess kept in ROLE_KEYS but hidden from UI. */
-export const HIDDEN_ROLES = new Set<Role>(["mess"]);
+/** Login / switcher pickers — no roles hidden. */
+export const HIDDEN_ROLES = new Set<Role>([]);
 
 export const VISIBLE_ROLE_KEYS = ROLE_KEYS.filter(
   (r) => !HIDDEN_ROLES.has(r),
@@ -26,6 +34,14 @@ export function rolesForPicker(current?: Role | null): Role[] {
   }
   return VISIBLE_ROLE_KEYS;
 }
+
+/** Ration + Admin share consume/ration panels. */
+export function isRationFamily(role?: Role | null) {
+  return role === "ration" || role === "admin";
+}
+
+/** Tags visible on Mess Distributioner ledger. */
+export const MESS_LEDGER_TAGS: DailyTag[] = ["MS", "CD"];
 
 export const DAILY_TAGS: {
   code: BuiltInDailyTag;
@@ -43,6 +59,29 @@ export const DAILY_TAGS: {
   { code: "TRG", labelKey: "tags.TRG", allowance: false, mess: false },
   { code: "MS", labelKey: "tags.MS", allowance: true, mess: true },
 ];
+
+/** Rate-only codes — Settings list yes, daily/consume tag pickers no. */
+export const FUEL_RATE_TAG = "FUEL" as const;
+
+export const RATE_ONLY_TAGS: {
+  code: typeof FUEL_RATE_TAG;
+  labelKey: MessageKey;
+  defaultAmount: number;
+}[] = [
+  { code: FUEL_RATE_TAG, labelKey: "tags.FUEL", defaultAmount: 50 },
+];
+
+export function isRateOnlyTag(tag: string) {
+  const key = tag.toLowerCase();
+  return RATE_ONLY_TAGS.some((t) => t.code.toLowerCase() === key);
+}
+
+export function isProtectedRateTag(tag: string) {
+  const key = tag.toLowerCase();
+  return (
+    DAILY_TAGS.some((t) => t.code.toLowerCase() === key) || isRateOnlyTag(tag)
+  );
+}
 
 export const RANKS = [
   "Constable",
@@ -69,8 +108,9 @@ export const CONSUME_REPORT_META = {
   formNo: "Bangladesh Form No-5211",
 } as const;
 
-/** Extra fuel ৳/day for FR bill print (0 hides fuel columns until set). */
-export const FR_FUEL_RATE_PER_DAY = 50;
+/** Fallback fuel ৳/day for FR bills when Settings FUEL rate missing. */
+export const FR_FUEL_RATE_PER_DAY =
+  RATE_ONLY_TAGS.find((t) => t.code === FUEL_RATE_TAG)?.defaultAmount ?? 50;
 
 /** Org / letter defaults for Ration Accounts print & transfer export. */
 export const RATION_REPORT_META = {

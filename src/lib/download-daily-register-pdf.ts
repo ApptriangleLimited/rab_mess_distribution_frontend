@@ -10,21 +10,22 @@ import {
 
 type Args = {
   month: string;
-  dayCount: number;
+  /** Calendar day numbers as column headers (1-based). */
+  dayNumbers: number[];
+  /** `row.days` length must match `dayNumbers`. */
   rows: LedgerRow[];
   filename?: string;
 };
 
 export function downloadDailyRegisterPdf({
   month,
-  dayCount,
+  dayNumbers,
   rows,
   filename,
 }: Args) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const monthLabel = formatMonthLong(month);
-  const days = Array.from({ length: dayCount }, (_, i) => i + 1);
 
   let y = 8;
   doc.setFont("helvetica", "bold");
@@ -46,7 +47,7 @@ export function downloadDailyRegisterPdf({
   );
   y += 5;
 
-  const head = ["No.", "Number", "Rank", "Name", ...days.map(String)];
+  const head = ["No.", "Number", "Rank", "Name", ...dayNumbers.map(String)];
 
   const body = rows.map((row, i) => {
     const cells: string[] = [

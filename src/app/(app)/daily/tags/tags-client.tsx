@@ -1,18 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconCalendar,
-  IconDownload,
-  IconEye,
-  IconEyeOff,
   IconPrinter,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
@@ -24,8 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RegisterBoard, PaintTagSelect } from "@/components/daily/register-board";
-import { MonthRegisterPrint } from "@/components/daily/month-register-print";
+import {
+  RegisterBoard,
+  PaintTagSelect,
+} from "@/components/daily/register-board";
 import { useStore } from "@/hooks/use-store";
 import { RANKS, WINGS } from "@/lib/constants";
 import {
@@ -43,10 +44,7 @@ import {
   setTag,
   setTagRange,
 } from "@/lib/store/assignments";
-import { getProjectedMessEaters } from "@/lib/store/mess";
-import { buildDailyRegister } from "@/lib/reports";
-import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
-import { printLetterElement } from "@/lib/print-letter-pdf";
+import { countTaggedToday, getProjectedTagMembers } from "@/lib/store/mess";
 import { compareUsers } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
@@ -63,14 +61,13 @@ export default function TagsPageClient() {
   const month = parseMonthInput(monthParam ?? monthKey());
   const today = todayISO();
   const dayCount = daysInMonth(month);
-  const printRef = useRef<HTMLDivElement>(null);
-  const [printing, setPrinting] = useState(false);
 
   const [paintTag, setPaintTag] = useState<DailyTag | "">("");
-  const [showInactive, setShowInactive] = useState(false);
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const setMonth = useCallback(
     (next: string) => {
@@ -78,6 +75,8 @@ export default function TagsPageClient() {
       params.set("month", next);
       params.delete("date");
       router.replace(`${pathname}?${params.toString()}`);
+      setDateFrom("");
+      setDateTo("");
     },
     [pathname, router, searchParams],
   );
@@ -87,7 +86,7 @@ export default function TagsPageClient() {
     return state.users
       .filter((u) => {
         if (u.approval_status !== "approved") return false;
-        if (!showInactive && u.status !== "1") return false;
+        if (u.status !== "1") return false;
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
         if (!query) return true;
@@ -97,16 +96,11 @@ export default function TagsPageClient() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [state.users, showInactive, q, rank, wing]);
+  }, [state.users, q, rank, wing]);
 
   const assignments = useMemo(
     () => listByMonth(month),
     [state.assignments, month],
-  );
-
-  const register = useMemo(
-    () => buildDailyRegister(month, users),
-    [month, users, state.assignments],
   );
 
   const priorByUser = useMemo(() => {
@@ -119,17 +113,51 @@ export default function TagsPageClient() {
     return map;
   }, [users, month, state.assignments]);
 
-  const taggedCells = useMemo(() => {
-    const ids = new Set(users.map((u) => u.id));
-    return assignments.filter((a) => ids.has(a.user_id)).length;
-  }, [assignments, users]);
+  const visibleDates = useMemo(() => {
+    const from = dateFrom.trim();
+    const to = dateTo.trim();
+    const out: string[] = [];
+    for (let d = 1; d <= dayCount; d++) {
+      const date = dateInMonth(month, d);
+      if (from && date < from) continue;
+      if (to && date > to) continue;
+      out.push(date);
+    }
+    return out;
+  }, [month, dayCount, dateFrom, dateTo]);
 
-  const tomorrowMess = useMemo(() => {
-    const date = nextISODate(today);
-    return getProjectedMessEaters(date);
-  }, [today, state.assignments, state.users, state.suppressed_carries]);
+  const todayMsCount = useMemo(
+    () => countTaggedToday("MS", today),
+    [today, state.assignments, state.users],
+  );
 
-  const capacity = users.length * dayCount;
+  const todayCdCount = useMemo(
+    () => countTaggedToday("CD", today),
+    [today, state.assignments, state.users],
+  );
+
+  const tomorrow = nextISODate(today);
+
+  const tomorrowMsCount = useMemo(
+    () => getProjectedTagMembers("MS", tomorrow).members.length,
+    [tomorrow, state.assignments, state.users, state.suppressed_carries],
+  );
+
+  const tomorrowCdCount = useMemo(
+    () => getProjectedTagMembers("CD", tomorrow).members.length,
+    [tomorrow, state.assignments, state.users, state.suppressed_carries],
+  );
+
+  const printHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("month", month);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
+    if (q.trim()) params.set("q", q.trim());
+    if (rank !== "all") params.set("rank", rank);
+    if (wing !== "all") params.set("wing", wing);
+    return `/daily/tags/print?${params.toString()}`;
+  }, [month, dateFrom, dateTo, q, rank, wing]);
 
   function onTagChange(userId: string, date: string, tag: DailyTag | "") {
     if (!tag) clearTag(userId, date);
@@ -140,50 +168,15 @@ export default function TagsPageClient() {
     setTagRange(userId, dates, tag);
   }
 
-  function onExportPdf() {
-    if (!register.rows.length) return;
-    downloadDailyRegisterPdf({
-      month,
-      dayCount: register.dayCount,
-      rows: register.rows,
-      filename: `attendance-register-${month}.pdf`,
-    });
-  }
-
-  async function onPrint() {
-    const el = printRef.current;
-    if (!el || !register.rows.length) return;
-    setPrinting(true);
-    try {
-      await printLetterElement(
-        el,
-        `attendance-register-${month}.pdf`,
-        "landscape",
-      );
-    } finally {
-      setPrinting(false);
-    }
-  }
-
   const fieldClass =
     "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
-    <PagePane className="gap-5 print:border-0 print:p-0">
-      <div className="pointer-events-none fixed left-[-10000px] top-0 w-[1400px]">
-        <MonthRegisterPrint
-          ref={printRef}
-          month={month}
-          dayCount={register.dayCount}
-          rows={register.rows}
-          preview
-        />
-      </div>
-
+    <PagePane className="gap-5">
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-5 no-print"
+        className="flex flex-col gap-5"
       >
         <PageHeader
           title={t("pages.dailyTags.title")}
@@ -197,52 +190,50 @@ export default function TagsPageClient() {
                 accent
               />
               <MiniStat
-                label={t("daily.registerCapacity")}
-                value={`${taggedCells}/${capacity}`}
+                label={t("daily.todayMs")}
+                value={String(todayMsCount)}
+                accent
+              />
+              <MiniStat
+                label={t("daily.todayCd")}
+                value={String(todayCdCount)}
               />
               <MiniStat
                 label={t("daily.tomorrowMess")}
-                value={String(tomorrowMess.eaters.length)}
+                value={String(tomorrowMsCount)}
                 accent
               />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-auto rounded-lg px-2.5 py-1.5"
-                onClick={() => setShowInactive((v) => !v)}
-                aria-pressed={showInactive}
-              >
-                {showInactive ? (
-                  <IconEyeOff className="h-4 w-4" />
-                ) : (
-                  <IconEye className="h-4 w-4" />
-                )}
-                <span className="hidden sm:inline">
-                  {showInactive
-                    ? t("daily.hideInactive")
-                    : t("daily.showInactive")}
-                </span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-auto rounded-lg px-2.5 py-1.5"
-                onClick={onExportPdf}
-                disabled={!register.rows.length}
-              >
-                <IconDownload className="h-4 w-4" />
-                {t("daily.exportPdf")}
-              </Button>
-              <Button
-                variant="cta"
-                size="sm"
-                className="h-auto rounded-lg px-2.5 py-1.5"
-                onClick={() => void onPrint()}
-                disabled={!register.rows.length || printing}
-              >
-                <IconPrinter className="h-4 w-4" />
-                {t("mess.print")}
-              </Button>
+              <MiniStat
+                label={t("daily.tomorrowCd")}
+                value={String(tomorrowCdCount)}
+              />
+              {users.length > 0 && visibleDates.length > 0 ? (
+                <Button
+                  asChild
+                  variant="cta"
+                  size="sm"
+                  className="h-auto rounded-lg px-2.5 py-1.5"
+                >
+                  <Link
+                    href={printHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <IconPrinter className="h-4 w-4" />
+                    {t("mess.print")}
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="cta"
+                  size="sm"
+                  className="h-auto rounded-lg px-2.5 py-1.5"
+                  disabled
+                >
+                  <IconPrinter className="h-4 w-4" />
+                  {t("mess.print")}
+                </Button>
+              )}
             </div>
           }
         />
@@ -297,12 +288,31 @@ export default function TagsPageClient() {
               </SelectContent>
             </Select>
           </div>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            min={`${month}-01`}
+            max={`${month}-${String(dayCount).padStart(2, "0")}`}
+            onChange={({ from, to }) => {
+              setDateFrom(from);
+              setDateTo(to);
+            }}
+            label={t("common.dateRange")}
+          />
           <ClearFiltersButton
-            disabled={!q.trim() && rank === "all" && wing === "all"}
+            disabled={
+              !q.trim() &&
+              rank === "all" &&
+              wing === "all" &&
+              !dateFrom &&
+              !dateTo
+            }
             onClick={() => {
               setQ("");
               setRank("all");
               setWing("all");
+              setDateFrom("");
+              setDateTo("");
             }}
           />
           <div className="hidden w-[9rem]" aria-hidden>
@@ -316,6 +326,8 @@ export default function TagsPageClient() {
 
         {users.length === 0 ? (
           <EmptyState title={t("daily.emptyTags")} />
+        ) : visibleDates.length === 0 ? (
+          <EmptyState title={t("common.noResults")} />
         ) : (
           <RegisterBoard
             users={users}
@@ -329,6 +341,8 @@ export default function TagsPageClient() {
             onPaintRange={onPaintRange}
             priorByUser={priorByUser}
             suppressedCarries={state.suppressed_carries ?? []}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
           />
         )}
       </motion.div>

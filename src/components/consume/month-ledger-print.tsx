@@ -13,6 +13,8 @@ type Props = {
   dayCount: number;
   tagCodes: DailyTag[];
   rows: LedgerRow[];
+  /** Subset of day-of-month numbers (1-based). Default: 1..dayCount. */
+  visibleDays?: number[];
   /** Show on screen for iframe print capture; default print-only. */
   preview?: boolean;
 };
@@ -26,12 +28,14 @@ function toBnDigits(n: number) {
 /** Landscape Forces Mess consume ledger — matches BN register print. */
 export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
   function MonthLedgerPrint(
-    { month, dayCount, tagCodes, rows, preview = false },
+    { month, dayCount, tagCodes, rows, visibleDays, preview = false },
     ref,
   ) {
     const t = useT();
     const { locale } = useI18n();
-    const days = Array.from({ length: dayCount }, (_, i) => i + 1);
+    const days = visibleDays?.length
+      ? visibleDays
+      : Array.from({ length: dayCount }, (_, i) => i + 1);
     const monthBn = formatMonthLong(month, "bn-BD");
     const monthEn = formatMonthLong(month);
     const useBn = locale === "bn";
@@ -113,14 +117,17 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="border border-black px-0.5 py-0 text-left whitespace-nowrap">
                   {row.user.name}
                 </td>
-                {row.days.map((cell, di) => (
+                {days.map((d) => {
+                  const cell = row.days[d - 1] ?? "";
+                  return (
                   <td
-                    key={di}
+                    key={d}
                     className="border border-black px-0 py-0 text-center font-mono"
                   >
                     {cell || ""}
                   </td>
-                ))}
+                  );
+                })}
                 {tagCodes.map((code) => (
                   <td
                     key={code}

@@ -10,6 +10,7 @@ type Args = {
   dayCount: number;
   tagCodes: DailyTag[];
   rows: LedgerRow[];
+  visibleDays?: number[];
   filename?: string;
 };
 
@@ -18,12 +19,15 @@ export function downloadConsumeLedgerPdf({
   dayCount,
   tagCodes,
   rows,
+  visibleDays,
   filename,
 }: Args) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const monthLabel = formatMonthLong(month);
-  const days = Array.from({ length: dayCount }, (_, i) => i + 1);
+  const days = visibleDays?.length
+    ? visibleDays
+    : Array.from({ length: dayCount }, (_, i) => i + 1);
 
   let y = 8;
   doc.setFont("helvetica", "bold");
@@ -58,7 +62,7 @@ export function downloadConsumeLedgerPdf({
     String(i + 1),
     row.user.rank,
     row.user.name,
-    ...row.days.map((d) => d || ""),
+    ...days.map((d) => row.days[d - 1] || ""),
     ...tagCodes.map((code) =>
       row.tagCounts[code] ? String(row.tagCounts[code]) : "",
     ),

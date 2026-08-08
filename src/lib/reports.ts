@@ -1,10 +1,7 @@
 import { getState } from "@/lib/store";
-import {
-  FR_FUEL_RATE_PER_DAY,
-  RATION_REPORT_META,
-} from "@/lib/constants";
+import { RATION_REPORT_META } from "@/lib/constants";
 import { daysInMonth, todayISO } from "@/lib/date";
-import { listAllTags } from "@/lib/store/rates";
+import { getFuelRatePerDay, listAllTags } from "@/lib/store/rates";
 import { compareUsers } from "@/lib/store/users";
 import type {
   DailyAssignment,
@@ -153,7 +150,7 @@ export function buildTagBill(month: string, tag: DailyTag): {
 } {
   const consume = buildConsumeMonth(month);
   const rate = rateMap().get(tag) ?? 0;
-  const fuelRate = tag === "FR" ? FR_FUEL_RATE_PER_DAY : 0;
+  const fuelRate = tag === "FR" ? getFuelRatePerDay() : 0;
 
   const rows: TagBillRow[] = consume.rows
     .map((row) => {
@@ -259,8 +256,13 @@ export function buildWingSummary(month: string): {
   };
 }
 
-/** Members × day-of-month tag marks for ledger print. */
-export function buildMonthLedger(month: string): {
+/** Members × day-of-month tag marks for ledger print.
+ *  Optional `tags` limits marks + result cols (e.g. Mess MS/CD only).
+ */
+export function buildMonthLedger(
+  month: string,
+  tags?: readonly DailyTag[],
+): {
   month: string;
   dayCount: number;
   tagCodes: DailyTag[];
@@ -269,12 +271,16 @@ export function buildMonthLedger(month: string): {
   const dayCount = daysInMonth(month);
   const assignments = assignmentsInMonth(month);
   const users = getState().users;
-  const tagCodes = listAllTags();
+  const tagFilter = tags?.length ? new Set<DailyTag>(tags) : null;
+  const tagCodes = tagFilter
+    ? tags!.filter((t, i, arr) => arr.indexOf(t) === i)
+    : listAllTags();
 
   const byUser = new Map<string, Map<number, DailyTag>>();
   const tagCounts = new Map<string, Partial<Record<DailyTag, number>>>();
 
   for (const a of assignments) {
+    if (tagFilter && !tagFilter.has(a.tag)) continue;
     const day = Number(a.date.slice(8, 10));
     if (!day) continue;
     let dayMap = byUser.get(a.user_id);
@@ -355,6 +361,17 @@ export function buildDailyRegister(
     });
 
   return { month, dayCount, rows };
+}
+
+/** Slice register rows to calendar day numbers (1-based). */
+export function sliceRegisterRows(
+  rows: LedgerRow[],
+  dayNumbers: number[],
+): LedgerRow[] {
+  return rows.map((row) => ({
+    ...row,
+    days: dayNumbers.map((d) => row.days[d - 1] ?? ""),
+  }));
 }
 
 /** Consecutive same-tag runs for register print spans (empty = one cell each). */
@@ -577,6 +594,8 @@ export function buildRationStaffLines(
     if (!sender) return [];
     const rate =
       rates.find((r) => r.tag === tag)?.amount_per_day ?? 0;
+    const fuelPerDay = tag === "FR" ? getFuelRatePerDay() : 0;
+    const dayRate = rate + fuelPerDay;
     const daysMap = new Map<string, number>();
     for (const a of assignmentsInMonth(month)) {
       if (a.tag !== tag) continue;
@@ -589,7 +608,7 @@ export function buildRationStaffLines(
         return {
           user,
           days,
-          amount: days * rate,
+          amount: days * dayRate,
           tags: [tag] as DailyTag[],
         };
       })
@@ -699,24 +718,27 @@ export function buildRationTransferLines(
   });
 }
 
-/** Single-member FR transfer letter (14-col) for selected bank + member. */
-export function buildFrMemberTransferSheet(
+/** FR transfer letter (14-col) — all FR members for bank. Optional single-user filter. */
+export function buildFrTransferSheet(
   month: string,
   senderId: string,
-  userId: string,
   reportDate = todayISO(),
+  userId?: string,
 ): RationTransferSheet | null {
   const sheets = buildRationStaffLines(month, senderId, "FR");
   const sheet = sheets[0];
   if (!sheet) return null;
-  const row = sheet.lines.find((l) => l.user.id === userId);
-  if (!row) return null;
+
+  const source = userId
+    ? sheet.lines.filter((l) => l.user.id === userId)
+    : sheet.lines;
+  if (source.length === 0) return null;
 
   const compactDate = reportDate.replace(/-/g, "");
-  const line: RationTransferLine = {
-    ser: 1,
+  const lines: RationTransferLine[] = source.map((row, i) => ({
+    ser: i + 1,
     date: reportDate,
-    refNo: `${compactDate}${String(1).padStart(6, "0")}`,
+    refNo: `${compactDate}${String(i + 1).padStart(6, "0")}`,
     senderAccountNo: sheet.sender.account_number || "0",
     receiverRouting: row.user.routing?.trim() || "0",
     senderRouting: sheet.sender.routing || "0",
@@ -730,15 +752,49 @@ export function buildFrMemberTransferSheet(
     currency: RATION_REPORT_META.currency,
     user: row.user,
     missingBank: row.missingBank,
-  };
+  }));
 
   return {
     month,
     sender: sheet.sender,
-    lines: [line],
-    total: line.amount,
+    lines,
+    total: lines.reduce((s, l) => s + l.amount, 0),
     reportDate,
   };
+}
+
+/** One FR transfer letter per member (not one combined table). */
+export function buildFrTransferSheetsPerUser(
+  month: string,
+  senderId: string,
+  reportDate = todayISO(),
+): RationTransferSheet[] {
+  const all = buildFrTransferSheet(month, senderId, reportDate);
+  if (!all) return [];
+  const compactDate = reportDate.replace(/-/g, "");
+  return all.lines.map((line, i) => ({
+    month: all.month,
+    sender: all.sender,
+    reportDate: all.reportDate,
+    lines: [
+      {
+        ...line,
+        ser: 1,
+        refNo: `${compactDate}${String(i + 1).padStart(6, "0")}`,
+      },
+    ],
+    total: line.amount,
+  }));
+}
+
+/** @deprecated Prefer buildFrTransferSheet — kept for single-member deep links. */
+export function buildFrMemberTransferSheet(
+  month: string,
+  senderId: string,
+  userId: string,
+  reportDate = todayISO(),
+): RationTransferSheet | null {
+  return buildFrTransferSheet(month, senderId, reportDate, userId);
 }
 
 export function formatBdt(amount: number) {

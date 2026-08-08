@@ -67,6 +67,8 @@ export function RegisterBoard({
   onPaintRange,
   priorByUser,
   suppressedCarries,
+  dateFrom = "",
+  dateTo = "",
 }: {
   users: User[];
   month: string;
@@ -79,16 +81,30 @@ export function RegisterBoard({
   onPaintRange: (userId: string, dates: string[], tag: DailyTag | "") => void;
   priorByUser: Map<string, DailyTag>;
   suppressedCarries: string[];
+  /** Inclusive ISO range — empty = show all month days. */
+  dateFrom?: string;
+  dateTo?: string;
 }) {
   void _paintTag;
   void _onPaintTagChange;
 
   const t = useT();
   const { locale } = useI18n();
-  const days = useMemo(
+  const allDays = useMemo(
     () => Array.from({ length: dayCount }, (_, i) => i + 1),
     [dayCount],
   );
+  const days = useMemo(() => {
+    const from = dateFrom.trim();
+    const to = dateTo.trim();
+    if (!from && !to) return allDays;
+    return allDays.filter((d) => {
+      const date = dateInMonth(month, d);
+      if (from && date < from) return false;
+      if (to && date > to) return false;
+      return true;
+    });
+  }, [allDays, month, dateFrom, dateTo]);
 
   const suppressedSet = useMemo(
     () => new Set(suppressedCarries),
@@ -352,25 +368,27 @@ export function RegisterBoard({
                   : "bg-neutral-50 dark:bg-neutral-900";
 
                 let rolling: DailyTag | undefined = priorByUser.get(user.id);
-                const rowMeta: {
+                const fullMeta: {
                   date: string;
                   day: number;
                   stored?: DailyTag;
                   ghost?: DailyTag;
                 }[] = [];
-                for (const d of days) {
+                for (const d of allDays) {
                   const date = dateInMonth(month, d);
                   const key = `${user.id}|${date}`;
                   const stored = byUserDate.get(key);
                   if (stored) rolling = stored;
                   const suppressed = suppressedSet.has(key);
-                  rowMeta.push({
+                  fullMeta.push({
                     date,
                     day: d,
                     stored,
                     ghost: stored || suppressed ? undefined : rolling,
                   });
                 }
+                const visibleDaySet = new Set(days);
+                const rowMeta = fullMeta.filter((c) => visibleDaySet.has(c.day));
 
                 return (
                   <tr

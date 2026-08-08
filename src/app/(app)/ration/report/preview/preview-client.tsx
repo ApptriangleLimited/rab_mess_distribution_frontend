@@ -18,7 +18,7 @@ import {
 import { formatMonthLong, parseMonthInput, todayISO } from "@/lib/date";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
-  buildFrMemberTransferSheet,
+  buildFrTransferSheetsPerUser,
   buildRationStaffLines,
 } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
@@ -53,11 +53,10 @@ export default function RationReportPreviewClient() {
   const month = parseMonthInput(searchParams.get("month") ?? "");
   const tag = parseTag(searchParams.get("tag"));
   const senderId = searchParams.get("sender") ?? "";
-  const userId = searchParams.get("user") ?? "";
-  const isFrMember = tag === "FR" && Boolean(userId);
+  const isFr = tag === "FR";
 
   const staffSheet = useMemo(() => {
-    if (!tag || !senderId || isFrMember) return null;
+    if (!tag || !senderId || isFr) return null;
     const sheets = buildRationStaffLines(month, senderId, tag);
     return sheets[0] ?? null;
   }, [
@@ -68,12 +67,12 @@ export default function RationReportPreviewClient() {
     month,
     tag,
     senderId,
-    isFrMember,
+    isFr,
   ]);
 
-  const transferSheet = useMemo(() => {
-    if (!isFrMember || !senderId || !userId) return null;
-    return buildFrMemberTransferSheet(month, senderId, userId, todayISO());
+  const frSheets = useMemo(() => {
+    if (!isFr || !senderId) return [];
+    return buildFrTransferSheetsPerUser(month, senderId, todayISO());
   }, [
     state.assignments,
     state.users,
@@ -81,24 +80,23 @@ export default function RationReportPreviewClient() {
     state.rates,
     month,
     senderId,
-    userId,
-    isFrMember,
+    isFr,
   ]);
 
   const sender = state.senders.find((s) => s.id === senderId);
   const monthLabel = formatMonthLong(month);
   const subject =
-    tag && sender && !isFrMember
+    tag && sender && !isFr
       ? RATION_REPORT_META.subjectTagBill
           .replace("{monthLabel}", monthLabel)
           .replace("{bank}", sender.bank_name || sender.label)
       : undefined;
 
   function onDownload() {
-    if (transferSheet) {
+    if (frSheets.length > 0) {
       downloadFrTransferPdf(
-        transferSheet,
-        `ration-fr-transfer-${transferSheet.month}-${userId}.pdf`,
+        frSheets,
+        `ration-fr-transfer-${month}-${senderId}.pdf`,
       );
       return;
     }
@@ -118,25 +116,26 @@ export default function RationReportPreviewClient() {
     if (!el) return;
     setPrinting(true);
     try {
-      const name = transferSheet
-        ? `ration-fr-transfer-${month}-${userId}.pdf`
-        : `ration-staff-${month}-${tag}-${senderId}.pdf`;
+      const name =
+        frSheets.length > 0
+          ? `ration-fr-transfer-${month}-${senderId}.pdf`
+          : `ration-staff-${month}-${tag}-${senderId}.pdf`;
       await printLetterElement(
         el,
         name,
-        isFrMember ? "landscape" : "portrait",
+        frSheets.length > 0 ? "landscape" : "portrait",
       );
     } finally {
       setPrinting(false);
     }
   }
 
-  const invalid = !tag || !senderId || !sender || (isFrMember && !userId);
-  const empty = isFrMember
-    ? !transferSheet
+  const invalid = !tag || !senderId || !sender;
+  const empty = isFr
+    ? frSheets.length === 0
     : !staffSheet || staffSheet.lines.length === 0;
-  const canAct = isFrMember
-    ? Boolean(transferSheet?.lines.length)
+  const canAct = isFr
+    ? frSheets.length > 0
     : Boolean(staffSheet?.lines.length);
 
   return (
@@ -147,8 +146,8 @@ export default function RationReportPreviewClient() {
           subtitle={
             invalid
               ? t("ration.reportPreviewHint")
-              : isFrMember
-                ? `FR · ${monthLabel} · ${sender!.label} · ${transferSheet?.lines[0]?.customerAccountName ?? ""}`
+              : isFr
+                ? `FR · ${monthLabel} · ${sender!.label}`
                 : `${tagLabel(tag!, locale)} · ${monthLabel} · ${sender!.label}`
           }
           actions={
@@ -190,12 +189,25 @@ export default function RationReportPreviewClient() {
           title={t("ration.reportEmpty")}
           description={t("ration.reportPreviewHint")}
         />
-      ) : isFrMember && transferSheet ? (
-        <FrTransferLetterPrint
-          ref={letterRef}
-          sheet={transferSheet}
-          transferToBank={transferSheet.lines[0]?.user.bank_name}
-        />
+      ) : isFr && frSheets.length > 0 ? (
+        <div className="w-full overflow-x-auto pb-2">
+          <div
+            ref={letterRef}
+            data-print-stack="true"
+            className="flex w-max min-w-full flex-col gap-6"
+          >
+            {frSheets.map((sheet) => {
+              const user = sheet.lines[0]?.user;
+              return (
+                <FrTransferLetterPrint
+                  key={user?.id ?? sheet.lines[0]?.refNo}
+                  sheet={sheet}
+                  transferToBank={user?.bank_name}
+                />
+              );
+            })}
+          </div>
+        </div>
       ) : staffSheet ? (
         <StaffPayoutPrint
           ref={letterRef}
