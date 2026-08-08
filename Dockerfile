@@ -1,20 +1,18 @@
 # Mess Distribution - Next.js production image
 # Uses Next.js standalone output
 
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat
 
-# package-lock.json MUST be committed to Git
 COPY package.json package-lock.json ./
 
-# Reproducible dependency installation
 RUN npm ci
 
 
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -27,7 +25,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 
@@ -36,11 +34,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Run the application as a non-root user
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
-# Next.js standalone output
 COPY --from=builder /app/public ./public
 
 COPY --from=builder --chown=nextjs:nodejs \
