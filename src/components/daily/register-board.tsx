@@ -17,6 +17,7 @@ import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
+import { canAssignOnDate } from "@/lib/store/daily";
 import { listAllTags } from "@/lib/store/rates";
 import { cn } from "@/lib/utils";
 
@@ -170,16 +171,17 @@ export function RegisterBoard({
         stroke.startDate <= stroke.endDate
           ? stroke.endDate
           : stroke.startDate;
-      const dates = eachISODate(lo, hi).filter((date) => date > todayISO);
+      const dates = eachISODate(lo, hi).filter(
+        (date) => date > todayISO && canAssignOnDate(user, date),
+      );
       if (dates.length === 0) {
         setDrag(null);
         return;
       }
 
-      const menuDate =
-        stroke.endDate > todayISO
-          ? stroke.endDate
-          : dates[dates.length - 1];
+      const menuDate = dates.includes(stroke.endDate)
+        ? stroke.endDate
+        : dates[dates.length - 1];
       const storedTag = byUserDate.get(`${stroke.userId}|${menuDate}`);
 
       let ghostTag: DailyTag | undefined;
@@ -187,6 +189,10 @@ export function RegisterBoard({
         let rolling = priorByUser.get(stroke.userId);
         for (const date of columnDates) {
           if (date >= menuDate) break;
+          if (!canAssignOnDate(user, date)) {
+            rolling = undefined;
+            continue;
+          }
           const s = byUserDate.get(`${stroke.userId}|${date}`);
           if (s) rolling = s;
         }
@@ -278,6 +284,8 @@ export function RegisterBoard({
   function startDrag(userId: string, date: string) {
     if (rangeMenu) return;
     if (date <= todayISO) return;
+    const user = users.find((u) => u.id === userId);
+    if (user && !canAssignOnDate(user, date)) return;
     const stroke: DragStroke = {
       userId,
       startDate: date,
@@ -420,8 +428,20 @@ export function RegisterBoard({
                   date: string;
                   stored?: DailyTag;
                   ghost?: DailyTag;
+                  afterOut: boolean;
                 }[] = [];
                 for (const date of columnDates) {
+                  const afterOut = !canAssignOnDate(user, date);
+                  if (afterOut) {
+                    rolling = undefined;
+                    rowMeta.push({
+                      date,
+                      stored: byUserDate.get(`${user.id}|${date}`),
+                      ghost: undefined,
+                      afterOut: true,
+                    });
+                    continue;
+                  }
                   const key = `${user.id}|${date}`;
                   const stored = byUserDate.get(key);
                   if (stored) rolling = stored;
@@ -430,6 +450,7 @@ export function RegisterBoard({
                     date,
                     stored,
                     ghost: stored || suppressed ? undefined : rolling,
+                    afterOut: false,
                   });
                 }
 
@@ -475,12 +496,12 @@ export function RegisterBoard({
                       {user.name}
                     </td>
                     {rowMeta.map((cell, cellIdx) => {
-                      const { date, stored, ghost } = cell;
+                      const { date, stored, ghost, afterOut } = cell;
                       const preview = inDragPreview(user.id, date);
-                      const locked = date <= todayISO;
+                      const locked = afterOut || date <= todayISO;
                       let tag = stored;
                       let isGhost = false;
-                      if (!stored && ghost) {
+                      if (!stored && ghost && !afterOut) {
                         tag = ghost;
                         // Future only — past/today show solid (not preview fade)
                         isGhost = !locked;
@@ -517,9 +538,10 @@ export function RegisterBoard({
                           userName={user.name}
                           isToday={date === todayISO}
                           locked={locked}
+                          afterOut={afterOut}
                           contL={contL}
                           contR={contR}
-                          preview={preview && date > todayISO}
+                          preview={preview && date > todayISO && !afterOut}
                           locale={locale}
                           onDragStart={() => startDrag(user.id, date)}
                         />
@@ -698,6 +720,7 @@ function RegisterCell({
   userName,
   isToday,
   locked,
+  afterOut,
   contL,
   contR,
   preview,
@@ -711,6 +734,7 @@ function RegisterCell({
   userName: string;
   isToday: boolean;
   locked: boolean;
+  afterOut?: boolean;
   contL: boolean;
   contR: boolean;
   preview: boolean;
@@ -732,6 +756,7 @@ function RegisterCell({
           // Faded carry preview = future only
           ghost &&
             "opacity-45 ring-1 ring-inset ring-dashed ring-neutral-400/70 dark:ring-neutral-500/70",
+          afterOut && "opacity-35",
         )
       : locked
         ? "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600"
@@ -740,8 +765,11 @@ function RegisterCell({
       "bg-primary/25 ring-2 ring-inset ring-primary shadow-[inset_0_0_0_1px_rgba(6,121,88,0.55)] dark:bg-primary/40 dark:ring-primary-light",
   );
 
+  const lockReason = afterOut
+    ? t("daily.afterOutLocked")
+    : t("daily.pastLocked");
   const title = locked
-    ? `${userName} · ${date} · ${tag ? `${tag} ${tagLabel(tag, locale)} · ` : ""}${t("daily.pastLocked")}`
+    ? `${userName} · ${date} · ${tag ? `${tag} ${tagLabel(tag, locale)} · ` : ""}${lockReason}`
     : tag
       ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
       : `${userName} · ${date}`;

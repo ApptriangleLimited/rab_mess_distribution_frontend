@@ -2,6 +2,16 @@ import { nowISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
 
+/** False when date is after member out_date (out day itself still allowed). */
+export function canAssignOnDate(
+  user: Pick<User, "out_date">,
+  date: string,
+): boolean {
+  const out = (user.out_date ?? "").trim();
+  if (out && date > out) return false;
+  return true;
+}
+
 function patchUser(
   id: string,
   patch: Partial<Pick<User, "approval_status" | "status">>,

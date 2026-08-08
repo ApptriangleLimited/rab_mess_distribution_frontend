@@ -4,6 +4,7 @@ import {
   getAssignment,
   isCarrySuppressed,
 } from "@/lib/store/assignments";
+import { canAssignOnDate } from "@/lib/store/daily";
 import { nextISODate, todayISO } from "@/lib/date";
 import type { DailyTag, User } from "@/lib/types";
 
@@ -19,6 +20,7 @@ export function getMessEaters(date: string): MessEater[] {
     if (!user) continue;
     if (user.approval_status !== "approved") continue;
     if (user.status !== "1") continue;
+    if (!canAssignOnDate(user, date)) continue;
     result.push({ ...user, assignment_id: a.id });
   }
   return result.sort((a, b) => a.name.localeCompare(b.name));
@@ -29,7 +31,12 @@ export function countTaggedToday(tag: DailyTag, date = todayISO()): number {
   const { users, assignments } = getState();
   const activeIds = new Set(
     users
-      .filter((u) => u.approval_status === "approved" && u.status === "1")
+      .filter(
+        (u) =>
+          u.approval_status === "approved" &&
+          u.status === "1" &&
+          canAssignOnDate(u, date),
+      )
       .map((u) => u.id),
   );
   return assignments.filter(
@@ -59,6 +66,7 @@ export function getProjectedTagMembers(
   for (const user of users) {
     if (user.approval_status !== "approved") continue;
     if (user.status !== "1") continue;
+    if (!canAssignOnDate(user, date)) continue;
 
     const direct = getAssignment(user.id, date);
     if (direct) {

@@ -536,6 +536,7 @@ export const en = {
     dragFillHint:
       "Click or drag future days only, then pick a tag. Today and past locked.",
     pastLocked: "Today / past — locked",
+    afterOutLocked: "After out date — locked",
     paintFillTitle: "Fill which cells?",
     paintFillBody: "Apply {tag} only to empty cells, or only to faded preview (carry) cells. Saved tags stay untouched.",
     paintClearTitle: "Clear which cells?",

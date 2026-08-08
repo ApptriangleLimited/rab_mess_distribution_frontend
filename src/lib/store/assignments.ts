@@ -1,9 +1,20 @@
 import { nowISO, previousISODate } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
-import type { DailyAssignment, DailyTag } from "@/lib/types";
+import { canAssignOnDate } from "@/lib/store/daily";
+import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 
 function newId() {
   return `a_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function findUser(userId: string): User | undefined {
+  return getState().users.find((u) => u.id === userId);
+}
+
+function isAssignable(userId: string, date: string): boolean {
+  const user = findUser(userId);
+  if (!user) return false;
+  return canAssignOnDate(user, date);
 }
 
 export function getAssignmentsByDate(date: string) {
@@ -23,7 +34,10 @@ export function setTag(
   date: string,
   tag: DailyTag,
   updatedBy = "daily",
-): DailyAssignment {
+): DailyAssignment | null {
+  if (!isAssignable(userId, date)) {
+    return getAssignment(userId, date);
+  }
   const existing = getAssignment(userId, date);
   const ts = nowISO();
 
@@ -69,9 +83,11 @@ export function setTagBulk(
   updatedBy = "daily",
 ) {
   const ts = nowISO();
+  const eligible = userIds.filter((id) => isAssignable(id, date));
+  if (eligible.length === 0) return 0;
   setState((prev) => {
     const next = [...prev.assignments];
-    for (const userId of userIds) {
+    for (const userId of eligible) {
       const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
       if (idx >= 0) {
         next[idx] = {
@@ -95,16 +111,17 @@ export function setTagBulk(
       ...prev,
       assignments: next,
       approved_dates: unmarkDate(prev.approved_dates, date),
-      suppressed_carries: userIds.reduce(
+      suppressed_carries: eligible.reduce(
         (acc, userId) => withoutCarry(acc, userId, date),
         prev.suppressed_carries ?? [],
       ),
     };
   });
-  return userIds.length;
+  return eligible.length;
 }
 
 export function clearTag(userId: string, date: string) {
+  if (!isAssignable(userId, date)) return;
   setState((prev) => ({
     ...prev,
     assignments: prev.assignments.filter(
@@ -123,15 +140,16 @@ export function setTagRange(
   tag: DailyTag | "",
   updatedBy = "daily",
 ) {
-  if (dates.length === 0) return 0;
+  const allowed = dates.filter((d) => isAssignable(userId, d));
+  if (allowed.length === 0) return 0;
   const ts = nowISO();
-  const dateSet = new Set(dates);
+  const dateSet = new Set(allowed);
   setState((prev) => {
     let next = prev.assignments.filter(
       (a) => !(a.user_id === userId && dateSet.has(a.date)),
     );
     if (tag) {
-      for (const date of dates) {
+      for (const date of allowed) {
         next.push({
           id: newId(),
           user_id: userId,
@@ -144,7 +162,7 @@ export function setTagRange(
     }
     let approved = prev.approved_dates ?? [];
     let suppressed = prev.suppressed_carries ?? [];
-    for (const date of dates) {
+    for (const date of allowed) {
       approved = unmarkDate(approved, date);
       if (tag) {
         suppressed = withoutCarry(suppressed, userId, date);
@@ -159,7 +177,7 @@ export function setTagRange(
       suppressed_carries: suppressed,
     };
   });
-  return dates.length;
+  return allowed.length;
 }
 
 export function listByMonth(month: string) {
@@ -236,7 +254,12 @@ export function approveCarryForward(
     const next = [...prev.assignments];
     let suppressed = prev.suppressed_carries ?? [];
 
+    const usersById = new Map(prev.users.map((u) => [u.id, u]));
+
     for (const userId of userIds) {
+      const user = usersById.get(userId);
+      if (!user || !canAssignOnDate(user, date)) continue;
+
       const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
       const suppressedHere = suppressed.includes(carryKey(userId, date));
 
@@ -307,7 +330,12 @@ export function autoApplyCarryForward(
   const ts = nowISO();
   let filled = 0;
 
+  const usersById = new Map(prev.users.map((u) => [u.id, u]));
+
   for (const userId of userIds) {
+    const user = usersById.get(userId);
+    if (!user || !canAssignOnDate(user, date)) continue;
+
     const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
     if (idx >= 0) continue;
     if (suppressed.includes(carryKey(userId, date))) continue;
