@@ -18,6 +18,7 @@ import {
   SearchFilterBar,
   searchFilterFieldClass,
 } from "@/components/shared/search-filter-bar";
+import { tagCellClass } from "@/components/daily/register-board";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,10 +30,13 @@ import {
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
 import { MESS_LEDGER_TAGS, RANKS, WINGS } from "@/lib/constants";
-import { monthDateBounds, todayISO } from "@/lib/date";
+import { monthDateBounds } from "@/lib/date";
 import { buildRangeLedger } from "@/lib/reports";
+import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
+
+type MessTagFilter = "all" | "MS" | "CD";
 
 function defaultRange() {
   return monthDateBounds();
@@ -47,6 +51,7 @@ export default function MessLedgerClient() {
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
+  const [tagFilter, setTagFilter] = useState<MessTagFilter>("all");
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
 
@@ -108,34 +113,32 @@ export default function MessLedgerClient() {
   const datesAreDefault =
     dateFrom === defaultDates.from && dateTo === defaultDates.to;
 
-  /**
-   * Default date range → today headcount (filtered).
-   * Custom date filter → MS/CD person-days across that range.
-   */
+  /** Person-days across selected date range (filtered rows). */
   const totals = useMemo(() => {
     let ms = 0;
     let cd = 0;
-
-    if (datesAreDefault) {
-      const today = todayISO();
-      const col = ledger.columnDates.indexOf(today);
-      if (col < 0) return { ms: 0, cd: 0, all: 0 };
-      for (const row of rows) {
-        const tag = row.days[col];
+    for (const row of rows) {
+      for (const tag of row.days) {
         if (tag === "MS") ms += 1;
         else if (tag === "CD") cd += 1;
       }
-    } else {
-      for (const row of rows) {
-        for (const tag of row.days) {
-          if (tag === "MS") ms += 1;
-          else if (tag === "CD") cd += 1;
-        }
-      }
     }
-
     return { ms, cd, all: ms + cd };
-  }, [datesAreDefault, ledger.columnDates, rows]);
+  }, [rows]);
+
+  const boardRows = useMemo(() => {
+    if (tagFilter === "all") return rows;
+    return rows.filter((row) => row.days.some((d) => d === tagFilter));
+  }, [rows, tagFilter]);
+
+  const boardTagCodes = useMemo((): DailyTag[] => {
+    if (tagFilter === "all") return ledger.tagCodes;
+    return [tagFilter];
+  }, [tagFilter, ledger.tagCodes]);
+
+  function selectTagFilter(next: MessTagFilter) {
+    setTagFilter((cur) => (cur === next && next !== "all" ? "all" : next));
+  }
 
   const printHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -150,10 +153,13 @@ export default function MessLedgerClient() {
 
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
-    rank !== "all" || wing !== "all" || !datesAreDefault;
+    rank !== "all" ||
+    wing !== "all" ||
+    !datesAreDefault ||
+    tagFilter !== "all";
 
   const printBtn =
-    rows.length > 0 ? (
+    boardRows.length > 0 ? (
       <Button
         asChild
         variant="cta"
@@ -187,38 +193,42 @@ export default function MessLedgerClient() {
         <PageHeader
           title={t("pages.messLedger.title")}
           subtitle={t("pages.messLedger.subtitle", { month })}
+          actions={printBtn}
         />
 
         <SearchFilterBar
           search={q}
           onSearchChange={setQ}
           searchPlaceholder={t("cc.searchPlaceholder")}
+          searchClassName="w-44 sm:w-48"
           tiles={
             <>
               <MiniStat
-                icon={<IconUsers className="h-4 w-4" />}
+                icon={<IconUsers className="h-3.5 w-3.5" />}
                 label={t("daily.rosterStatAll")}
                 value={String(totals.all)}
-                accent
+                toneClass="bg-primary/15 text-primary dark:bg-primary/30 dark:text-emerald-100"
+                selected={tagFilter === "all"}
+                onClick={() => setTagFilter("all")}
               />
               <MiniStat
-                icon={<IconSoup className="h-4 w-4" />}
-                label={
-                  datesAreDefault ? t("daily.todayMs") : t("mess.totalMs")
-                }
+                icon={<IconSoup className="h-3.5 w-3.5" />}
+                label="MS"
                 value={String(totals.ms)}
-                accent
+                toneClass={tagCellClass("MS")}
+                selected={tagFilter === "MS"}
+                onClick={() => selectTagFilter("MS")}
               />
               <MiniStat
-                icon={<IconShield className="h-4 w-4" />}
-                label={
-                  datesAreDefault ? t("daily.todayCd") : t("mess.totalCd")
-                }
+                icon={<IconShield className="h-3.5 w-3.5" />}
+                label="CD"
                 value={String(totals.cd)}
+                toneClass={tagCellClass("CD")}
+                selected={tagFilter === "CD"}
+                onClick={() => selectTagFilter("CD")}
               />
             </>
           }
-          trailing={printBtn}
         >
           <DateRangePicker
             from={dateFrom}
@@ -226,8 +236,9 @@ export default function MessLedgerClient() {
             maxSpanDays={31}
             onChange={({ from, to }) => applyDateRange(from, to)}
             label={t("common.dateRange")}
+            triggerClassName="min-w-[10rem] w-[10rem] px-2 text-xs"
           />
-          <div className="w-[9.5rem] shrink-0">
+          <div className="w-[7.5rem] shrink-0">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
@@ -242,7 +253,7 @@ export default function MessLedgerClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[9rem] shrink-0">
+          <div className="w-[7rem] shrink-0">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectWing")} />
@@ -263,6 +274,7 @@ export default function MessLedgerClient() {
               setQ("");
               setRank("all");
               setWing("all");
+              setTagFilter("all");
               applyDateRange("", "");
             }}
           />
@@ -270,16 +282,16 @@ export default function MessLedgerClient() {
 
         {ledger.rows.length === 0 ? (
           <EmptyState title={t("mess.ledgerEmpty")} />
-        ) : rows.length === 0 ? (
+        ) : boardRows.length === 0 ? (
           <EmptyState title={t("common.noResults")} />
         ) : (
           <MonthLedgerBoard
             month={month}
             dayCount={ledger.dayCount}
-            tagCodes={ledger.tagCodes}
-            rows={rows}
+            tagCodes={boardTagCodes}
+            rows={boardRows}
             columnDates={ledger.columnDates}
-            showAllColumn
+            showAllColumn={tagFilter === "all"}
             previewFuture
           />
         )}
@@ -292,42 +304,40 @@ function MiniStat({
   icon,
   label,
   value,
-  accent,
+  toneClass,
+  selected,
+  onClick,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
-  accent?: boolean;
+  toneClass?: string;
+  selected?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
       className={cn(
-        "inline-flex h-11 shrink-0 items-center gap-2.5 rounded-xl border px-3.5",
-        accent
-          ? "border-primary/20 bg-primary/[0.08]"
-          : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
+        "inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border px-2 transition",
+        toneClass ??
+          "border-neutral-200/90 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
+        selected
+          ? "ring-2 ring-inset ring-neutral-900/25 dark:ring-white/35"
+          : "border-transparent hover:brightness-[0.97] dark:hover:brightness-110",
       )}
     >
-      <span
-        className={cn(
-          "shrink-0",
-          accent ? "text-primary" : "text-neutral-500",
-        )}
-        aria-hidden
-      >
+      <span className="shrink-0 opacity-90" aria-hidden>
         {icon}
       </span>
-      <span className="whitespace-nowrap text-xs font-bold uppercase tracking-[0.08em] text-neutral-700 dark:text-neutral-200">
+      <span className="truncate text-[10px] font-bold uppercase tracking-wide">
         {label}
       </span>
-      <span
-        className={cn(
-          "text-lg font-extrabold tabular-nums",
-          accent ? "text-primary" : "text-neutral-900 dark:text-white",
-        )}
-      >
+      <span className="shrink-0 text-xs font-extrabold tabular-nums">
         {value}
       </span>
-    </div>
+    </button>
   );
 }

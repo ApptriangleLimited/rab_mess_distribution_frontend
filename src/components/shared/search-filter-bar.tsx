@@ -12,6 +12,8 @@ type Props = {
   search: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
+  /** Override default search field width (e.g. `w-44 shrink-0`). */
+  searchClassName?: string;
   /** Collapse mode only. Ignored when `flat`. */
   filtersOpen?: boolean;
   onFiltersOpenChange?: (open: boolean) => void;
@@ -19,6 +21,11 @@ type Props = {
   filtersActive?: boolean;
   /** Stat tiles (collapse: after filter btn; flat: after fields). */
   tiles?: ReactNode;
+  /**
+   * Put tiles on their own row under filters (one line, own X-scroll).
+   * Keeps filter row from stretching with many stats.
+   */
+  wrapTiles?: boolean;
   /** Optional trailing control (e.g. print). */
   trailing?: ReactNode;
   /** Filter fields — inline when `flat`, else expand panel. */
@@ -36,10 +43,12 @@ export function SearchFilterBar({
   search,
   onSearchChange,
   searchPlaceholder,
+  searchClassName,
   filtersOpen = false,
   onFiltersOpenChange,
   filtersActive = false,
   tiles,
+  wrapTiles = false,
   trailing,
   children,
   flat = true,
@@ -55,8 +64,8 @@ export function SearchFilterBar({
         className,
       )}
     >
-      <div className="flex w-full flex-nowrap items-center gap-2.5 overflow-x-auto">
-        <div className="w-64 shrink-0 sm:w-72">
+      <div className="flex w-full min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto">
+        <div className={cn("w-64 shrink-0 sm:w-72", searchClassName)}>
           <Input
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -95,13 +104,19 @@ export function SearchFilterBar({
           </Button>
         )}
 
-        {tiles ? (
-          <div className="flex shrink-0 flex-nowrap items-center gap-2">
+        {tiles && !wrapTiles ? (
+          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1">
             {tiles}
           </div>
         ) : null}
         {trailing ? <div className="shrink-0">{trailing}</div> : null}
       </div>
+
+      {tiles && wrapTiles ? (
+        <div className="mt-2.5 flex w-full min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-t border-neutral-200/80 pt-2.5 dark:border-neutral-700/80">
+          {tiles}
+        </div>
+      ) : null}
 
       {!flat ? (
         <AnimatePresence initial={false}>
