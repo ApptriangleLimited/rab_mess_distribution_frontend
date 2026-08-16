@@ -44,11 +44,15 @@ function user(
     | "documents"
     | "joining_date"
     | "out_date"
+    | "member_type"
+    | "personal_id"
     | "emergency_contacts"
   > & {
     documents?: User["documents"];
     joining_date?: string;
     out_date?: string;
+    member_type?: User["member_type"];
+    personal_id?: string;
     emergency_contacts?: User["emergency_contacts"];
   },
 ): User {
@@ -57,6 +61,8 @@ function user(
     documents: [],
     joining_date: todayISO(),
     out_date: "",
+    member_type: "permanent",
+    personal_id: "",
     emergency_contacts: [],
     created_at: ts,
     updated_at: ts,
@@ -187,7 +193,7 @@ type MemberPlan = {
   spans?: { tag: DailyTag; from: number; to: number }[];
 };
 
-function buildDemoUsers(total = 50): User[] {
+function buildDemoUsers(total = 12): User[] {
   const users: User[] = [];
 
   for (let i = 0; i < total; i++) {
@@ -199,14 +205,28 @@ function buildDemoUsers(total = 50): User[] {
     const wing = WINGS[i % WINGS.length]!;
     const bank = BANKS[i % BANKS.length]!;
 
-    // Mix approval / status for UI demos
+    // Mix approval / status for UI demos (scaled for small seeds).
     let approval_status: User["approval_status"] = "approved";
     let status: User["status"] = "1";
     let out_date = "";
     let idPrefix = "u";
     let rabBase = 2000 + n;
 
-    if (n <= 4) {
+    if (total <= 12) {
+      if (n === 1) {
+        approval_status = "pending";
+        idPrefix = "u_pending";
+        rabBase = 1000 + n;
+      } else if (n === 2) {
+        approval_status = "ended";
+        status = "0";
+        out_date = shiftMonthKey(monthKey(), -1) + "-15";
+        idPrefix = "u_ended";
+      } else if (n === 3) {
+        status = "0";
+        idPrefix = "u_off";
+      }
+    } else if (n <= 4) {
       approval_status = "pending";
       idPrefix = "u_pending";
       rabBase = 1000 + n;
@@ -293,7 +313,7 @@ function buildMemberPlans(users: User[]): MemberPlan[] {
 }
 
 /** Bump → auto wipe localStorage + reseed on next load. */
-export const SEED_VERSION = 5;
+export const SEED_VERSION = 10;
 
 export function createSeedState(): AppState {
   const today = todayISO();
@@ -407,6 +427,8 @@ export function createSeedState(): AppState {
     rates,
     approved_dates: [],
     suppressed_carries: [],
+    boro_khana_dates: [],
+    state_reports: [],
     version: SEED_VERSION,
   };
 }

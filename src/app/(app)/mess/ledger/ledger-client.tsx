@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  IconFlame,
   IconPrinter,
   IconShield,
   IconSoup,
@@ -20,6 +21,7 @@ import {
 } from "@/components/shared/search-filter-bar";
 import { tagCellClass } from "@/components/daily/register-board";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
+import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,10 +32,12 @@ import {
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
 import { MESS_LEDGER_TAGS, RANKS, WINGS } from "@/lib/constants";
-import { monthDateBounds } from "@/lib/date";
+import { formatDateLong, monthDateBounds } from "@/lib/date";
 import { buildRangeLedger } from "@/lib/reports";
+import { listBoroKhanaDates } from "@/lib/store/boro-khana";
+import { getMessEaters } from "@/lib/store/mess";
 import type { DailyTag } from "@/lib/types";
-import { useT } from "@/i18n/provider";
+import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 type MessTagFilter = "all" | "MS" | "CD";
@@ -44,6 +48,7 @@ function defaultRange() {
 
 export default function MessLedgerClient() {
   const t = useT();
+  const { locale } = useI18n();
   const state = useStore();
   const reduceMotion = useReducedMotion();
   const initial = defaultRange();
@@ -136,6 +141,20 @@ export default function MessLedgerClient() {
     return [tagFilter];
   }, [tagFilter, ledger.tagCodes]);
 
+  const bkDaysInRange = useMemo(() => {
+    return listBoroKhanaDates()
+      .filter((d) => d >= rangeBounds.from && d <= rangeBounds.to)
+      .map((d) => ({
+        date: d,
+        eaters: getMessEaters(d).length,
+      }));
+  }, [
+    rangeBounds,
+    state.boro_khana_dates,
+    state.users,
+    state.assignments,
+  ]);
+
   function selectTagFilter(next: MessTagFilter) {
     setTagFilter((cur) => (cur === next && next !== "all" ? "all" : next));
   }
@@ -164,7 +183,7 @@ export default function MessLedgerClient() {
         asChild
         variant="cta"
         size="sm"
-        className="h-10 shrink-0 rounded-xl px-3"
+        className="h-10 shrink-0 rounded-xl px-3 shadow-sm shadow-primary/20"
       >
         <Link href={printHref} target="_blank" rel="noopener noreferrer">
           <IconPrinter className="h-4 w-4" />
@@ -190,24 +209,40 @@ export default function MessLedgerClient() {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
-        <PageHeader
-          title={t("pages.messLedger.title")}
-          subtitle={t("pages.messLedger.subtitle", { month })}
-          actions={printBtn}
-        />
+        <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-white via-emerald-50/50 to-sky-50/60 p-4 shadow-[0_10px_40px_-24px_rgba(6,121,87,0.35)] sm:p-5 dark:border-primary/25 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none">
+          <div
+            className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-nav-accent/10 blur-3xl"
+            aria-hidden
+          />
+          <div className="relative">
+            <PageHeader
+              title={t("pages.messLedger.title")}
+              subtitle={t("pages.messLedger.subtitle", { month })}
+              center={<MessTabs />}
+              actions={printBtn}
+            />
+          </div>
+        </div>
 
         <SearchFilterBar
           search={q}
           onSearchChange={setQ}
           searchPlaceholder={t("cc.searchPlaceholder")}
           searchClassName="w-44 sm:w-48"
+          filtersActive={filtersActive}
+          wrapTiles={false}
+          className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={
             <>
               <MiniStat
                 icon={<IconUsers className="h-3.5 w-3.5" />}
                 label={t("daily.rosterStatAll")}
                 value={String(totals.all)}
-                toneClass="bg-primary/15 text-primary dark:bg-primary/30 dark:text-emerald-100"
+                toneClass="border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100"
                 selected={tagFilter === "all"}
                 onClick={() => setTagFilter("all")}
               />
@@ -227,6 +262,25 @@ export default function MessLedgerClient() {
                 selected={tagFilter === "CD"}
                 onClick={() => selectTagFilter("CD")}
               />
+              {bkDaysInRange.map((row) => (
+                <Link
+                  key={row.date}
+                  href={`/mess/today?date=${row.date}`}
+                  title={`${t("mess.bkDaysInRange")}: ${formatDateLong(row.date, locale === "bn" ? "bn-BD" : "en-GB")} · ${t("mess.openBkList")}`}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-orange-200/90 bg-orange-50 px-3 text-orange-900 shadow-sm transition hover:brightness-[0.97] dark:border-orange-800/50 dark:bg-orange-950/40 dark:text-orange-200 dark:hover:brightness-110"
+                >
+                  <IconFlame className="h-3.5 w-3.5 shrink-0" />
+                  <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wide">
+                    BK
+                  </span>
+                  <span className="max-w-[7rem] truncate text-[10px] font-semibold tabular-nums sm:max-w-none">
+                    {row.date.slice(8)}/{row.date.slice(5, 7)}
+                  </span>
+                  <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
+                    {row.eaters}
+                  </span>
+                </Link>
+              ))}
             </>
           }
         >
@@ -321,12 +375,12 @@ function MiniStat({
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        "inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border px-2 transition",
+        "inline-flex h-9 min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 shadow-sm transition",
         toneClass ??
           "border-neutral-200/90 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
         selected
-          ? "ring-2 ring-inset ring-neutral-900/25 dark:ring-white/35"
-          : "border-transparent hover:brightness-[0.97] dark:hover:brightness-110",
+          ? "border-black ring-1 ring-black brightness-95 dark:border-white dark:ring-white dark:brightness-110"
+          : "hover:brightness-[0.97] dark:hover:brightness-110",
       )}
     >
       <span className="shrink-0 opacity-90" aria-hidden>
@@ -335,7 +389,7 @@ function MiniStat({
       <span className="truncate text-[10px] font-bold uppercase tracking-wide">
         {label}
       </span>
-      <span className="shrink-0 text-xs font-extrabold tabular-nums">
+      <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
         {value}
       </span>
     </button>

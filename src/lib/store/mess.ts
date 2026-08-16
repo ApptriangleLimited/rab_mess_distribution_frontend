@@ -4,24 +4,74 @@ import {
   getAssignment,
   isCarrySuppressed,
 } from "@/lib/store/assignments";
+import { isBoroKhana } from "@/lib/store/boro-khana";
 import { canAssignOnDate } from "@/lib/store/daily";
 import { nextISODate, todayISO } from "@/lib/date";
 import type { DailyTag, User } from "@/lib/types";
 
-export type MessEater = User & { assignment_id: string };
+export type MessEaterReason = "MS" | "FR" | "BK";
 
-/** approved + active + MS tag for date */
+export type MessEater = User & {
+  assignment_id: string;
+  /**
+   * Why on mess list:
+   * - MS — normal mess day or BK with MS tag
+   * - FR — Boro Khana guest with FR tag
+   * - BK — Boro Khana guest with any other / no tag
+   */
+  mess_reason: MessEaterReason;
+};
+
+/** Projected duty tag for user on date (explicit or carry). */
+function projectedTagOnDate(userId: string, date: string): DailyTag | null {
+  const direct = getAssignment(userId, date);
+  if (direct) return direct.tag;
+  if (isCarrySuppressed(userId, date)) return null;
+  return findPriorTag(userId, date);
+}
+
+function reasonForBkGuest(tag: DailyTag | null): MessEaterReason {
+  if (tag === "MS") return "MS";
+  if (tag === "FR") return "FR";
+  return "BK";
+}
+
+/**
+ * Who eats mess on `date`:
+ * - Normal: approved + active + explicit MS
+ * - Boro Khana: **all** approved + active (everyone eats)
+ */
 export function getMessEaters(date: string): MessEater[] {
   const { users, assignments } = getState();
-  const ms = assignments.filter((a) => a.date === date && a.tag === "MS");
+  const byId = new Map(users.map((u) => [u.id, u]));
+
+  if (isBoroKhana(date)) {
+    const result: MessEater[] = [];
+    for (const user of users) {
+      if (user.approval_status !== "approved") continue;
+      if (user.status !== "1") continue;
+      if (!canAssignOnDate(user, date)) continue;
+      const tag = projectedTagOnDate(user.id, date);
+      const direct = getAssignment(user.id, date);
+      result.push({
+        ...user,
+        assignment_id:
+          direct?.id ?? `bk-${user.id}-${date}`,
+        mess_reason: reasonForBkGuest(tag),
+      });
+    }
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   const result: MessEater[] = [];
+  const ms = assignments.filter((a) => a.date === date && a.tag === "MS");
   for (const a of ms) {
-    const user = users.find((u) => u.id === a.user_id);
+    const user = byId.get(a.user_id);
     if (!user) continue;
     if (user.approval_status !== "approved") continue;
     if (user.status !== "1") continue;
     if (!canAssignOnDate(user, date)) continue;
-    result.push({ ...user, assignment_id: a.id });
+    result.push({ ...user, assignment_id: a.id, mess_reason: "MS" });
   }
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -91,20 +141,47 @@ export function getProjectedTagMembers(
 
 /**
  * Who eats mess on `date` (default tomorrow):
- * explicit MS that day, else carry prior tag if MS and not suppressed.
+ * MS projected, or on Boro Khana — all approved+active.
  */
 export function getProjectedMessEaters(date = nextISODate(todayISO())): {
   date: string;
   eaters: User[];
   tagged: number;
   carried: number;
+  /** Non-MS eaters on BK day (everyone else). */
+  guests: number;
 } {
+  if (isBoroKhana(date)) {
+    const { users } = getState();
+    const eaters = users
+      .filter(
+        (u) =>
+          u.approval_status === "approved" &&
+          u.status === "1" &&
+          canAssignOnDate(u, date),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const msIds = new Set(
+      getProjectedTagMembers("MS", date).members.map((u) => u.id),
+    );
+    const guests = eaters.filter((u) => !msIds.has(u.id)).length;
+    const projected = getProjectedTagMembers("MS", date);
+    return {
+      date,
+      eaters,
+      tagged: projected.tagged,
+      carried: projected.carried,
+      guests,
+    };
+  }
+
   const projected = getProjectedTagMembers("MS", date);
   return {
     date: projected.date,
     eaters: projected.members,
     tagged: projected.tagged,
     carried: projected.carried,
+    guests: 0,
   };
 }
 

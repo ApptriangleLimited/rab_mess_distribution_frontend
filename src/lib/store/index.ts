@@ -1,4 +1,5 @@
 import { RATE_ONLY_TAGS, STORE_KEY } from "@/lib/constants";
+import { parseMoney } from "@/lib/money";
 import { createSeedState, SEED_VERSION } from "@/lib/store/seed";
 import type {
   AllowanceRate,
@@ -36,7 +37,10 @@ function normalizeEmergencyContacts(u: LegacyUser): EmergencyContact[] {
 }
 
 function ensureRateOnlyRates(rates: AllowanceRate[]): AllowanceRate[] {
-  const next = [...rates];
+  const next = rates.map((r) => ({
+    ...r,
+    amount_per_day: parseMoney(r.amount_per_day),
+  }));
   for (const only of RATE_ONLY_TAGS) {
     const exists = next.some(
       (r) => r.tag.toLowerCase() === only.code.toLowerCase(),
@@ -99,6 +103,8 @@ function normalizeState(state: AppState): AppState {
         ...rest,
         joining_date: legacy.joining_date ?? "",
         out_date: legacy.out_date ?? "",
+        member_type: legacy.member_type ?? "permanent",
+        personal_id: legacy.personal_id ?? "",
         emergency_contacts: normalizeEmergencyContacts(legacy),
       };
     }),
@@ -108,6 +114,12 @@ function normalizeState(state: AppState): AppState {
       : [],
     suppressed_carries: Array.isArray(state.suppressed_carries)
       ? state.suppressed_carries
+      : [],
+    boro_khana_dates: Array.isArray(state.boro_khana_dates)
+      ? state.boro_khana_dates
+      : [],
+    state_reports: Array.isArray(state.state_reports)
+      ? state.state_reports
       : [],
   };
 }
@@ -141,6 +153,8 @@ export function getServerSnapshot(): AppState {
     rates: [],
     approved_dates: [],
     suppressed_carries: [],
+    boro_khana_dates: [],
+    state_reports: [],
     version: 0,
   };
 }

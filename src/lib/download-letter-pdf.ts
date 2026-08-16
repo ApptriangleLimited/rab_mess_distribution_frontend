@@ -40,8 +40,9 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
   const monthBill = formatMonthBill(sheet.month);
   const dtLabel = formatMonthLong(sheet.reportDate.slice(0, 7));
   const memberBank = sheet.lines[0]?.user.bank_name || "—";
-  const subject = RATION_REPORT_META.subjectFreshMoneyTransfer
-    .replace("{monthLabel}", monthBill)
+  const monthLabel = formatMonthLong(sheet.month);
+  const subject = RATION_REPORT_META.subjectTagBill
+    .replace("{monthLabel}", monthLabel)
     .replace("{bank}", memberBank);
 
   doc.setFontSize(9);
@@ -173,77 +174,98 @@ export function downloadFrTransferPdf(
 }
 
 export function downloadStaffPayoutPdf(
-  sheet: RationStaffSheet,
-  subject: string,
+  sheets: RationStaffSheet[],
   filename: string,
+  subjectOverride?: string,
 ) {
+  if (!sheets.length) return;
+
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
-  let y = writeHeader(doc, 14);
 
-  const monthLabel = formatMonthLong(sheet.month);
-  doc.setFontSize(9);
-  doc.text(`${RATION_REPORT_META.refPrefix}/${sheet.month}`, 14, y);
-  doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
-  y += 6;
+  sheets.forEach((sheet, sheetIndex) => {
+    if (sheetIndex > 0) doc.addPage();
 
-  doc.text("To: Manager", 14, y);
-  y += 4;
-  doc.text(sheet.sender.bank_name || sheet.sender.label, 14, y);
-  y += 4;
-  if (sheet.sender.branch) {
-    doc.text(sheet.sender.branch, 14, y);
+    let y = writeHeader(doc, 14);
+    const monthLabel = formatMonthLong(sheet.month);
+    const subject =
+      subjectOverride ??
+      (sheet.memberBank
+        ? RATION_REPORT_META.subjectTagBill
+            .replace("{monthLabel}", monthLabel)
+            .replace("{bank}", sheet.memberBank)
+        : RATION_REPORT_META.subjectFreshMoney.replace(
+            "{month}",
+            monthLabel,
+          ));
+
+    doc.setFontSize(9);
+    doc.text(`${RATION_REPORT_META.refPrefix}/${sheet.month}`, 14, y);
+    doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
+    y += 6;
+
+    doc.text("To: Manager", 14, y);
     y += 4;
-  }
-  y += 2;
+    doc.text(sheet.sender.bank_name || sheet.sender.label, 14, y);
+    y += 4;
+    if (sheet.sender.branch) {
+      doc.text(sheet.sender.branch, 14, y);
+      y += 4;
+    }
+    y += 2;
 
-  doc.setFont("helvetica", "bold");
-  doc.text(`SUBJECT : ${subject}`, 14, y);
-  const subW = doc.getTextWidth(`SUBJECT : ${subject}`);
-  doc.line(14, y + 1, 14 + Math.min(subW, pageW - 28), y + 1);
-  doc.setFont("helvetica", "normal");
-  y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.text(`SUBJECT : ${subject}`, 14, y);
+    const subW = doc.getTextWidth(`SUBJECT : ${subject}`);
+    doc.line(14, y + 1, 14 + Math.min(subW, pageW - 28), y + 1);
+    doc.setFont("helvetica", "normal");
+    y += 6;
 
-  doc.text("Dear Sir,", 14, y);
-  y += 5;
-  doc.text(
-    `We would request you to disburse of payment Fresh Money bills for the following employees for the month of ${monthLabel}.`,
-    14,
-    y,
-    { maxWidth: pageW - 28 },
-  );
-  y += 8;
+    doc.text("Dear Sir,", 14, y);
+    y += 5;
+    doc.text(
+      `We would request you to disburse of payment Fresh Money bills for the following employees for the month of ${monthLabel}.`,
+      14,
+      y,
+      { maxWidth: pageW - 28 },
+    );
+    y += 8;
 
-  autoTable(doc, {
-    startY: y,
-    head: [
-      [
-        "Ser",
-        "Pers No",
-        "Rank",
-        "Name",
-        "Acct No",
-        "Routing",
-        "Bank",
-        "Amount",
-        "Remarks",
+    autoTable(doc, {
+      startY: y,
+      head: [
+        [
+          "Ser",
+          "Pers No",
+          "Rank",
+          "Name",
+          "Acct No",
+          "Routing",
+          "Bank",
+          "Amount",
+          "Remarks",
+        ],
       ],
-    ],
-    body: sheet.lines.map((row) => [
-      String(row.ser),
-      row.user.rab_id,
-      row.user.rank || "",
-      row.user.name,
-      row.user.account_number || "—",
-      row.user.routing || "—",
-      row.user.bank_name || "—",
-      amt(row.amount),
-      row.remarks || (row.missingBank ? "Missing bank details" : ""),
-    ]),
-    styles: { fontSize: 7, cellPadding: 1.2 },
-    headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: "bold" },
-    theme: "grid",
-    margin: { left: 12, right: 12 },
+      body: sheet.lines.map((row) => [
+        String(row.ser),
+        row.user.rab_id,
+        row.user.rank || "",
+        row.user.name,
+        row.user.account_number || "—",
+        row.user.routing || "—",
+        row.user.bank_name || "—",
+        amt(row.amount),
+        row.remarks || (row.missingBank ? "Missing bank details" : ""),
+      ]),
+      styles: { fontSize: 7, cellPadding: 1.2 },
+      headStyles: {
+        fillColor: [240, 240, 240],
+        textColor: 20,
+        fontStyle: "bold",
+      },
+      theme: "grid",
+      margin: { left: 12, right: 12 },
+    });
   });
 
   doc.save(filename);

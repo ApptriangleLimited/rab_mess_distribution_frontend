@@ -41,14 +41,18 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
           const monthLabel = formatMonthLong(sheet.month);
           const subject =
             subjectOverride ??
-            RATION_REPORT_META.subjectFreshMoney.replace(
-              "{month}",
-              monthLabel,
-            );
+            (sheet.memberBank
+              ? RATION_REPORT_META.subjectTagBill
+                  .replace("{monthLabel}", monthLabel)
+                  .replace("{bank}", sheet.memberBank)
+              : RATION_REPORT_META.subjectFreshMoney.replace(
+                  "{month}",
+                  monthLabel,
+                ));
 
           return (
             <section
-              key={sheet.sender.id}
+              key={`${sheet.sender.id}-${sheet.memberBank ?? "all"}-${sheetIndex}`}
               className={cn(
                 sheetIndex < sheets.length - 1 && "print:break-after-page",
                 "mb-8 last:mb-0",

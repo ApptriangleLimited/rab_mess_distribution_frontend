@@ -44,6 +44,7 @@ import {
 } from "@/lib/store/mess";
 import { useI18n, useT } from "@/i18n/provider";
 import { tagLabel } from "@/i18n";
+import { formatBdt } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { ApprovalStatus } from "@/lib/types";
 
@@ -271,6 +272,7 @@ export default function AdminDashboardClient() {
     state.assignments,
     state.senders,
     state.rates,
+    state.boro_khana_dates,
     month,
     today,
     tomorrow,
@@ -746,7 +748,7 @@ export default function AdminDashboardClient() {
                       </span>
                     </div>
                     <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-neutral-900 dark:text-white">
-                      ৳{rate.amount_per_day}
+                      {formatBdt(rate.amount_per_day)}
                       <span className="ml-1 text-[10px] font-medium text-neutral-400">
                         /{t("pages.adminDashboard.rates.day")}
                       </span>

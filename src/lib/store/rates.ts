@@ -1,11 +1,13 @@
 import { getState, setState } from "@/lib/store";
 import {
+  CL_FR_MONTHLY_TAG,
   DAILY_TAGS,
   FR_FUEL_RATE_PER_DAY,
   FUEL_RATE_TAG,
   isRateOnlyTag,
   RATE_ONLY_TAGS,
 } from "@/lib/constants";
+import { parseMoney, roundPaisa } from "@/lib/money";
 import type { AllowanceRate, DailyTag } from "@/lib/types";
 
 export function listRates() {
@@ -57,15 +59,28 @@ export function getFuelRatePerDay(): number {
   const rate = listRates().find(
     (r) => r.tag.toLowerCase() === FUEL_RATE_TAG.toLowerCase(),
   );
-  if (rate) return Math.max(0, rate.amount_per_day);
+  if (rate) return Math.max(0, roundPaisa(rate.amount_per_day));
   return FR_FUEL_RATE_PER_DAY;
+}
+
+/**
+ * Fixed monthly Fresh Ration for MS members on CL (Settings CLFR).
+ * Not FR daily rate · not × CL days.
+ */
+export function getClFrMonthlyAmount(): number {
+  const rate = listRates().find(
+    (r) => r.tag.toLowerCase() === CL_FR_MONTHLY_TAG.toLowerCase(),
+  );
+  if (rate) return parseMoney(rate.amount_per_day);
+  const fallback = RATE_ONLY_TAGS.find((t) => t.code === CL_FR_MONTHLY_TAG);
+  return fallback ? parseMoney(fallback.defaultAmount) : 0;
 }
 
 export function upsertRate(tag: DailyTag, amount_per_day: number): AllowanceRate {
   const code = String(tag).trim() as DailyTag;
   const rate: AllowanceRate = {
     tag: code,
-    amount_per_day: Math.max(0, amount_per_day),
+    amount_per_day: parseMoney(amount_per_day),
   };
   setState((prev) => {
     const key = code.toLowerCase();
@@ -94,7 +109,10 @@ export function removeRate(tag: DailyTag) {
 }
 
 export function setRates(rates: AllowanceRate[]) {
-  const next = [...rates];
+  const next = rates.map((r) => ({
+    ...r,
+    amount_per_day: parseMoney(r.amount_per_day),
+  }));
   for (const only of RATE_ONLY_TAGS) {
     const exists = next.some(
       (r) => r.tag.toLowerCase() === only.code.toLowerCase(),

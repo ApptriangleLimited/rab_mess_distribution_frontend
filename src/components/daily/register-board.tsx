@@ -1,7 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IconCheck, IconX } from "@tabler/icons-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  IconCheck,
+  IconDownload,
+  IconFlame,
+  IconSearch,
+  IconShield,
+  IconSoup,
+  IconUsers,
+  IconX,
+} from "@tabler/icons-react";
 import {
   Select,
   SelectContent,
@@ -9,8 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ListPagination } from "@/components/shared/list-pagination";
-import { dateInMonth, eachISODate } from "@/lib/date";
+import { dateInMonth, eachISODate, formatDateLong } from "@/lib/date";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
@@ -18,23 +31,15 @@ import { useI18n, useT } from "@/i18n/provider";
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { canAssignOnDate } from "@/lib/store/daily";
+import { setBoroKhana } from "@/lib/store/boro-khana";
+import { getProjectedTagMembers } from "@/lib/store/mess";
 import { listAllTags } from "@/lib/store/rates";
+import { compareUsers } from "@/lib/store/users";
+import { downloadDayMsCdPdf } from "@/lib/download-day-ms-cd-pdf";
+import { TAG_CELL, tagCellClass } from "@/lib/tag-colors";
 import { cn } from "@/lib/utils";
 
-const TAG_CELL: Record<string, string> = {
-  FR: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100",
-  MS: "bg-primary/15 text-primary dark:bg-primary/30 dark:text-emerald-100",
-  CL: "bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100",
-  PL: "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-100",
-  WR: "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
-  CD: "bg-violet-100 text-violet-900 dark:bg-violet-900/50 dark:text-violet-100",
-  WIT: "bg-orange-100 text-orange-900 dark:bg-orange-900/50 dark:text-orange-100",
-  MED: "bg-rose-100 text-rose-900 dark:bg-rose-900/50 dark:text-rose-100",
-  TRG: "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-100",
-};
-
-const TAG_CELL_FALLBACK =
-  "bg-neutral-100 text-neutral-800 dark:bg-neutral-700 dark:text-neutral-100";
+export { TAG_CELL, tagCellClass };
 
 const MONTH_ABBR = [
   "Jan",
@@ -50,12 +55,6 @@ const MONTH_ABBR = [
   "Nov",
   "Dec",
 ] as const;
-
-export function tagCellClass(tag: string) {
-  return TAG_CELL[tag] ?? TAG_CELL_FALLBACK;
-}
-
-export { TAG_CELL };
 
 type DragStroke = {
   userId: string;
@@ -108,6 +107,11 @@ export function RegisterBoard({
 
   const t = useT();
   const { locale } = useI18n();
+  const state = useStore();
+  const bkDates = useMemo(
+    () => new Set(state.boro_khana_dates ?? []),
+    [state.boro_khana_dates],
+  );
   /** Full month ISO list — seed for carry roll when no range filter. */
   const monthDates = useMemo(
     () =>
@@ -145,6 +149,7 @@ export function RegisterBoard({
     return map;
   }, [assignments]);
 
+  const [dayPeek, setDayPeek] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragStroke | null>(null);
   const dragRef = useRef<DragStroke | null>(null);
   const [rangeMenu, setRangeMenu] = useState<RangeMenu | null>(null);
@@ -385,6 +390,7 @@ export function RegisterBoard({
                 {columnDates.map((date, i) => {
                   const isToday = date === todayISO;
                   const past = date <= todayISO;
+                  const isBk = bkDates.has(date);
                   const dayNum = Number(date.slice(8, 10));
                   const showMonth =
                     crossMonth &&
@@ -395,21 +401,72 @@ export function RegisterBoard({
                   return (
                     <th
                       key={date}
-                      title={date}
                       className={cn(
-                        "w-9 min-w-9 border-b border-r border-neutral-300 px-0 py-1 text-center dark:border-neutral-700",
-                        isToday &&
-                          "bg-primary/15 text-primary dark:bg-primary/25",
-                        past &&
-                          "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/50 dark:text-neutral-600",
+                        "w-9 min-w-9 border-b border-r border-neutral-300 p-0 text-center dark:border-neutral-700",
+                        isBk
+                          ? "bg-orange-100 text-orange-950 dark:bg-orange-950/70 dark:text-orange-100"
+                          : isToday
+                            ? "bg-primary/15 text-primary dark:bg-primary/25"
+                            : past
+                              ? "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/50 dark:text-neutral-600"
+                              : null,
                       )}
                     >
-                      {monthAbbr ? (
-                        <span className="block text-[8px] font-semibold leading-none tracking-wide opacity-80">
-                          {monthAbbr}
-                        </span>
-                      ) : null}
-                      <span className="leading-tight">{dayNum}</span>
+                      <div className="flex h-full min-h-10 flex-col">
+                        <button
+                          type="button"
+                          title={t("daily.dayMsCdHint", { date })}
+                          onClick={() => setDayPeek(date)}
+                          className={cn(
+                            "flex w-full flex-1 cursor-pointer flex-col items-center justify-center px-0 pt-1 transition",
+                            isBk
+                              ? "hover:bg-orange-200 dark:hover:bg-orange-900/80"
+                              : "hover:bg-neutral-300 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white",
+                            isToday &&
+                              !isBk &&
+                              "hover:bg-primary/40 hover:text-primary dark:hover:bg-primary/50",
+                            dayPeek === date &&
+                              "ring-2 ring-inset ring-neutral-900/30 dark:ring-white/40",
+                          )}
+                        >
+                          {monthAbbr ? (
+                            <span className="block text-[8px] font-semibold leading-none tracking-wide opacity-80">
+                              {monthAbbr}
+                            </span>
+                          ) : null}
+                          <span className="leading-tight">{dayNum}</span>
+                        </button>
+                        <button
+                          type="button"
+                          title={
+                            isBk
+                              ? t("daily.boroKhanaClear", { date })
+                              : t("daily.boroKhanaSet", { date })
+                          }
+                          aria-pressed={isBk}
+                          aria-label={
+                            isBk
+                              ? t("daily.boroKhanaClear", { date })
+                              : t("daily.boroKhanaSet", { date })
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBoroKhana(date, !isBk);
+                          }}
+                          className={cn(
+                            "flex w-full cursor-pointer items-center justify-center gap-0.5 border-t px-0 py-0.5 text-[8px] font-extrabold uppercase tracking-wide transition",
+                            isBk
+                              ? "border-orange-300/80 bg-orange-500 text-white hover:bg-orange-600 dark:border-orange-700"
+                              : "border-neutral-200/80 bg-neutral-100 text-neutral-500 hover:bg-orange-100 hover:text-orange-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-orange-950 dark:hover:text-orange-200",
+                          )}
+                        >
+                          <IconFlame
+                            className="h-2.5 w-2.5 shrink-0"
+                            stroke={2.5}
+                          />
+                          BK
+                        </button>
+                      </div>
                     </th>
                   );
                 })}
@@ -537,6 +594,7 @@ export function RegisterBoard({
                           date={date}
                           userName={user.name}
                           isToday={date === todayISO}
+                          boroKhana={bkDates.has(date)}
                           locked={locked}
                           afterOut={afterOut}
                           contL={contL}
@@ -593,6 +651,415 @@ export function RegisterBoard({
           </div>
         </>
       ) : null}
+
+      <DayMsCdPeek
+        date={dayPeek}
+        filterUsers={users}
+        onClose={() => setDayPeek(null)}
+      />
+    </div>
+  );
+}
+
+function DayMsCdPeek({
+  date,
+  filterUsers,
+  onClose,
+}: {
+  date: string | null;
+  filterUsers: User[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const { locale } = useI18n();
+  const titleId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const state = useStore();
+  const reduceMotion = useReducedMotion();
+  const open = Boolean(date);
+  const [peekFilter, setPeekFilter] = useState<"all" | "MS" | "CD">("all");
+  const [peekQ, setPeekQ] = useState("");
+  const bkOn = Boolean(
+    date && (state.boro_khana_dates ?? []).includes(date),
+  );
+
+  const lists = useMemo(() => {
+    if (!date) return { ms: [] as User[], cd: [] as User[] };
+    const allowed = new Set(filterUsers.map((u) => u.id));
+    const ms = getProjectedTagMembers("MS", date)
+      .members.filter((u) => allowed.has(u.id))
+      .sort(compareUsers);
+    const cd = getProjectedTagMembers("CD", date)
+      .members.filter((u) => allowed.has(u.id))
+      .sort(compareUsers);
+    return { ms, cd };
+  }, [
+    date,
+    filterUsers,
+    state.assignments,
+    state.users,
+    state.suppressed_carries,
+  ]);
+
+  const dateLabel = date
+    ? formatDateLong(date, locale === "bn" ? "bn-BD" : "en-GB")
+    : "";
+
+  const rows = useMemo(() => {
+    const query = peekQ.trim().toLowerCase();
+    const tagged: { user: User; tag: "MS" | "CD" }[] = [
+      ...lists.ms.map((user) => ({ user, tag: "MS" as const })),
+      ...lists.cd.map((user) => ({ user, tag: "CD" as const })),
+    ];
+    return tagged.filter(({ user, tag }) => {
+      if (peekFilter !== "all" && tag !== peekFilter) return false;
+      if (!query) return true;
+      return [user.name, user.personal_id, user.rab_id, user.rank, user.wing]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [lists, peekFilter, peekQ]);
+
+  useEffect(() => {
+    if (!open) return;
+    setPeekFilter("all");
+    setPeekQ("");
+    closeRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  const total = lists.ms.length + lists.cd.length;
+  const emptyDay = total === 0;
+  const emptyFilter = !emptyDay && rows.length === 0;
+
+  return createPortal(
+    <AnimatePresence>
+      {open && date ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-end justify-center p-0 sm:items-center sm:p-4"
+          role="presentation"
+        >
+          <motion.button
+            type="button"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0 }}
+            className="absolute inset-0 bg-page-dark/55 backdrop-blur-sm"
+            aria-label={t("common.cancel")}
+            onClick={onClose}
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            initial={
+              reduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }
+            }
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={
+              reduceMotion ? undefined : { opacity: 0, y: 10, scale: 0.98 }
+            }
+            transition={{ duration: 0.2 }}
+            className="relative z-10 flex max-h-[min(40rem,92vh)] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl border border-neutral-200 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] sm:rounded-3xl dark:border-neutral-700 dark:bg-neutral-950"
+          >
+            <div className="h-1 w-full bg-gradient-to-r from-primary via-primary-light to-secondary" />
+
+            <div className="flex items-start gap-3 px-4 pb-3 pt-4 sm:px-5">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-md shadow-primary/25">
+                <IconUsers className="h-5 w-5" stroke={2.25} />
+              </span>
+              <div className="min-w-0 flex-1 pt-0.5">
+                <h2
+                  id={titleId}
+                  className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white"
+                >
+                  {t("daily.dayMsCdTitle", { date: dateLabel })}
+                </h2>
+                <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
+                  {emptyDay
+                    ? t("daily.dayMsCdEmpty")
+                    : t("daily.dayMsCdSubtitle", { count: total })}
+                </p>
+              </div>
+              <Button
+                ref={closeRef}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 w-9 shrink-0 rounded-xl p-0"
+                onClick={onClose}
+                aria-label={t("common.cancel")}
+              >
+                <IconX className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="border-b border-neutral-100 px-4 pb-3 sm:px-5 dark:border-neutral-800">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={bkOn}
+                onClick={() => date && setBoroKhana(date, !bkOn)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition",
+                  bkOn
+                    ? "border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/50"
+                    : "border-neutral-200 bg-neutral-50 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-neutral-600",
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                    bkOn
+                      ? "bg-orange-500 text-white"
+                      : "bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400",
+                  )}
+                >
+                  <IconFlame className="h-4 w-4" stroke={2.25} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-neutral-900 dark:text-white">
+                    {t("daily.boroKhana")}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-neutral-500 dark:text-neutral-400">
+                    {bkOn
+                      ? t("daily.boroKhanaOnHint")
+                      : t("daily.boroKhanaOffHint")}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    "relative h-6 w-11 shrink-0 rounded-full transition",
+                    bkOn ? "bg-orange-500" : "bg-neutral-300 dark:bg-neutral-600",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition",
+                      bkOn ? "left-5" : "left-0.5",
+                    )}
+                  />
+                </span>
+              </button>
+            </div>
+
+            {!emptyDay ? (
+              <div className="flex flex-col gap-3 border-b border-neutral-100 px-4 pb-3 sm:px-5 dark:border-neutral-800">
+                <div
+                  className="inline-flex w-full rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-700 dark:bg-neutral-900"
+                  role="tablist"
+                  aria-label={t("daily.dayMsCdTitle", { date: dateLabel })}
+                >
+                  {(
+                    [
+                      {
+                        id: "all" as const,
+                        label: t("daily.rosterStatAll"),
+                        count: total,
+                        icon: <IconUsers className="h-3.5 w-3.5" />,
+                      },
+                      {
+                        id: "MS" as const,
+                        label: t("mess.statMs"),
+                        count: lists.ms.length,
+                        icon: <IconSoup className="h-3.5 w-3.5" />,
+                      },
+                      {
+                        id: "CD" as const,
+                        label: t("mess.statCd"),
+                        count: lists.cd.length,
+                        icon: <IconShield className="h-3.5 w-3.5" />,
+                      },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={peekFilter === tab.id}
+                      onClick={() => setPeekFilter(tab.id)}
+                      className={cn(
+                        "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition",
+                        peekFilter === tab.id
+                          ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white"
+                          : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "shrink-0",
+                          tab.id === "MS" && peekFilter === "MS" && "text-primary",
+                          tab.id === "CD" &&
+                            peekFilter === "CD" &&
+                            "text-violet-600 dark:text-violet-300",
+                        )}
+                      >
+                        {tab.icon}
+                      </span>
+                      <span className="truncate">{tab.label}</span>
+                      <span className="tabular-nums opacity-70">{tab.count}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative">
+                  <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                  <Input
+                    value={peekQ}
+                    onChange={(e) => setPeekQ(e.target.value)}
+                    placeholder={t("cc.searchPlaceholder")}
+                    className="h-10 rounded-xl border-neutral-200 bg-white pl-9 dark:border-neutral-700 dark:bg-neutral-900"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+              {emptyDay ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-400 dark:bg-neutral-900">
+                    <IconUsers className="h-6 w-6" />
+                  </span>
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                    {t("daily.dayMsCdEmpty")}
+                  </p>
+                </div>
+              ) : emptyFilter ? (
+                <p className="py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  {t("common.noResults")}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {rows.map(({ user, tag }, i) => (
+                    <li key={`${tag}-${user.id}`}>
+                      <DayMsCdRow index={i} user={user} tag={tag} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {!emptyDay ? (
+              <div className="flex items-center justify-between gap-2 border-t border-neutral-100 px-4 py-3 sm:px-5 dark:border-neutral-800">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {t("daily.dayMsCdShowing", {
+                    shown: rows.length,
+                    total,
+                  })}
+                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="cta"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={() => {
+                      downloadDayMsCdPdf({
+                        date,
+                        ms: lists.ms,
+                        cd: lists.cd,
+                        include: peekFilter,
+                        filename: `ms-cd-${date}${peekFilter === "all" ? "" : `-${peekFilter.toLowerCase()}`}.pdf`,
+                      });
+                    }}
+                  >
+                    <IconDownload className="h-4 w-4" />
+                    {t("daily.exportPdf")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={onClose}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-end border-t border-neutral-100 px-4 py-3 sm:px-5 dark:border-neutral-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={onClose}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      ) : null}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
+function DayMsCdRow({
+  index,
+  user,
+  tag,
+}: {
+  index: number;
+  user: User;
+  tag: "MS" | "CD";
+}) {
+  const initials = user.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-transparent bg-neutral-50/80 px-3 py-2.5 transition hover:border-neutral-200 hover:bg-white dark:bg-neutral-900/60 dark:hover:border-neutral-700 dark:hover:bg-neutral-900">
+      <span className="w-5 shrink-0 text-center text-[11px] tabular-nums text-neutral-400">
+        {index + 1}
+      </span>
+      <span
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold",
+          tagCellClass(tag),
+        )}
+        aria-hidden
+      >
+        {initials || tag}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate font-medium text-neutral-900 dark:text-white">
+            {user.name}
+          </p>
+          <span
+            className={cn(
+              "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+              tagCellClass(tag),
+            )}
+          >
+            {tag}
+          </span>
+        </div>
+        <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="font-mono">{user.rab_id}</span>
+          {user.rank ? ` · ${user.rank}` : null}
+          {user.wing ? ` · ${user.wing}` : null}
+        </p>
+      </div>
     </div>
   );
 }
@@ -719,6 +1186,7 @@ function RegisterCell({
   date,
   userName,
   isToday,
+  boroKhana,
   locked,
   afterOut,
   contL,
@@ -733,6 +1201,7 @@ function RegisterCell({
   date: string;
   userName: string;
   isToday: boolean;
+  boroKhana?: boolean;
   locked: boolean;
   afterOut?: boolean;
   contL: boolean;
@@ -778,8 +1247,9 @@ function RegisterCell({
     <td
       className={cn(
         "h-9 w-9 min-w-9 border-b border-r border-neutral-200 p-0 dark:border-neutral-800",
-        isToday && !preview && "bg-primary/[0.04]",
-        locked && !tag && "bg-neutral-50/80 dark:bg-neutral-900/40",
+        boroKhana && !preview && "bg-orange-50/90 dark:bg-orange-950/25",
+        isToday && !preview && !boroKhana && "bg-primary/[0.04]",
+        locked && !tag && !boroKhana && "bg-neutral-50/80 dark:bg-neutral-900/40",
         preview && "bg-primary/20 dark:bg-primary/35",
       )}
       data-reg-user={locked ? undefined : userId}

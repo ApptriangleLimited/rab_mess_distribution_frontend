@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { IconPrinter } from "@tabler/icons-react";
+import {
+  IconCalendarStats,
+  IconCoin,
+  IconPrinter,
+  IconUserCheck,
+  IconUsers,
+} from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { AllConsumePanel } from "@/components/consume/all-consume-panel";
@@ -97,6 +103,13 @@ export default function ConsumeMonthlyClient() {
     [state.assignments, state.users, state.rates, month, tag],
   );
 
+  const amountValue =
+    tag !== "all" && tagBill ? tagBill.grandTotal : headerStats.amount;
+  const amountLabel =
+    tag !== "all" && tagBill && (tag === "FR" || tagBill.fuelRate > 0)
+      ? t("consume.colGrandTotal")
+      : t("consume.statAmount");
+
   function patchQuery(patch: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [k, v] of Object.entries(patch)) params.set(k, v);
@@ -119,6 +132,36 @@ export default function ConsumeMonthlyClient() {
   const exportDisabled =
     tag === "all" ? !report.rows.length : !tagBill?.rows.length;
 
+  const statsTiles = (
+    <>
+      <StatChip
+        icon={<IconCalendarStats className="h-3.5 w-3.5" />}
+        label={t("consume.statDays")}
+        value={String(headerStats.days)}
+        tone="sky"
+      />
+      <StatChip
+        icon={<IconUsers className="h-3.5 w-3.5" />}
+        label={t("consume.statMembers")}
+        value={String(headerStats.members)}
+        tone="teal"
+      />
+      <StatChip
+        icon={<IconUserCheck className="h-3.5 w-3.5" />}
+        label={t("consume.statAllowance")}
+        value={String(headerStats.allowance)}
+        tone="lime"
+      />
+      <StatChip
+        icon={<IconCoin className="h-3.5 w-3.5" />}
+        label={amountLabel}
+        value={formatBdt(amountValue)}
+        tone="primary"
+        accent
+      />
+    </>
+  );
+
   return (
     <PagePane className="gap-5">
       <motion.div
@@ -126,62 +169,29 @@ export default function ConsumeMonthlyClient() {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
-        <div>
-          <PageHeader
-            title={t("pages.consumeMonthly.title")}
-            subtitle={t("pages.consumeMonthly.subtitle", { month })}
-            center={<ConsumePanelTabs />}
+        <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-white via-emerald-50/50 to-sky-50/60 p-4 shadow-[0_10px_40px_-24px_rgba(6,121,87,0.35)] sm:p-5 dark:border-primary/25 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none">
+          <div
+            className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20"
+            aria-hidden
           />
-        </div>
-
-        {/* Bill desk — by-tag tabs left, stats + actions right */}
-        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
-          <div className="border-b border-neutral-100 bg-neutral-50/70 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
-                  {t("consume.byTag")}
-                </p>
-                <ConsumeTagTabs
-                  value={tag}
-                  onChange={setTag}
-                  stats={tagStats}
-                />
-              </div>
-              <div className="flex flex-wrap items-end gap-x-5 gap-y-2 lg:justify-end">
-                <HeaderStat
-                  label={t("consume.statDays")}
-                  value={String(headerStats.days)}
-                />
-                <HeaderStat
-                  label={t("consume.statMembers")}
-                  value={String(headerStats.members)}
-                />
-                <HeaderStat
-                  label={t("consume.statAllowance")}
-                  value={String(headerStats.allowance)}
-                />
-                <HeaderStat
-                  label={
-                    tag !== "all" && tagBill && (tag === "FR" || tagBill.fuelRate > 0)
-                      ? t("consume.colGrandTotal")
-                      : t("consume.statAmount")
-                  }
-                  value={formatBdt(
-                    tag !== "all" && tagBill
-                      ? tagBill.grandTotal
-                      : headerStats.amount,
-                  )}
-                  accent
-                />
-                {tag !== "all" ? (
-                  <div className="flex gap-2 self-end">
+          <div
+            className="pointer-events-none absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-nav-accent/10 blur-3xl"
+            aria-hidden
+          />
+          <div className="relative">
+            <PageHeader
+              title={t("pages.consumeMonthly.title")}
+              subtitle={t("pages.consumeMonthly.subtitle", { month })}
+              center={<ConsumePanelTabs />}
+              actions={
+                tag !== "all" ? (
+                  <div className="flex flex-wrap items-center gap-2 no-print">
                     {!exportDisabled ? (
                       <Button
                         asChild
                         variant="cta"
                         size="sm"
-                        className="h-9 rounded-lg"
+                        className="h-9 rounded-xl shadow-sm shadow-primary/20"
                       >
                         <Link
                           href={printHref}
@@ -196,7 +206,7 @@ export default function ConsumeMonthlyClient() {
                       <Button
                         variant="cta"
                         size="sm"
-                        className="h-9 rounded-lg"
+                        className="h-9 rounded-xl"
                         disabled
                       >
                         <IconPrinter className="h-3.5 w-3.5" />
@@ -204,9 +214,22 @@ export default function ConsumeMonthlyClient() {
                       </Button>
                     )}
                   </div>
-                ) : null}
-              </div>
-            </div>
+                ) : null
+              }
+            />
+          </div>
+        </div>
+
+        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
+          <div className="border-b border-neutral-100 bg-gradient-to-br from-white via-white to-emerald-50/40 px-4 py-3.5 dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+              {t("consume.byTag")}
+            </p>
+            <ConsumeTagTabs
+              value={tag}
+              onChange={setTag}
+              stats={tagStats}
+            />
           </div>
 
           <div className="p-4 sm:p-5">
@@ -216,6 +239,7 @@ export default function ConsumeMonthlyClient() {
                 rows={report.rows}
                 month={month}
                 onMonthChange={setMonth}
+                tiles={statsTiles}
               />
             ) : (
               <TagBillPanel
@@ -223,6 +247,7 @@ export default function ConsumeMonthlyClient() {
                 month={month}
                 tag={tag}
                 onMonthChange={setMonth}
+                tiles={statsTiles}
               />
             )}
           </div>
@@ -232,28 +257,46 @@ export default function ConsumeMonthlyClient() {
   );
 }
 
-function HeaderStat({
+function StatChip({
+  icon,
   label,
   value,
+  tone,
   accent,
 }: {
+  icon: ReactNode;
   label: string;
   value: string;
+  tone: "sky" | "teal" | "lime" | "primary";
   accent?: boolean;
 }) {
+  const toneClass = {
+    sky: "border-sky-200/90 bg-sky-50 text-sky-800 dark:border-sky-800/50 dark:bg-sky-950/40 dark:text-sky-100",
+    teal: "border-teal-200/90 bg-teal-50 text-teal-800 dark:border-teal-800/50 dark:bg-teal-950/40 dark:text-teal-100",
+    lime: "border-lime-200/90 bg-lime-50 text-lime-900 dark:border-lime-800/50 dark:bg-lime-950/40 dark:text-lime-100",
+    primary:
+      "border-primary/25 bg-primary/[0.08] text-primary dark:border-primary/40 dark:bg-primary/20 dark:text-emerald-100",
+  }[tone];
+
   return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+    <div
+      className={cn(
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5 shadow-sm",
+        toneClass,
+      )}
+    >
+      <span className="opacity-80">{icon}</span>
+      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] opacity-80">
         {label}
-      </p>
-      <p
+      </span>
+      <span
         className={cn(
-          "mt-0.5 font-mono text-sm font-semibold tabular-nums",
-          accent ? "text-primary" : "text-neutral-800 dark:text-neutral-100",
+          "text-sm font-bold tabular-nums",
+          accent ? "font-mono text-base" : "",
         )}
       >
         {value}
-      </p>
+      </span>
     </div>
   );
 }

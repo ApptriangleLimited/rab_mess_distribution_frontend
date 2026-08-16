@@ -3,6 +3,9 @@ export type Role = "cc" | "daily" | "mess" | "consume" | "ration" | "admin";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "ended";
 export type UserStatus = "0" | "1";
 
+/** How the member is classified on create/edit. */
+export type MemberType = "new" | "attached" | "permanent";
+
 export type BuiltInDailyTag =
   | "FR"
   | "CL"
@@ -32,10 +35,14 @@ export interface EmergencyContact {
 export interface User {
   id: string;
   name: string;
+  /** National / personal identity number. */
+  personal_id: string;
   rab_id: string;
   rfid: string;
   rank: string;
   wing: string;
+  /** new | attached | permanent — New has no rank/wing. */
+  member_type: MemberType;
   dropdown_no: string;
   phone: string;
   documents: DocumentMeta[];
@@ -86,6 +93,38 @@ export interface Session {
   loggedInAt: string;
 }
 
+export type StateReportStatus = "pending" | "approved" | "rejected";
+
+export type StateReportMember = {
+  user_id: string;
+  /** Projected or explicit duty tag for the report date. */
+  tag: DailyTag | "";
+  /** Mess list reason when Boro Khana; null on normal days. */
+  mess_reason?: "MS" | "FR" | "BK" | null;
+  name: string;
+  rab_id: string;
+  rank: string;
+  wing: string;
+};
+
+export type DailyStateReport = {
+  id: string;
+  date: string;
+  status: StateReportStatus;
+  submitted_at: string;
+  submitted_by: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  note?: string;
+  boro_khana: boolean;
+  members: StateReportMember[];
+  totals: {
+    active: number;
+    by_tag: Partial<Record<DailyTag, number>>;
+    mess_eaters: number;
+  };
+};
+
 export interface AppState {
   users: User[];
   assignments: DailyAssignment[];
@@ -95,5 +134,9 @@ export interface AppState {
   approved_dates: string[];
   /** `${userId}|${date}` — hide carry ghost until Approve restores or new tag set. */
   suppressed_carries: string[];
+  /** ISO dates marked Boro Khana (special mess day — everyone eats). */
+  boro_khana_dates: string[];
+  /** Daily duty-state snapshots submitted for Admin approval. */
+  state_reports: DailyStateReport[];
   version: number;
 }

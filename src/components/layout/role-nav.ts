@@ -6,6 +6,8 @@ import {
   IconChartBar,
   IconCashBanknote,
   IconFileReport,
+  IconClipboardList,
+  IconSoup,
   IconSettings,
   type Icon,
 } from "@tabler/icons-react";
@@ -27,6 +29,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
+      href: "/daily/state-report",
+      labelKey: "nav.stateReport",
+      icon: IconClipboardList,
+      chip: "amber",
+    },
+    {
       href: "/daily/roster",
       labelKey: "nav.roster",
       icon: IconUserCheck,
@@ -34,6 +42,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     },
   ],
   mess: [
+    {
+      href: "/mess/today",
+      labelKey: "nav.todaysMess",
+      icon: IconSoup,
+      chip: "orange",
+    },
     {
       href: "/mess/ledger",
       labelKey: "nav.messLedger",
@@ -96,6 +110,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
+      href: "/admin/state-reports",
+      labelKey: "nav.stateReports",
+      icon: IconClipboardList,
+      chip: "amber",
+    },
+    {
       href: "/ration/monthly",
       labelKey: "nav.monthlyRation",
       icon: IconCashBanknote,
@@ -131,6 +151,7 @@ export const CHIP_CLASS: Record<string, string> = {
   indigo: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300",
   orange: "bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300",
   teal: "bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300",
+  amber: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
   cyan: "bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300",
   red: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300",

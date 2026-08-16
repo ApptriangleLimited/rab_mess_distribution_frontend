@@ -10,14 +10,69 @@ import {
   findPriorTag,
   isCarrySuppressed,
 } from "@/lib/store/assignments";
-import { getFuelRatePerDay, listAllTags } from "@/lib/store/rates";
+import { getClFrMonthlyAmount, getFuelRatePerDay, listAllTags } from "@/lib/store/rates";
 import { compareUsers } from "@/lib/store/users";
+import { roundPaisa } from "@/lib/money";
 import type {
   DailyAssignment,
   DailyTag,
   SenderAccount,
   User,
 } from "@/lib/types";
+
+export { formatBdt } from "@/lib/money";
+
+function moneyDays(days: number, rate: number) {
+  return roundPaisa(days * rate);
+}
+
+/** Tag day counts per user for month (from stored assignments). */
+function tagDaysByUserInMonth(month: string): Map<string, Map<DailyTag, number>> {
+  const out = new Map<string, Map<DailyTag, number>>();
+  for (const a of assignmentsInMonth(month)) {
+    let tags = out.get(a.user_id);
+    if (!tags) {
+      tags = new Map();
+      out.set(a.user_id, tags);
+    }
+    tags.set(a.tag, (tags.get(a.tag) ?? 0) + 1);
+  }
+  return out;
+}
+
+/**
+ * MS on CL → fixed monthly Fresh Ration (CLFR), not FR daily rate.
+ * Skip anyone with FR days that month.
+ */
+function isClFrEligible(tagDays: Map<DailyTag, number> | undefined): boolean {
+  if (!tagDays) return false;
+  const cl = tagDays.get("CL") ?? 0;
+  const ms = tagDays.get("MS") ?? 0;
+  const fr = tagDays.get("FR") ?? 0;
+  return cl > 0 && ms > 0 && fr === 0;
+}
+
+function buildClFrRationLines(month: string): RationLine[] {
+  const monthly = getClFrMonthlyAmount();
+  if (monthly <= 0) return [];
+  const { users } = getState();
+  const byUser = tagDaysByUserInMonth(month);
+  const lines: RationLine[] = [];
+  for (const user of users) {
+    const tags = byUser.get(user.id);
+    if (!isClFrEligible(tags)) continue;
+    const days = tags!.get("CL") ?? 0;
+    lines.push({
+      user,
+      tag: "CL",
+      days,
+      /** Display: monthly fixed (not ৳/day). */
+      rate: monthly,
+      amount: monthly,
+    });
+  }
+  return lines.sort((a, b) => sortUsersBankWise(a.user, b.user));
+}
 
 export type UserMonthRow = {
   user: User;
@@ -90,6 +145,16 @@ function sortUsersForBill(a: User, b: User) {
   return compareUsers(a, b);
 }
 
+/** Ration letters: same member bank together (e.g. Sonali…), then roster order. */
+function sortUsersBankWise(a: User, b: User) {
+  const ba = (a.bank_name ?? "").trim().toLowerCase();
+  const bb = (b.bank_name ?? "").trim().toLowerCase();
+  const aKey = ba || "\uffff";
+  const bKey = bb || "\uffff";
+  if (aKey !== bKey) return aKey.localeCompare(bKey);
+  return compareUsers(a, b);
+}
+
 export function buildConsumeMonth(month: string) {
   const assignments = assignmentsInMonth(month);
   const users = getState().users;
@@ -114,7 +179,7 @@ export function buildConsumeMonth(month: string) {
       const rate = rates.get(tag) ?? 0;
       if (rate > 0) {
         allowanceDays += days;
-        amount += days * rate;
+        amount = roundPaisa(amount + moneyDays(days, rate));
       }
     }
     rows.push({ user, tagDays, totalDays, allowanceDays, amount });
@@ -132,7 +197,7 @@ export function buildConsumeMonth(month: string) {
     tag,
     days: v.days,
     users: v.userIds.size,
-    amount: v.days * (rates.get(tag) ?? 0),
+    amount: moneyDays(v.days, rates.get(tag) ?? 0),
   }));
   byTag.sort((a, b) => b.days - a.days);
 
@@ -141,7 +206,7 @@ export function buildConsumeMonth(month: string) {
     assignmentCount: assignments.length,
     rows,
     byTag,
-    totalAmount: rows.reduce((s, r) => s + r.amount, 0),
+    totalAmount: roundPaisa(rows.reduce((s, r) => s + r.amount, 0)),
   };
 }
 
@@ -165,8 +230,8 @@ export function buildTagBill(month: string, tag: DailyTag): {
     .map((row) => {
       const days = row.tagDays[tag] ?? 0;
       if (!days) return null;
-      const amount = days * rate;
-      const fuelAmount = days * fuelRate;
+      const amount = moneyDays(days, rate);
+      const fuelAmount = moneyDays(days, fuelRate);
       return {
         sl: 0,
         user: row.user,
@@ -175,7 +240,7 @@ export function buildTagBill(month: string, tag: DailyTag): {
         amount,
         fuelRate,
         fuelAmount,
-        grandTotal: amount + fuelAmount,
+        grandTotal: roundPaisa(amount + fuelAmount),
         remarks: "",
       };
     })
@@ -190,9 +255,9 @@ export function buildTagBill(month: string, tag: DailyTag): {
     fuelRate,
     rows,
     totalDays: rows.reduce((s, r) => s + r.days, 0),
-    totalAmount: rows.reduce((s, r) => s + r.amount, 0),
-    totalFuel: rows.reduce((s, r) => s + r.fuelAmount, 0),
-    grandTotal: rows.reduce((s, r) => s + r.grandTotal, 0),
+    totalAmount: roundPaisa(rows.reduce((s, r) => s + r.amount, 0)),
+    totalFuel: roundPaisa(rows.reduce((s, r) => s + r.fuelAmount, 0)),
+    grandTotal: roundPaisa(rows.reduce((s, r) => s + r.grandTotal, 0)),
   };
 }
 
@@ -605,7 +670,7 @@ export function buildRationMonth(month: string) {
       ][]) {
         const rate = rates.get(tag) ?? 0;
         if (rate <= 0 || !days) continue;
-        parts.push({ tag, days, rate, amount: days * rate });
+        parts.push({ tag, days, rate, amount: moneyDays(days, rate) });
       }
       return { ...row, parts };
     })
@@ -615,7 +680,7 @@ export function buildRationMonth(month: string) {
     month,
     rows: eligibleRows,
     byTag: consume.byTag.filter((t) => t.amount > 0),
-    totalAmount: eligibleRows.reduce((s, r) => s + r.amount, 0),
+    totalAmount: roundPaisa(eligibleRows.reduce((s, r) => s + r.amount, 0)),
   };
 }
 
@@ -643,8 +708,11 @@ export function buildRationReport(month: string): {
     const user = users.find((u) => u.id === userId);
     if (!user) continue;
     const rate = rateByTag.get(tag) ?? 0;
-    lines.push({ user, tag, days, rate, amount: days * rate });
+    lines.push({ user, tag, days, rate, amount: moneyDays(days, rate) });
   }
+
+  // MS + CL (no FR that month) → fixed monthly Fresh Ration via CL lines.
+  lines.push(...buildClFrRationLines(month));
 
   const groups: SenderReportGroup[] = senders.map((sender) => {
     const senderLines = lines.filter((l) =>
@@ -653,7 +721,7 @@ export function buildRationReport(month: string): {
     return {
       sender,
       lines: senderLines.sort((a, b) => a.user.name.localeCompare(b.user.name)),
-      total: senderLines.reduce((s, l) => s + l.amount, 0),
+      total: roundPaisa(senderLines.reduce((s, l) => s + l.amount, 0)),
     };
   });
 
@@ -664,7 +732,7 @@ export function buildRationReport(month: string): {
     month,
     groups,
     unmapped,
-    total: lines.reduce((s, l) => s + l.amount, 0),
+    total: roundPaisa(lines.reduce((s, l) => s + l.amount, 0)),
   };
 }
 
@@ -691,6 +759,8 @@ export type RationStaffSheet = {
   sender: SenderAccount;
   lines: RationStaffLine[];
   total: number;
+  /** Member bank for SUBJECT “…Transfer BEFTN to {bank}”. */
+  memberBank?: string;
 };
 
 export type RationTransferLine = {
@@ -749,11 +819,48 @@ function rollLinesPerUser(lines: RationLine[]): {
       tags: [...v.tags],
       days: v.days,
     }))
-    .sort((a, b) => sortUsersForBill(a.user, b.user));
+    .sort((a, b) => sortUsersBankWise(a.user, b.user));
 }
 
 function missingBank(user: User) {
   return !user.account_number?.trim() || !user.routing?.trim();
+}
+
+function memberBankLabel(user: User) {
+  return (user.bank_name ?? "").trim() || "—";
+}
+
+/** One staff letter per member bank (Sonali / Islami / …). */
+export function splitStaffByMemberBank(
+  sheet: RationStaffSheet,
+): RationStaffSheet[] {
+  const groups = new Map<string, RationStaffLine[]>();
+  for (const line of sheet.lines) {
+    const key = memberBankLabel(line.user);
+    const list = groups.get(key) ?? [];
+    list.push(line);
+    groups.set(key, list);
+  }
+
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      if (a === "—") return 1;
+      if (b === "—") return -1;
+      return a.localeCompare(b);
+    })
+    .map(([bank, lines]) => ({
+      month: sheet.month,
+      sender: sheet.sender,
+      memberBank: bank,
+      lines: lines.map((row, i) => ({ ...row, ser: i + 1 })),
+      total: roundPaisa(lines.reduce((s, l) => s + l.amount, 0)),
+    }));
+}
+
+function flattenStaffByMemberBank(
+  sheets: RationStaffSheet[],
+): RationStaffSheet[] {
+  return sheets.flatMap((sheet) => splitStaffByMemberBank(sheet));
 }
 
 /** Staff payout rows (PDF p2 shape), rolled per member. Optional sender / tag filter. */
@@ -767,6 +874,30 @@ export function buildRationStaffLines(
     const { users, senders, rates } = getState();
     const sender = senders.find((s) => s.id === senderId);
     if (!sender) return [];
+
+    // CL ration letter: MS members get fixed monthly Fresh Ration (CLFR), not FR/day.
+    if (tag === "CL") {
+      const clFr = buildClFrRationLines(month);
+      if (!clFr.length) return [];
+      const lines: RationStaffLine[] = clFr.map((row, i) => ({
+        ser: i + 1,
+        user: row.user,
+        amount: row.amount,
+        tags: ["CL"],
+        days: row.days,
+        missingBank: missingBank(row.user),
+        remarks: "CL→FR monthly (MS)",
+      }));
+      return flattenStaffByMemberBank([
+        {
+          month,
+          sender,
+          lines,
+          total: roundPaisa(lines.reduce((s, l) => s + l.amount, 0)),
+        },
+      ]);
+    }
+
     const rate =
       rates.find((r) => r.tag === tag)?.amount_per_day ?? 0;
     const fuelPerDay = tag === "FR" ? getFuelRatePerDay() : 0;
@@ -783,7 +914,7 @@ export function buildRationStaffLines(
         return {
           user,
           days,
-          amount: days * dayRate,
+          amount: moneyDays(days, dayRate),
           tags: [tag] as DailyTag[],
         };
       })
@@ -797,7 +928,7 @@ export function buildRationStaffLines(
           tags: DailyTag[];
         } => Boolean(row),
       )
-      .sort((a, b) => sortUsersForBill(a.user, b.user));
+      .sort((a, b) => sortUsersBankWise(a.user, b.user));
 
     if (!rolled.length) return [];
 
@@ -811,14 +942,14 @@ export function buildRationStaffLines(
       remarks: "",
     }));
 
-    return [
+    return flattenStaffByMemberBank([
       {
         month,
         sender,
         lines,
-        total: lines.reduce((s, l) => s + l.amount, 0),
+        total: roundPaisa(lines.reduce((s, l) => s + l.amount, 0)),
       },
-    ];
+    ]);
   }
 
   const report = buildRationReportClean(month);
@@ -826,6 +957,8 @@ export function buildRationStaffLines(
     ? report.groups.filter((g) => g.sender.id === senderId)
     : report.groups;
 
+  // Overview / sender rollup: one sheet per sender (not bank-split).
+  // Tag letters use bank-split above via flattenStaffByMemberBank.
   return groups
     .map((group) => {
       const scoped = tag
@@ -845,7 +978,7 @@ export function buildRationStaffLines(
         month,
         sender: group.sender,
         lines,
-        total: lines.reduce((s, l) => s + l.amount, 0),
+        total: roundPaisa(lines.reduce((s, l) => s + l.amount, 0)),
       };
     })
     .filter((sheet) => sheet.lines.length > 0);
@@ -901,22 +1034,23 @@ export function buildFrTransferSheet(
   userId?: string,
 ): RationTransferSheet | null {
   const sheets = buildRationStaffLines(month, senderId, "FR");
-  const sheet = sheets[0];
-  if (!sheet) return null;
+  if (!sheets.length) return null;
 
+  const merged = sheets.flatMap((s) => s.lines);
   const source = userId
-    ? sheet.lines.filter((l) => l.user.id === userId)
-    : sheet.lines;
+    ? merged.filter((l) => l.user.id === userId)
+    : merged;
   if (source.length === 0) return null;
 
+  const sender = sheets[0]!.sender;
   const compactDate = reportDate.replace(/-/g, "");
   const lines: RationTransferLine[] = source.map((row, i) => ({
     ser: i + 1,
     date: reportDate,
     refNo: `${compactDate}${String(i + 1).padStart(6, "0")}`,
-    senderAccountNo: sheet.sender.account_number || "0",
+    senderAccountNo: sender.account_number || "0",
     receiverRouting: row.user.routing?.trim() || "0",
-    senderRouting: sheet.sender.routing || "0",
+    senderRouting: sender.routing || "0",
     type: RATION_REPORT_META.transferType,
     customerAccountName: row.user.account_name?.trim() || row.user.name,
     customerAccountNo: row.user.account_number?.trim() || "0",
@@ -931,14 +1065,52 @@ export function buildFrTransferSheet(
 
   return {
     month,
-    sender: sheet.sender,
+    sender,
     lines,
-    total: lines.reduce((s, l) => s + l.amount, 0),
+    total: roundPaisa(lines.reduce((s, l) => s + l.amount, 0)),
     reportDate,
   };
 }
 
-/** One FR transfer letter per member (not one combined table). */
+/** One FR transfer letter per member bank (all Sonali on one sheet, etc.). */
+export function buildFrTransferSheetsByMemberBank(
+  month: string,
+  senderId: string,
+  reportDate = todayISO(),
+): RationTransferSheet[] {
+  const all = buildFrTransferSheet(month, senderId, reportDate);
+  if (!all) return [];
+  const compactDate = reportDate.replace(/-/g, "");
+  const groups = new Map<string, typeof all.lines>();
+  for (const line of all.lines) {
+    const key = memberBankLabel(line.user);
+    const list = groups.get(key) ?? [];
+    list.push(line);
+    groups.set(key, list);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      if (a === "—") return 1;
+      if (b === "—") return -1;
+      return a.localeCompare(b);
+    })
+    .map(([, bankLines]) => {
+      const lines = bankLines.map((line, i) => ({
+        ...line,
+        ser: i + 1,
+        refNo: `${compactDate}${String(i + 1).padStart(6, "0")}`,
+      }));
+      return {
+        month: all.month,
+        sender: all.sender,
+        reportDate: all.reportDate,
+        lines,
+        total: roundPaisa(lines.reduce((s, l) => s + l.amount, 0)),
+      } satisfies RationTransferSheet;
+    });
+}
+
+/** @deprecated Prefer buildFrTransferSheetsByMemberBank — one letter per member. */
 export function buildFrTransferSheetsPerUser(
   month: string,
   senderId: string,
@@ -970,8 +1142,4 @@ export function buildFrMemberTransferSheet(
   reportDate = todayISO(),
 ): RationTransferSheet | null {
   return buildFrTransferSheet(month, senderId, reportDate, userId);
-}
-
-export function formatBdt(amount: number) {
-  return `৳${amount.toLocaleString("en-BD")}`;
 }

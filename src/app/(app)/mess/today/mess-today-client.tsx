@@ -1,13 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  IconCalendar,
-  IconChevronLeft,
-  IconChevronRight,
   IconDownload,
+  IconFlame,
   IconPrinter,
   IconUsers,
 } from "@tabler/icons-react";
@@ -19,8 +17,8 @@ import {
   SearchFilterBar,
   searchFilterFieldClass,
 } from "@/components/shared/search-filter-bar";
+import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -31,10 +29,10 @@ import {
 import { MessTodayList } from "@/components/mess/mess-today-list";
 import { useStore } from "@/hooks/use-store";
 import { RANKS, WINGS } from "@/lib/constants";
-import { nextISODate, previousISODate, todayISO } from "@/lib/date";
+import { todayISO } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
-import { countByField, getMessEaters } from "@/lib/store/mess";
-import { getServedIds, toggleServed } from "@/lib/served";
+import { getMessEaters } from "@/lib/store/mess";
+import { isBoroKhana } from "@/lib/store/boro-khana";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -45,65 +43,39 @@ function isValidDate(value: string) {
 export default function MessTodayClient() {
   const t = useT();
   const state = useStore();
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
   const dateParam = searchParams.get("date");
   const date = dateParam && isValidDate(dateParam) ? dateParam : todayISO();
 
-  const [servedTick, setServedTick] = useState(0);
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
-  const [serveFilter, setServeFilter] = useState("all");
 
-  const servedIds = useMemo(() => {
-    void servedTick;
-    return getServedIds(date);
-  }, [date, servedTick]);
+  const isBk = isBoroKhana(date);
 
   const eaters = useMemo(
     () => getMessEaters(date),
-    [state.users, state.assignments, date],
+    [state.users, state.assignments, state.boro_khana_dates, date],
   );
 
-  const servedCount = useMemo(
-    () => eaters.filter((e) => servedIds.has(e.id)).length,
-    [eaters, servedIds],
+  const guestCount = useMemo(
+    () => eaters.filter((e) => e.mess_reason !== "MS").length,
+    [eaters],
   );
-  const remaining = eaters.length - servedCount;
-  const progress =
-    eaters.length === 0 ? 0 : Math.round((servedCount / eaters.length) * 100);
-
-  const byWing = useMemo(() => countByField(eaters, "wing"), [eaters]);
-  const byRank = useMemo(() => countByField(eaters, "rank"), [eaters]);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return eaters.filter((u) => {
       if (rank !== "all" && u.rank !== rank) return false;
       if (wing !== "all" && u.wing !== wing) return false;
-      const served = servedIds.has(u.id);
-      if (serveFilter === "served" && !served) return false;
-      if (serveFilter === "pending" && served) return false;
       if (!query) return true;
       return [u.name, u.rab_id, u.wing, u.rank, u.phone]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [eaters, q, rank, wing, serveFilter, servedIds]);
-
-  const setDate = useCallback(
-    (next: string) => {
-      if (!isValidDate(next)) return;
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("date", next);
-      router.replace(`${pathname}?${params.toString()}`);
-    },
-    [pathname, router, searchParams],
-  );
+  }, [eaters, q, rank, wing]);
 
   function onExport() {
     const rows = [
@@ -114,7 +86,6 @@ export default function MessTodayClient() {
         t("mess.colRank"),
         t("mess.colWing"),
         t("mess.colPhone"),
-        t("mess.colServed"),
       ],
       ...eaters.map((u, i) => [
         String(i + 1),
@@ -123,17 +94,13 @@ export default function MessTodayClient() {
         u.rank,
         u.wing,
         u.phone,
-        servedIds.has(u.id) ? "yes" : "no",
       ]),
     ];
     downloadCsv(`mess-${date}.csv`, rows);
   }
 
   const fieldClass = searchFilterFieldClass;
-  const headerFieldClass =
-    "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
-  const filtersActive =
-    rank !== "all" || wing !== "all" || serveFilter !== "all";
+  const filtersActive = rank !== "all" || wing !== "all";
 
   return (
     <PagePane className="gap-5 print:border-0 print:p-0">
@@ -142,68 +109,49 @@ export default function MessTodayClient() {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
-        <PageHeader
-          title={t("pages.messToday.title")}
-          subtitle={t("pages.messToday.subtitle", {
-            count: eaters.length,
-            date,
-          })}
-          actions={
-            <div className="flex flex-wrap items-center gap-2 no-print">
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-xl"
-                  aria-label={t("mess.prevDay")}
-                  onClick={() => setDate(previousISODate(date))}
-                >
-                  <IconChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="relative w-[11.5rem] shrink-0">
-                  <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-                  <Input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    aria-label={t("mess.date")}
-                    className={cn(headerFieldClass, "h-9 w-[11.5rem] pl-8")}
-                  />
+        <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-white via-emerald-50/50 to-sky-50/60 p-4 shadow-[0_10px_40px_-24px_rgba(6,121,87,0.35)] sm:p-5 dark:border-primary/25 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none">
+          <div
+            className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-nav-accent/10 blur-3xl"
+            aria-hidden
+          />
+          <div className="relative">
+            <PageHeader
+              title={t("pages.messToday.title")}
+              subtitle={t("pages.messToday.subtitle", {
+                count: eaters.length,
+                date,
+              })}
+              center={<MessTabs />}
+              actions={
+                <div className="flex flex-wrap items-center gap-2 no-print">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-xl"
+                    onClick={onExport}
+                    disabled={!eaters.length}
+                  >
+                    <IconDownload className="h-3.5 w-3.5" />
+                    {t("mess.exportCsv")}
+                  </Button>
+                  <Button
+                    variant="cta"
+                    size="sm"
+                    className="h-9 rounded-xl shadow-sm shadow-primary/20"
+                    onClick={() => window.print()}
+                  >
+                    <IconPrinter className="h-3.5 w-3.5" />
+                    {t("mess.print")}
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-xl"
-                  aria-label={t("mess.nextDay")}
-                  onClick={() => setDate(nextISODate(date))}
-                >
-                  <IconChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-xl"
-                onClick={onExport}
-                disabled={!eaters.length}
-              >
-                <IconDownload className="h-3.5 w-3.5" />
-                {t("mess.exportCsv")}
-              </Button>
-              <Button
-                variant="cta"
-                size="sm"
-                className="h-9 rounded-xl"
-                onClick={() => window.print()}
-              >
-                <IconPrinter className="h-3.5 w-3.5" />
-                {t("mess.print")}
-              </Button>
-            </div>
-          }
-        />
+              }
+            />
+          </div>
+        </div>
 
         <SearchFilterBar
           className="no-print"
@@ -217,12 +165,20 @@ export default function MessTodayClient() {
                 value={String(eaters.length)}
                 accent
               />
-              <StatChip
-                label={t("mess.served")}
-                value={String(servedCount)}
-              />
-              <StatChip label={t("mess.remaining")} value={String(remaining)} />
-              <StatChip label={t("mess.progress")} value={`${progress}%`} />
+              {isBk ? (
+                <div
+                  className="inline-flex h-10 max-w-full shrink-0 items-center gap-2 rounded-xl border border-orange-200/90 bg-orange-50 px-3.5 text-orange-950 shadow-sm dark:border-orange-800/50 dark:bg-orange-950/40 dark:text-orange-100"
+                  title={t("mess.boroKhanaBannerHint", {
+                    total: eaters.length,
+                    guests: guestCount,
+                  })}
+                >
+                  <IconFlame className="h-3.5 w-3.5 shrink-0" stroke={2.25} />
+                  <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.08em]">
+                    {t("mess.boroKhanaBanner")}
+                  </span>
+                </div>
+              ) : null}
             </>
           }
         >
@@ -256,62 +212,15 @@ export default function MessTodayClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[10rem] shrink-0">
-            <Select value={serveFilter} onValueChange={setServeFilter}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("mess.servedAll")}</SelectItem>
-                <SelectItem value="served">{t("mess.servedOnly")}</SelectItem>
-                <SelectItem value="pending">{t("mess.pendingOnly")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <ClearFiltersButton
             disabled={!filtersActive && !q.trim()}
             onClick={() => {
               setQ("");
               setRank("all");
               setWing("all");
-              setServeFilter("all");
             }}
           />
         </SearchFilterBar>
-
-        {eaters.length > 0 ? (
-          <div className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white p-3.5 shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
-            <div className="mb-2.5 flex items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-                {t("mess.progress")}
-              </p>
-              <p className="text-xs tabular-nums text-neutral-500">
-                {servedCount}/{eaters.length}
-              </p>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {eaters.length > 0 ? (
-          <div className="grid gap-3 no-print sm:grid-cols-2">
-            <Breakdown
-              title={t("mess.byWing")}
-              items={byWing}
-              tone="wing"
-            />
-            <Breakdown
-              title={t("mess.byRank")}
-              items={byRank}
-              tone="rank"
-            />
-          </div>
-        ) : null}
 
         {eaters.length === 0 ? (
           <EmptyState
@@ -331,56 +240,11 @@ export default function MessTodayClient() {
                 {filtered.length}/{eaters.length}
               </span>
             </div>
-            <MessTodayList
-              eaters={filtered}
-              servedIds={servedIds}
-              onToggleServed={(userId) => {
-                toggleServed(date, userId);
-                setServedTick((n) => n + 1);
-              }}
-            />
+            <MessTodayList eaters={filtered} />
           </section>
         )}
       </motion.div>
     </PagePane>
-  );
-}
-
-function Breakdown({
-  title,
-  items,
-  tone,
-}: {
-  title: string;
-  items: [string, number][];
-  tone: "wing" | "rank";
-}) {
-  return (
-    <div className="rounded-2xl border border-neutral-200/90 bg-white p-3.5 dark:border-neutral-700 dark:bg-neutral-950">
-      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-        {title}
-      </p>
-      {items.length === 0 ? (
-        <p className="text-sm text-neutral-400">—</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {items.map(([label, n]) => (
-            <span
-              key={label}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs",
-                tone === "wing"
-                  ? "border-nav-accent/20 bg-nav-accent/10 text-nav-accent"
-                  : "border-primary/20 bg-primary/10 text-primary",
-              )}
-            >
-              <span className="font-medium">{label}</span>
-              <span className="tabular-nums opacity-80">{n}</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 

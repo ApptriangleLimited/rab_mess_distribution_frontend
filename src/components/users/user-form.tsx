@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import { SectionCard } from "@/components/shared/section-card";
 import { TagSelector } from "@/components/daily/tag-selector";
-import { RANKS, WINGS } from "@/lib/constants";
-import type { DailyTag, DocumentMeta, User, UserStatus } from "@/lib/types";
+import { RANKS, WINGS, MEMBER_TYPES } from "@/lib/constants";
+import type { DailyTag, DocumentMeta, MemberType, User, UserStatus } from "@/lib/types";
 import {
   emptyEmergencyContact,
   type UserInput,
@@ -42,10 +42,12 @@ export type UserFormSubmitPayload = UserFormValues & {
 
 const emptyValues = (): UserFormValues => ({
   name: "",
+  personal_id: "",
   rab_id: "",
   rfid: "",
   rank: RANKS[0] ?? "",
   wing: WINGS[0] ?? "",
+  member_type: "permanent",
   dropdown_no: "",
   phone: "",
   documents: [],
@@ -67,10 +69,12 @@ export function userToFormValues(user: User): UserFormValues {
       : [emptyEmergencyContact()];
   return {
     name: user.name,
+    personal_id: user.personal_id ?? "",
     rab_id: user.rab_id,
     rfid: user.rfid,
     rank: user.rank,
     wing: user.wing,
+    member_type: user.member_type ?? "permanent",
     dropdown_no: user.dropdown_no,
     phone: user.phone,
     documents: user.documents,
@@ -115,12 +119,30 @@ export function UserForm({
   );
   const [todayTag, setTodayTag] = useState<DailyTag>(initialTag);
   const [dragOver, setDragOver] = useState(false);
+  const isNewMember = values.member_type === "new";
 
   function patch<K extends keyof UserFormValues>(
     key: K,
     value: UserFormValues[K],
   ) {
     setValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setMemberType(next: MemberType) {
+    setValues((prev) => {
+      if (next === "new") {
+        return { ...prev, member_type: next, rank: "", wing: "" };
+      }
+      return {
+        ...prev,
+        member_type: next,
+        rank: prev.rank || RANKS[0] || "",
+        wing: prev.wing || WINGS[0] || "",
+      };
+    });
+    if (next === "new" && variant === "daily" && mode === "create") {
+      setTodayTag("TRG");
+    }
   }
 
   function onFiles(files: FileList | null) {
@@ -239,6 +261,14 @@ export function UserForm({
               placeholder={t("cc.placeholders.name")}
             />
           </Field>
+          <Field label={t("cc.fields.personalId")}>
+            <Input
+              value={values.personal_id}
+              onChange={(e) => patch("personal_id", e.target.value)}
+              className={inputClass}
+              placeholder={t("cc.placeholders.personalId")}
+            />
+          </Field>
           <Field label={t("cc.fields.rabId")}>
             <Input
               value={values.rab_id}
@@ -256,34 +286,61 @@ export function UserForm({
               placeholder={t("cc.placeholders.rfid")}
             />
           </Field>
-          <Field label={t("cc.fields.rank")}>
-            <Select value={values.rank} onValueChange={(v) => patch("rank", v)}>
+          <Field label={t("cc.fields.memberType")}>
+            <Select
+              value={values.member_type}
+              onValueChange={(v) => setMemberType(v as MemberType)}
+            >
               <SelectTrigger className={selectTriggerClass}>
-                <SelectValue placeholder={t("cc.selectRank")} />
+                <SelectValue placeholder={t("cc.selectMemberType")} />
               </SelectTrigger>
               <SelectContent>
-                {RANKS.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
+                {MEMBER_TYPES.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {t(m.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
-          <Field label={t("cc.fields.wing")}>
-            <Select value={values.wing} onValueChange={(v) => patch("wing", v)}>
-              <SelectTrigger className={selectTriggerClass}>
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                {WINGS.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          {!isNewMember ? (
+            <>
+              <Field label={t("cc.fields.rank")}>
+                <Select
+                  value={values.rank}
+                  onValueChange={(v) => patch("rank", v)}
+                >
+                  <SelectTrigger className={selectTriggerClass}>
+                    <SelectValue placeholder={t("cc.selectRank")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RANKS.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label={t("cc.fields.wing")}>
+                <Select
+                  value={values.wing}
+                  onValueChange={(v) => patch("wing", v)}
+                >
+                  <SelectTrigger className={selectTriggerClass}>
+                    <SelectValue placeholder={t("cc.selectWing")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WINGS.map((w) => (
+                      <SelectItem key={w} value={w}>
+                        {w}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </>
+          ) : null}
           <Field label={t("cc.fields.phone")}>
             <Input
               value={values.phone}

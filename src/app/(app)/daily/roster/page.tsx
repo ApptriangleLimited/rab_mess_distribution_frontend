@@ -1,10 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { IconPlus, IconUsers } from "@tabler/icons-react";
+import {
+  IconCircleCheck,
+  IconClockHour4,
+  IconPlus,
+  IconUserOff,
+  IconUsers,
+} from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -41,6 +47,8 @@ import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import type { User } from "@/lib/types";
 
+type RosterView = "all" | "pending" | "active" | "inactive";
+
 export default function RosterPage() {
   const t = useT();
   const { locale } = useI18n();
@@ -53,6 +61,7 @@ export default function RosterPage() {
   const [wing, setWing] = useState("all");
   const [tag, setTagFilter] = useState("all");
   const [status, setStatus] = useState("all");
+  const [view, setView] = useState<RosterView>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const today = todayISO();
@@ -79,9 +88,15 @@ export default function RosterPage() {
 
   const allCount = pendingAll.length + approved.length;
 
+  const effectiveStatus =
+    view === "active" ? "1" : view === "inactive" ? "0" : status;
+
   const pending = useMemo(() => {
+    if (view === "active" || view === "inactive") return [];
+    if (view !== "pending" && (effectiveStatus !== "all" || tag !== "all")) {
+      return [];
+    }
     const query = q.trim().toLowerCase();
-    if (status !== "all" || tag !== "all") return [];
     return pendingAll
       .filter((u) => {
         if (rank !== "all" && u.rank !== rank) return false;
@@ -99,19 +114,23 @@ export default function RosterPage() {
     q,
     rank,
     wing,
-    status,
+    effectiveStatus,
     tag,
     dateFrom,
     dateTo,
+    view,
   ]);
 
   const roster = useMemo(() => {
+    if (view === "pending") return [];
     const query = q.trim().toLowerCase();
     return approved
       .filter((u) => {
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
-        if (status !== "all" && u.status !== status) return false;
+        if (effectiveStatus !== "all" && u.status !== effectiveStatus) {
+          return false;
+        }
         if (!matchesMemberDateFilter(u, dateFrom, dateTo)) return false;
         if (tag !== "all") {
           const todayTag = getAssignment(u.id, today)?.tag ?? null;
@@ -134,11 +153,12 @@ export default function RosterPage() {
     rank,
     wing,
     tag,
-    status,
+    effectiveStatus,
     today,
     state.assignments,
     dateFrom,
     dateTo,
+    view,
   ]);
 
   const boardEmpty = pending.length === 0 && roster.length === 0;
@@ -169,8 +189,16 @@ export default function RosterPage() {
     wing !== "all" ||
     tag !== "all" ||
     status !== "all" ||
+    view !== "all" ||
     Boolean(dateFrom.trim()) ||
     Boolean(dateTo.trim());
+
+  function selectView(next: RosterView) {
+    setView((cur) => (cur === next ? "all" : next));
+    if (next === "active" || next === "inactive" || next === "pending") {
+      setStatus("all");
+    }
+  }
 
   return (
     <PagePane className="gap-5">
@@ -179,47 +207,77 @@ export default function RosterPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
-        <PageHeader
-          title={t("pages.roster.title")}
-          subtitle={t("pages.roster.subtitle", { count: showing })}
-          center={<DailyTabs />}
-          actions={
-            <Button
-              asChild
-              variant="cta"
-              size="sm"
-              className="h-9 shrink-0 rounded-xl px-3"
-            >
-              <Link href="/daily/users/new">
-                <IconPlus className="h-3.5 w-3.5" />
-                {t("cc.newUser")}
-              </Link>
-            </Button>
-          }
-        />
+        <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-white via-emerald-50/50 to-sky-50/60 p-4 shadow-[0_10px_40px_-24px_rgba(6,121,87,0.35)] sm:p-5 dark:border-primary/25 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none">
+          <div
+            className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-nav-accent/10 blur-3xl"
+            aria-hidden
+          />
+          <div className="relative">
+            <PageHeader
+              title={t("pages.roster.title")}
+              subtitle={t("pages.roster.subtitle", { count: showing })}
+              center={<DailyTabs />}
+              actions={
+                <Button
+                  asChild
+                  variant="cta"
+                  size="sm"
+                  className="h-9 shrink-0 rounded-xl px-3 shadow-sm shadow-primary/20"
+                >
+                  <Link href="/daily/users/new">
+                    <IconPlus className="h-3.5 w-3.5" />
+                    {t("cc.newUser")}
+                  </Link>
+                </Button>
+              }
+            />
+          </div>
+        </div>
 
         <SearchFilterBar
           search={q}
           onSearchChange={setQ}
           searchPlaceholder={t("cc.searchPlaceholder")}
+          filtersActive={filtersActive}
+          wrapTiles={false}
+          className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={
             <>
               <StatChip
+                icon={<IconUsers className="h-3.5 w-3.5" />}
                 label={t("daily.rosterStatAll")}
                 value={String(allCount)}
-                accent
+                tone="teal"
+                selected={view === "all"}
+                onClick={() => setView("all")}
               />
               <StatChip
+                icon={<IconClockHour4 className="h-3.5 w-3.5" />}
                 label={t("daily.rosterStatPending")}
                 value={String(pendingAll.length)}
+                tone="amber"
+                selected={view === "pending"}
+                onClick={() => selectView("pending")}
               />
               <StatChip
+                icon={<IconCircleCheck className="h-3.5 w-3.5" />}
                 label={t("daily.rosterStatActive")}
                 value={String(activeCount)}
+                tone="emerald"
+                selected={view === "active"}
+                onClick={() => selectView("active")}
               />
               <StatChip
+                icon={<IconUserOff className="h-3.5 w-3.5" />}
                 label={t("daily.rosterStatInactive")}
                 value={String(inactiveCount)}
+                tone="neutral"
+                selected={view === "inactive"}
+                onClick={() => selectView("inactive")}
               />
             </>
           }
@@ -271,7 +329,13 @@ export default function RosterPage() {
             </Select>
           </div>
           <div className="w-[9.5rem] shrink-0">
-            <Select value={status} onValueChange={setStatus}>
+            <Select
+              value={view === "active" || view === "inactive" ? "all" : status}
+              onValueChange={(v) => {
+                setView("all");
+                setStatus(v);
+              }}
+            >
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
               </SelectTrigger>
@@ -296,6 +360,7 @@ export default function RosterPage() {
               setWing("all");
               setTagFilter("all");
               setStatus("all");
+              setView("all");
               setDateFrom("");
               setDateTo("");
             }}
@@ -316,24 +381,24 @@ export default function RosterPage() {
             }
           />
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
-            <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-2.5 dark:border-neutral-800">
-              <IconUsers className="h-3.5 w-3.5 text-neutral-400" />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+          <div className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-[0_1px_2px_rgba(6,121,87,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)] dark:border-neutral-700 dark:bg-neutral-950 dark:shadow-none">
+            <div className="flex items-center gap-2 border-b border-neutral-100 bg-gradient-to-r from-primary/[0.06] via-sky-50/50 to-transparent px-4 py-2.5 dark:border-neutral-800 dark:from-primary/10 dark:via-neutral-900 dark:to-neutral-900">
+              <IconUsers className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
                 {t("daily.rosterBoard")}
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
+                <thead className="bg-gradient-to-r from-primary/[0.07] via-sky-50/70 to-teal-50/50 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-600 dark:from-primary/15 dark:via-neutral-900 dark:to-neutral-900 dark:text-neutral-400">
                   <tr>
-                    <th className="px-4 py-3">{t("cc.fields.rabId")}</th>
-                    <th className="px-4 py-3">{t("cc.fields.rank")}</th>
-                    <th className="px-4 py-3">{t("cc.fields.name")}</th>
-                    <th className="px-4 py-3">{t("cc.fields.wing")}</th>
-                    <th className="px-4 py-3">{t("cc.fields.joiningDate")}</th>
-                    <th className="px-4 py-3">{t("cc.fields.outDate")}</th>
-                    <th className="px-4 py-3">{t("cc.fields.status")}</th>
+                    <th className="px-4 py-3.5">{t("cc.fields.rabId")}</th>
+                    <th className="px-4 py-3.5">{t("cc.fields.rank")}</th>
+                    <th className="px-4 py-3.5">{t("cc.fields.name")}</th>
+                    <th className="px-4 py-3.5">{t("cc.fields.wing")}</th>
+                    <th className="px-4 py-3.5">{t("cc.fields.joiningDate")}</th>
+                    <th className="px-4 py-3.5">{t("cc.fields.outDate")}</th>
+                    <th className="px-4 py-3.5">{t("cc.fields.status")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -361,6 +426,7 @@ export default function RosterPage() {
               from={from}
               to={to}
               onPageChange={setPage}
+              className="bg-gradient-to-r from-neutral-50/80 to-teal-50/30 dark:from-neutral-900 dark:to-neutral-900"
             />
           </div>
         )}
@@ -370,34 +436,52 @@ export default function RosterPage() {
 }
 
 function StatChip({
+  icon,
   label,
   value,
-  accent,
+  tone,
+  selected,
+  onClick,
 }: {
+  icon: ReactNode;
   label: string;
   value: string;
-  accent?: boolean;
+  tone: "teal" | "amber" | "emerald" | "neutral";
+  selected?: boolean;
+  onClick?: () => void;
 }) {
+  const tones = {
+    teal: "border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100",
+    amber:
+      "border-amber-200/90 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200",
+    emerald:
+      "border-emerald-200/90 bg-emerald-50 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200",
+    neutral:
+      "border-neutral-200/90 bg-neutral-100 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200",
+  }[tone];
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5",
-        accent
-          ? "border-primary/20 bg-primary/[0.08]"
-          : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-3 shadow-sm transition",
+        tones,
+        selected
+          ? "border-black ring-1 ring-black brightness-95 dark:border-white dark:ring-white dark:brightness-110"
+          : "hover:brightness-[0.97] dark:hover:brightness-110",
       )}
     >
-      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
+      <span className="shrink-0 opacity-90" aria-hidden>
+        {icon}
+      </span>
+      <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wide">
         {label}
       </span>
-      <span
-        className={cn(
-          "text-base font-bold tabular-nums",
-          accent ? "text-primary" : "text-neutral-900 dark:text-white",
-        )}
-      >
+      <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
         {value}
       </span>
-    </div>
+    </button>
   );
 }

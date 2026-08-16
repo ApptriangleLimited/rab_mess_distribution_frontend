@@ -44,9 +44,9 @@ export function ConsumeTagTabs({ value, onChange, stats, className }: Props) {
         aria-pressed={value === "all"}
         onClick={() => onChange("all")}
         className={cn(
-          "rounded-lg border px-2.5 py-1.5 text-xs font-bold tracking-wide transition",
+          "inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold tracking-wide transition",
           value === "all"
-            ? "border-primary bg-primary text-white shadow-sm ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-neutral-950"
+            ? "border-neutral-900 bg-primary text-white shadow-sm dark:border-white"
             : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800",
         )}
       >
@@ -56,6 +56,7 @@ export function ConsumeTagTabs({ value, onChange, stats, className }: Props) {
       {tags.map((code) => {
         const active = value === code;
         const quiet = stats != null && !byCode.has(code);
+        const count = byCode.get(code)?.users;
 
         return (
           <button
@@ -66,15 +67,20 @@ export function ConsumeTagTabs({ value, onChange, stats, className }: Props) {
             aria-label={`${code} ${tagLabel(code, locale)}`}
             onClick={() => onChange(code)}
             className={cn(
-              "rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold tracking-wide transition",
+              "inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 font-mono text-xs font-bold tracking-wide transition",
               tagCellClass(code),
               active
-                ? "ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-neutral-950"
-                : "opacity-80 hover:opacity-100",
+                ? "border-neutral-900 shadow-sm dark:border-white"
+                : "border-transparent opacity-85 hover:opacity-100",
               quiet && !active && "opacity-35 hover:opacity-55",
             )}
           >
             {code}
+            {count != null && count > 0 ? (
+              <span className="rounded-md bg-black/10 px-1.5 py-px text-[10px] font-extrabold tabular-nums dark:bg-white/15">
+                {count}
+              </span>
+            ) : null}
           </button>
         );
       })}

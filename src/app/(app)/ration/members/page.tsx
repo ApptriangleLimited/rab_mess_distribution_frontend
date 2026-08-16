@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { IconBuildingBank, IconEye, IconUsers } from "@tabler/icons-react";
+import {
+  IconEye,
+  IconUserOff,
+  IconUsers,
+  IconUserCheck,
+} from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -17,8 +22,6 @@ import { UserConfirmCard } from "@/components/daily/user-confirm-card";
 import { RosterRow } from "@/components/daily/status-toggle";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -28,30 +31,11 @@ import {
 } from "@/components/ui/select";
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
-import { useToast } from "@/components/shared/toast-provider";
-import { updateUserBank, compareUsers } from "@/lib/store/users";
+import { compareUsers } from "@/lib/store/users";
 import { RANKS, WINGS } from "@/lib/constants";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import type { User } from "@/lib/types";
-
-type BankForm = {
-  bank_name: string;
-  account_name: string;
-  account_number: string;
-  routing: string;
-  branch: string;
-};
-
-function bankFromUser(user: User): BankForm {
-  return {
-    bank_name: user.bank_name ?? "",
-    account_name: user.account_name ?? "",
-    account_number: user.account_number ?? "",
-    routing: user.routing ?? "",
-    branch: user.branch ?? "",
-  };
-}
 
 function hasBank(user: User) {
   return Boolean(
@@ -62,24 +46,12 @@ function hasBank(user: User) {
 export default function RationMembersPage() {
   const t = useT();
   const state = useStore();
-  const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
   const [status, setStatus] = useState("all");
   const [viewUser, setViewUser] = useState<User | null>(null);
-  const [bankUser, setBankUser] = useState<User | null>(null);
-  const [bankForm, setBankForm] = useState<BankForm | null>(null);
-
-  useEffect(() => {
-    if (!bankUser) {
-      setBankForm(null);
-      return;
-    }
-    const latest = state.users.find((u) => u.id === bankUser.id) ?? bankUser;
-    setBankForm(bankFromUser(latest));
-  }, [bankUser, state.users]);
 
   const approved = useMemo(
     () => state.users.filter((u) => u.approval_status === "approved"),
@@ -123,18 +95,20 @@ export default function RationMembersPage() {
   const { page, setPage, totalPages, pageItems, total, from, to } =
     usePagination(roster, resetKey);
 
-  function saveBank() {
-    if (!bankUser || !bankForm) return;
-    const updated = updateUserBank(bankUser.id, bankForm);
-    if (updated) {
-      toast(t("ration.savedMemberBank"), "success");
-      setBankUser(null);
-    }
-  }
-
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
     rank !== "all" || wing !== "all" || status !== "all";
+
+  function toggleStatus(next: "1" | "0" | "all") {
+    setStatus((prev) => (prev === next ? "all" : next));
+  }
+
+  function clearAll() {
+    setQ("");
+    setRank("all");
+    setWing("all");
+    setStatus("all");
+  }
 
   return (
     <PagePane className="gap-5">
@@ -143,32 +117,56 @@ export default function RationMembersPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
-        <PageHeader
-          title={t("pages.rationMembers.title")}
-          subtitle={t("pages.rationMembers.subtitle", {
-            count: roster.length,
-          })}
-          center={<RationTabs />}
-        />
+        <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-white via-emerald-50/50 to-sky-50/60 p-4 shadow-[0_10px_40px_-24px_rgba(6,121,87,0.35)] sm:p-5 dark:border-primary/25 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none">
+          <div
+            className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-nav-accent/10 blur-3xl"
+            aria-hidden
+          />
+          <div className="relative">
+            <PageHeader
+              title={t("pages.rationMembers.title")}
+              subtitle={t("pages.rationMembers.subtitle", {
+                count: roster.length,
+              })}
+              center={<RationTabs />}
+            />
+          </div>
+        </div>
 
         <SearchFilterBar
           search={q}
           onSearchChange={setQ}
           searchPlaceholder={t("cc.searchPlaceholder")}
+          className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={
             <>
               <StatChip
                 label={t("daily.rosterStatAll")}
-                value={String(approved.length)}
-                accent
+                value={approved.length}
+                icon={<IconUsers className="h-3.5 w-3.5" />}
+                tone="teal"
+                active={status === "all" && !q.trim()}
+                onClick={clearAll}
               />
               <StatChip
                 label={t("daily.rosterStatActive")}
-                value={String(activeCount)}
+                value={activeCount}
+                icon={<IconUserCheck className="h-3.5 w-3.5" />}
+                tone="emerald"
+                active={status === "1"}
+                onClick={() => toggleStatus("1")}
               />
               <StatChip
                 label={t("daily.rosterStatInactive")}
-                value={String(inactiveCount)}
+                value={inactiveCount}
+                icon={<IconUserOff className="h-3.5 w-3.5" />}
+                tone="amber"
+                active={status === "0"}
+                onClick={() => toggleStatus("0")}
               />
             </>
           }
@@ -217,12 +215,7 @@ export default function RationMembersPage() {
           </div>
           <ClearFiltersButton
             disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              setWing("all");
-              setStatus("all");
-            }}
+            onClick={clearAll}
           />
         </SearchFilterBar>
 
@@ -236,6 +229,9 @@ export default function RationMembersPage() {
               <IconUsers className="h-3.5 w-3.5 text-neutral-400" />
               <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
                 {t("daily.rosterBoard")}
+              </span>
+              <span className="ml-auto text-[11px] tabular-nums text-neutral-400">
+                {roster.length}/{approved.length}
               </span>
             </div>
             <div className="overflow-x-auto">
@@ -255,42 +251,25 @@ export default function RationMembersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageItems.map((user) => {
-                    const bankReady = hasBank(user);
-                    return (
-                      <RosterRow
-                        key={user.id}
-                        user={user}
-                        showDates
-                        actions={
-                          <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 rounded-lg px-2.5"
-                              onClick={() => setViewUser(user)}
-                            >
-                              <IconEye className="h-3.5 w-3.5" />
-                              {t("common.view")}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={bankReady ? "outline" : "cta"}
-                              className="h-8 rounded-lg px-2.5"
-                              onClick={() => setBankUser(user)}
-                            >
-                              <IconBuildingBank className="h-3.5 w-3.5" />
-                              {bankReady
-                                ? t("ration.editMemberBankBtn")
-                                : t("ration.addMemberBank")}
-                            </Button>
-                          </div>
-                        }
-                      />
-                    );
-                  })}
+                  {pageItems.map((user) => (
+                    <RosterRow
+                      key={user.id}
+                      user={user}
+                      showDates
+                      actions={
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 rounded-xl px-2.5"
+                          onClick={() => setViewUser(user)}
+                        >
+                          <IconEye className="h-3.5 w-3.5" />
+                          {t("common.view")}
+                        </Button>
+                      }
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -319,7 +298,7 @@ export default function RationMembersPage() {
         {liveViewUser ? (
           <div className="space-y-4">
             <UserConfirmCard user={liveViewUser} />
-            <div className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-3.5 dark:border-neutral-700 dark:bg-neutral-900/60">
+            <div className="rounded-2xl border border-neutral-200 bg-gradient-to-br from-white via-emerald-50/40 to-sky-50/30 p-3.5 dark:border-neutral-700 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900">
               <p className="mb-2.5 text-sm font-semibold text-neutral-900 dark:text-white">
                 {t("ration.editMemberBank")}
               </p>
@@ -347,66 +326,6 @@ export default function RationMembersPage() {
               ) : (
                 <p className="text-sm text-neutral-500">{t("ration.noBankYet")}</p>
               )}
-              <Button
-                type="button"
-                size="sm"
-                variant="cta"
-                className="mt-3 rounded-lg"
-                onClick={() => {
-                  setViewUser(null);
-                  setBankUser(liveViewUser);
-                }}
-              >
-                <IconBuildingBank className="h-3.5 w-3.5" />
-                {hasBank(liveViewUser)
-                  ? t("ration.editMemberBankBtn")
-                  : t("ration.addMemberBank")}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={!!bankUser}
-        tone="default"
-        title={
-          bankUser && hasBank(bankUser)
-            ? t("ration.editMemberBankBtn")
-            : t("ration.addMemberBank")
-        }
-        body={t("ration.editMemberBankHint")}
-        confirmLabel={t("ration.saveMemberBank")}
-        panelClassName="max-w-[33.6rem]"
-        onCancel={() => setBankUser(null)}
-        onConfirm={saveBank}
-      >
-        {bankUser && bankForm ? (
-          <div className="space-y-4">
-            <UserConfirmCard user={bankUser} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(
-                [
-                  ["bank_name", t("cc.fields.bankName")],
-                  ["account_name", t("cc.fields.accountName")],
-                  ["account_number", t("cc.fields.accountNumber")],
-                  ["routing", t("cc.fields.routing")],
-                  ["branch", t("cc.fields.branch")],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key} className="space-y-1.5">
-                  <Label>{label}</Label>
-                  <Input
-                    value={bankForm[key]}
-                    onChange={(e) =>
-                      setBankForm((prev) =>
-                        prev ? { ...prev, [key]: e.target.value } : prev,
-                      )
-                    }
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-              ))}
             </div>
           </div>
         ) : null}
@@ -418,32 +337,48 @@ export default function RationMembersPage() {
 function StatChip({
   label,
   value,
-  accent,
+  icon,
+  tone,
+  active,
+  onClick,
 }: {
   label: string;
-  value: string;
-  accent?: boolean;
+  value: number;
+  icon: ReactNode;
+  tone: "teal" | "emerald" | "amber";
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const tones = {
+    teal: "border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100",
+    emerald:
+      "border-emerald-200/90 bg-emerald-50 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200",
+    amber:
+      "border-amber-200/90 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200",
+  }[tone];
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5",
-        accent
-          ? "border-primary/20 bg-primary/[0.08]"
-          : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-3 shadow-sm transition",
+        tones,
+        active
+          ? "border-black ring-1 ring-black brightness-95 dark:border-white dark:ring-white dark:brightness-110"
+          : "hover:brightness-[0.97] dark:hover:brightness-110",
       )}
     >
-      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
+      <span className="shrink-0 opacity-90" aria-hidden>
+        {icon}
+      </span>
+      <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wide">
         {label}
       </span>
-      <span
-        className={cn(
-          "text-base font-bold tabular-nums",
-          accent ? "text-primary" : "text-neutral-900 dark:text-white",
-        )}
-      >
+      <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
         {value}
       </span>
-    </div>
+    </button>
   );
 }

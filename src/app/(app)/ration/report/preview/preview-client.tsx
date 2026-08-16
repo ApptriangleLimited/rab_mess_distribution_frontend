@@ -10,7 +10,6 @@ import { FrTransferLetterPrint } from "@/components/ration/fr-transfer-letter-pr
 import { StaffPayoutPrint } from "@/components/ration/staff-payout-print";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
-import { RATION_REPORT_META } from "@/lib/constants";
 import {
   downloadFrTransferPdf,
   downloadStaffPayoutPdf,
@@ -18,7 +17,7 @@ import {
 import { formatMonthLong, parseMonthInput, todayISO } from "@/lib/date";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
-  buildFrTransferSheetsPerUser,
+  buildFrTransferSheetsByMemberBank,
   buildRationStaffLines,
 } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
@@ -55,10 +54,9 @@ export default function RationReportPreviewClient() {
   const senderId = searchParams.get("sender") ?? "";
   const isFr = tag === "FR";
 
-  const staffSheet = useMemo(() => {
-    if (!tag || !senderId || isFr) return null;
-    const sheets = buildRationStaffLines(month, senderId, tag);
-    return sheets[0] ?? null;
+  const staffSheets = useMemo(() => {
+    if (!tag || !senderId || isFr) return [];
+    return buildRationStaffLines(month, senderId, tag);
   }, [
     state.assignments,
     state.users,
@@ -72,7 +70,7 @@ export default function RationReportPreviewClient() {
 
   const frSheets = useMemo(() => {
     if (!isFr || !senderId) return [];
-    return buildFrTransferSheetsPerUser(month, senderId, todayISO());
+    return buildFrTransferSheetsByMemberBank(month, senderId, todayISO());
   }, [
     state.assignments,
     state.users,
@@ -85,12 +83,6 @@ export default function RationReportPreviewClient() {
 
   const sender = state.senders.find((s) => s.id === senderId);
   const monthLabel = formatMonthLong(month);
-  const subject =
-    tag && sender && !isFr
-      ? RATION_REPORT_META.subjectTagBill
-          .replace("{monthLabel}", monthLabel)
-          .replace("{bank}", sender.bank_name || sender.label)
-      : undefined;
 
   function onDownload() {
     if (frSheets.length > 0) {
@@ -100,14 +92,10 @@ export default function RationReportPreviewClient() {
       );
       return;
     }
-    if (!staffSheet || !tag) return;
+    if (!staffSheets.length || !tag) return;
     downloadStaffPayoutPdf(
-      staffSheet,
-      subject ??
-        RATION_REPORT_META.subjectTagBill
-          .replace("{monthLabel}", monthLabel)
-          .replace("{bank}", staffSheet.sender.bank_name || staffSheet.sender.label),
-      `ration-staff-${staffSheet.month}-${tag}-${staffSheet.sender.id}.pdf`,
+      staffSheets,
+      `ration-staff-${month}-${tag}-${senderId}.pdf`,
     );
   }
 
@@ -133,10 +121,11 @@ export default function RationReportPreviewClient() {
   const invalid = !tag || !senderId || !sender;
   const empty = isFr
     ? frSheets.length === 0
-    : !staffSheet || staffSheet.lines.length === 0;
+    : staffSheets.length === 0 ||
+      staffSheets.every((s) => s.lines.length === 0);
   const canAct = isFr
     ? frSheets.length > 0
-    : Boolean(staffSheet?.lines.length);
+    : staffSheets.some((s) => s.lines.length > 0);
 
   return (
     <PagePane className="gap-4">
@@ -147,8 +136,8 @@ export default function RationReportPreviewClient() {
             invalid
               ? t("ration.reportPreviewHint")
               : isFr
-                ? `FR · ${monthLabel} · ${sender!.label}`
-                : `${tagLabel(tag!, locale)} · ${monthLabel} · ${sender!.label}`
+                ? `FR · ${monthLabel} · ${sender!.label} · ${frSheets.length} bank letter(s)`
+                : `${tagLabel(tag!, locale)} · ${monthLabel} · ${sender!.label} · ${staffSheets.length} bank letter(s)`
           }
           actions={
             <>
@@ -196,24 +185,23 @@ export default function RationReportPreviewClient() {
             data-print-stack="true"
             className="flex w-max min-w-full flex-col gap-6"
           >
-            {frSheets.map((sheet) => {
-              const user = sheet.lines[0]?.user;
+            {frSheets.map((sheet, i) => {
+              const bank = sheet.lines[0]?.user.bank_name || "—";
               return (
                 <FrTransferLetterPrint
-                  key={user?.id ?? sheet.lines[0]?.refNo}
+                  key={`${bank}-${i}`}
                   sheet={sheet}
-                  transferToBank={user?.bank_name}
+                  transferToBank={bank}
                 />
               );
             })}
           </div>
         </div>
-      ) : staffSheet ? (
+      ) : staffSheets.length > 0 ? (
         <StaffPayoutPrint
           ref={letterRef}
-          sheets={[staffSheet]}
+          sheets={staffSheets}
           preview
-          subject={subject}
         />
       ) : null}
     </PagePane>

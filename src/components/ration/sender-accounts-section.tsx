@@ -35,15 +35,19 @@ const emptyForm = (): SenderInput => ({
   mapped_tags: [],
 });
 
-/** Org payout bank accounts — Settings left pane (ration). */
-export function SenderAccountsSection() {
+/** Org payout bank accounts — Settings (ration). */
+export function SenderAccountsSection({
+  static: staticPanel = false,
+}: {
+  static?: boolean;
+} = {}) {
   const t = useT();
   const state = useStore();
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<SenderInput>(emptyForm());
   const [showForm, setShowForm] = useState(false);
-  const [sectionOpen, setSectionOpen] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(staticPanel);
   const [deleteTarget, setDeleteTarget] = useState<SenderAccount | null>(null);
 
   function startCreate() {
@@ -99,8 +103,9 @@ export function SenderAccountsSection() {
       icon={IconBuildingBank}
       title={t("pages.senders.title")}
       hint={t("pages.senders.subtitle", { count: state.senders.length })}
-      open={sectionOpen}
-      onOpenChange={setSectionOpen}
+      open={staticPanel ? true : sectionOpen}
+      onOpenChange={staticPanel ? undefined : setSectionOpen}
+      static={staticPanel}
       badge={
         <span className="rounded-md bg-neutral-900/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-neutral-500 dark:bg-white/10">
           {state.senders.length}

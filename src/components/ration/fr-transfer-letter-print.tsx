@@ -36,8 +36,9 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
       transferToBank ||
       sheet.lines[0]?.user.bank_name ||
       "—";
-    const subject = RATION_REPORT_META.subjectFreshMoneyTransfer
-      .replace("{monthLabel}", monthBill)
+    const monthLabel = formatMonthLong(sheet.month);
+    const subject = RATION_REPORT_META.subjectTagBill
+      .replace("{monthLabel}", monthLabel)
       .replace("{bank}", memberBank);
     const words = amountToWordsEn(sheet.total);
 

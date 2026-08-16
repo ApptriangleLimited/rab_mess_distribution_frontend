@@ -1,20 +1,21 @@
 "use client";
 
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconChartBar,
+  IconClipboardList,
   IconFileReport,
   IconLayoutDashboard,
   IconSettings,
   IconTags,
   IconUsers,
 } from "@tabler/icons-react";
+import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
 import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n";
 import type { Icon } from "@tabler/icons-react";
 import { useSession } from "@/hooks/use-session";
-import { cn } from "@/lib/utils";
 
 type Tab = {
   href: string;
@@ -27,7 +28,14 @@ const DASHBOARD_TAB: Tab = {
   href: "/admin",
   labelKey: "nav.adminDashboard",
   icon: IconLayoutDashboard,
-  match: (path) => path === "/admin" || path.startsWith("/admin/"),
+  match: (path) => path === "/admin",
+};
+
+const STATE_REPORTS_TAB: Tab = {
+  href: "/admin/state-reports",
+  labelKey: "nav.stateReports",
+  icon: IconClipboardList,
+  match: (path) => path.startsWith("/admin/state-reports"),
 };
 
 const BASE_TABS: Tab[] = [
@@ -67,51 +75,39 @@ const BASE_TABS: Tab[] = [
   },
 ];
 
-/** Ration strip. Admin auto-gets Dashboard tab first. */
+/** Ration strip. Admin auto-gets Dashboard + State Reports tabs first. */
 export function RationTabs({
   className,
   withDashboard,
+  after,
 }: {
   className?: string;
   /** Force dashboard tab; default = admin session. */
   withDashboard?: boolean;
+  /** Extra controls after main tabs (Settings section tabs). */
+  after?: ReactNode;
 }) {
   const pathname = usePathname();
   const t = useT();
   const { session } = useSession();
   const showDashboard = withDashboard ?? session?.role === "admin";
-  const tabs = showDashboard ? [DASHBOARD_TAB, ...BASE_TABS] : BASE_TABS;
+  const tabs = showDashboard
+    ? [DASHBOARD_TAB, STATE_REPORTS_TAB, ...BASE_TABS]
+    : BASE_TABS;
 
   return (
-    <nav
-      className={cn(
-        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-700 dark:bg-neutral-900",
-        className,
-      )}
-      aria-label={
-        showDashboard ? t("nav.adminTabs") : t("nav.rationTabs")
-      }
-    >
-      {tabs.map((tab) => {
-        const Icon = tab.icon;
-        const active = tab.match(pathname);
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition",
-              active
-                ? "bg-white text-neutral-900 shadow-sm ring-1 ring-black/[0.04] dark:bg-neutral-800 dark:text-white dark:ring-white/10"
-                : "text-neutral-500 hover:bg-white/70 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800/80 dark:hover:text-neutral-100",
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="whitespace-nowrap">{t(tab.labelKey)}</span>
-          </Link>
-        );
-      })}
-    </nav>
+    <RoleNavTabs
+      className={className}
+      ariaLabel={showDashboard ? t("nav.adminTabs") : t("nav.rationTabs")}
+      layoutId="ration-role-tabs-pill"
+      after={after}
+      tabs={tabs.map((tab) => ({
+        href: tab.href,
+        label: t(tab.labelKey),
+        icon: tab.icon,
+        active: tab.match(pathname),
+      }))}
+    />
   );
 }
 

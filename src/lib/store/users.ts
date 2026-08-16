@@ -5,16 +5,19 @@ import type {
   ApprovalStatus,
   DocumentMeta,
   EmergencyContact,
+  MemberType,
   User,
   UserStatus,
 } from "@/lib/types";
 
 export type UserInput = {
   name: string;
+  personal_id: string;
   rab_id: string;
   rfid: string;
   rank: string;
   wing: string;
+  member_type: MemberType;
   dropdown_no: string;
   phone: string;
   documents: DocumentMeta[];
@@ -98,6 +101,9 @@ export function createUser(
     ...input,
     name: input.name.trim(),
     rab_id: input.rab_id.trim(),
+    member_type: input.member_type || "permanent",
+    rank: input.member_type === "new" ? "" : input.rank,
+    wing: input.member_type === "new" ? "" : input.wing,
     emergency_contacts: cleanEmergencyContacts(input.emergency_contacts ?? []),
     status: input.status,
     approval_status,
@@ -116,6 +122,9 @@ export function updateUser(id: string, input: UserInput): User | null {
     ...input,
     name: input.name.trim(),
     rab_id: input.rab_id.trim(),
+    member_type: input.member_type || existing.member_type || "permanent",
+    rank: input.member_type === "new" ? "" : input.rank,
+    wing: input.member_type === "new" ? "" : input.wing,
     emergency_contacts: cleanEmergencyContacts(input.emergency_contacts ?? []),
     updated_at: nowISO(),
   };
@@ -224,7 +233,7 @@ export function filterUsers(users: User[], filters: UserFilters) {
         return false;
       }
       if (!q) return true;
-      const hay = [u.name, u.rab_id, u.rfid, u.phone, u.dropdown_no]
+      const hay = [u.name, u.personal_id, u.rab_id, u.rfid, u.phone, u.dropdown_no]
         .join(" ")
         .toLowerCase();
       return hay.includes(q);

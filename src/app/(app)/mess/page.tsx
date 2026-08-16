@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function MessIndex() {
-  redirect("/mess/ledger");
+  redirect("/mess/today");
 }

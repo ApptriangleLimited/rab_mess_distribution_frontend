@@ -49,12 +49,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
-  if (!ready || !session) {
+  if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
         {t("common.loadingShell")}
       </div>
     );
+  }
+
+  if (!session) {
+    return null;
   }
 
   const hideSidebar =

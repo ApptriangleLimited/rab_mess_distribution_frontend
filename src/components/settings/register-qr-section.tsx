@@ -13,7 +13,11 @@ import { useToast } from "@/components/shared/toast-provider";
 import { useT } from "@/i18n/provider";
 
 /** Settings QR → public /register URL for member scan. */
-export function RegisterQrSection() {
+export function RegisterQrSection({
+  static: staticPanel = false,
+}: {
+  static?: boolean;
+} = {}) {
   const t = useT();
   const { toast } = useToast();
   const [url, setUrl] = useState("");
@@ -85,6 +89,8 @@ export function RegisterQrSection() {
       icon={IconQrcode}
       title={t("settings.registerQr")}
       hint={t("settings.registerQrHint")}
+      static={staticPanel}
+      defaultOpen={staticPanel}
       headerActions={
         <div className="flex shrink-0 gap-1.5">
           <Button

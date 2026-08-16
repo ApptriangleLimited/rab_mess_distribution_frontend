@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { IconUsers } from "@tabler/icons-react";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ListPagination } from "@/components/shared/list-pagination";
@@ -10,6 +10,7 @@ import {
   searchFilterFieldClass,
 } from "@/components/shared/search-filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import {
   Select,
   SelectContent,
@@ -36,10 +37,16 @@ type Props = {
   rows: AllConsumeRow[];
   month: string;
   onMonthChange: (month: string) => void;
+  tiles?: ReactNode;
 };
 
 /** Month rollup — all tags combined. */
-export function AllConsumePanel({ rows, month, onMonthChange }: Props) {
+export function AllConsumePanel({
+  rows,
+  month,
+  onMonthChange,
+  tiles,
+}: Props) {
   const t = useT();
   const defaultMonth = monthKey();
   const [q, setQ] = useState("");
@@ -69,6 +76,11 @@ export function AllConsumePanel({ rows, month, onMonthChange }: Props) {
     [members],
   );
 
+  const filteredAllowance = useMemo(
+    () => members.reduce((s, r) => s + r.allowanceDays, 0),
+    [members],
+  );
+
   const resetKey = useMemo(
     () => `${month}|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
     [month, q, rank, wing, members],
@@ -95,6 +107,8 @@ export function AllConsumePanel({ rows, month, onMonthChange }: Props) {
         search={q}
         onSearchChange={setQ}
         searchPlaceholder={t("consume.searchPlaceholder")}
+        className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
+        tiles={tiles}
       >
         <MonthNav month={month} onChange={onMonthChange} />
         <div className="w-[9.5rem] shrink-0">
@@ -152,38 +166,37 @@ export function AllConsumePanel({ rows, month, onMonthChange }: Props) {
       ) : members.length === 0 ? (
         <EmptyState title={t("common.noResults")} />
       ) : (
-        <section className="overflow-hidden rounded-xl border border-neutral-200/90 dark:border-neutral-700">
-          <div className="flex items-center gap-2 border-b border-neutral-100 bg-neutral-50/80 px-4 py-2.5 dark:border-neutral-800 dark:bg-neutral-900/60">
-            <IconUsers className="h-4 w-4 text-neutral-400" />
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
+          <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-2.5 dark:border-neutral-800">
+            <IconUsers className="h-3.5 w-3.5 text-neutral-400" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
               {t("consume.perUser")}
             </span>
-            <span className="ml-auto font-mono text-xs tabular-nums text-neutral-400">
+            <span className="ml-auto text-[11px] tabular-nums text-neutral-400">
               {members.length}/{rows.length}
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-base">
-              <thead className="border-b border-neutral-100 text-xs font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-neutral-800">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
                 <tr>
-                  <th className="w-12 px-3 py-3 text-center">
+                  <th className="w-12 px-4 py-3 text-center">
                     {t("consume.colSl")}
                   </th>
-                  <th className="px-3 py-3">{t("consume.colId")}</th>
-                  <th className="px-3 py-3">{t("consume.colRank")}</th>
-                  <th className="min-w-[9.5rem] px-3 py-3">
+                  <th className="min-w-[12rem] px-4 py-3">
                     {t("consume.colName")}
                   </th>
-                  <th className="px-3 py-3 text-center">
+                  <th className="px-4 py-3">{t("consume.colRank")}</th>
+                  <th className="px-4 py-3 text-center">
                     {t("consume.totalDays")}
                   </th>
-                  <th className="px-3 py-3 text-center">
+                  <th className="px-4 py-3 text-center">
                     {t("consume.allowanceDays")}
                   </th>
-                  <th className="px-3 py-3 text-right">
+                  <th className="px-4 py-3 text-right">
                     {t("consume.colGrandTotal")}
                   </th>
-                  <th className="min-w-[6rem] px-3 py-3">
+                  <th className="min-w-[6rem] px-4 py-3">
                     {t("consume.colRemarks")}
                   </th>
                 </tr>
@@ -192,51 +205,58 @@ export function AllConsumePanel({ rows, month, onMonthChange }: Props) {
                 {pageItems.map((row, i) => (
                   <tr
                     key={row.user.id}
-                    className="border-t border-neutral-100/90 transition-colors hover:bg-primary/[0.03] dark:border-neutral-800/80 dark:hover:bg-primary/5"
+                    className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
                   >
-                    <td className="px-3 py-2.5 text-center font-mono text-xs tabular-nums text-neutral-400">
+                    <td className="px-4 py-3 text-center tabular-nums text-neutral-400">
                       {(page - 1) * pageSize + i + 1}
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-neutral-600 dark:text-neutral-300">
-                      {row.user.rab_id}
+                    <td className="px-4 py-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <UserAvatar name={row.user.name} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
+                            {row.user.name}
+                          </p>
+                          <p className="font-mono text-xs text-neutral-500">
+                            {row.user.rab_id}
+                          </p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-3 py-2.5 text-sm text-neutral-700 dark:text-neutral-300">
+                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">
                       {row.user.rank || "—"}
                     </td>
-                    <td className="px-3 py-2.5 font-medium text-neutral-900 dark:text-white">
-                      {row.user.name}
-                    </td>
-                    <td className="px-3 py-2.5 text-center font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
+                    <td className="px-4 py-3 text-center font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
                       {row.totalDays}
                     </td>
-                    <td className="px-3 py-2.5 text-center font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
+                    <td className="px-4 py-3 text-center font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
                       {row.allowanceDays}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono text-base font-semibold tabular-nums text-primary">
+                    <td className="px-4 py-3 text-right font-mono text-sm font-semibold tabular-nums text-primary">
                       {formatBdt(row.amount)}
                     </td>
-                    <td className="px-3 py-2.5 text-sm text-neutral-500">—</td>
+                    <td className="px-4 py-3 text-sm text-neutral-400">—</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-neutral-200 bg-neutral-50/90 dark:border-neutral-700 dark:bg-neutral-900/70">
+                <tr className="border-t border-primary/15 bg-gradient-to-r from-emerald-50/80 via-white to-sky-50/50 dark:border-primary/25 dark:from-primary/10 dark:via-neutral-950 dark:to-neutral-950">
                   <td
-                    colSpan={4}
-                    className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400"
+                    colSpan={3}
+                    className="px-4 py-3.5 text-right text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400"
                   >
                     {t("consume.billTotal")}
                   </td>
-                  <td className="px-3 py-3 text-center font-mono tabular-nums text-neutral-600 dark:text-neutral-300">
+                  <td className="px-4 py-3.5 text-center font-mono font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
                     {filteredDays}
                   </td>
-                  <td className="px-3 py-3 text-center font-mono tabular-nums text-neutral-600 dark:text-neutral-300">
-                    {members.reduce((s, r) => s + r.allowanceDays, 0)}
+                  <td className="px-4 py-3.5 text-center font-mono font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
+                    {filteredAllowance}
                   </td>
-                  <td className="px-3 py-3 text-right font-mono text-lg font-semibold tabular-nums text-primary">
+                  <td className="px-4 py-3.5 text-right font-mono text-lg font-bold tabular-nums text-primary">
                     {formatBdt(filteredTotal)}
                   </td>
-                  <td className="px-3 py-3" />
+                  <td className="px-4 py-3.5" />
                 </tr>
               </tfoot>
             </table>

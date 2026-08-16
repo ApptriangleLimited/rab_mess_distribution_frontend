@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import {
@@ -22,6 +23,9 @@ import { cn } from "@/lib/utils";
 type Props = {
   value: UserFilters;
   onChange: (next: UserFilters) => void;
+  /** Optional stat / quick-filter chips under (or beside) filters. */
+  tiles?: ReactNode;
+  wrapTiles?: boolean;
 };
 
 const EMPTY_FILTERS: UserFilters = {
@@ -65,7 +69,12 @@ export function MemberDateFilter({
   );
 }
 
-export function UserFiltersBar({ value, onChange }: Props) {
+export function UserFiltersBar({
+  value,
+  onChange,
+  tiles,
+  wrapTiles = false,
+}: Props) {
   const t = useT();
 
   function patch(partial: Partial<UserFilters>) {
@@ -87,6 +96,10 @@ export function UserFiltersBar({ value, onChange }: Props) {
       search={value.q ?? ""}
       onSearchChange={(q) => patch({ q })}
       searchPlaceholder={t("cc.searchPlaceholder")}
+      filtersActive={filtersActive}
+      tiles={tiles}
+      wrapTiles={wrapTiles}
+      className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
     >
       <div className="w-[9.5rem] shrink-0">
         <Select

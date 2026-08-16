@@ -130,6 +130,11 @@ export function UserDetail({ user }: { user: User }) {
               <p className="truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
                 {user.name}
               </p>
+              {user.personal_id ? (
+                <p className="mt-0.5 font-mono text-xs tabular-nums text-neutral-500">
+                  {t("cc.fields.personalId")}: {user.personal_id}
+                </p>
+              ) : null}
               <p className="mt-1 font-mono text-xs tabular-nums text-neutral-500">
                 {user.rab_id}
                 {meta ? (
@@ -163,6 +168,12 @@ export function UserDetail({ user }: { user: User }) {
         </div>
 
         <dl className="grid gap-2.5 p-5 sm:grid-cols-2 lg:grid-cols-3">
+          <DetailField
+            icon={IconId}
+            label={t("cc.fields.personalId")}
+            value={user.personal_id}
+            mono
+          />
           <DetailField
             icon={IconShield}
             label={t("cc.fields.rank")}
