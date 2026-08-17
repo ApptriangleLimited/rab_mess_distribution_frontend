@@ -413,7 +413,7 @@ function ReportDetail({
         />
         <MiniStat
           label={t("stateReport.statTags")}
-          value={tagEntries.reduce((n, [, c]) => n + c, 0)}
+          value={tagEntries.reduce<number>((n, [, c]) => n + (c ?? 0), 0)}
         />
       </div>
 

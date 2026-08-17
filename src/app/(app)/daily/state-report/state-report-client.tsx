@@ -109,7 +109,7 @@ export default function StateReportClient() {
   );
 
   const tagTotal = useMemo(
-    () => tagEntries.reduce((n, [, c]) => n + c, 0),
+    () => tagEntries.reduce<number>((n, [, c]) => n + (c ?? 0), 0),
     [tagEntries],
   );
 
@@ -413,7 +413,7 @@ export default function StateReportClient() {
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {history.map((r) => {
-              const tagSum = Object.values(r.totals.by_tag).reduce(
+              const tagSum = Object.values(r.totals.by_tag).reduce<number>(
                 (n, c) => n + (c ?? 0),
                 0,
               );
