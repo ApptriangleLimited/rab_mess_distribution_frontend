@@ -8,6 +8,9 @@ import {
   IconFileReport,
   IconClipboardList,
   IconSoup,
+  IconCalendarEvent,
+  IconClockHour4,
+  IconUserPlus,
   IconSettings,
   type Icon,
 } from "@tabler/icons-react";
@@ -43,16 +46,40 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   mess: [
     {
+      href: "/mess/ledger",
+      labelKey: "nav.messLedger",
+      icon: IconTags,
+      chip: "teal",
+    },
+    {
       href: "/mess/today",
       labelKey: "nav.todaysMess",
       icon: IconSoup,
       chip: "orange",
     },
     {
-      href: "/mess/ledger",
-      labelKey: "nav.messLedger",
-      icon: IconTags,
-      chip: "teal",
+      href: "/mess/shifts",
+      labelKey: "nav.shifts",
+      icon: IconClockHour4,
+      chip: "purple",
+    },
+    {
+      href: "/mess/planning",
+      labelKey: "nav.mealPlanning",
+      icon: IconCalendarEvent,
+      chip: "amber",
+    },
+    {
+      href: "/mess/reports",
+      labelKey: "nav.mealReports",
+      icon: IconFileReport,
+      chip: "indigo",
+    },
+    {
+      href: "/mess/guests",
+      labelKey: "nav.guestMeals",
+      icon: IconUserPlus,
+      chip: "red",
     },
   ],
   consume: [
@@ -132,6 +159,24 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.consumeSummary",
       icon: IconFileReport,
       chip: "indigo",
+    },
+    {
+      href: "/mess/planning",
+      labelKey: "nav.mealPlanning",
+      icon: IconCalendarEvent,
+      chip: "amber",
+    },
+    {
+      href: "/mess/reports",
+      labelKey: "nav.mealReports",
+      icon: IconFileReport,
+      chip: "indigo",
+    },
+    {
+      href: "/mess/guests",
+      labelKey: "nav.guestMeals",
+      icon: IconUserPlus,
+      chip: "red",
     },
   ],
 };

@@ -9,17 +9,23 @@ import {
   slicePage,
 } from "@/lib/pagination";
 
-/** Client pagination — resets to page 1 when `resetKey` changes. */
+/** Client pagination — resets to page 1 when `resetKey` or page size changes. */
 export function usePagination<T>(
   items: T[],
   resetKey?: string | number,
-  pageSize = PAGE_SIZE,
+  initialPageSize = PAGE_SIZE,
 ) {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(initialPageSize);
 
   useEffect(() => {
     setPage(1);
   }, [resetKey]);
+
+  function setPageSize(next: number) {
+    setPageSizeState(next);
+    setPage(1);
+  }
 
   const total = items.length;
   const totalPages = pageCount(total, pageSize);
@@ -36,6 +42,7 @@ export function usePagination<T>(
     page: safePage,
     setPage,
     pageSize,
+    setPageSize,
     total,
     totalPages,
     pageItems,

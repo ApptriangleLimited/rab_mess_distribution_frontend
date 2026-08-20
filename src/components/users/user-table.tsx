@@ -40,12 +40,23 @@ const approvalClass: Record<ApprovalStatus, string> = {
     "border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
 };
 
+export type UserTablePagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+};
+
 export function UserTable({
   users,
+  pagination,
   detailHref = (id: string) => `/cc/users/${id}`,
   onEmptyCreateHref = "/cc/users/new",
 }: {
   users: User[];
+  /** When set, `users` is already one page — no client slice. */
+  pagination?: UserTablePagination;
   detailHref?: (id: string) => string;
   onEmptyCreateHref?: string;
 }) {
@@ -55,17 +66,28 @@ export function UserTable({
     () => users.map((u) => u.id).join("|"),
     [users],
   );
-  const {
-    page,
-    setPage,
-    totalPages,
-    pageItems,
-    total,
-    from,
-    to,
-  } = usePagination(users, resetKey);
+  const client = usePagination(users, resetKey);
 
-  if (users.length === 0) {
+  const page = pagination?.page ?? client.page;
+  const pageSize = pagination?.pageSize ?? client.pageSize;
+  const total = pagination?.total ?? client.total;
+  const totalPages =
+    pagination != null
+      ? Math.max(1, Math.ceil(total / pageSize) || 1)
+      : client.totalPages;
+  const pageItems = pagination ? users : client.pageItems;
+  const from =
+    pagination != null
+      ? total === 0
+        ? 0
+        : (page - 1) * pageSize + 1
+      : client.from;
+  const to =
+    pagination != null ? Math.min(page * pageSize, total) : client.to;
+  const setPage = pagination?.onPageChange ?? client.setPage;
+  const setPageSize = pagination?.onPageSizeChange ?? client.setPageSize;
+
+  if (total === 0) {
     return (
       <EmptyState
         title={t("cc.empty")}
@@ -295,6 +317,8 @@ export function UserTable({
         from={from}
         to={to}
         onPageChange={setPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
         className="bg-gradient-to-r from-neutral-50/80 to-teal-50/30 dark:from-neutral-900 dark:to-neutral-900"
       />
     </div>

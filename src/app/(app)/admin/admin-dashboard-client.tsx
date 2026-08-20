@@ -5,6 +5,9 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconBuildingBank,
+  IconCalendarEvent,
+  IconCircleCheck,
+  IconCopy,
   IconSoup,
   IconTags,
   IconUserCheck,
@@ -19,6 +22,9 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Legend,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -32,12 +38,16 @@ import { RationTabs } from "@/components/layout/ration-tabs";
 import { useStore } from "@/hooks/use-store";
 import {
   formatDateDisplay,
+  monthDatesThroughToday,
   monthKey,
   nextISODate,
   recentMonthDates,
   todayISO,
 } from "@/lib/date";
 import { buildMonthLedger } from "@/lib/reports";
+import { listGuestMeals } from "@/lib/store/guest-meals";
+import { listMealAssigns } from "@/lib/store/meal-assigns";
+import { listMealShifts, mealShiftLabel } from "@/lib/store/meal-shifts";
 import {
   getMessEaters,
   getProjectedMessEaters,
@@ -75,6 +85,13 @@ const TAG_COLORS = [
   "#ea580c",
   "#0891b2",
   "#be123c",
+];
+
+const MEAL_SHIFT_COLORS = [
+  "#0284c7",
+  "#d97706",
+  "#0d9488",
+  "#7c3aed",
 ];
 
 const RANK_COLORS = [
@@ -244,6 +261,54 @@ export default function AdminDashboardClient() {
       0,
     );
 
+    const shifts = listMealShifts();
+    const shiftCount = Math.max(shifts.length, 1);
+    const monthDays = monthDatesThroughToday();
+    const monthFrom = monthDays[0] ?? today;
+    const assigns = listMealAssigns();
+    const guests = listGuestMeals();
+    const inMonth = (date: string) => date >= monthFrom && date <= today;
+
+    const mealConsume = assigns.filter(
+      (a) => inMonth(a.date) && a.status === 1,
+    ).length;
+    const mealDuplicate = assigns.filter(
+      (a) => inMonth(a.date) && a.status === 2,
+    ).length;
+    const mealGuests = guests.filter((g) => inMonth(g.date)).length;
+    let mealPlanned = 0;
+    for (const date of monthDays) {
+      mealPlanned += getMessEaters(date).length * shiftCount;
+    }
+
+    const mealDaySeries = recentMonthDates(14)
+      .slice()
+      .reverse()
+      .map((date) => {
+        const eaters = getMessEaters(date).length;
+        return {
+          date,
+          label: formatDateDisplay(date).slice(0, 6),
+          consume: assigns.filter((a) => a.date === date && a.status === 1)
+            .length,
+          duplicate: assigns.filter((a) => a.date === date && a.status === 2)
+            .length,
+          guests: guests.filter((g) => g.date === date).length,
+          planned: eaters * shiftCount,
+        };
+      });
+
+    const mealShiftPie = shifts
+      .map((shift, i) => ({
+        key: shift.id,
+        name: mealShiftLabel(shift.id, shift.name, t),
+        value: assigns.filter(
+          (a) => inMonth(a.date) && a.status === 1 && a.shift_id === shift.id,
+        ).length,
+        fill: MEAL_SHIFT_COLORS[i % MEAL_SHIFT_COLORS.length],
+      }))
+      .filter((row) => row.value > 0);
+
     return {
       accepted: accepted.length,
       pending,
@@ -266,6 +331,12 @@ export default function AdminDashboardClient() {
       tagBars,
       daySeries,
       liveRates,
+      mealPlanned,
+      mealConsume,
+      mealDuplicate,
+      mealGuests,
+      mealDaySeries,
+      mealShiftPie,
     };
   }, [
     state.users,
@@ -273,6 +344,9 @@ export default function AdminDashboardClient() {
     state.senders,
     state.rates,
     state.boro_khana_dates,
+    state.meal_assigns,
+    state.guest_meals,
+    state.meal_shifts,
     month,
     today,
     tomorrow,
@@ -391,6 +465,187 @@ export default function AdminDashboardClient() {
               carried: stats.messTomorrowCarried,
             })}
           </p>
+        </div>
+
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              href: "/mess/reports",
+              label: t("pages.adminDashboard.meals.planned"),
+              hint: t("pages.adminDashboard.meals.plannedHint"),
+              value: stats.mealPlanned,
+              icon: IconCalendarEvent,
+              tone: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
+            },
+            {
+              href: "/mess/reports?status=1",
+              label: t("pages.adminDashboard.meals.consume"),
+              hint: t("pages.adminDashboard.meals.consumeHint"),
+              value: stats.mealConsume,
+              icon: IconCircleCheck,
+              tone: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+            },
+            {
+              href: "/mess/reports?status=2",
+              label: t("pages.adminDashboard.meals.duplicate"),
+              hint: t("pages.adminDashboard.meals.duplicateHint"),
+              value: stats.mealDuplicate,
+              icon: IconCopy,
+              tone: "bg-rose-500/12 text-rose-700 dark:text-rose-300",
+            },
+            {
+              href: "/mess/guests",
+              label: t("pages.adminDashboard.meals.guests"),
+              hint: t("pages.adminDashboard.meals.guestsHint"),
+              value: stats.mealGuests,
+              icon: IconUserPlus,
+              tone: "bg-amber-500/12 text-amber-800 dark:text-amber-300",
+            },
+          ].map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={card.href}
+                href={card.href}
+                className="rounded-2xl border border-neutral-200 bg-white p-3.5 transition hover:border-primary/30 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={cn(
+                      "inline-flex h-8 w-8 items-center justify-center rounded-xl",
+                      card.tone,
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="text-2xl font-semibold tabular-nums tracking-tight text-neutral-900 dark:text-white">
+                    {card.value}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                  {card.label}
+                </p>
+                <p className="text-[10px] text-neutral-400">{card.hint}</p>
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <ChartCard
+            title={t("pages.adminDashboard.meals.series")}
+            subtitle={t("pages.adminDashboard.meals.seriesHint")}
+          >
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={stats.mealDaySeries}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: "1px solid #e5e5e5",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    dataKey="consume"
+                    name={t("pages.adminDashboard.meals.consumeKey")}
+                    fill="#059669"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={14}
+                  />
+                  <Bar
+                    dataKey="duplicate"
+                    name={t("pages.adminDashboard.meals.duplicateKey")}
+                    fill="#e11d48"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={14}
+                  />
+                  <Bar
+                    dataKey="guests"
+                    name={t("pages.adminDashboard.meals.guestKey")}
+                    fill="#d97706"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={14}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="planned"
+                    name={t("pages.adminDashboard.meals.plannedKey")}
+                    stroke="#0284c7"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+
+          <ChartCard
+            title={t("pages.adminDashboard.meals.byShift")}
+            subtitle={t("pages.adminDashboard.meals.byShiftHint")}
+          >
+            {stats.mealShiftPie.length === 0 ? (
+              <p className="py-16 text-center text-sm text-neutral-400">
+                {t("pages.adminDashboard.charts.empty")}
+              </p>
+            ) : (
+              <div className="flex h-[280px] flex-col sm:flex-row sm:items-center">
+                <div className="h-[200px] w-full sm:h-full sm:w-1/2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.mealShiftPie}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={58}
+                        outerRadius={86}
+                        paddingAngle={3}
+                        strokeWidth={0}
+                      >
+                        {stats.mealShiftPie.map((entry) => (
+                          <Cell key={entry.key} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => [String(value ?? 0), ""]}
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #e5e5e5",
+                          fontSize: 12,
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="flex flex-wrap gap-2 px-2 pb-2 sm:w-1/2 sm:flex-col sm:gap-2.5 sm:pb-0">
+                  {stats.mealShiftPie.map((row) => (
+                    <li
+                      key={row.key}
+                      className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: row.fill }}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                      <span className="font-semibold tabular-nums text-neutral-900 dark:text-white">
+                        {row.value}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </ChartCard>
         </div>
 
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">

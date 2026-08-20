@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -18,18 +18,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ROLE_HOMES, VISIBLE_ROLE_KEYS } from "@/lib/constants";
+import {
+  ROLE_HOMES,
+  ROLE_KEYS,
+  REMEMBER_EMAIL_KEY,
+  SEED_STAFF_EMAIL,
+  SEED_STAFF_PASSWORD,
+  VISIBLE_ROLE_KEYS,
+} from "@/lib/constants";
 import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/shared/toast-provider";
 import { useI18n, useT } from "@/i18n/provider";
 import { roleLabel } from "@/i18n";
+import { ApiClientError } from "@/lib/api/client";
+import { loginStaff } from "@/lib/api/auth";
+import { isApiEnabled } from "@/lib/api/mode";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 
-const ROLE_META: Record<
-  Role,
-  { icon: Icon; accent: string; chip: string }
-> = {
+function isRole(value: string): value is Role {
+  return (ROLE_KEYS as readonly string[]).includes(value);
+}
+
+const ROLE_META: Record<Role, { icon: Icon; accent: string; chip: string }> = {
   cc: {
     icon: IconUsers,
     accent: "from-sky-500/20 to-sky-600/5",
@@ -69,25 +80,107 @@ export default function LoginPage() {
   const t = useT();
   const { locale } = useI18n();
   const reduceMotion = useReducedMotion();
-  const [name, setName] = useState(() => t("login.demoUser"));
-  const [password, setPassword] = useState("demo");
+  const apiOn = isApiEnabled();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [demoRole, setDemoRole] = useState<Role>("cc");
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<Role>("cc");
+  const [busy, setBusy] = useState(false);
 
-  function onSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_EMAIL_KEY);
+      if (saved) {
+        setEmail(saved);
+        setRememberMe(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function finishDemo(role: Role, name: string) {
+    login(role, name, undefined, rememberMe);
+    toast(t("login.loggedInAs", { role: roleLabel(role, locale) }), "success");
+    router.replace(ROLE_HOMES[role]);
+  }
+
+  async function signIn(nextEmail: string, nextPassword: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const data = await loginStaff(nextEmail, nextPassword);
+      if (!isRole(data.staff.role)) {
+        toast(t("login.fail"), "error");
+        return;
+      }
+      login(data.staff.role, data.staff.display_name, data.access_token, rememberMe);
+      try {
+        if (rememberMe) {
+          localStorage.setItem(REMEMBER_EMAIL_KEY, nextEmail);
+        } else {
+          localStorage.removeItem(REMEMBER_EMAIL_KEY);
+        }
+      } catch {
+        /* ignore */
+      }
+      toast(
+        t("login.loggedInAs", { role: roleLabel(data.staff.role, locale) }),
+        "success",
+      );
+      router.replace(ROLE_HOMES[data.staff.role]);
+    } catch (err) {
+      if (err instanceof ApiClientError && err.code === "AUTH_INVALID_CREDENTIALS") {
+        toast(t("login.invalidCredentials"), "error");
+      } else if (err instanceof ApiClientError && err.code === "AUTH_INACTIVE") {
+        toast(t("login.inactive"), "error");
+      } else if (err instanceof ApiClientError) {
+        toast(err.detail, "error");
+      } else {
+        toast(t("login.fail"), "error");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) {
-      toast(t("login.nameRequired"), "error");
+    if (apiOn) {
+      if (!email.trim()) {
+        toast(t("login.emailRequired"), "error");
+        return;
+      }
+      if (!password.trim()) {
+        toast(t("login.passwordRequired"), "error");
+        return;
+      }
+      await signIn(email.trim().toLowerCase(), password);
       return;
     }
     if (!password.trim()) {
       toast(t("login.passwordRequired"), "error");
       return;
     }
-    login(role, name.trim());
-    toast(t("login.loggedInAs", { role: roleLabel(role, locale) }), "success");
-    router.replace(ROLE_HOMES[role]);
+    finishDemo(demoRole, email.trim() || t("login.demoUser"));
   }
+
+  async function onQuickRole(role: Role) {
+    if (!apiOn) {
+      setDemoRole(role);
+      finishDemo(role, email.trim() || roleLabel(role, locale));
+      return;
+    }
+    const nextEmail = SEED_STAFF_EMAIL(role);
+    setEmail(nextEmail);
+    setPassword(SEED_STAFF_PASSWORD);
+    await signIn(nextEmail, SEED_STAFF_PASSWORD);
+  }
+
+  const selectedRole = apiOn
+    ? VISIBLE_ROLE_KEYS.find((r) => email.trim().toLowerCase() === SEED_STAFF_EMAIL(r))
+    : demoRole;
 
   const fade = reduceMotion
     ? undefined
@@ -95,7 +188,6 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-page-dark text-white md:grid md:grid-cols-[1.08fr_0.92fr]">
-      {/* Ambient field — charcoal + green, not pastel orbs */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_10%,rgba(6,121,87,0.28),transparent_55%),radial-gradient(ellipse_at_90%_80%,rgba(44,103,160,0.12),transparent_50%)]"
@@ -105,7 +197,6 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]"
       />
 
-      {/* Brand panel */}
       <section className="relative flex flex-col justify-between px-6 py-8 sm:px-10 sm:py-12 md:min-h-dvh md:px-14 md:py-16">
         <div className="absolute left-0 top-0 hidden h-full w-1.5 bg-gradient-to-b from-primary-light via-primary to-primary-dark md:block" />
 
@@ -155,11 +246,10 @@ export default function LoginPage() {
           transition={{ duration: 0.45, delay: reduceMotion ? 0 : 0.12 }}
           className="relative mt-10 text-xs text-white/35 md:mt-0"
         >
-          {t("login.localOnly")}
+          {t(apiOn ? "login.localOnly" : "login.localOnlyDemo")}
         </motion.p>
       </section>
 
-      {/* Form panel */}
       <section className="relative flex items-center justify-center bg-white px-5 py-10 text-neutral-900 shadow-[-24px_0_60px_rgba(0,0,0,0.35)] dark:bg-neutral-950 dark:text-neutral-100 sm:px-8 md:min-h-dvh md:px-12 lg:px-16">
         <div
           aria-hidden
@@ -180,22 +270,24 @@ export default function LoginPage() {
               {t("login.welcome")}
             </h2>
             <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-              {t("login.subtitle")}
+              {t(apiOn ? "login.subtitle" : "login.subtitleDemo")}
             </p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-neutral-700 dark:text-neutral-300">
-                {t("login.displayName")}
+              <Label htmlFor="identity" className="text-neutral-700 dark:text-neutral-300">
+                {t(apiOn ? "login.email" : "login.displayName")}
               </Label>
               <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t("login.namePlaceholder")}
+                id="identity"
+                type={apiOn ? "email" : "text"}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t(apiOn ? "login.emailPlaceholder" : "login.namePlaceholder")}
                 className="h-11 rounded-xl border-neutral-200 bg-neutral-50 px-3.5 text-base shadow-none focus-visible:ring-primary dark:border-neutral-700 dark:bg-neutral-900"
-                autoComplete="username"
+                autoComplete={apiOn ? "email" : "username"}
+                disabled={busy}
               />
             </div>
 
@@ -212,6 +304,7 @@ export default function LoginPage() {
                   placeholder={t("login.passwordPlaceholder")}
                   className="h-11 rounded-xl border-neutral-200 bg-neutral-50 px-3.5 pr-11 text-base shadow-none focus-visible:ring-primary dark:border-neutral-700 dark:bg-neutral-900"
                   autoComplete="current-password"
+                  disabled={busy}
                 />
                 <button
                   type="button"
@@ -228,33 +321,34 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
-              <p className="text-xs text-neutral-400">{t("login.passwordHint")}</p>
+              <p className="text-xs text-neutral-400">
+                {t(apiOn ? "login.passwordHint" : "login.passwordHintDemo")}
+              </p>
             </div>
 
             <div className="space-y-3">
               <Label className="text-neutral-700 dark:text-neutral-300">
-                {t("login.chooseDuty")}
+                {t("login.quickAccess")}
               </Label>
               <div
-                role="radiogroup"
-                aria-label={t("login.chooseDuty")}
+                role="group"
+                aria-label={t("login.quickAccess")}
                 className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"
               >
                 {VISIBLE_ROLE_KEYS.map((r) => {
                   const meta = ROLE_META[r];
                   const Icon = meta.icon;
-                  const selected = role === r;
+                  const selected = selectedRole === r;
                   return (
                     <motion.button
                       key={r}
                       type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      whileHover={reduceMotion ? undefined : { y: -2 }}
-                      whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-                      onClick={() => setRole(r)}
+                      disabled={busy}
+                      whileHover={reduceMotion || busy ? undefined : { y: -2 }}
+                      whileTap={reduceMotion || busy ? undefined : { scale: 0.98 }}
+                      onClick={() => void onQuickRole(r)}
                       className={cn(
-                        "group relative flex flex-col items-start gap-2.5 overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200",
+                        "group relative flex flex-col items-start gap-2.5 overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 disabled:opacity-60",
                         selected
                           ? "border-primary bg-primary/[0.06] shadow-[0_0_0_1px_var(--primary)] dark:bg-primary/10"
                           : "border-neutral-200 bg-neutral-50/80 hover:border-neutral-300 hover:bg-white dark:border-neutral-700 dark:bg-neutral-900/80 dark:hover:border-neutral-600",
@@ -287,15 +381,29 @@ export default function LoginPage() {
               </div>
             </div>
 
+            <label className="flex cursor-pointer items-center gap-2.5 select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={busy}
+                className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+              />
+              <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                {t("login.rememberMe")}
+              </span>
+            </label>
+
             <motion.div
-              whileHover={reduceMotion ? undefined : { scale: 1.01 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+              whileHover={reduceMotion || busy ? undefined : { scale: 1.01 }}
+              whileTap={reduceMotion || busy ? undefined : { scale: 0.99 }}
             >
               <Button
                 type="submit"
                 variant="cta"
                 size="lg"
                 className="h-12 w-full rounded-xl text-sm font-semibold tracking-wide"
+                disabled={busy}
               >
                 {t("login.enterSystem")}
                 <IconArrowRight className="h-4 w-4" />

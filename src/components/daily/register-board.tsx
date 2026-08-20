@@ -333,12 +333,13 @@ export function RegisterBoard({
   const {
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalPages,
     pageItems,
     total,
     from,
     to,
-    pageSize,
   } = usePagination(users, resetKey);
 
   return (
@@ -618,6 +619,8 @@ export function RegisterBoard({
           from={from}
           to={to}
           onPageChange={setPage}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
         />
       </div>
 

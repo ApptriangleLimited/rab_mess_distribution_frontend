@@ -1,5 +1,8 @@
 export const PAGE_SIZE = 25;
 
+/** Common page-size choices for list tables. */
+export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+
 export function pageCount(total: number, pageSize = PAGE_SIZE) {
   return Math.max(1, Math.ceil(Math.max(0, total) / pageSize));
 }

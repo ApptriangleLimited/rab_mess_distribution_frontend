@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SectionCard } from "@/components/shared/section-card";
+import { DatePicker } from "@/components/shared/date-picker";
 import { TagSelector } from "@/components/daily/tag-selector";
 import { RANKS, WINGS, MEMBER_TYPES } from "@/lib/constants";
 import type { DailyTag, DocumentMeta, MemberType, User, UserStatus } from "@/lib/types";
@@ -103,14 +104,16 @@ export function UserForm({
   onCancel,
   variant = "cc",
   initialTag = "MS",
+  busy = false,
 }: {
   initial?: UserFormValues;
   mode: "create" | "edit";
-  onSubmit: (values: UserFormSubmitPayload) => void;
+  onSubmit: (values: UserFormSubmitPayload) => void | Promise<void>;
   onCancel: () => void;
   /** CC/public create pending; Daily creates accepted + picks today's tag. */
   variant?: "cc" | "daily" | "public";
   initialTag?: DailyTag;
+  busy?: boolean;
 }) {
   const t = useT();
   const reduceMotion = useReducedMotion();
@@ -198,13 +201,14 @@ export function UserForm({
     });
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     if (variant === "daily" && mode === "create") {
-      onSubmit({ ...values, today_tag: todayTag });
+      await onSubmit({ ...values, today_tag: todayTag });
       return;
     }
-    onSubmit(values);
+    await onSubmit(values);
   }
 
   const fade = reduceMotion
@@ -377,19 +381,29 @@ export function UserForm({
             </Field>
           ) : null}
           <Field label={t("cc.fields.joiningDate")}>
-            <Input
-              type="date"
+            <DatePicker
               value={values.joining_date}
-              onChange={(e) => patch("joining_date", e.target.value)}
-              className={inputClass}
+              onChange={(iso) => {
+                setValues((prev) => ({
+                  ...prev,
+                  joining_date: iso,
+                  out_date:
+                    prev.out_date && iso && prev.out_date < iso
+                      ? ""
+                      : prev.out_date,
+                }));
+              }}
+              label={t("cc.fields.joiningDate")}
+              triggerClassName={inputClass}
             />
           </Field>
           <Field label={t("cc.fields.outDate")}>
-            <Input
-              type="date"
+            <DatePicker
               value={values.out_date}
-              onChange={(e) => patch("out_date", e.target.value)}
-              className={inputClass}
+              onChange={(iso) => patch("out_date", iso)}
+              min={values.joining_date || undefined}
+              label={t("cc.fields.outDate")}
+              triggerClassName={inputClass}
             />
           </Field>
         </div>
@@ -597,10 +611,17 @@ export function UserForm({
       </FormSection>
 
       <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="rounded-lg"
+          onClick={onCancel}
+          disabled={busy}
+        >
           {t("common.cancel")}
         </Button>
-        <Button type="submit" variant="cta" size="sm" className="rounded-lg">
+        <Button type="submit" variant="cta" size="sm" className="rounded-lg" disabled={busy}>
           {mode === "create" ? (
             <>
               <IconPlus className="h-3.5 w-3.5" />

@@ -180,8 +180,17 @@ export default function RosterPage() {
     () => boardRows.map((r) => `${r.kind}:${r.user.id}`).join("|"),
     [boardRows],
   );
-  const { page, setPage, totalPages, pageItems, total, from, to } =
-    usePagination(boardRows, resetKey);
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    pageItems,
+    total,
+    from,
+    to,
+  } = usePagination(boardRows, resetKey);
 
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
@@ -426,6 +435,8 @@ export default function RosterPage() {
               from={from}
               to={to}
               onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
               className="bg-gradient-to-r from-neutral-50/80 to-teal-50/30 dark:from-neutral-900 dark:to-neutral-900"
             />
           </div>

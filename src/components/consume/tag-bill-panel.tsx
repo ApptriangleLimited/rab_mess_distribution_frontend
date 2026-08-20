@@ -95,8 +95,17 @@ export function TagBillPanel({
       `${month}|${tag}|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
     [month, tag, q, rank, wing, members],
   );
-  const { page, setPage, totalPages, pageItems, total, from, to } =
-    usePagination(members, resetKey);
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    pageItems,
+    total,
+    from,
+    to,
+  } = usePagination(members, resetKey);
 
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
@@ -289,6 +298,8 @@ export function TagBillPanel({
               from={from}
               to={to}
               onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </section>
         )}

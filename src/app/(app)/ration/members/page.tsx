@@ -92,8 +92,17 @@ export default function RationMembersPage() {
     () => `${q}|${rank}|${wing}|${status}|${roster.map((u) => u.id).join(",")}`,
     [q, rank, wing, status, roster],
   );
-  const { page, setPage, totalPages, pageItems, total, from, to } =
-    usePagination(roster, resetKey);
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    pageItems,
+    total,
+    from,
+    to,
+  } = usePagination(roster, resetKey);
 
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
@@ -280,6 +289,8 @@ export default function RationMembersPage() {
               from={from}
               to={to}
               onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         )}

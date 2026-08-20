@@ -1,4 +1,9 @@
-import type { BuiltInDailyTag, DailyTag, MemberType, Role } from "@/lib/types";
+import type {
+  BuiltInDailyTag,
+  DailyTag,
+  MemberType,
+  Role,
+} from "@/lib/types";
 import type { MessageKey } from "@/i18n";
 
 export const ROLE_HOMES: Record<Role, string> = {
@@ -153,4 +158,9 @@ export const MEMBER_TYPES: {
 
 export const SESSION_COOKIE = "mess_session";
 export const SESSION_STORAGE_KEY = "mess_session_v1";
+export const ACCESS_TOKEN_KEY = "mess_access_token";
+export const REMEMBER_EMAIL_KEY = "mess_login_email";
+/** Demo seed staff. Matches backend `SEED_STAFF_PASSWORD` / `{role}@mess.rab`. */
+export const SEED_STAFF_PASSWORD = "ChangeMe!";
+export const SEED_STAFF_EMAIL = (role: Role) => `${role}@mess.rab`;
 export const STORE_KEY = "mess_proto_v1";

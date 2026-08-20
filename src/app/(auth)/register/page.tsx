@@ -7,16 +7,23 @@ import { IconArrowLeft, IconCheck } from "@tabler/icons-react";
 import { UserForm, type UserFormValues } from "@/components/users/user-form";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { isApiEnabled } from "@/lib/api/mode";
+import { publicRegisterMember } from "@/lib/api/register";
 import { createUser, findUserByRabId } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
 
+/** Public member entry — personnel only. Not a login/signup. */
 export default function RegisterPage() {
   const t = useT();
   const { toast } = useToast();
   const reduceMotion = useReducedMotion();
+  const apiOn = isApiEnabled();
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  function onSubmit(values: UserFormValues) {
+  async function onSubmit(values: UserFormValues) {
+    if (busy) return;
     if (!values.name.trim()) {
       toast(t("cc.nameRequired"), "error");
       return;
@@ -25,13 +32,36 @@ export default function RegisterPage() {
       toast(t("cc.rabIdRequired"), "error");
       return;
     }
-    if (findUserByRabId(values.rab_id)) {
-      toast(t("cc.rabIdDuplicate"), "error");
+
+    if (!apiOn) {
+      if (findUserByRabId(values.rab_id)) {
+        toast(t("cc.rabIdDuplicate"), "error");
+        return;
+      }
+      createUser({ ...values, status: "0" }, { approval_status: "pending" });
+      toast(t("register.success"), "success");
+      setDone(true);
       return;
     }
-    createUser({ ...values, status: "0" }, { approval_status: "pending" });
-    toast(t("register.success"), "success");
-    setDone(true);
+
+    setBusy(true);
+    try {
+      await publicRegisterMember(values);
+      toast(t("register.success"), "success");
+      setDone(true);
+    } catch (err) {
+      if (err instanceof ApiClientError && err.code === "CONFLICT_RAB_ID") {
+        toast(t("cc.rabIdDuplicate"), "error");
+      } else if (err instanceof ApiClientError && err.errors[0]?.message) {
+        toast(err.errors[0].message, "error");
+      } else if (err instanceof ApiClientError) {
+        toast(err.detail, "error");
+      } else {
+        toast(t("register.fail"), "error");
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -88,6 +118,7 @@ export default function RegisterPage() {
           <UserForm
             mode="create"
             variant="public"
+            busy={busy}
             onSubmit={onSubmit}
             onCancel={() => {
               window.location.href = "/login";

@@ -3,12 +3,14 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
+  IconCalendarEvent,
   IconChartBar,
   IconClipboardList,
   IconFileReport,
   IconLayoutDashboard,
   IconSettings,
   IconTags,
+  IconUserPlus,
   IconUsers,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
@@ -67,15 +69,37 @@ const BASE_TABS: Tab[] = [
     icon: IconUsers,
     match: (path) => path.startsWith("/ration/members"),
   },
+];
+
+const ADMIN_MEAL_TABS: Tab[] = [
   {
-    href: "/settings",
-    labelKey: "nav.settings",
-    icon: IconSettings,
-    match: (path) => path.startsWith("/settings"),
+    href: "/mess/planning",
+    labelKey: "nav.mealPlanning",
+    icon: IconCalendarEvent,
+    match: (path) => path.startsWith("/mess/planning"),
+  },
+  {
+    href: "/mess/reports",
+    labelKey: "nav.mealReports",
+    icon: IconFileReport,
+    match: (path) => path.startsWith("/mess/reports"),
+  },
+  {
+    href: "/mess/guests",
+    labelKey: "nav.guestMeals",
+    icon: IconUserPlus,
+    match: (path) => path.startsWith("/mess/guests"),
   },
 ];
 
-/** Ration strip. Admin auto-gets Dashboard + State Reports tabs first. */
+const SETTINGS_TAB: Tab = {
+  href: "/settings",
+  labelKey: "nav.settings",
+  icon: IconSettings,
+  match: (path) => path.startsWith("/settings"),
+};
+
+/** Ration strip. Admin auto-gets Dashboard + State Reports + meal planning/reports. */
 export function RationTabs({
   className,
   withDashboard,
@@ -92,8 +116,14 @@ export function RationTabs({
   const { session } = useSession();
   const showDashboard = withDashboard ?? session?.role === "admin";
   const tabs = showDashboard
-    ? [DASHBOARD_TAB, STATE_REPORTS_TAB, ...BASE_TABS]
-    : BASE_TABS;
+    ? [
+        DASHBOARD_TAB,
+        STATE_REPORTS_TAB,
+        ...BASE_TABS,
+        ...ADMIN_MEAL_TABS,
+        SETTINGS_TAB,
+      ]
+    : [...BASE_TABS, SETTINGS_TAB];
 
   return (
     <RoleNavTabs

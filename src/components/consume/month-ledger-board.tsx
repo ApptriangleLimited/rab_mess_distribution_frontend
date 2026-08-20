@@ -163,12 +163,13 @@ export function MonthLedgerBoard({
   const {
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalPages,
     pageItems,
     total,
     from,
     to,
-    pageSize,
   } = usePagination(rows, resetKey);
 
   return (
@@ -525,6 +526,8 @@ export function MonthLedgerBoard({
         from={from}
         to={to}
         onPageChange={setPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
       />
     </div>
   );

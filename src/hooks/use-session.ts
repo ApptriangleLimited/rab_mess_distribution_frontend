@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { logoutStaff } from "@/lib/api/auth";
+import { isApiEnabled } from "@/lib/api/mode";
 import {
   clearSession,
   getSessionFromStorage,
+  setAccessToken,
   setSession as persistSession,
 } from "@/lib/session";
 import type { Role, Session } from "@/lib/types";
@@ -18,14 +21,19 @@ export function useSession() {
     setReady(true);
   }, []);
 
-  const login = useCallback((role: Role, name: string) => {
-    const next: Session = { role, name, loggedInAt: nowISO() };
-    persistSession(next);
-    setSessionState(next);
-    return next;
-  }, []);
+  const login = useCallback(
+    (role: Role, name: string, accessToken?: string, remember = true) => {
+      const next: Session = { role, name, loggedInAt: nowISO() };
+      persistSession(next, remember);
+      if (accessToken) setAccessToken(accessToken, remember);
+      setSessionState(next);
+      return next;
+    },
+    [],
+  );
 
   const logout = useCallback(() => {
+    if (isApiEnabled()) void logoutStaff();
     clearSession();
     setSessionState(null);
   }, []);

@@ -2,6 +2,8 @@ import { DAILY_TAGS, RATE_ONLY_TAGS, RANKS, WINGS } from "@/lib/constants";
 import {
   dateInMonth,
   daysInMonth,
+  eachISODate,
+  monthDateBounds,
   monthDatesThroughToday,
   monthKey,
   nowISO,
@@ -13,6 +15,11 @@ import type {
   AppState,
   DailyAssignment,
   DailyTag,
+  MealAssign,
+  MealPlan,
+  MealShift,
+  MealShiftId,
+  GuestMeal,
   SenderAccount,
   User,
 } from "@/lib/types";
@@ -312,8 +319,192 @@ function buildMemberPlans(users: User[]): MemberPlan[] {
   });
 }
 
+function seedMealShifts(): MealShift[] {
+  const stamp = nowISO();
+  return [
+    {
+      id: "breakfast",
+      name: "Breakfast",
+      start_time: "06:00",
+      end_time: "09:00",
+      description: "Breakfast",
+      created_at: stamp,
+      updated_at: stamp,
+    },
+    {
+      id: "lunch",
+      name: "Lunch",
+      start_time: "12:00",
+      end_time: "15:00",
+      description: "Lunch",
+      created_at: stamp,
+      updated_at: stamp,
+    },
+    {
+      id: "dinner",
+      name: "Dinner",
+      start_time: "19:00",
+      end_time: "22:00",
+      description: "Dinner",
+      created_at: stamp,
+      updated_at: stamp,
+    },
+  ];
+}
+
+function seedMealPlans(): MealPlan[] {
+  const stamp = nowISO();
+  const { from, to } = monthDateBounds();
+  return eachISODate(from, to).map((date) => {
+    const day = Number(date.slice(8, 10));
+    const weekday = new Date(`${date}T12:00:00`).getDay();
+    const weekend = weekday === 0 || weekday === 6;
+    const breakfast = weekend ? 28 + (day % 5) : 44 + (day % 9);
+    const lunch = weekend ? 72 + (day % 8) : 98 + (day % 14);
+    const dinner = day % 6 === 0 ? 0 : weekend ? 40 + (day % 6) : 70 + (day % 8);
+    const meals = [
+      { shift_id: "breakfast" as const, count: breakfast },
+      { shift_id: "lunch" as const, count: lunch },
+      ...(dinner > 0
+        ? [{ shift_id: "dinner" as const, count: dinner }]
+        : []),
+    ];
+    return {
+      id: `mp_${date.replaceAll("-", "")}`,
+      date,
+      meals,
+      created_at: stamp,
+      updated_at: stamp,
+    };
+  });
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function seedMealAssigns(users: User[], plans: MealPlan[]): MealAssign[] {
+  const roster = users.filter(
+    (u) => u.approval_status === "approved" && u.status === "1",
+  );
+  if (roster.length === 0) return [];
+  const stamp = nowISO();
+  const start: Record<MealShiftId, [number, number]> = {
+    breakfast: [7, 10],
+    lunch: [12, 35],
+    dinner: [19, 20],
+  };
+  const out: MealAssign[] = [];
+  let n = 0;
+
+  for (const plan of plans) {
+    const day = Number(plan.date.slice(8, 10));
+    const offset = day % roster.length;
+    for (const meal of plan.meals) {
+      const take = Math.min(meal.count, 10);
+      const [h, m] = start[meal.shift_id];
+      for (let i = 0; i < take; i++) {
+        const u = roster[(offset + i) % roster.length]!;
+        const totalMin = m + (i % 18);
+        const hh = h + Math.floor(totalMin / 60);
+        const mm = totalMin % 60;
+        n += 1;
+        out.push({
+          id: `ma_${n}`,
+          member_id: u.id,
+          shift_id: meal.shift_id,
+          status: 1,
+          date: plan.date,
+          check_in_time: `${plan.date}T${pad2(hh)}:${pad2(mm)}:00`,
+          created_at: stamp,
+          updated_at: stamp,
+        });
+      }
+      const dupCount =
+        take >= 8 ? Math.max(2, Math.floor(take * 0.08)) : take >= 3 ? 1 : 0;
+      for (let d = 0; d < dupCount; d++) {
+        const u = roster[(offset + d) % roster.length]!;
+        n += 1;
+        out.push({
+          id: `ma_${n}`,
+          member_id: u.id,
+          shift_id: meal.shift_id,
+          status: 2,
+          date: plan.date,
+          check_in_time: `${plan.date}T${pad2(h)}:${pad2((m + 42 + d) % 60)}:00`,
+          created_at: stamp,
+          updated_at: stamp,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+const GUEST_NAMES = [
+  "Md. Abdul Karim",
+  "Shamima Akter",
+  "Rafiqul Islam",
+  "Taslima Begum",
+  "Engineer Hasan Chowdhury",
+  "SI Kamal Hossain",
+  "Advocate Nurul Amin",
+  "Dr. Farzana Yasmin",
+  "Contractor Rana Traders",
+  "Audit Officer Rezaul Karim",
+  "HQ Visitor Anwar Hossain",
+  "Fatema Khatun",
+];
+
+const GUEST_INFOS = ["Visitor", "Vendor", "Family", "HQ", "Audit"];
+
+function seedGuestMeals(users: User[]): GuestMeal[] {
+  const stamp = nowISO();
+  const { from, to } = monthDateBounds();
+  const hosts = users.filter(
+    (u) => u.approval_status === "approved" && u.status === "1",
+  );
+  const shiftIds: MealShiftId[] = ["breakfast", "lunch", "dinner"];
+  const start: Record<MealShiftId, [number, number]> = {
+    breakfast: [7, 20],
+    lunch: [12, 40],
+    dinner: [19, 30],
+  };
+  const out: GuestMeal[] = [];
+  let n = 0;
+
+  for (const date of eachISODate(from, to)) {
+    const day = Number(date.slice(8, 10));
+    if (day % 3 === 0) continue;
+    const count = 1 + (day % 4);
+    for (let i = 0; i < count; i++) {
+      const shift_id = shiftIds[(day + i) % shiftIds.length]!;
+      const [h, m] = start[shift_id];
+      const host = hosts.length
+        ? hosts[(day + i) % hosts.length]
+        : null;
+      n += 1;
+      const mm = (m + i * 7) % 60;
+      out.push({
+        id: `gm_${n}`,
+        shift_id,
+        date,
+        check_in_time: `${date}T${pad2(h)}:${pad2(mm)}:00`,
+        guest_name: GUEST_NAMES[(n - 1) % GUEST_NAMES.length]!,
+        guest_info: GUEST_INFOS[(n + day) % GUEST_INFOS.length]!,
+        ref_info: host
+          ? `Hosted by ${host.name}`
+          : `REF-${date.replaceAll("-", "")}-${i + 1}`,
+        created_at: stamp,
+        updated_at: stamp,
+      });
+    }
+  }
+  return out;
+}
+
 /** Bump → auto wipe localStorage + reseed on next load. */
-export const SEED_VERSION = 10;
+export const SEED_VERSION = 16;
 
 export function createSeedState(): AppState {
   const today = todayISO();
@@ -420,6 +611,9 @@ export function createSeedState(): AppState {
     })),
   ];
 
+  const meal_shifts = seedMealShifts();
+  const meal_plans = seedMealPlans();
+
   return {
     users,
     assignments,
@@ -429,6 +623,10 @@ export function createSeedState(): AppState {
     suppressed_carries: [],
     boro_khana_dates: [],
     state_reports: [],
+    meal_plans,
+    meal_assigns: seedMealAssigns(users, meal_plans),
+    meal_shifts,
+    guest_meals: seedGuestMeals(users),
     version: SEED_VERSION,
   };
 }

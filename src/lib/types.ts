@@ -125,6 +125,59 @@ export type DailyStateReport = {
   };
 };
 
+export type MealShiftId = string;
+
+export interface MealShift {
+  id: MealShiftId;
+  name: string;
+  start_time: string;
+  end_time: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MealPlanMeal {
+  shift_id: MealShiftId;
+  count: number;
+}
+
+/** CMS meal-allowance analog: date + per-shift counts (single mess, no branch). */
+export interface MealPlan {
+  id: string;
+  date: string;
+  meals: MealPlanMeal[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type MealAssignStatus = 1 | 2;
+
+/** CMS meal_assigns analog: check-in row. 1 = unique, 2 = duplicate. */
+export interface MealAssign {
+  id: string;
+  member_id: string;
+  shift_id: MealShiftId;
+  status: MealAssignStatus;
+  date: string;
+  check_in_time: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** CMS guest_meals analog: named visitor check-in. No create UI. */
+export interface GuestMeal {
+  id: string;
+  shift_id: MealShiftId;
+  date: string;
+  check_in_time: string;
+  guest_name: string;
+  guest_info: string;
+  ref_info: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppState {
   users: User[];
   assignments: DailyAssignment[];
@@ -138,5 +191,13 @@ export interface AppState {
   boro_khana_dates: string[];
   /** Daily duty-state snapshots submitted for Admin approval. */
   state_reports: DailyStateReport[];
+  /** Mess kitchen plan: one row per date, counts per meal shift. */
+  meal_plans: MealPlan[];
+  /** Check-ins for Meal reports (CMS meal_assigns). */
+  meal_assigns: MealAssign[];
+  /** Kitchen windows (CMS shifts). */
+  meal_shifts: MealShift[];
+  /** Named guest check-ins (CMS guest_meals). */
+  guest_meals: GuestMeal[];
   version: number;
 }

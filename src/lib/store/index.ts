@@ -121,6 +121,10 @@ function normalizeState(state: AppState): AppState {
     state_reports: Array.isArray(state.state_reports)
       ? state.state_reports
       : [],
+    meal_plans: Array.isArray(state.meal_plans) ? state.meal_plans : [],
+    meal_assigns: Array.isArray(state.meal_assigns) ? state.meal_assigns : [],
+    meal_shifts: Array.isArray(state.meal_shifts) ? state.meal_shifts : [],
+    guest_meals: Array.isArray(state.guest_meals) ? state.guest_meals : [],
   };
 }
 
@@ -155,6 +159,10 @@ export function getServerSnapshot(): AppState {
     suppressed_carries: [],
     boro_khana_dates: [],
     state_reports: [],
+    meal_plans: [],
+    meal_assigns: [],
+    meal_shifts: [],
+    guest_meals: [],
     version: 0,
   };
 }

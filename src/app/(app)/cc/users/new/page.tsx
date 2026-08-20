@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
@@ -9,6 +10,9 @@ import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
 import { UserForm, type UserFormValues } from "@/components/users/user-form";
 import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { createMember } from "@/lib/api/members";
+import { isApiEnabled } from "@/lib/api/mode";
 import { createUser, findUserByRabId } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
 
@@ -16,8 +20,11 @@ export default function CcNewUserPage() {
   const t = useT();
   const router = useRouter();
   const { toast } = useToast();
+  const apiOn = isApiEnabled();
+  const [busy, setBusy] = useState(false);
 
-  function onSubmit(values: UserFormValues) {
+  async function onSubmit(values: UserFormValues) {
+    if (busy) return;
     if (!values.name.trim()) {
       toast(t("cc.nameRequired"), "error");
       return;
@@ -26,13 +33,39 @@ export default function CcNewUserPage() {
       toast(t("cc.rabIdRequired"), "error");
       return;
     }
-    if (findUserByRabId(values.rab_id)) {
-      toast(t("cc.rabIdDuplicate"), "error");
+
+    if (!apiOn) {
+      if (findUserByRabId(values.rab_id)) {
+        toast(t("cc.rabIdDuplicate"), "error");
+        return;
+      }
+      createUser(values);
+      toast(t("cc.created"), "success");
+      router.push("/cc/users");
       return;
     }
-    createUser(values);
-    toast(t("cc.created"), "success");
-    router.push("/cc/users");
+
+    setBusy(true);
+    try {
+      await createMember(values, {
+        status: values.status || "1",
+        approval_status: "pending",
+      });
+      toast(t("cc.created"), "success");
+      router.push("/cc/users");
+    } catch (err) {
+      if (err instanceof ApiClientError && err.code === "CONFLICT_RAB_ID") {
+        toast(t("cc.rabIdDuplicate"), "error");
+      } else if (err instanceof ApiClientError && err.errors[0]?.message) {
+        toast(err.errors[0].message, "error");
+      } else if (err instanceof ApiClientError) {
+        toast(err.detail, "error");
+      } else {
+        toast(t("cc.createFail"), "error");
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

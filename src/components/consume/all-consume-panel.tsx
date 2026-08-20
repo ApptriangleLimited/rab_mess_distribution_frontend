@@ -88,12 +88,13 @@ export function AllConsumePanel({
   const {
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalPages,
     pageItems,
     total,
     from,
     to,
-    pageSize,
   } = usePagination(members, resetKey);
 
   const fieldClass = searchFilterFieldClass;
@@ -268,6 +269,8 @@ export function AllConsumePanel({
             from={from}
             to={to}
             onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
           />
         </section>
       )}

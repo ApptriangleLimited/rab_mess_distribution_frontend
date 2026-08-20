@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { useT } from "@/i18n/provider";
 
-/** Settings QR → public /register URL for member scan. */
+/** Settings QR → public /register URL for member entry (not staff login). */
 export function RegisterQrSection({
   static: staticPanel = false,
 }: {

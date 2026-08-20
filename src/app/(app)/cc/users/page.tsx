@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import {
@@ -16,29 +16,88 @@ import { Button } from "@/components/ui/button";
 import { UserFiltersBar } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";
 import { useStore } from "@/hooks/use-store";
+import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { isApiEnabled } from "@/lib/api/mode";
+import { listMembers, memberToUser } from "@/lib/api/members";
+import { PAGE_SIZE } from "@/lib/pagination";
 import { filterUsers, type UserFilters } from "@/lib/store/users";
+import type { User } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
+
+const emptyFilters: UserFilters = {
+  q: "",
+  status: "all",
+  approval: "all",
+  wing: "all",
+  rank: "all",
+  date_from: "",
+  date_to: "",
+};
 
 export default function CcUsersPage() {
   const t = useT();
   const state = useStore();
-  const [filters, setFilters] = useState<UserFilters>({
-    q: "",
-    status: "all",
-    approval: "all",
-    wing: "all",
-    rank: "all",
-    date_from: "",
-    date_to: "",
-  });
+  const { toast } = useToast();
+  const apiOn = isApiEnabled();
+  const [apiUsers, setApiUsers] = useState<User[]>([]);
+  const [apiTotal, setApiTotal] = useState(0);
+  const [loading, setLoading] = useState(apiOn);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [filters, setFilters] = useState<UserFilters>(emptyFilters);
 
-  const users = useMemo(
+  // One list call — BE pages by page_size from FE (default 25).
+  useEffect(() => {
+    if (!apiOn) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    listMembers({
+      q: filters.q || undefined,
+      status: filters.status,
+      approval: filters.approval,
+      wing: filters.wing,
+      rank: filters.rank,
+      date_from: filters.date_from || undefined,
+      date_to: filters.date_to || undefined,
+      page,
+      page_size: pageSize,
+    })
+      .then((data) => {
+        if (cancelled) return;
+        setApiUsers(data.items.map(memberToUser));
+        setApiTotal(data.total);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiUsers([]);
+        setApiTotal(0);
+        const detail =
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not load members from API.";
+        toast(detail, "error");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, filters, page, pageSize, toast]);
+
+  const demoUsers = useMemo(
     () => filterUsers(state.users, filters),
     [state.users, filters],
   );
 
-  const rosterStats = useMemo(() => {
+  const users = apiOn ? apiUsers : demoUsers;
+
+  const demoStats = useMemo(() => {
     const all = state.users;
     return {
       total: all.length,
@@ -48,25 +107,45 @@ export default function CcUsersPage() {
     };
   }, [state.users]);
 
+  // API: only filtered `total` from list res. No extra page_size=1 spam.
+  // Demo: local counts for each chip.
+  const stats = apiOn
+    ? {
+        total:
+          filters.status === "all" && filters.approval === "all"
+            ? apiTotal
+            : undefined,
+        active: filters.status === "1" ? apiTotal : undefined,
+        pending: filters.approval === "pending" ? apiTotal : undefined,
+        accepted: filters.approval === "approved" ? apiTotal : undefined,
+      }
+    : demoStats;
+  const subtitleCount = apiOn ? apiTotal : demoUsers.length;
+
+  function setFiltersAndResetPage(next: UserFilters) {
+    setFilters(next);
+    setPage(1);
+  }
+
   function toggleStatus(status: "1" | "all") {
-    setFilters((prev) => ({
-      ...prev,
-      status: prev.status === status ? "all" : status,
-    }));
+    setFiltersAndResetPage({
+      ...filters,
+      status: filters.status === status ? "all" : status,
+    });
   }
 
   function toggleApproval(approval: "pending" | "approved" | "all") {
-    setFilters((prev) => ({
-      ...prev,
-      approval: prev.approval === approval ? "all" : approval,
-    }));
+    setFiltersAndResetPage({
+      ...filters,
+      approval: filters.approval === approval ? "all" : approval,
+    });
   }
 
   const tiles = (
     <>
       <StatChip
         label={t("consume.statMembers")}
-        value={rosterStats.total}
+        value={stats.total}
         icon={<IconUsers className="h-3.5 w-3.5" />}
         tone="teal"
         active={
@@ -74,21 +153,11 @@ export default function CcUsersPage() {
           filters.approval === "all" &&
           !filters.q
         }
-        onClick={() =>
-          setFilters({
-            q: "",
-            status: "all",
-            approval: "all",
-            wing: "all",
-            rank: "all",
-            date_from: "",
-            date_to: "",
-          })
-        }
+        onClick={() => setFiltersAndResetPage(emptyFilters)}
       />
       <StatChip
         label={t("cc.statusActive")}
-        value={rosterStats.active}
+        value={stats.active}
         icon={<IconUserCheck className="h-3.5 w-3.5" />}
         tone="emerald"
         active={filters.status === "1"}
@@ -96,7 +165,7 @@ export default function CcUsersPage() {
       />
       <StatChip
         label={t("cc.approvalPending")}
-        value={rosterStats.pending}
+        value={stats.pending}
         icon={<IconClockHour4 className="h-3.5 w-3.5" />}
         tone="amber"
         active={filters.approval === "pending"}
@@ -104,7 +173,7 @@ export default function CcUsersPage() {
       />
       <StatChip
         label={t("cc.approvalApproved")}
-        value={rosterStats.accepted}
+        value={stats.accepted}
         icon={<IconCircleCheck className="h-3.5 w-3.5" />}
         tone="sky"
         active={filters.approval === "approved"}
@@ -132,7 +201,11 @@ export default function CcUsersPage() {
           <div className="relative">
             <PageHeader
               title={t("pages.ccUsers.title")}
-              subtitle={t("pages.ccUsers.subtitle", { count: users.length })}
+              subtitle={
+                loading
+                  ? t("common.loading")
+                  : t("pages.ccUsers.subtitle", { count: subtitleCount })
+              }
               actions={
                 <Button
                   asChild
@@ -152,11 +225,33 @@ export default function CcUsersPage() {
 
         <UserFiltersBar
           value={filters}
-          onChange={setFilters}
+          onChange={setFiltersAndResetPage}
           tiles={tiles}
           wrapTiles={false}
         />
-        <UserTable users={users} />
+        {loading ? (
+          <p className="py-10 text-center text-sm text-neutral-500">
+            {t("common.loading")}
+          </p>
+        ) : (
+          <UserTable
+            users={users}
+            pagination={
+              apiOn
+                ? {
+                    page,
+                    pageSize,
+                    total: apiTotal,
+                    onPageChange: setPage,
+                    onPageSizeChange: (size) => {
+                      setPageSize(size);
+                      setPage(1);
+                    },
+                  }
+                : undefined
+            }
+          />
+        )}
       </motion.div>
     </PagePane>
   );
@@ -171,7 +266,7 @@ function StatChip({
   onClick,
 }: {
   label: string;
-  value: number;
+  value?: number;
   icon: ReactNode;
   tone: "teal" | "emerald" | "amber" | "sky";
   active?: boolean;
@@ -205,9 +300,11 @@ function StatChip({
       <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wide">
         {label}
       </span>
-      <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
-        {value}
-      </span>
+      {value != null ? (
+        <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
+          {value}
+        </span>
+      ) : null}
     </button>
   );
 }

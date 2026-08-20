@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
+import { ListPagination } from "@/components/shared/list-pagination";
 import {
   SearchFilterBar,
   searchFilterFieldClass,
@@ -34,6 +35,7 @@ import { downloadCsv } from "@/lib/csv";
 import { getMessEaters } from "@/lib/store/mess";
 import { isBoroKhana } from "@/lib/store/boro-khana";
 import { useT } from "@/i18n/provider";
+import { PAGE_SIZE } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 function isValidDate(value: string) {
@@ -51,6 +53,12 @@ export default function MessTodayClient() {
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [date]);
 
   const isBk = isBoroKhana(date);
 
@@ -76,6 +84,17 @@ export default function MessTodayClient() {
         .includes(query);
     });
   }, [eaters, q, rank, wing]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filtered.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
+  function resetPage() {
+    setPage(1);
+  }
 
   function onExport() {
     const rows = [
@@ -156,7 +175,10 @@ export default function MessTodayClient() {
         <SearchFilterBar
           className="no-print"
           search={q}
-          onSearchChange={setQ}
+          onSearchChange={(v) => {
+            setQ(v);
+            resetPage();
+          }}
           searchPlaceholder={t("mess.searchPlaceholder")}
           tiles={
             <>
@@ -183,7 +205,13 @@ export default function MessTodayClient() {
           }
         >
           <div className="w-[10rem] shrink-0">
-            <Select value={rank} onValueChange={setRank}>
+            <Select
+              value={rank}
+              onValueChange={(v) => {
+                setRank(v);
+                resetPage();
+              }}
+            >
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
               </SelectTrigger>
@@ -198,7 +226,13 @@ export default function MessTodayClient() {
             </Select>
           </div>
           <div className="w-[10rem] shrink-0">
-            <Select value={wing} onValueChange={setWing}>
+            <Select
+              value={wing}
+              onValueChange={(v) => {
+                setWing(v);
+                resetPage();
+              }}
+            >
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
               </SelectTrigger>
@@ -218,6 +252,7 @@ export default function MessTodayClient() {
               setQ("");
               setRank("all");
               setWing("all");
+              resetPage();
             }}
           />
         </SearchFilterBar>
@@ -237,10 +272,24 @@ export default function MessTodayClient() {
                 {t("mess.board")}
               </span>
               <span className="ml-auto text-[11px] tabular-nums text-neutral-400">
-                {filtered.length}/{eaters.length}
+                {pageRows.length}/{filtered.length}
               </span>
             </div>
-            <MessTodayList eaters={filtered} />
+            <MessTodayList eaters={pageRows} />
+            <ListPagination
+              className="no-print"
+              page={safePage}
+              totalPages={totalPages}
+              total={filtered.length}
+              from={(safePage - 1) * pageSize + 1}
+              to={Math.min(safePage * pageSize, filtered.length)}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+            />
           </section>
         )}
       </motion.div>
