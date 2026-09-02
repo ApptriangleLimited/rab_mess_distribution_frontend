@@ -8,6 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
+import { ApiClientError } from "@/lib/api/client";
+import { isApiEnabled } from "@/lib/api/mode";
+import {
+  createRate,
+  deleteRate,
+  listRates,
+  putRates,
+  rateApiToAllowanceRate,
+} from "@/lib/api/settings";
 import { resetToSeed } from "@/lib/store";
 import {
   CL_FR_MONTHLY_TAG,
@@ -19,7 +28,7 @@ import {
 import { useSession } from "@/hooks/use-session";
 import { homeForRole, setSession } from "@/lib/session";
 import { nowISO } from "@/lib/date";
-import type { DailyTag, Role } from "@/lib/types";
+import type { AllowanceRate, DailyTag, Role } from "@/lib/types";
 import {
   Select,
   SelectContent,
@@ -37,7 +46,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { SenderAccountsSection } from "@/components/ration/sender-accounts-section";
+import { AuthorizedSection } from "@/components/settings/authorized-section";
+import { MemberBanksSection } from "@/components/settings/member-banks-section";
 import { RegisterQrSection } from "@/components/settings/register-qr-section";
+import { OrgListSection } from "@/components/settings/org-list-section";
 import {
   parseSettingsTab,
   SettingsSectionTabs,
@@ -50,7 +62,10 @@ import { tagCellClass } from "@/lib/tag-colors";
 import {
   IconCoin,
   IconCurrencyTaka,
+  IconMilitaryRank,
   IconPlus,
+  IconShield,
+  IconTopologyStar3,
   IconTrash,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -59,6 +74,7 @@ const TAG_NAME_RE = /^[A-Za-z0-9]{2,8}$/;
 
 function SettingsPageInner() {
   const state = useStore();
+  const apiOn = isApiEnabled();
   const { toast } = useToast();
   const { session } = useSession();
   const t = useT();
@@ -96,13 +112,58 @@ function SettingsPageInner() {
   const [newTag, setNewTag] = useState("");
   const [newAmount, setNewAmount] = useState("0");
   const [deleteTag, setDeleteTag] = useState<DailyTag | null>(null);
+  const [loadingRates, setLoadingRates] = useState(false);
+  const [apiRates, setApiRates] = useState<AllowanceRate[] | null>(null);
+
+  const rates = apiOn && apiRates ? apiRates : state.rates;
+
+  useEffect(() => {
+    if (!apiOn) return;
+    let cancelled = false;
+    setLoadingRates(true);
+    void listRates()
+      .then((res) => {
+        if (cancelled) return;
+        const next = res.items.map(rateApiToAllowanceRate);
+        setApiRates(next);
+        setRateDraft(
+          Object.fromEntries(
+            next.map((r) => [r.tag, String(r.amount_per_day)]),
+          ),
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiRates([]);
+        const detail =
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not load allowance rates from API.";
+        toast(detail, "error");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRates(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, toast]);
+
+  useEffect(() => {
+    if (apiOn) return;
+    setRateDraft(
+      Object.fromEntries(
+        state.rates.map((r) => [r.tag, String(r.amount_per_day)]),
+      ),
+    );
+  }, [apiOn, state.rates]);
 
   const eligibleCount = useMemo(
     () =>
-      state.rates.filter(
+      rates.filter(
         (r) => parseMoney(rateDraft[r.tag] ?? r.amount_per_day) > 0,
       ).length,
-    [state.rates, rateDraft],
+    [rates, rateDraft],
   );
 
   function onReset() {
@@ -119,13 +180,32 @@ function SettingsPageInner() {
     window.location.href = homeForRole(role);
   }
 
-  function onSaveRates() {
-    setRates(
-      state.rates.map((r) => ({
-        tag: r.tag,
-        amount_per_day: parseMoney(rateDraft[r.tag] ?? r.amount_per_day),
-      })),
-    );
+  async function onSaveRates() {
+    const next = rates.map((r) => ({
+      tag: r.tag,
+      amount_per_day: parseMoney(rateDraft[r.tag] ?? r.amount_per_day),
+    }));
+    if (apiOn) {
+      try {
+        const res = await putRates(next);
+        const saved = res.items.map(rateApiToAllowanceRate);
+        setApiRates(saved);
+        setRateDraft(
+          Object.fromEntries(
+            saved.map((r) => [r.tag, String(r.amount_per_day)]),
+          ),
+        );
+        toast(t("settings.ratesSaved"), "success");
+      } catch (err) {
+        const detail =
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not save allowance rates.";
+        toast(detail, "error");
+      }
+      return;
+    }
+    setRates(next);
     toast(t("settings.ratesSaved"), "success");
   }
 
@@ -135,7 +215,7 @@ function SettingsPageInner() {
     setNewAmount("0");
   }
 
-  function onAddAllowance() {
+  async function onAddAllowance() {
     const name = newTag.trim();
     if (!name) {
       toast(t("settings.allowanceTagRequired"), "error");
@@ -145,13 +225,31 @@ function SettingsPageInner() {
       toast(t("settings.allowanceTagInvalid"), "error");
       return;
     }
-    if (
-      state.rates.some((r) => r.tag.toLowerCase() === name.toLowerCase())
-    ) {
+    if (rates.some((r) => r.tag.toLowerCase() === name.toLowerCase())) {
       toast(t("settings.allowanceTagDuplicate"), "error");
       return;
     }
     const amount = parseMoney(newAmount);
+    if (apiOn) {
+      try {
+        const created = await createRate(name, amount);
+        const row = rateApiToAllowanceRate(created);
+        setApiRates((prev) => [...(prev ?? []), row]);
+        setRateDraft((prev) => ({
+          ...prev,
+          [row.tag]: String(row.amount_per_day),
+        }));
+        toast(t("settings.allowanceAdded"), "success");
+        closeAdd();
+      } catch (err) {
+        const detail =
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not add allowance tag.";
+        toast(detail, "error");
+      }
+      return;
+    }
     upsertRate(name as DailyTag, amount);
     setRateDraft((prev) => ({
       ...prev,
@@ -161,9 +259,29 @@ function SettingsPageInner() {
     closeAdd();
   }
 
-  function onDeleteAllowance() {
+  async function onDeleteAllowance() {
     if (!deleteTag) return;
     const tag = deleteTag;
+    if (apiOn) {
+      try {
+        await deleteRate(tag);
+        setApiRates((prev) => (prev ?? []).filter((r) => r.tag !== tag));
+        setRateDraft((prev) => {
+          const next = { ...prev };
+          delete next[tag];
+          return next;
+        });
+        setDeleteTag(null);
+        toast(t("settings.allowanceDeleted"), "success");
+      } catch (err) {
+        const detail =
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not delete allowance tag.";
+        toast(detail, "error");
+      }
+      return;
+    }
     removeRate(tag);
     setRateDraft((prev) => {
       const next = { ...prev };
@@ -183,7 +301,7 @@ function SettingsPageInner() {
       className="border-primary/10 shadow-sm"
       badge={
         <span className="rounded-lg bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-primary">
-          {eligibleCount}/{state.rates.length}
+          {eligibleCount}/{rates.length}
         </span>
       }
       headerActions={
@@ -202,7 +320,12 @@ function SettingsPageInner() {
       }
     >
       <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-        {state.rates.map((rate) => {
+        {loadingRates ? (
+          <li className="px-3 py-8 text-center text-sm text-neutral-500">
+            {t("common.loading")}
+          </li>
+        ) : (
+          rates.map((rate) => {
           const amount = parseMoney(rateDraft[rate.tag] ?? rate.amount_per_day);
           const live = amount > 0;
           return (
@@ -278,7 +401,8 @@ function SettingsPageInner() {
               ) : null}
             </li>
           );
-        })}
+        })
+        )}
       </ul>
 
       <footer className="mt-auto flex items-center justify-end gap-2 border-t border-primary/10 bg-gradient-to-r from-emerald-50/80 via-white to-sky-50/50 px-3 py-2.5 dark:border-primary/20 dark:from-primary/10 dark:via-neutral-950 dark:to-neutral-950">
@@ -326,7 +450,22 @@ function SettingsPageInner() {
         />
 
         {tab === "rates" ? ratesPanel : null}
-        {tab === "bank" && isRation ? <SenderAccountsSection static /> : null}
+        {tab === "rank" ? (
+          <OrgListSection kind="rank" icon={IconMilitaryRank} />
+        ) : null}
+        {tab === "wing" ? (
+          <OrgListSection kind="wing" icon={IconTopologyStar3} />
+        ) : null}
+        {tab === "force" ? (
+          <OrgListSection kind="force" icon={IconShield} />
+        ) : null}
+        {tab === "bank" && isRation ? (
+          <SenderAccountsSection static rateTags={rates.map((r) => r.tag)} />
+        ) : null}
+        {tab === "member-bank" && isRation ? (
+          <MemberBanksSection static />
+        ) : null}
+        {tab === "authorized" ? <AuthorizedSection static /> : null}
         {tab === "qr" ? <RegisterQrSection static /> : null}
 
         {/* Languages — kept for later; hidden for now */}

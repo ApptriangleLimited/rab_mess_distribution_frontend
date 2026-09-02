@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
-import { RANKS, WINGS } from "@/lib/constants";
+
 import { monthDateBounds } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
 import { buildRangeLedger } from "@/lib/reports";
@@ -38,6 +38,7 @@ function defaultRange() {
 export default function RationMonthlyClient() {
   const t = useT();
   const state = useStore();
+  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const initial = defaultRange();
 
@@ -199,7 +200,7 @@ export default function RationMonthlyClient() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {RANKS.map((r) => (
+                {ranks.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
@@ -217,7 +218,7 @@ export default function RationMonthlyClient() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {WINGS.map((w) => (
+                {wings.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
                   </SelectItem>

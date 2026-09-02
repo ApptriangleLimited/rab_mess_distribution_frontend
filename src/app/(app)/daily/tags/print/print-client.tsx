@@ -13,7 +13,9 @@ import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MonthRegisterPrint } from "@/components/daily/month-register-print";
 import { Button } from "@/components/ui/button";
+import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
 import { useStore } from "@/hooks/use-store";
+import { isApiEnabled } from "@/lib/api/mode";
 import {
   dateInMonth,
   daysInMonth,
@@ -23,12 +25,16 @@ import {
 } from "@/lib/date";
 import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { buildDailyRegisterDates } from "@/lib/reports";
-import { compareUsers } from "@/lib/store/users";
+import {
+  buildDailyRegisterDates,
+  buildDailyRegisterFromCells,
+} from "@/lib/reports";
+import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
 
 export default function DailyRegisterPrintClient() {
   const t = useT();
+  const apiOn = isApiEnabled();
   const state = useStore();
   const searchParams = useSearchParams();
   const printRef = useRef<HTMLDivElement>(null);
@@ -40,16 +46,32 @@ export default function DailyRegisterPrintClient() {
   const q = searchParams.get("q") ?? "";
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
-  const showInactive = searchParams.get("inactive") === "1";
-
+  const statusParam = searchParams.get("status");
+  const memberStatus: "all" | "0" | "1" =
+    statusParam === "0" || statusParam === "1" || statusParam === "all"
+      ? statusParam
+      : "1";
   const dayCount = daysInMonth(month);
+  const loadFrom = dateFrom.trim() || dateInMonth(month, 1);
+  const loadTo = dateTo.trim() || dateInMonth(month, dayCount);
 
-  const users = useMemo(() => {
+  const cockpit = useDailyCockpit({
+    dateFrom: loadFrom,
+    dateTo: loadTo,
+    q,
+    rank,
+    wing,
+    status: memberStatus,
+  });
+
+  /** Approved roster — honor status filter (default Active). */
+  const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
     return state.users
       .filter((u) => {
+        if (!isCockpitMember(u)) return false;
         if (u.approval_status !== "approved") return false;
-        if (!showInactive && u.status !== "1") return false;
+        if (memberStatus !== "all" && u.status !== memberStatus) return false;
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
         if (!query) return true;
@@ -59,7 +81,10 @@ export default function DailyRegisterPrintClient() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [state.users, showInactive, q, rank, wing]);
+  }, [state.users, q, rank, wing, memberStatus]);
+
+  const users = apiOn ? cockpit.users : demoUsers;
+  const loading = apiOn && cockpit.loading;
 
   const columnDates = useMemo(() => {
     const from = dateFrom.trim();
@@ -77,16 +102,23 @@ export default function DailyRegisterPrintClient() {
     [columnDates],
   );
 
-  const printRows = useMemo(
-    () => buildDailyRegisterDates(columnDates, users).rows,
-    [columnDates, users, state.assignments],
-  );
+  const printRows = useMemo(() => {
+    if (apiOn) {
+      return buildDailyRegisterFromCells(columnDates, users, cockpit.cells).rows;
+    }
+    return buildDailyRegisterDates(columnDates, users).rows;
+  }, [apiOn, columnDates, users, cockpit.cells, state.assignments]);
 
   const backHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("month", month);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
+    if (q.trim()) params.set("q", q.trim());
+    if (rank !== "all") params.set("rank", rank);
+    if (wing !== "all") params.set("wing", wing);
     return `/daily/tags?${params.toString()}`;
-  }, [month]);
+  }, [month, dateFrom, dateTo, q, rank, wing]);
 
   const monthLabel = formatMonthLong(month);
   const canAct = printRows.length > 0 && dayNumbers.length > 0;
@@ -167,7 +199,11 @@ export default function DailyRegisterPrintClient() {
         />
       </div>
 
-      {!users.length ? (
+      {loading ? (
+        <p className="py-10 text-center text-sm text-neutral-500">
+          {t("common.loading")}
+        </p>
+      ) : !users.length ? (
         <EmptyState title={t("daily.emptyTags")} />
       ) : !dayNumbers.length ? (
         <EmptyState title={t("common.noResults")} />

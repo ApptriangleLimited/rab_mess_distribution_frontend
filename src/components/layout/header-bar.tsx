@@ -11,6 +11,7 @@ import {
   IconMenu2,
   IconSettings,
   IconUserCircle,
+  IconLanguage,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -23,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useI18n, useT } from "@/i18n/provider";
+import type { Locale } from "@/i18n";
 import { roleLabel } from "@/i18n";
 import { ROLE_HOMES, rolesForPicker } from "@/lib/constants";
 import { setSession } from "@/lib/session";
@@ -45,7 +47,7 @@ export function HeaderBar({
   hideSidebarControls?: boolean;
 }) {
   const t = useT();
-  const { locale } = useI18n();
+  const { locale, setLocale } = useI18n();
   const router = useRouter();
   const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,6 +139,28 @@ export function HeaderBar({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1.5">
+            <IconLanguage
+              className="hidden h-4 w-4 shrink-0 text-white/70 sm:block"
+              aria-hidden
+            />
+            <Select
+              value={locale}
+              onValueChange={(v) => setLocale(v as Locale)}
+            >
+              <SelectTrigger
+                className="h-10 min-w-[108px] rounded-xl border-white/10 bg-white/10 text-sm text-white shadow-none hover:bg-white/15 focus:ring-2 focus:ring-primary-light/40"
+                aria-label={t("settings.locale")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">{t("settings.localeEn")}</SelectItem>
+                <SelectItem value="bn">{t("settings.localeBn")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="hidden sm:block">
             <Select
               value={session.role}

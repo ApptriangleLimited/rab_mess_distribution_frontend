@@ -6,8 +6,10 @@ import {
 } from "@/lib/store/assignments";
 import { isBoroKhana } from "@/lib/store/boro-khana";
 import { canAssignOnDate } from "@/lib/store/daily";
+import { listMealAssigns } from "@/lib/store/meal-assigns";
+import { isCockpitMember } from "@/lib/store/users";
 import { nextISODate, todayISO } from "@/lib/date";
-import type { DailyTag, User } from "@/lib/types";
+import type { DailyTag, MealShiftId, User } from "@/lib/types";
 
 export type MessEaterReason = "MS" | "FR" | "BK";
 
@@ -76,6 +78,39 @@ export function getMessEaters(date: string): MessEater[] {
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Unique kitchen check-ins (status=1) for date, optional shift. */
+export function listConsumedMemberIds(
+  date: string,
+  shiftId?: MealShiftId | "all",
+): Set<string> {
+  const ids = new Set<string>();
+  for (const row of listMealAssigns()) {
+    if (row.date !== date) continue;
+    if (row.status !== 1) continue;
+    if (shiftId && shiftId !== "all" && row.shift_id !== shiftId) continue;
+    ids.add(row.member_id);
+  }
+  return ids;
+}
+
+/** Expected eaters who checked in (unique) that day. */
+export function getDidConsume(
+  date: string,
+  shiftId?: MealShiftId | "all",
+): MessEater[] {
+  const ate = listConsumedMemberIds(date, shiftId);
+  return getMessEaters(date).filter((u) => ate.has(u.id));
+}
+
+/** Expected eaters with no unique consume check-in that day. */
+export function getDidNotConsume(
+  date: string,
+  shiftId?: MealShiftId | "all",
+): MessEater[] {
+  const ate = listConsumedMemberIds(date, shiftId);
+  return getMessEaters(date).filter((u) => !ate.has(u.id));
+}
+
 /** approved + active with explicit tag on date (no carry). */
 export function countTaggedToday(tag: DailyTag, date = todayISO()): number {
   const { users, assignments } = getState();
@@ -85,6 +120,7 @@ export function countTaggedToday(tag: DailyTag, date = todayISO()): number {
         (u) =>
           u.approval_status === "approved" &&
           u.status === "1" &&
+          isCockpitMember(u) &&
           canAssignOnDate(u, date),
       )
       .map((u) => u.id),
@@ -116,6 +152,7 @@ export function getProjectedTagMembers(
   for (const user of users) {
     if (user.approval_status !== "approved") continue;
     if (user.status !== "1") continue;
+    if (!isCockpitMember(user)) continue;
     if (!canAssignOnDate(user, date)) continue;
 
     const direct = getAssignment(user.id, date);
@@ -158,6 +195,7 @@ export function getProjectedMessEaters(date = nextISODate(todayISO())): {
         (u) =>
           u.approval_status === "approved" &&
           u.status === "1" &&
+          isCockpitMember(u) &&
           canAssignOnDate(u, date),
       )
       .sort((a, b) => a.name.localeCompare(b.name));

@@ -2,11 +2,15 @@ import { nowISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
 
-/** False when date is after member out_date (out day itself still allowed). */
+/**
+ * False when inactive, or date after out_date (out day itself still allowed).
+ * Inactive → no paint / no carry ghost; stored history still readable elsewhere.
+ */
 export function canAssignOnDate(
-  user: Pick<User, "out_date">,
+  user: Pick<User, "out_date" | "status">,
   date: string,
 ): boolean {
+  if (user.status !== "1") return false;
   const out = (user.out_date ?? "").trim();
   if (out && date > out) return false;
   return true;

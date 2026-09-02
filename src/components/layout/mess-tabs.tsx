@@ -2,12 +2,10 @@
 
 import { usePathname } from "next/navigation";
 import {
-  IconCalendarEvent,
   IconClockHour4,
   IconFileReport,
-  IconSoup,
+  IconCake,
   IconTags,
-  IconUserPlus,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
 import { AdminTabs } from "@/components/layout/ration-tabs";
@@ -23,25 +21,11 @@ const TABS = [
       path === "/mess/ledger" || path.startsWith("/mess/ledger/"),
   },
   {
-    href: "/mess/today",
-    labelKey: "nav.todaysMess" as const,
-    icon: IconSoup,
-    match: (path: string) =>
-      path === "/mess/today" || path.startsWith("/mess/today/"),
-  },
-  {
     href: "/mess/shifts",
     labelKey: "nav.shifts" as const,
     icon: IconClockHour4,
     match: (path: string) =>
       path === "/mess/shifts" || path.startsWith("/mess/shifts/"),
-  },
-  {
-    href: "/mess/planning",
-    labelKey: "nav.mealPlanning" as const,
-    icon: IconCalendarEvent,
-    match: (path: string) =>
-      path === "/mess/planning" || path.startsWith("/mess/planning/"),
   },
   {
     href: "/mess/reports",
@@ -51,15 +35,15 @@ const TABS = [
       path === "/mess/reports" || path.startsWith("/mess/reports/"),
   },
   {
-    href: "/mess/guests",
-    labelKey: "nav.guestMeals" as const,
-    icon: IconUserPlus,
+    href: "/mess/pritibhoj",
+    labelKey: "nav.pritibhoj" as const,
+    icon: IconCake,
     match: (path: string) =>
-      path === "/mess/guests" || path.startsWith("/mess/guests/"),
+      path === "/mess/pritibhoj" || path.startsWith("/mess/pritibhoj/"),
   },
 ] as const;
 
-/** Ledger / Today / Shifts / Planning / Reports / Guests — header strip. */
+/** Ledger / Shifts / Reports / Pritibhoj — header strip. */
 export function MessTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();
@@ -79,7 +63,7 @@ export function MessTabs({ className }: { className?: string }) {
   );
 }
 
-/** Planning / reports / guests — admin sees admin strip, mess sees mess strip. */
+/** Admin → admin strip; mess → mess strip. */
 export function MessPageTabs({ className }: { className?: string }) {
   const { session } = useSession();
   if (session?.role === "admin") return <AdminTabs className={className} />;

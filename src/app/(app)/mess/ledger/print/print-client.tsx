@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -14,21 +14,32 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
+import { ledgerRowApiToLedgerRow, listMessLedger } from "@/lib/api/mess";
+import { isApiEnabled } from "@/lib/api/mode";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
-import { formatMonthLong, monthKey } from "@/lib/date";
+import { formatMonthLong, monthDateBounds, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { buildMonthLedger, buildRangeLedger } from "@/lib/reports";
+import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
+import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 export default function MessLedgerPrintClient() {
   const t = useT();
+  const apiOn = isApiEnabled();
   const state = useStore();
   const searchParams = useSearchParams();
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [apiLedger, setApiLedger] = useState<{
+    rows: LedgerRow[];
+    dayCount: number;
+    tagCodes: DailyTag[];
+    columnDates?: string[];
+  } | null>(null);
 
   const rawMonth = searchParams.get("month");
   const month = rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : monthKey();
@@ -41,35 +52,62 @@ export default function MessLedgerPrintClient() {
   const rangeBounds = useMemo(() => {
     const from = dateFrom.trim();
     const to = dateTo.trim();
-    if (!from && !to) return null;
     if (from && to) {
       return from <= to ? { from, to } : { from: to, to: from };
     }
-    const only = from || to;
-    return { from: only, to: only };
-  }, [dateFrom, dateTo]);
-
-  const ledger = useMemo(() => {
-    if (rangeBounds) {
-      const range = buildRangeLedger(
-        rangeBounds.from,
-        rangeBounds.to,
-        MESS_LEDGER_TAGS,
-        { carry: true, previewFuture: true },
-      );
-      return {
-        month,
-        dayCount: range.dates.length,
-        tagCodes: range.tagCodes,
-        rows: range.rows,
-        columnDates: range.dates,
-      };
+    if (from || to) {
+      const only = from || to;
+      return { from: only, to: only };
     }
-    const monthLedger = buildMonthLedger(month, MESS_LEDGER_TAGS, {
-      carry: true,
-      previewFuture: true,
-    });
-    return { ...monthLedger, columnDates: undefined as string[] | undefined };
+    const bounds = monthDateBounds(month);
+    return { from: bounds.from, to: bounds.to };
+  }, [dateFrom, dateTo, month]);
+
+  useEffect(() => {
+    if (!apiOn) return;
+    let cancelled = false;
+    setLoading(true);
+    void listMessLedger(rangeBounds.from, rangeBounds.to)
+      .then((res) => {
+        if (cancelled) return;
+        setApiLedger({
+          rows: res.rows.map(ledgerRowApiToLedgerRow),
+          dayCount: res.dates.length,
+          tagCodes: res.tag_codes as DailyTag[],
+          columnDates: res.dates,
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setApiLedger({
+          rows: [],
+          dayCount: 0,
+          tagCodes: [...MESS_LEDGER_TAGS],
+          columnDates: [],
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, rangeBounds]);
+
+  const demoLedger = useMemo(() => {
+    const range = buildRangeLedger(
+      rangeBounds.from,
+      rangeBounds.to,
+      MESS_LEDGER_TAGS,
+      { carry: true, previewFuture: true },
+    );
+    return {
+      month,
+      dayCount: range.dates.length,
+      tagCodes: range.tagCodes,
+      rows: range.rows,
+      columnDates: range.dates,
+    };
   }, [
     state.assignments,
     state.users,
@@ -77,6 +115,16 @@ export default function MessLedgerPrintClient() {
     month,
     rangeBounds,
   ]);
+
+  const ledger = apiOn
+    ? {
+        month,
+        dayCount: apiLedger?.dayCount ?? 0,
+        tagCodes: apiLedger?.tagCodes ?? [...MESS_LEDGER_TAGS],
+        rows: apiLedger?.rows ?? [],
+        columnDates: apiLedger?.columnDates,
+      }
+    : demoLedger;
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -168,8 +216,12 @@ export default function MessLedgerPrintClient() {
         />
       </div>
 
-      {!canAct ? (
+      {!loading && !canAct ? (
         <EmptyState title={t("common.noResults")} />
+      ) : loading ? (
+        <p className="py-10 text-center text-sm text-neutral-500">
+          {t("common.loading")}
+        </p>
       ) : (
         <div className="overflow-x-auto">
           <MonthLedgerPrint

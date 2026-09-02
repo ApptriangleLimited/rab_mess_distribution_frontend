@@ -9,7 +9,7 @@ import { isBoroKhana } from "@/lib/store/boro-khana";
 import { canAssignOnDate } from "@/lib/store/daily";
 import { getMessEaters } from "@/lib/store/mess";
 import { getSessionFromStorage } from "@/lib/session";
-import { compareUsers } from "@/lib/store/users";
+import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type {
   DailyStateReport,
   DailyTag,
@@ -54,6 +54,7 @@ export function buildDailyStateReportDraft(date: string): Omit<
       (u) =>
         u.approval_status === "approved" &&
         u.status === "1" &&
+        isCockpitMember(u) &&
         canAssignOnDate(u, date),
     )
     .sort(compareUsers);

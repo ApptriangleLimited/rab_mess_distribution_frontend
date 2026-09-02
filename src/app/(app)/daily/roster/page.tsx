@@ -37,10 +37,11 @@ import { useStore } from "@/hooks/use-store";
 import { getAssignment } from "@/lib/store/assignments";
 import {
   compareUsers,
+  isCockpitMember,
   matchesMemberDateFilter,
 } from "@/lib/store/users";
 import { listAllTags } from "@/lib/store/rates";
-import { RANKS, WINGS } from "@/lib/constants";
+
 import { todayISO } from "@/lib/date";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -54,6 +55,7 @@ export default function RosterPage() {
   const { locale } = useI18n();
   const router = useRouter();
   const state = useStore();
+  const { ranks, wings } = state;
   const tags = listAllTags();
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
@@ -67,12 +69,18 @@ export default function RosterPage() {
   const today = todayISO();
 
   const approved = useMemo(
-    () => state.users.filter((u) => u.approval_status === "approved"),
+    () =>
+      state.users.filter(
+        (u) => u.approval_status === "approved" && isCockpitMember(u),
+      ),
     [state.users],
   );
 
   const pendingAll = useMemo(
-    () => state.users.filter((u) => u.approval_status === "pending"),
+    () =>
+      state.users.filter(
+        (u) => u.approval_status === "pending" && isCockpitMember(u),
+      ),
     [state.users],
   );
 
@@ -298,7 +306,7 @@ export default function RosterPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {RANKS.map((r) => (
+                {ranks.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
@@ -313,7 +321,7 @@ export default function RosterPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {WINGS.map((w) => (
+                {wings.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
                   </SelectItem>

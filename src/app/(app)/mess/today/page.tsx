@@ -1,18 +1,5 @@
-import { Suspense } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-import MessTodayClient from "./mess-today-client";
+import { redirect } from "next/navigation";
 
-export default function MessTodayPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="page-pane">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="mt-4 h-40 w-full" />
-        </div>
-      }
-    >
-      <MessTodayClient />
-    </Suspense>
-  );
+export default function MessTodayRedirect() {
+  redirect("/mess/reports?view=missing");
 }

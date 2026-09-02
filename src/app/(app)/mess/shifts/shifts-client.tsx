@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   IconClockHour4,
   IconPencil,
+  IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
@@ -47,7 +48,8 @@ export default function MessShiftsClient() {
   const state = useStore();
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
-  const [editor, setEditor] = useState<MealShift | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<MealShift | null>(null);
   const [deleting, setDeleting] = useState<MealShift | null>(null);
 
   const shifts = useMemo(
@@ -70,6 +72,21 @@ export default function MessShiftsClient() {
         .includes(query),
     );
   }, [shifts, q, t]);
+
+  function openCreate() {
+    setEditing(null);
+    setEditorOpen(true);
+  }
+
+  function openEdit(shift: MealShift) {
+    setEditing(shift);
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
+    setEditing(null);
+  }
 
   function failMessage(err: unknown) {
     if (err instanceof MealShiftFail && err.code === "IN_USE") {
@@ -100,6 +117,18 @@ export default function MessShiftsClient() {
                 count: filtered.length,
               })}
               center={<MessTabs />}
+              actions={
+                <Button
+                  type="button"
+                  variant="cta"
+                  size="sm"
+                  className="h-9 shrink-0 rounded-xl px-3 shadow-sm shadow-primary/20"
+                  onClick={openCreate}
+                >
+                  <IconPlus className="h-3.5 w-3.5" />
+                  {t("mess.shifts.newShift")}
+                </Button>
+              }
             />
           </div>
         </div>
@@ -120,6 +149,18 @@ export default function MessShiftsClient() {
           <EmptyState
             title={t("mess.shifts.empty")}
             description={t("mess.shifts.emptyHint")}
+            action={
+              <Button
+                type="button"
+                variant="cta"
+                size="sm"
+                className="h-9 rounded-xl px-3"
+                onClick={openCreate}
+              >
+                <IconPlus className="h-3.5 w-3.5" />
+                {t("mess.shifts.newShift")}
+              </Button>
+            }
           />
         ) : (
           <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-950">
@@ -194,7 +235,7 @@ export default function MessShiftsClient() {
                               size="icon"
                               className="h-9 w-9 rounded-xl"
                               aria-label={t("mess.shifts.editShift")}
-                              onClick={() => setEditor(shift)}
+                              onClick={() => openEdit(shift)}
                             >
                               <IconPencil className="h-4 w-4" />
                             </Button>
@@ -223,9 +264,9 @@ export default function MessShiftsClient() {
       </motion.div>
 
       <ShiftDialog
-        open={editor !== null}
-        shift={editor}
-        onClose={() => setEditor(null)}
+        open={editorOpen}
+        shift={editing}
+        onClose={closeEditor}
         onSaved={() => toast(t("mess.shifts.saved"), "success")}
         onError={(message) => toast(message, "error")}
       />

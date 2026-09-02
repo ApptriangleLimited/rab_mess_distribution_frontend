@@ -39,7 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
-import { RANKS } from "@/lib/constants";
+
 import {
   parseMonthInput,
   monthKey,
@@ -61,6 +61,7 @@ type PrintKind = "staff" | "transfer";
 export default function RationSenderReportClient() {
   const t = useT();
   const state = useStore();
+  const { ranks } = state;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -396,7 +397,7 @@ export default function RationSenderReportClient() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {RANKS.map((r) => (
+                {ranks.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>

@@ -21,6 +21,7 @@ import {
 } from "@/components/shared/search-filter-bar";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -30,11 +31,12 @@ import {
 } from "@/components/ui/select";
 import {
   RegisterBoard,
-  PaintTagSelect,
   tagCellClass,
 } from "@/components/daily/register-board";
+import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
 import { useStore } from "@/hooks/use-store";
-import { RANKS, WINGS } from "@/lib/constants";
+import { isApiEnabled } from "@/lib/api/mode";
+import { DAILY_TAGS } from "@/lib/constants";
 import {
   daysInMonth,
   eachISODate,
@@ -45,14 +47,13 @@ import {
 import {
   autoApplyCarryForward,
   clearTag,
-  findPriorTag,
   listByMonth,
   setTag,
   setTagRange,
 } from "@/lib/store/assignments";
 import { getProjectedTagMembers } from "@/lib/store/mess";
 import { listAllTags } from "@/lib/store/rates";
-import { compareUsers } from "@/lib/store/users";
+import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -62,32 +63,52 @@ function defaultRange() {
   return monthDateBounds();
 }
 
+function orderTags(tags: DailyTag[]) {
+  const priority = ["MS", "CD"] as const;
+  const head = priority.filter((t) =>
+    tags.some((x) => x.toUpperCase() === t),
+  ) as DailyTag[];
+  const headKeys = new Set(head.map((t) => t.toUpperCase()));
+  const rest = tags.filter((t) => !headKeys.has(t.toUpperCase()));
+  return [...head, ...rest];
+}
+
 export default function TagsPageClient() {
   const t = useT();
   const { locale } = useI18n();
+  const apiOn = isApiEnabled();
   const state = useStore();
+  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const today = todayISO();
   const initial = defaultRange();
-  /** MS + CD first in tiles, then remaining tags. */
-  const allTags = useMemo(() => {
-    const tags = listAllTags();
-    const priority = ["MS", "CD"] as const;
-    const head = priority.filter((t) =>
-      tags.some((x) => x.toUpperCase() === t),
-    ) as DailyTag[];
-    const headKeys = new Set(head.map((t) => t.toUpperCase()));
-    const rest = tags.filter((t) => !headKeys.has(t.toUpperCase()));
-    return [...head, ...rest];
-  }, [state.rates]);
 
   const [paintTag, setPaintTag] = useState<DailyTag | "">("");
   const [tagFilter, setTagFilter] = useState<DailyTag | "all">("all");
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
+  /** Default: active members only. */
+  const [memberStatus, setMemberStatus] = useState<"all" | "0" | "1">("1");
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
+
+  const cockpit = useDailyCockpit({
+    dateFrom,
+    dateTo,
+    q,
+    rank,
+    wing,
+    status: memberStatus,
+  });
+
+  const demoAllTags = useMemo(
+    () => orderTags(listAllTags()),
+    [state.rates],
+  );
+  const allTags = apiOn
+    ? orderTags(DAILY_TAGS.map((tag) => tag.code))
+    : demoAllTags;
 
   const month = dateFrom.slice(0, 7) || initial.from.slice(0, 7);
   const dayCount = daysInMonth(month);
@@ -103,21 +124,29 @@ export default function TagsPageClient() {
     setDateTo(to || from);
   }
 
-  /** Empty today cells inherit prior tag unless Daily cleared them. */
+  /** Demo only — API computes carry on read. Active members only. */
   useEffect(() => {
+    if (apiOn) return;
     const ids = state.users
-      .filter((u) => u.approval_status === "approved" && u.status === "1")
+      .filter(
+        (u) =>
+          u.approval_status === "approved" &&
+          u.status === "1" &&
+          isCockpitMember(u),
+      )
       .map((u) => u.id);
     if (!ids.length) return;
     autoApplyCarryForward(ids, today);
-  }, [today, state.users, state.assignments, state.suppressed_carries]);
+  }, [apiOn, today, state.users, state.assignments, state.suppressed_carries]);
 
-  const users = useMemo(() => {
+  /** Approved roster — filter by Active / Inactive / All (default Active). */
+  const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
     return state.users
       .filter((u) => {
+        if (!isCockpitMember(u)) return false;
         if (u.approval_status !== "approved") return false;
-        if (u.status !== "1") return false;
+        if (memberStatus !== "all" && u.status !== memberStatus) return false;
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
         if (!query) return true;
@@ -127,30 +156,30 @@ export default function TagsPageClient() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [state.users, q, rank, wing]);
+  }, [state.users, q, rank, wing, memberStatus]);
+
+  const users = apiOn ? cockpit.users : demoUsers;
 
   const assignmentMonths = useMemo(
     () => monthsCoveringRange(dateFrom, dateTo),
     [dateFrom, dateTo],
   );
 
-  const assignments = useMemo(
+  const demoAssignments = useMemo(
     () => assignmentMonths.flatMap((m) => listByMonth(m)),
     [state.assignments, assignmentMonths],
   );
+  const assignments = apiOn ? cockpit.assignments : demoAssignments;
 
-  const rangeStart = useMemo(() => {
-    return dateFrom <= dateTo ? dateFrom : dateTo;
-  }, [dateFrom, dateTo]);
-
-  const priorByUser = useMemo(() => {
+  const demoPriorByUser = useMemo(() => {
     const map = new Map<string, DailyTag>();
     for (const u of users) {
-      const prior = findPriorTag(u.id, rangeStart);
-      if (prior) map.set(u.id, prior);
+      if (u.status === "1" && u.default_tag) map.set(u.id, u.default_tag);
     }
     return map;
-  }, [users, rangeStart, state.assignments]);
+  }, [users]);
+
+  const priorByUser = apiOn ? cockpit.priorByUser : demoPriorByUser;
 
   const visibleDates = useMemo(
     () => eachISODate(dateFrom, dateTo),
@@ -161,8 +190,7 @@ export default function TagsPageClient() {
   const datesAreDefault =
     dateFrom === defaultDates.from && dateTo === defaultDates.to;
 
-  /** Person-days per tag across selected date range (filtered users). */
-  const tagCounts = useMemo(() => {
+  const demoTagCounts = useMemo(() => {
     const allowed = new Set(users.map((u) => u.id));
     const counts: Record<string, number> = {};
     for (const tag of allTags) counts[tag] = 0;
@@ -185,13 +213,14 @@ export default function TagsPageClient() {
     state.rates,
   ]);
 
+  const tagCounts = apiOn ? cockpit.tagCounts : demoTagCounts;
+
   const allTaggedCount = useMemo(
     () => allTags.reduce((sum, tag) => sum + (tagCounts[tag] ?? 0), 0),
     [allTags, tagCounts],
   );
 
-  /** User ids that hold each tag at least once in the date range. */
-  const tagMemberIds = useMemo(() => {
+  const demoTagMemberIds = useMemo(() => {
     const allowed = new Set(users.map((u) => u.id));
     const map = new Map<string, Set<string>>();
     for (const tag of allTags) {
@@ -212,6 +241,22 @@ export default function TagsPageClient() {
     state.users,
     state.suppressed_carries,
   ]);
+
+  const apiTagMemberIds = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const tag of allTags) {
+      const ids = new Set<string>();
+      for (const date of visibleDates) {
+        for (const user of cockpit.projectedTagMembers(tag, date)) {
+          ids.add(user.id);
+        }
+      }
+      map.set(tag, ids);
+    }
+    return map;
+  }, [allTags, visibleDates, cockpit]);
+
+  const tagMemberIds = apiOn ? apiTagMemberIds : demoTagMemberIds;
 
   const boardUsers = useMemo(() => {
     if (tagFilter === "all") return users;
@@ -241,20 +286,30 @@ export default function TagsPageClient() {
     if (q.trim()) params.set("q", q.trim());
     if (rank !== "all") params.set("rank", rank);
     if (wing !== "all") params.set("wing", wing);
+    if (memberStatus !== "all") params.set("status", memberStatus);
     return `/daily/tags/print?${params.toString()}`;
-  }, [month, dateFrom, dateTo, q, rank, wing]);
+  }, [month, dateFrom, dateTo, q, rank, wing, memberStatus]);
 
   function onTagChange(userId: string, date: string, tag: DailyTag | "") {
-    if (!tag) clearTag(userId, date);
+    const user = users.find((u) => u.id === userId);
+    if (user && user.status !== "1") return;
+    if (apiOn) void cockpit.onTagChange(userId, date, tag);
+    else if (!tag) clearTag(userId, date);
     else setTag(userId, date, tag);
   }
 
   function onPaintRange(userId: string, dates: string[], tag: DailyTag | "") {
-    setTagRange(userId, dates, tag);
+    const user = users.find((u) => u.id === userId);
+    if (user && user.status !== "1") return;
+    if (apiOn) void cockpit.onPaintRange(userId, dates, tag);
+    else setTagRange(userId, dates, tag);
   }
+
+  const loading = apiOn && cockpit.loading;
 
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
+    memberStatus !== "1" ||
     rank !== "all" ||
     wing !== "all" ||
     !datesAreDefault ||
@@ -266,7 +321,7 @@ export default function TagsPageClient() {
         asChild
         variant="cta"
         size="sm"
-        className="h-10 shrink-0 rounded-xl px-3"
+        className="h-9 shrink-0 rounded-xl px-3"
       >
         <Link href={printHref} target="_blank" rel="noopener noreferrer">
           <IconPrinter className="h-4 w-4" />
@@ -277,7 +332,7 @@ export default function TagsPageClient() {
       <Button
         variant="cta"
         size="sm"
-        className="h-10 shrink-0 rounded-xl px-3"
+        className="h-9 shrink-0 rounded-xl px-3"
         disabled
       >
         <IconPrinter className="h-4 w-4" />
@@ -306,7 +361,103 @@ export default function TagsPageClient() {
               title={t("pages.dailyTags.title")}
               subtitle={t("pages.dailyTags.subtitle", { month })}
               center={<DailyTabs />}
-              actions={printBtn}
+              actions={
+                <div className="flex flex-nowrap items-center justify-end gap-1.5">
+                  <Input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder={t("cc.searchPlaceholder")}
+                    className={cn(
+                      fieldClass,
+                      "h-9 w-32 shrink-0 rounded-xl sm:w-40",
+                    )}
+                    aria-label={t("common.search")}
+                  />
+                  <div className="w-[7.25rem] shrink-0">
+                    <Select
+                      value={memberStatus}
+                      onValueChange={(v) =>
+                        setMemberStatus(v as "all" | "0" | "1")
+                      }
+                    >
+                      <SelectTrigger
+                        className={cn(fieldClass, "h-9 w-full rounded-xl")}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">
+                          {t("cc.statusActive")}
+                        </SelectItem>
+                        <SelectItem value="0">
+                          {t("cc.statusInactive")}
+                        </SelectItem>
+                        <SelectItem value="all">
+                          {t("common.allStatus")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-[6.5rem] shrink-0">
+                    <Select value={rank} onValueChange={setRank}>
+                      <SelectTrigger
+                        className={cn(fieldClass, "h-9 w-full rounded-xl")}
+                      >
+                        <SelectValue placeholder={t("cc.selectRank")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">
+                          {t("common.allRank")}
+                        </SelectItem>
+                        {ranks.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-24 shrink-0">
+                    <Select value={wing} onValueChange={setWing}>
+                      <SelectTrigger
+                        className={cn(fieldClass, "h-9 w-full rounded-xl")}
+                      >
+                        <SelectValue placeholder={t("cc.selectWing")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">
+                          {t("common.allWing")}
+                        </SelectItem>
+                        {wings.map((w) => (
+                          <SelectItem key={w} value={w}>
+                            {w}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DateRangePicker
+                    from={dateFrom}
+                    to={dateTo}
+                    maxSpanDays={31}
+                    onChange={({ from, to }) => applyDateRange(from, to)}
+                    label={t("common.dateRange")}
+                    triggerClassName="h-9 w-40 min-w-0 shrink-0 rounded-xl px-2 text-xs"
+                  />
+                  <ClearFiltersButton
+                    className="h-9 w-9 shrink-0"
+                    disabled={!filtersActive && !q.trim()}
+                    onClick={() => {
+                      setQ("");
+                      setMemberStatus("1");
+                      setRank("all");
+                      setWing("all");
+                      setTagFilter("all");
+                      applyDateRange("", "");
+                    }}
+                  />
+                </div>
+              }
             />
           </div>
         </div>
@@ -314,10 +465,11 @@ export default function TagsPageClient() {
         <SearchFilterBar
           search={q}
           onSearchChange={setQ}
-          searchPlaceholder={t("cc.searchPlaceholder")}
-          searchClassName="w-44 sm:w-48"
+          hideSearch
+          hideFilters
           filtersActive={filtersActive}
           wrapTiles={false}
+          trailing={printBtn}
           className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={
             <>
@@ -344,64 +496,14 @@ export default function TagsPageClient() {
             </>
           }
         >
-          <div className="w-[7.5rem] shrink-0">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {RANKS.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[7rem] shrink-0">
-            <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {WINGS.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DateRangePicker
-            from={dateFrom}
-            to={dateTo}
-            maxSpanDays={31}
-            onChange={({ from, to }) => applyDateRange(from, to)}
-            label={t("common.dateRange")}
-            triggerClassName="min-w-[10rem] w-[10rem] px-2 text-xs"
-          />
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              setWing("all");
-              setTagFilter("all");
-              applyDateRange("", "");
-            }}
-          />
-          <div className="hidden w-[9rem]" aria-hidden>
-            <PaintTagSelect
-              paintTag={paintTag}
-              onPaintTagChange={setPaintTag}
-              triggerClassName={cn(fieldClass, "w-full font-mono font-bold")}
-            />
-          </div>
+          <></>
         </SearchFilterBar>
 
-        {users.length === 0 ? (
+        {loading ? (
+          <p className="py-10 text-center text-sm text-neutral-500">
+            {t("common.loading")}
+          </p>
+        ) : users.length === 0 ? (
           <EmptyState title={t("daily.emptyTags")} />
         ) : visibleDates.length === 0 || boardUsers.length === 0 ? (
           <EmptyState title={t("common.noResults")} />
@@ -417,7 +519,14 @@ export default function TagsPageClient() {
             onTagChange={onTagChange}
             onPaintRange={onPaintRange}
             priorByUser={priorByUserFiltered}
-            suppressedCarries={state.suppressed_carries ?? []}
+            suppressedCarries={
+              apiOn ? cockpit.suppressedCarries : (state.suppressed_carries ?? [])
+            }
+            boroKhanaDates={apiOn ? cockpit.boroKhanaDates : undefined}
+            onBoroKhanaToggle={apiOn ? cockpit.onBoroKhanaToggle : undefined}
+            projectedTagMembers={
+              apiOn ? cockpit.projectedTagMembers : undefined
+            }
             dateFrom={dateFrom}
             dateTo={dateTo}
           />
@@ -450,19 +559,24 @@ function MiniStat({
   title?: string;
   onClick?: () => void;
 }) {
+  const interactive = typeof onClick === "function";
   return (
     <button
       type="button"
       title={title}
       onClick={onClick}
-      aria-pressed={selected}
+      disabled={!interactive}
+      aria-pressed={interactive ? selected : undefined}
       className={cn(
-        "inline-flex h-9 min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 shadow-sm transition",
+        "inline-flex h-9 min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 transition",
         toneClass ??
-          "border-neutral-200/90 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
-        selected
-          ? "border-black ring-1 ring-black brightness-95 dark:border-white dark:ring-white dark:brightness-110"
-          : "hover:brightness-[0.97] dark:hover:brightness-110",
+          "border border-neutral-200/80 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
+        toneClass && "border border-transparent",
+        interactive
+          ? selected
+            ? "ring-2 ring-primary/50 ring-offset-1 ring-offset-white dark:ring-offset-neutral-950"
+            : "hover:brightness-[0.97] dark:hover:brightness-110"
+          : "cursor-default disabled:opacity-100",
       )}
     >
       <span className="shrink-0 opacity-90" aria-hidden>

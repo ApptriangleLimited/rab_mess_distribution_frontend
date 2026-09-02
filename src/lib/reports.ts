@@ -1,3 +1,4 @@
+import type { AssignmentCell } from "@/lib/api/assignments";
 import { getState } from "@/lib/store";
 import { RATION_REPORT_META } from "@/lib/constants";
 import {
@@ -11,7 +12,8 @@ import {
   isCarrySuppressed,
 } from "@/lib/store/assignments";
 import { getClFrMonthlyAmount, getFuelRatePerDay, listAllTags } from "@/lib/store/rates";
-import { compareUsers } from "@/lib/store/users";
+import { compareUsers, isCockpitMember } from "@/lib/store/users";
+import { activeSenders } from "@/lib/store/senders";
 import { roundPaisa } from "@/lib/money";
 import type {
   DailyAssignment,
@@ -376,7 +378,10 @@ export function buildMonthLedger(
 
   if (useCarry) {
     const candidates = users.filter(
-      (u) => u.approval_status === "approved" && u.status === "1",
+      (u) =>
+        u.approval_status === "approved" &&
+        u.status === "1" &&
+        isCockpitMember(u),
     );
     for (const user of candidates) {
       let dayMap = byUser.get(user.id);
@@ -467,7 +472,10 @@ export function buildRangeLedger(
 
   if (useCarry) {
     const candidates = users.filter(
-      (u) => u.approval_status === "approved" && u.status === "1",
+      (u) =>
+        u.approval_status === "approved" &&
+        u.status === "1" &&
+        isCockpitMember(u),
     );
     for (const user of candidates) {
       let dayMap = byUser.get(user.id);
@@ -603,6 +611,52 @@ export function buildDailyRegisterDates(
   return { dates, rows };
 }
 
+/** Register rows from API assignment cells (stored + carry tags). */
+export function buildDailyRegisterFromCells(
+  dates: string[],
+  users: User[],
+  cells: AssignmentCell[],
+): {
+  dates: string[];
+  rows: LedgerRow[];
+} {
+  if (!dates.length) return { dates, rows: [] };
+  const lo = dates[0];
+  const hi = dates[dates.length - 1];
+  const byUser = new Map<string, Map<string, DailyTag>>();
+  for (const cell of cells) {
+    if (cell.date < lo || cell.date > hi) continue;
+    if (!cell.tag || cell.source === "empty" || cell.source === "suppressed") {
+      continue;
+    }
+    let dayMap = byUser.get(cell.member_id);
+    if (!dayMap) {
+      dayMap = new Map();
+      byUser.set(cell.member_id, dayMap);
+    }
+    dayMap.set(cell.date, cell.tag as DailyTag);
+  }
+
+  const rows: LedgerRow[] = [...users]
+    .sort(sortUsersForBill)
+    .map((user) => {
+      const dayMap = byUser.get(user.id);
+      const counts: Partial<Record<DailyTag, number>> = {};
+      const days: LedgerDayCell[] = dates.map((date) => {
+        const tag = dayMap?.get(date) ?? "";
+        if (tag) counts[tag] = (counts[tag] ?? 0) + 1;
+        return tag;
+      });
+      const totalDays = Object.values(counts).reduce<number>(
+        (s, n) => s + (n ?? 0),
+        0,
+      );
+      return { user, days, tagCounts: counts, totalDays };
+    });
+
+  return { dates, rows };
+}
+
 /** Slice register rows to calendar day numbers (1-based). */
 export function sliceRegisterRows(
   rows: LedgerRow[],
@@ -691,6 +745,7 @@ export function buildRationReport(month: string): {
   total: number;
 } {
   const { users, senders, rates } = getState();
+  const payoutSenders = activeSenders(senders);
   const rateByTag = new Map(rates.map((r) => [r.tag, r.amount_per_day]));
   const assignments = assignmentsInMonth(month);
 
@@ -714,7 +769,7 @@ export function buildRationReport(month: string): {
   // MS + CL (no FR that month) → fixed monthly Fresh Ration via CL lines.
   lines.push(...buildClFrRationLines(month));
 
-  const groups: SenderReportGroup[] = senders.map((sender) => {
+  const groups: SenderReportGroup[] = payoutSenders.map((sender) => {
     const senderLines = lines.filter((l) =>
       sender.mapped_tags.includes(l.tag),
     );
@@ -725,7 +780,7 @@ export function buildRationReport(month: string): {
     };
   });
 
-  const mappedTags = new Set(senders.flatMap((s) => s.mapped_tags));
+  const mappedTags = new Set(payoutSenders.flatMap((s) => s.mapped_tags));
   const unmapped = lines.filter((l) => !mappedTags.has(l.tag));
 
   return {
@@ -872,7 +927,7 @@ export function buildRationStaffLines(
   // Tag + bank letter: count days for tag even when rate is 0 / tag not on mapped_tags.
   if (tag && senderId) {
     const { users, senders, rates } = getState();
-    const sender = senders.find((s) => s.id === senderId);
+    const sender = activeSenders(senders).find((s) => s.id === senderId);
     if (!sender) return [];
 
     // CL ration letter: MS members get fixed monthly Fresh Ration (CLFR), not FR/day.

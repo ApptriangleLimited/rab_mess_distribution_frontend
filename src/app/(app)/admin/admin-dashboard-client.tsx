@@ -494,7 +494,7 @@ export default function AdminDashboardClient() {
               tone: "bg-rose-500/12 text-rose-700 dark:text-rose-300",
             },
             {
-              href: "/mess/guests",
+              href: "/mess/reports?audience=guest",
               label: t("pages.adminDashboard.meals.guests"),
               hint: t("pages.adminDashboard.meals.guestsHint"),
               value: stats.mealGuests,

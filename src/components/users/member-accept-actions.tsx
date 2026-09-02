@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { approveUser, rejectUser } from "@/lib/store/daily";
 import { getAssignment, setTag } from "@/lib/store/assignments";
+import { updateUser } from "@/lib/store/users";
+import { userToFormValues } from "@/components/users/user-form";
 import { todayISO } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import type { DailyTag, User } from "@/lib/types";
@@ -50,6 +52,10 @@ export function MemberAcceptActions({
           return;
         }
         setTag(user.id, todayISO(), actionTag);
+        updateUser(user.id, {
+          ...userToFormValues(user),
+          default_tag: actionTag,
+        });
       }
       approveUser(user.id);
       toast(t("daily.approvedToast"), "success");

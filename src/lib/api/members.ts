@@ -1,7 +1,7 @@
 import { apiJson } from "@/lib/api/client";
 import { toMemberEntryBody } from "@/lib/api/register";
 import type { UserFormValues } from "@/components/users/user-form";
-import type { ApprovalStatus, MemberType, User, UserStatus } from "@/lib/types";
+import type { ApprovalStatus, MemberType, User, UserStatus, DailyTag } from "@/lib/types";
 
 export type MemberListParams = {
   q?: string;
@@ -41,8 +41,10 @@ export type MemberApiRow = {
   account_number: string;
   routing: string;
   branch: string;
+  branch_location: string;
   joining_date: string | null;
   out_date: string | null;
+  default_tag?: string;
   emergency_contacts: User["emergency_contacts"];
   created_at: string;
   updated_at: string;
@@ -62,7 +64,14 @@ function asApproval(value: string): ApprovalStatus {
 }
 
 function asMemberType(value: string): MemberType {
-  if (value === "new" || value === "attached" || value === "permanent") return value;
+  if (
+    value === "new" ||
+    value === "attached" ||
+    value === "permanent" ||
+    value === "guest" ||
+    value === "civilian"
+  )
+    return value;
   return "permanent";
 }
 
@@ -76,10 +85,15 @@ export function memberToUser(row: MemberApiRow): User {
     rfid: row.rfid ?? "",
     rank: row.rank ?? "",
     wing: row.wing ?? "",
+    force: "",
+    religion: "",
     member_type: asMemberType(row.member_type),
     dropdown_no: row.dropdown_no ?? "",
     phone: row.phone ?? "",
     documents: row.documents ?? [],
+    documents_verified: Boolean(
+      (row as MemberApiRow & { documents_verified?: boolean }).documents_verified,
+    ),
     status: (row.status === "1" ? "1" : "0") as UserStatus,
     approval_status: asApproval(row.approval_status),
     bank_name: row.bank_name ?? "",
@@ -87,8 +101,10 @@ export function memberToUser(row: MemberApiRow): User {
     account_number: row.account_number ?? "",
     routing: row.routing ?? "",
     branch: row.branch ?? "",
+    branch_location: row.branch_location ?? "",
     joining_date: row.joining_date ?? "",
     out_date: row.out_date ?? "",
+    default_tag: ((row.default_tag || "MS").toUpperCase() || "MS") as DailyTag,
     emergency_contacts: row.emergency_contacts ?? [],
     created_at: row.created_at,
     updated_at: row.updated_at,

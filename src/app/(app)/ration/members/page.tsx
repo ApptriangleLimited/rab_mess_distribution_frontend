@@ -32,7 +32,7 @@ import {
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { compareUsers } from "@/lib/store/users";
-import { RANKS, WINGS } from "@/lib/constants";
+
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import type { User } from "@/lib/types";
@@ -46,6 +46,7 @@ function hasBank(user: User) {
 export default function RationMembersPage() {
   const t = useT();
   const state = useStore();
+  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -187,7 +188,7 @@ export default function RationMembersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {RANKS.map((r) => (
+                {ranks.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
@@ -202,7 +203,7 @@ export default function RationMembersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {WINGS.map((w) => (
+                {wings.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
                   </SelectItem>
@@ -322,6 +323,7 @@ export default function RationMembersPage() {
                       ["account_number", t("cc.fields.accountNumber")],
                       ["routing", t("cc.fields.routing")],
                       ["branch", t("cc.fields.branch")],
+                      ["branch_location", t("cc.fields.branchLocation")],
                     ] as const
                   ).map(([key, label]) => (
                     <div key={key} className="min-w-0">

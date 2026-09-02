@@ -1,4 +1,18 @@
-import { DAILY_TAGS, RATE_ONLY_TAGS, RANKS, WINGS } from "@/lib/constants";
+import {
+  BRANCH_DISTRICTS,
+  DEFAULT_AUTHORIZED,
+  DAILY_TAGS,
+  defaultForceRanks,
+  FORCES,
+  RATE_ONLY_TAGS,
+  RANKS,
+  RELIGIONS,
+  WINGS,
+  ADMIN_SUB_WINGS,
+  HQ_SUB_WINGS,
+  DEFAULT_WING_PARENT,
+  MEMBER_BANKS,
+} from "@/lib/constants";
 import {
   dateInMonth,
   daysInMonth,
@@ -15,11 +29,13 @@ import type {
   AppState,
   DailyAssignment,
   DailyTag,
+  DocumentMeta,
   MealAssign,
   MealPlan,
   MealShift,
   MealShiftId,
   GuestMeal,
+  MemberType,
   SenderAccount,
   User,
 } from "@/lib/types";
@@ -54,6 +70,7 @@ function user(
     | "member_type"
     | "personal_id"
     | "emergency_contacts"
+    | "default_tag"
   > & {
     documents?: User["documents"];
     joining_date?: string;
@@ -61,16 +78,19 @@ function user(
     member_type?: User["member_type"];
     personal_id?: string;
     emergency_contacts?: User["emergency_contacts"];
+    default_tag?: DailyTag;
   },
 ): User {
   const ts = nowISO();
   return {
     documents: [],
+    documents_verified: false,
     joining_date: todayISO(),
     out_date: "",
     member_type: "permanent",
     personal_id: "",
     emergency_contacts: [],
+    default_tag: "MS",
     created_at: ts,
     updated_at: ts,
     ...partial,
@@ -153,16 +173,13 @@ const LAST_NAMES = [
   "Parveen",
 ];
 
-const BANKS = [
-  { bank: "Sonali Bank", branch: "Mirpur" },
-  { bank: "Agrani Bank", branch: "Uttara" },
-  { bank: "Janata Bank", branch: "Motijheel" },
-  { bank: "Pubali Bank", branch: "Banani" },
-  { bank: "BRAC Bank", branch: "Gulshan" },
-  { bank: "City Bank", branch: "Dhanmondi" },
-  { bank: "Dutch Bangla", branch: "Mohakhali" },
-  { bank: "Islami Bank", branch: "Farmgate" },
-];
+/** Branches for Settings member-bank catalog (MEMBER_BANKS). */
+const BANK_BRANCHES = ["Mirpur", "Uttara", "Motijheel"] as const;
+
+const BANKS = MEMBER_BANKS.map((bank, i) => ({
+  bank,
+  branch: BANK_BRANCHES[i % BANK_BRANCHES.length]!,
+}));
 
 /** Base duty tags for roster members (pending/ended skip assignments). */
 const BASE_TAGS: DailyTag[] = [
@@ -200,72 +217,117 @@ type MemberPlan = {
   spans?: { tag: DailyTag; from: number; to: number }[];
 };
 
-function buildDemoUsers(total = 12): User[] {
-  const users: User[] = [];
+const SEED_WINGS = [
+  "Admin",
+  "Ops Wg",
+  "Int Wg",
+  "Comm & MIS Wg",
+  "Trg Wg",
+  "L & M Wg",
+  "Inv Wg",
+  "Air Wg",
+  "R & D Cell",
+  "Training School",
+] as const;
 
-  for (let i = 0; i < total; i++) {
-    const n = i + 1;
+/** Ranks that fill Manpower columns (Officer + Settings RANKS). */
+const SEED_MANPOWER_RANKS = ["Officer", ...RANKS] as const;
+
+/** How many approved members per wing for each rank — demo-sized Form 1. */
+const SEED_RANK_PER_WING: Record<(typeof SEED_MANPOWER_RANKS)[number], number> =
+  {
+    Officer: 2,
+    DAD: 2,
+    RT: 1,
+    ASI: 3,
+    AASI: 3,
+    Naik: 4,
+    Constable: 7,
+    Cook: 1,
+    ANCE: 1,
+    Civill: 1,
+    Attached: 1,
+  };
+
+/** Full tag history only for first N roster members (mess/consume demos). */
+const SEED_FULL_HISTORY_ROSTER = 25;
+
+/** Total demo members (edge cases + grid + pending civilian). */
+const SEED_DEMO_MEMBER_TOTAL = 25;
+
+function seedDocuments(n: number): DocumentMeta[] {
+  return [
+    {
+      name: n % 3 === 0 ? "posting-order.pdf" : "joining-order.pdf",
+      size: 180_000 + n * 4_200,
+    },
+  ];
+}
+
+type SeedMemberProfile = {
+  member_type: MemberType;
+  approval_status: User["approval_status"];
+  status: User["status"];
+  idPrefix: string;
+  rabBase: number;
+  out_date?: string;
+};
+
+function buildDemoUsers(): User[] {
+  const users: User[] = [];
+  let n = 0;
+
+  function pushMember(opts: {
+    profile: SeedMemberProfile;
+    rank: string;
+    wing: string;
+    force?: string;
+  }) {
+    n += 1;
+    const i = n - 1;
     const first = FIRST_NAMES[i % FIRST_NAMES.length]!;
     const last = LAST_NAMES[(i * 3) % LAST_NAMES.length]!;
     const name = `${first} ${last}`;
-    const rank = RANKS[i % RANKS.length]!;
-    const wing = WINGS[i % WINGS.length]!;
     const bank = BANKS[i % BANKS.length]!;
+    const profile = opts.profile;
+    const isCivilian =
+      profile.member_type === "civilian" || opts.rank === "Civill";
+    const force =
+      opts.force ??
+      (isCivilian ? "Civilian" : FORCES[i % (FORCES.length - 1)]!);
+    const religion = RELIGIONS[i % RELIGIONS.length]!;
+    const personalNo = isCivilian
+      ? `${1980 + (n % 20)}${String(1000000 + n * 137).slice(0, 8)}`
+      : `PN-${String(10000 + n).padStart(5, "0")}`;
+    const cardNo = isCivilian ? `CARD-${String(n).padStart(4, "0")}` : "";
+    const rab_id = isCivilian
+      ? `CIV-${cardNo.replace(/^CARD-/, "")}`
+      : `RAB-${profile.rabBase}`;
 
-    // Mix approval / status for UI demos (scaled for small seeds).
-    let approval_status: User["approval_status"] = "approved";
-    let status: User["status"] = "1";
-    let out_date = "";
-    let idPrefix = "u";
-    let rabBase = 2000 + n;
-
-    if (total <= 12) {
-      if (n === 1) {
-        approval_status = "pending";
-        idPrefix = "u_pending";
-        rabBase = 1000 + n;
-      } else if (n === 2) {
-        approval_status = "ended";
-        status = "0";
-        out_date = shiftMonthKey(monthKey(), -1) + "-15";
-        idPrefix = "u_ended";
-      } else if (n === 3) {
-        status = "0";
-        idPrefix = "u_off";
-      }
-    } else if (n <= 4) {
-      approval_status = "pending";
-      idPrefix = "u_pending";
-      rabBase = 1000 + n;
-    } else if (n === 5 || n === 6) {
-      approval_status = "ended";
-      status = "0";
-      out_date = shiftMonthKey(monthKey(), -1) + "-15";
-      idPrefix = "u_ended";
-    } else if (n === 7 || n === 8) {
-      status = "0";
-      idPrefix = "u_off";
-    }
-
-    const rab_id = `RAB-${rabBase}`;
     users.push(
       user({
-        id: `${idPrefix}_${n}`,
+        id: `${profile.idPrefix}_${n}`,
         name,
+        personal_id: personalNo,
         rab_id,
-        rfid: `RFID-${rabBase}`,
-        rank,
-        wing,
-        dropdown_no: `D-${String(n).padStart(2, "0")}`,
+        rfid: isCivilian ? "" : `RFID-${profile.rabBase}`,
+        rank: isCivilian ? "Civill" : opts.rank,
+        wing: opts.wing,
+        force,
+        religion,
+        member_type: profile.member_type,
+        dropdown_no: cardNo,
         phone: `01711${String(n).padStart(6, "0")}`,
-        status,
-        approval_status,
+        status: profile.status,
+        approval_status: profile.approval_status,
         bank_name: bank.bank,
         account_name: name,
-        account_number: `${approval_status === "pending" ? "11" : "22"}02${String(rabBase).padStart(6, "0")}`,
+        account_number: `${profile.approval_status === "pending" ? "11" : "22"}02${String(profile.rabBase).padStart(6, "0")}`,
         routing: `20027${String(n).padStart(4, "0")}`,
         branch: bank.branch,
-        out_date,
+        branch_location: BRANCH_DISTRICTS[i % BRANCH_DISTRICTS.length]!,
+        documents: seedDocuments(n),
+        out_date: profile.out_date ?? "",
         joining_date:
           n % 7 === 0
             ? dateInMonth(shiftMonthKey(monthKey(), -2), 1 + (n % 20))
@@ -283,6 +345,88 @@ function buildDemoUsers(total = 12): User[] {
       }),
     );
   }
+
+  // Edge-case rows for CC/Daily workflows (not on Manpower held).
+  pushMember({
+    profile: {
+      member_type: "new",
+      approval_status: "pending",
+      status: "1",
+      idPrefix: "u_pending",
+      rabBase: 1001,
+    },
+    rank: "Constable",
+    wing: "Ops Wg",
+  });
+  pushMember({
+    profile: {
+      member_type: "permanent",
+      approval_status: "ended",
+      status: "0",
+      idPrefix: "u_ended",
+      rabBase: 2002,
+      out_date: shiftMonthKey(monthKey(), -1) + "-15",
+    },
+    rank: "ASI",
+    wing: "Int Wg",
+  });
+  pushMember({
+    profile: {
+      member_type: "permanent",
+      approval_status: "approved",
+      status: "0",
+      idPrefix: "u_off",
+      rabBase: 2003,
+    },
+    rank: "DAD",
+    wing: "Admin",
+  });
+
+  // Main Manpower grid: round-robin wings so SEED_DEMO_MEMBER_TOTAL
+  // does not dump everyone on Admin (first wing).
+  const gridSlots: { wing: string; rank: (typeof SEED_MANPOWER_RANKS)[number] }[] =
+    [];
+  for (const rank of SEED_MANPOWER_RANKS) {
+    const copies = SEED_RANK_PER_WING[rank] ?? 1;
+    for (let c = 0; c < copies; c++) {
+      for (const wing of SEED_WINGS) {
+        gridSlots.push({ wing, rank });
+      }
+    }
+  }
+  for (const slot of gridSlots) {
+    if (users.length >= SEED_DEMO_MEMBER_TOTAL - 1) break;
+    const isCiv = slot.rank === "Civill";
+    const isAtt = slot.rank === "Attached";
+    pushMember({
+      profile: {
+        member_type: isCiv
+          ? "civilian"
+          : isAtt
+            ? "attached"
+            : "permanent",
+        approval_status: "approved",
+        status: "1",
+        idPrefix: isCiv ? "u_civ" : isAtt ? "u_att" : "u",
+        rabBase: 3000 + n + 1,
+      },
+      rank: slot.rank,
+      wing: slot.wing,
+    });
+  }
+
+  // One pending civilian for CC queue demo.
+  pushMember({
+    profile: {
+      member_type: "civilian",
+      approval_status: "pending",
+      status: "1",
+      idPrefix: "u_civ_pending",
+      rabBase: 9001,
+    },
+    rank: "Civill",
+    wing: "Admin",
+  });
 
   return users;
 }
@@ -504,13 +648,20 @@ function seedGuestMeals(users: User[]): GuestMeal[] {
 }
 
 /** Bump → auto wipe localStorage + reseed on next load. */
-export const SEED_VERSION = 16;
+export const SEED_VERSION = 30;
 
 export function createSeedState(): AppState {
   const today = todayISO();
-  const users = buildDemoUsers(50);
-  const dates = seedDemoDates(3);
+  const users = buildDemoUsers();
+  const fullHistoryDates = seedDemoDates(3);
+  const currentMonthDates = monthDatesThroughToday();
   const memberPlans = buildMemberPlans(users);
+  const defaultByUser = new Map(
+    memberPlans.map((plan) => [plan.user_id, plan.base] as const),
+  );
+  for (const u of users) {
+    u.default_tag = defaultByUser.get(u.id) ?? "MS";
+  }
 
   function resolveDayBound(bound: number, lastDay: number) {
     if (bound < 0) return lastDay + bound + 1;
@@ -527,15 +678,19 @@ export function createSeedState(): AppState {
   }
 
   const assignments: DailyAssignment[] = [];
-  for (const date of dates) {
-    const day = Number(date.slice(8, 10));
-    const month = date.slice(0, 7);
-    const lastDay =
-      month === monthKey()
-        ? Number(today.slice(8, 10))
-        : daysInMonth(month);
+  const rosterPlans = memberPlans;
+  for (let pi = 0; pi < rosterPlans.length; pi++) {
+    const plan = rosterPlans[pi]!;
+    const dates =
+      pi < SEED_FULL_HISTORY_ROSTER ? fullHistoryDates : currentMonthDates;
+    for (const date of dates) {
+      const day = Number(date.slice(8, 10));
+      const month = date.slice(0, 7);
+      const lastDay =
+        month === monthKey()
+          ? Number(today.slice(8, 10))
+          : daysInMonth(month);
 
-    for (const plan of memberPlans) {
       assignments.push({
         id: id("a"),
         user_id: plan.user_id,
@@ -551,52 +706,57 @@ export function createSeedState(): AppState {
     {
       id: "s_fr",
       label: "FR Pool",
-      bank_name: "Bangladesh Bank",
+      bank_name: MEMBER_BANKS[0]!,
       account_name: "RAB FR Allowance",
       account_number: "9001001001",
       routing: "000000001",
       branch: "Head Office",
       mapped_tags: ["FR"],
+      active: true,
     },
     {
       id: "s_ms",
       label: "Mess Fund",
-      bank_name: "Sonali Bank",
+      bank_name: MEMBER_BANKS[1]!,
       account_name: "RAB Mess Fund",
       account_number: "9001001002",
       routing: "000000002",
       branch: "HQ Branch",
       mapped_tags: ["MS"],
+      active: true,
     },
     {
       id: "s_ops",
       label: "Ops Contingency",
-      bank_name: "Agrani Bank",
+      bank_name: MEMBER_BANKS[2]!,
       account_name: "RAB Ops Pool",
       account_number: "9001001003",
       routing: "000000003",
       branch: "Central",
       mapped_tags: ["CD", "TRG"],
+      active: true,
     },
     {
       id: "s_med",
       label: "Medical Pool",
-      bank_name: "Janata Bank",
+      bank_name: MEMBER_BANKS[0]!,
       account_name: "RAB Medical Fund",
       account_number: "9001001004",
       routing: "000000004",
       branch: "HQ Branch",
       mapped_tags: ["MED", "WIT"],
+      active: true,
     },
     {
       id: "s_leave",
       label: "Leave / Admin",
-      bank_name: "Pubali Bank",
+      bank_name: MEMBER_BANKS[1]!,
       account_name: "RAB Admin Pool",
       account_number: "9001001005",
       routing: "000000005",
       branch: "Banani",
       mapped_tags: ["CL", "PL", "WR"],
+      active: true,
     },
   ];
 
@@ -619,6 +779,39 @@ export function createSeedState(): AppState {
     assignments,
     senders,
     rates,
+    ranks: [...RANKS],
+    wings: [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS],
+    wing_parent: { ...DEFAULT_WING_PARENT },
+    wing_labels: {},
+    forces: [...FORCES],
+    force_ranks: defaultForceRanks(),
+    force_rank_extras: Object.fromEntries(FORCES.map((f) => [f, [] as string[]])),
+    force_rank_removed: Object.fromEntries(FORCES.map((f) => [f, [] as string[]])),
+    force_rank_labels: Object.fromEntries(
+      FORCES.map((f) => [f, {} as Record<string, string>]),
+    ),
+    rank_labels: {},
+    rank_forces: {
+      DAD: ["Army", "Police"],
+      ...Object.fromEntries(
+        RANKS.filter((r) => r !== "DAD").map((r) => [r, [] as string[]]),
+      ),
+    },
+    rank_equivalents: {
+      DAD: {
+        Army: ["OR", "L/Cpl"],
+        Police: ["Insp"],
+      },
+    },
+    rank_force_wings: Object.fromEntries(
+      RANKS.map((r) => [r, {} as Record<string, string[]>]),
+    ),
+    member_banks: [...MEMBER_BANKS],
+    authorized: DEFAULT_AUTHORIZED.map((row) => ({
+      ...row,
+      wings: { ...(row.wings ?? {}) },
+    })),
+    manpower_officer_absent: {},
     approved_dates: [],
     suppressed_carries: [],
     boro_khana_dates: [],

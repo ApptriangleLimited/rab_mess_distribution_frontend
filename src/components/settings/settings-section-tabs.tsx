@@ -1,9 +1,15 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   IconBuildingBank,
   IconCoin,
+  IconMilitaryRank,
   IconQrcode,
+  IconShield,
+  IconTopologyStar3,
+  IconClipboardList,
+  IconUsers,
   type Icon,
 } from "@tabler/icons-react";
 import { motion, useReducedMotion } from "motion/react";
@@ -11,7 +17,15 @@ import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-export type SettingsTabId = "rates" | "bank" | "qr";
+export type SettingsTabId =
+  | "rates"
+  | "rank"
+  | "wing"
+  | "force"
+  | "bank"
+  | "member-bank"
+  | "authorized"
+  | "qr";
 
 type TabDef = {
   id: SettingsTabId;
@@ -22,11 +36,25 @@ type TabDef = {
 
 const TABS: TabDef[] = [
   { id: "rates", labelKey: "settings.tabRates", icon: IconCoin },
+  { id: "rank", labelKey: "settings.tabRank", icon: IconMilitaryRank },
+  { id: "wing", labelKey: "settings.tabWing", icon: IconTopologyStar3 },
+  { id: "force", labelKey: "settings.tabForce", icon: IconShield },
   {
     id: "bank",
     labelKey: "settings.tabBank",
     icon: IconBuildingBank,
     rationOnly: true,
+  },
+  {
+    id: "member-bank",
+    labelKey: "settings.tabMemberBank",
+    icon: IconUsers,
+    rationOnly: true,
+  },
+  {
+    id: "authorized",
+    labelKey: "settings.tabAuthorized",
+    icon: IconClipboardList,
   },
   { id: "qr", labelKey: "settings.tabQr", icon: IconQrcode },
 ];
@@ -46,7 +74,7 @@ export function parseSettingsTab(
   return allowed[0] ?? "rates";
 }
 
-/** In-page Settings sections — Rates / Bank / QR. */
+/** In-page Settings sections — Rates / Ranks / Wings / Forces / Rab Bank / Member Bank / Authorized / QR. */
 export function SettingsSectionTabs({
   value,
   onChange,
@@ -64,6 +92,22 @@ export function SettingsSectionTabs({
   const t = useT();
   const reduceMotion = useReducedMotion();
   const tabs = settingsTabsForRole(isRation);
+  const rootRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const activeEl = root.querySelector<HTMLElement>(
+      `[data-settings-tab="${value}"]`,
+    );
+    if (!activeEl) return;
+    const target =
+      activeEl.offsetLeft - root.clientWidth / 2 + activeEl.offsetWidth / 2;
+    root.scrollTo({
+      left: Math.max(0, target),
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, [value, reduceMotion]);
 
   const buttons = tabs.map((tab) => {
     const Icon = tab.icon;
@@ -72,6 +116,7 @@ export function SettingsSectionTabs({
       <button
         key={tab.id}
         type="button"
+        data-settings-tab={tab.id}
         onClick={() => onChange(tab.id)}
         aria-current={active ? "page" : undefined}
         className={cn(
@@ -118,6 +163,7 @@ export function SettingsSectionTabs({
   if (embedded) {
     return (
       <div
+        ref={rootRef as React.RefObject<HTMLDivElement>}
         className={cn("inline-flex items-center gap-1", className)}
         role="group"
         aria-label={t("settings.tabs")}
@@ -129,8 +175,9 @@ export function SettingsSectionTabs({
 
   return (
     <nav
+      ref={rootRef}
       className={cn(
-        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-primary/15 bg-gradient-to-r from-emerald-50/90 via-white to-sky-50/80 p-1 shadow-[0_1px_2px_rgba(6,121,87,0.06),0_8px_20px_-14px_rgba(15,23,42,0.2)] dark:border-primary/25 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none",
+        "inline-flex max-w-full items-center gap-1 overflow-x-auto scroll-smooth rounded-2xl border border-primary/15 bg-gradient-to-r from-emerald-50/90 via-white to-sky-50/80 p-1 shadow-[0_1px_2px_rgba(6,121,87,0.06),0_8px_20px_-14px_rgba(15,23,42,0.2)] dark:border-primary/25 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none",
         className,
       )}
       aria-label={t("settings.tabs")}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import type { Icon } from "@tabler/icons-react";
@@ -32,11 +32,29 @@ export function RoleNavTabs({
   after,
 }: Props) {
   const reduceMotion = useReducedMotion();
+  const navRef = useRef<HTMLElement>(null);
+  const activeHref = tabs.find((tab) => tab.active)?.href ?? "";
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || !activeHref) return;
+    const active = nav.querySelector<HTMLElement>(
+      `[data-tab-href="${CSS.escape(activeHref)}"]`,
+    );
+    if (!active) return;
+    const target =
+      active.offsetLeft - nav.clientWidth / 2 + active.offsetWidth / 2;
+    nav.scrollTo({
+      left: Math.max(0, target),
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, [activeHref, reduceMotion]);
 
   return (
     <nav
+      ref={navRef}
       className={cn(
-        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-primary/15 bg-gradient-to-r from-emerald-50/90 via-white to-sky-50/80 p-1 shadow-[0_1px_2px_rgba(6,121,87,0.06),0_8px_20px_-14px_rgba(15,23,42,0.2)] dark:border-primary/25 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none",
+        "inline-flex max-w-full items-center gap-1 overflow-x-auto scroll-smooth rounded-2xl border border-primary/15 bg-gradient-to-r from-emerald-50/90 via-white to-sky-50/80 p-1 shadow-[0_1px_2px_rgba(6,121,87,0.06),0_8px_20px_-14px_rgba(15,23,42,0.2)] dark:border-primary/25 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none",
         className,
       )}
       aria-label={ariaLabel}
@@ -47,6 +65,7 @@ export function RoleNavTabs({
           <Link
             key={tab.href}
             href={tab.href}
+            data-tab-href={tab.href}
             aria-current={tab.active ? "page" : undefined}
             className={cn(
               "relative inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors",

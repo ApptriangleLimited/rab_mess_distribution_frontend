@@ -51,7 +51,7 @@ export default function DailyNewUserPage() {
         return;
       }
       const user = createUser(
-        { ...input, status: "1" },
+        { ...input, status: "1", default_tag: today_tag },
         { approval_status: "approved" },
       );
       setTag(user.id, todayISO(), today_tag);

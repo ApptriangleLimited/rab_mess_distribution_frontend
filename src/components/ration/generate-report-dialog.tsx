@@ -14,6 +14,7 @@ import {
 import { useStore } from "@/hooks/use-store";
 import { parseMonthInput } from "@/lib/date";
 import { listAllTags } from "@/lib/store/rates";
+import { activeSenders } from "@/lib/store/senders";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -44,7 +45,7 @@ export function GenerateReportDialog({
     setSenderId("");
   }, [open, defaultMonth]);
 
-  const senders = state.senders;
+  const senders = activeSenders(state.senders);
   const canGenerate = Boolean(tag && senderId);
 
   function senderForTag(nextTag: DailyTag) {

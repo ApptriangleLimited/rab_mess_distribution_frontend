@@ -1,10 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   IconCheck,
+  IconChevronLeft,
+  IconChevronRight,
   IconDownload,
   IconFlame,
   IconSearch,
@@ -72,6 +82,13 @@ type RangeMenu = {
   storedTag?: DailyTag;
 };
 
+
+/** Sticky result cols (tag day-counts + All) — match consume ledger. */
+const NAME_STICKY_LEFT = 224;
+const NAME_STICKY_W = 173;
+const RESULT_TAG_W = 40;
+const RESULT_LEFT0 = NAME_STICKY_LEFT + NAME_STICKY_W;
+
 export function RegisterBoard({
   users,
   month,
@@ -86,6 +103,9 @@ export function RegisterBoard({
   suppressedCarries,
   dateFrom = "",
   dateTo = "",
+  boroKhanaDates,
+  onBoroKhanaToggle,
+  projectedTagMembers,
 }: {
   users: User[];
   month: string;
@@ -101,6 +121,9 @@ export function RegisterBoard({
   /** Inclusive ISO range — empty = show all month days. */
   dateFrom?: string;
   dateTo?: string;
+  boroKhanaDates?: string[];
+  onBoroKhanaToggle?: (date: string, on: boolean) => void;
+  projectedTagMembers?: (tag: DailyTag, date: string) => User[];
 }) {
   void _paintTag;
   void _onPaintTagChange;
@@ -108,9 +131,31 @@ export function RegisterBoard({
   const t = useT();
   const { locale } = useI18n();
   const state = useStore();
+  /** Sticky tag-count + All cols (consume-style totals). */
+  const [showResultCols, setShowResultCols] = useState(true);
+  const reduceMotion = useReducedMotion();
+  const resultColMotion = reduceMotion
+    ? undefined
+    : "width 220ms ease, min-width 220ms ease, max-width 220ms ease, opacity 180ms ease, padding 220ms ease, border-width 220ms ease";
+  function resultColStyle(index: number): CSSProperties {
+    const open = showResultCols;
+    const w = open ? RESULT_TAG_W : 0;
+    return {
+      left: RESULT_LEFT0 + index * RESULT_TAG_W,
+      width: w,
+      minWidth: w,
+      maxWidth: w,
+      opacity: open ? 1 : 0,
+      padding: open ? undefined : 0,
+      overflow: "hidden",
+      borderRightWidth: open ? undefined : 0,
+      pointerEvents: open ? "auto" : "none",
+      transition: resultColMotion,
+    };
+  }
   const bkDates = useMemo(
-    () => new Set(state.boro_khana_dates ?? []),
-    [state.boro_khana_dates],
+    () => new Set(boroKhanaDates ?? state.boro_khana_dates ?? []),
+    [boroKhanaDates, state.boro_khana_dates],
   );
   /** Full month ISO list — seed for carry roll when no range filter. */
   const monthDates = useMemo(
@@ -135,6 +180,8 @@ export function RegisterBoard({
       columnDates[columnDates.length - 1].slice(0, 7)
     );
   }, [columnDates]);
+
+  const resultTags = useMemo(() => listAllTags(), [state.rates]);
 
   const suppressedSet = useMemo(
     () => new Set(suppressedCarries),
@@ -191,18 +238,9 @@ export function RegisterBoard({
 
       let ghostTag: DailyTag | undefined;
       if (!storedTag && dates.length === 1) {
-        let rolling = priorByUser.get(stroke.userId);
-        for (const date of columnDates) {
-          if (date >= menuDate) break;
-          if (!canAssignOnDate(user, date)) {
-            rolling = undefined;
-            continue;
-          }
-          const s = byUserDate.get(`${stroke.userId}|${date}`);
-          if (s) rolling = s;
-        }
         const key = `${stroke.userId}|${menuDate}`;
-        if (!suppressedSet.has(key) && rolling) ghostTag = rolling;
+        const def = priorByUser.get(stroke.userId);
+        if (!suppressedSet.has(key) && def) ghostTag = def;
       }
 
       const el = document.querySelector(
@@ -362,10 +400,35 @@ export function RegisterBoard({
           "border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950",
         )}
       >
-        <div className="flex flex-wrap items-center border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="min-w-0 flex-1 truncate text-xs text-neutral-500 dark:text-neutral-400">
+        <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="min-w-0 text-xs text-neutral-500 dark:text-neutral-400">
             {t("daily.dragFillHint")}
           </p>
+          <button
+            type="button"
+            onClick={() => setShowResultCols((v) => !v)}
+            aria-pressed={showResultCols}
+            title={
+              showResultCols
+                ? t("daily.hideTagTotals")
+                : t("daily.showTagTotals")
+            }
+            className={cn(
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-semibold uppercase tracking-wide transition-colors duration-200",
+              showResultCols
+                ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-900",
+            )}
+          >
+            {showResultCols ? (
+              <IconChevronLeft className="h-3.5 w-3.5" stroke={2.25} />
+            ) : (
+              <IconChevronRight className="h-3.5 w-3.5" stroke={2.25} />
+            )}
+            {showResultCols
+              ? t("daily.hideTagTotals")
+              : t("daily.showTagTotals")}
+          </button>
         </div>
         <div
           className={cn(
@@ -387,6 +450,35 @@ export function RegisterBoard({
                 </th>
                 <th className="sticky left-[224px] z-40 w-[173px] min-w-[173px] max-w-[173px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
                   {t("cc.fields.name")}
+                </th>
+                {resultTags.map((code, i) => {
+                  return (
+                    <th
+                      key={`res-${code}`}
+                      title={showResultCols ? tagLabel(code, locale) : undefined}
+                      aria-hidden={!showResultCols}
+                      className={cn(
+                        "sticky z-40 box-border border-b border-neutral-300 bg-emerald-100 text-center font-mono text-[10px] text-emerald-800 dark:border-neutral-700 dark:bg-emerald-950 dark:text-emerald-300",
+                        showResultCols ? "border-r px-0 py-2" : "border-r-0 p-0",
+                      )}
+                      style={resultColStyle(i)}
+                    >
+                      <span className="block truncate">{code}</span>
+                    </th>
+                  );
+                })}
+                <th
+                  title={showResultCols ? t("mess.colAll") : undefined}
+                  aria-hidden={!showResultCols}
+                  className={cn(
+                    "sticky z-40 box-border border-b border-neutral-300 bg-emerald-100 text-center font-mono text-[10px] text-emerald-800 dark:border-neutral-700 dark:bg-emerald-950 dark:text-emerald-300",
+                    showResultCols
+                      ? "border-r px-0 py-2 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.22)]"
+                      : "border-r-0 p-0 shadow-none",
+                  )}
+                  style={resultColStyle(resultTags.length)}
+                >
+                  <span className="block truncate">{t("common.all")}</span>
                 </th>
                 {columnDates.map((date, i) => {
                   const isToday = date === todayISO;
@@ -452,7 +544,8 @@ export function RegisterBoard({
                           }
                           onClick={(e) => {
                             e.stopPropagation();
-                            setBoroKhana(date, !isBk);
+                            if (onBoroKhanaToggle) onBoroKhanaToggle(date, !isBk);
+                            else setBoroKhana(date, !isBk);
                           }}
                           className={cn(
                             "flex w-full cursor-pointer items-center justify-center gap-0.5 border-t px-0 py-0.5 text-[8px] font-extrabold uppercase tracking-wide transition",
@@ -481,7 +574,8 @@ export function RegisterBoard({
                   ? "bg-white dark:bg-neutral-950"
                   : "bg-neutral-50 dark:bg-neutral-900";
 
-                let rolling: DailyTag | undefined = priorByUser.get(user.id);
+                const defaultGhost: DailyTag | undefined =
+                  user.status === "1" ? priorByUser.get(user.id) : undefined;
                 const rowMeta: {
                   date: string;
                   stored?: DailyTag;
@@ -491,7 +585,8 @@ export function RegisterBoard({
                 for (const date of columnDates) {
                   const afterOut = !canAssignOnDate(user, date);
                   if (afterOut) {
-                    rolling = undefined;
+                    // Inactive / after out: lock paint, no default ghost.
+                    // Stored history still shows (prior days).
                     rowMeta.push({
                       date,
                       stored: byUserDate.get(`${user.id}|${date}`),
@@ -502,12 +597,12 @@ export function RegisterBoard({
                   }
                   const key = `${user.id}|${date}`;
                   const stored = byUserDate.get(key);
-                  if (stored) rolling = stored;
                   const suppressed = suppressedSet.has(key);
                   rowMeta.push({
                     date,
                     stored,
-                    ghost: stored || suppressed ? undefined : rolling,
+                    // Empty cell → member default_tag only (not last paint).
+                    ghost: stored || suppressed ? undefined : defaultGhost,
                     afterOut: false,
                   });
                 }
@@ -547,16 +642,79 @@ export function RegisterBoard({
                     </td>
                     <td
                       className={cn(
-                        "sticky left-[224px] z-20 w-[173px] min-w-[173px] max-w-[173px] truncate border-b border-r border-neutral-200 px-2 py-0 text-xs font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
+                        "sticky left-[224px] z-20 w-[173px] min-w-[173px] max-w-[173px] border-b border-r border-neutral-200 px-2 py-0 text-xs font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
                         stickyBg,
                       )}
                     >
-                      {user.name}
+                      <span className="flex min-w-0 items-center gap-1 truncate">
+                        <span className="truncate">{user.name}</span>
+                        {user.status !== "1" ? (
+                          <span className="shrink-0 rounded bg-neutral-200/80 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+                            {t("cc.statusInactive")}
+                          </span>
+                        ) : null}
+                      </span>
                     </td>
+                    {(() => {
+                      const tagCounts: Partial<Record<DailyTag, number>> = {};
+                      let totalDays = 0;
+                      for (const cell of rowMeta) {
+                        const shown =
+                          cell.stored ??
+                          (!cell.afterOut && cell.ghost ? cell.ghost : undefined);
+                        if (!shown) continue;
+                        tagCounts[shown] = (tagCounts[shown] ?? 0) + 1;
+                        totalDays += 1;
+                      }
+                      const stickyTagBg = odd
+                        ? "bg-emerald-50 dark:bg-emerald-950"
+                        : "bg-emerald-100 dark:bg-emerald-900";
+                      return (
+                        <>
+                          {resultTags.map((code, i) => {
+                            const n = tagCounts[code] ?? 0;
+                            return (
+                              <td
+                                key={`res-${user.id}-${code}`}
+                                className={cn(
+                                  "sticky z-20 box-border border-b border-neutral-200 text-center font-mono text-[11px] font-semibold tabular-nums text-neutral-800 dark:border-neutral-800 dark:text-neutral-200",
+                                  stickyTagBg,
+                                  showResultCols ? "border-r" : "border-r-0",
+                                )}
+                                style={resultColStyle(i)}
+                                aria-hidden={!showResultCols}
+                              >
+                                <span className="block truncate">{n || "—"}</span>
+                              </td>
+                            );
+                          })}
+                          <td
+                            className={cn(
+                              "sticky z-20 box-border border-b border-neutral-200 text-center font-mono text-[11px] font-semibold tabular-nums text-neutral-900 dark:border-neutral-800 dark:text-white",
+                              stickyTagBg,
+                              showResultCols
+                                ? "border-r shadow-[4px_0_8px_-2px_rgba(0,0,0,0.22)]"
+                                : "border-r-0 shadow-none",
+                            )}
+                            style={resultColStyle(resultTags.length)}
+                            aria-hidden={!showResultCols}
+                          >
+                            <span className="block truncate">
+                              {totalDays || "—"}
+                            </span>
+                          </td>
+                        </>
+                      );
+                    })()}
                     {rowMeta.map((cell, cellIdx) => {
                       const { date, stored, ghost, afterOut } = cell;
+                      const inactive = user.status !== "1";
                       const preview = inDragPreview(user.id, date);
-                      const locked = afterOut || date <= todayISO;
+                      // Inactive + prior stored tag → full color, not "disabled" look.
+                      // Inactive + empty → locked blank. Active: past/out lock as before.
+                      const locked = inactive
+                        ? !stored
+                        : afterOut || date <= todayISO;
                       let tag = stored;
                       let isGhost = false;
                       if (!stored && ghost && !afterOut) {
@@ -598,6 +756,7 @@ export function RegisterBoard({
                           boroKhana={bkDates.has(date)}
                           locked={locked}
                           afterOut={afterOut}
+                          inactive={inactive}
                           contL={contL}
                           contR={contR}
                           preview={preview && date > todayISO && !afterOut}
@@ -659,6 +818,9 @@ export function RegisterBoard({
         date={dayPeek}
         filterUsers={users}
         onClose={() => setDayPeek(null)}
+        boroKhanaDates={boroKhanaDates}
+        onBoroKhanaToggle={onBoroKhanaToggle}
+        projectedTagMembers={projectedTagMembers}
       />
     </div>
   );
@@ -668,10 +830,16 @@ function DayMsCdPeek({
   date,
   filterUsers,
   onClose,
+  boroKhanaDates,
+  onBoroKhanaToggle,
+  projectedTagMembers,
 }: {
   date: string | null;
   filterUsers: User[];
   onClose: () => void;
+  boroKhanaDates?: string[];
+  onBoroKhanaToggle?: (date: string, on: boolean) => void;
+  projectedTagMembers?: (tag: DailyTag, date: string) => User[];
 }) {
   const t = useT();
   const { locale } = useI18n();
@@ -683,22 +851,26 @@ function DayMsCdPeek({
   const [peekFilter, setPeekFilter] = useState<"all" | "MS" | "CD">("all");
   const [peekQ, setPeekQ] = useState("");
   const bkOn = Boolean(
-    date && (state.boro_khana_dates ?? []).includes(date),
+    date &&
+      (boroKhanaDates ?? state.boro_khana_dates ?? []).includes(date),
   );
 
   const lists = useMemo(() => {
     if (!date) return { ms: [] as User[], cd: [] as User[] };
     const allowed = new Set(filterUsers.map((u) => u.id));
-    const ms = getProjectedTagMembers("MS", date)
-      .members.filter((u) => allowed.has(u.id))
-      .sort(compareUsers);
-    const cd = getProjectedTagMembers("CD", date)
-      .members.filter((u) => allowed.has(u.id))
-      .sort(compareUsers);
+    const msSource = projectedTagMembers
+      ? projectedTagMembers("MS", date)
+      : getProjectedTagMembers("MS", date).members;
+    const cdSource = projectedTagMembers
+      ? projectedTagMembers("CD", date)
+      : getProjectedTagMembers("CD", date).members;
+    const ms = msSource.filter((u) => allowed.has(u.id)).sort(compareUsers);
+    const cd = cdSource.filter((u) => allowed.has(u.id)).sort(compareUsers);
     return { ms, cd };
   }, [
     date,
     filterUsers,
+    projectedTagMembers,
     state.assignments,
     state.users,
     state.suppressed_carries,
@@ -814,7 +986,11 @@ function DayMsCdPeek({
                 type="button"
                 role="switch"
                 aria-checked={bkOn}
-                onClick={() => date && setBoroKhana(date, !bkOn)}
+                onClick={() => {
+                  if (!date) return;
+                  if (onBoroKhanaToggle) onBoroKhanaToggle(date, !bkOn);
+                  else setBoroKhana(date, !bkOn);
+                }}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition",
                   bkOn
@@ -1192,6 +1368,7 @@ function RegisterCell({
   boroKhana,
   locked,
   afterOut,
+  inactive,
   contL,
   contR,
   preview,
@@ -1207,6 +1384,7 @@ function RegisterCell({
   boroKhana?: boolean;
   locked: boolean;
   afterOut?: boolean;
+  inactive?: boolean;
   contL: boolean;
   contR: boolean;
   preview: boolean;
@@ -1217,39 +1395,46 @@ function RegisterCell({
 
   const cellClass = cn(
     "flex h-full w-full items-center justify-center font-mono text-[10px] font-bold leading-none touch-none transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-    locked
+    // Empty locked = disabled look. Prior stored tags = full color (inactive too).
+    locked && !tag
       ? "cursor-not-allowed"
-      : "cursor-pointer hover:ring-1 hover:ring-primary/40",
+      : locked || inactive
+        ? "cursor-default"
+        : "cursor-pointer hover:ring-1 hover:ring-inset hover:ring-primary/35",
     tag
       ? cn(
           tagCellClass(tag),
-          contL ? "rounded-l-none" : "rounded-l-sm",
-          contR ? "rounded-r-none" : "rounded-r-sm",
-          // Faded carry preview = future only
-          ghost &&
-            "opacity-45 ring-1 ring-inset ring-dashed ring-neutral-400/70 dark:ring-neutral-500/70",
-          afterOut && "opacity-35",
+          contL ? "rounded-l-none" : "rounded-l-md",
+          contR ? "rounded-r-none" : "rounded-r-md",
+          // Carry ghost only — soft wash, no hard outline
+          ghost && "opacity-40",
         )
       : locked
         ? "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600"
         : "text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-800",
     preview &&
-      "bg-primary/25 ring-2 ring-inset ring-primary shadow-[inset_0_0_0_1px_rgba(6,121,88,0.55)] dark:bg-primary/40 dark:ring-primary-light",
+      "bg-primary/25 ring-2 ring-inset ring-primary/60 dark:bg-primary/40",
   );
 
-  const lockReason = afterOut
-    ? t("daily.afterOutLocked")
-    : t("daily.pastLocked");
-  const title = locked
-    ? `${userName} · ${date} · ${tag ? `${tag} ${tagLabel(tag, locale)} · ` : ""}${lockReason}`
-    : tag
-      ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
-      : `${userName} · ${date}`;
+  const lockReason = inactive
+    ? t("daily.inactiveLocked")
+    : afterOut
+      ? t("daily.afterOutLocked")
+      : t("daily.pastLocked");
+  // Prior stored tags: normal title (not "disabled"). Empty locked: lock reason.
+  const title =
+    tag && !ghost
+      ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)}${locked ? ` · ${lockReason}` : ""}`
+      : locked
+        ? `${userName} · ${date} · ${lockReason}`
+        : tag
+          ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
+          : `${userName} · ${date}`;
 
   return (
     <td
       className={cn(
-        "h-9 w-9 min-w-9 border-b border-r border-neutral-200 p-0 dark:border-neutral-800",
+        "h-9 w-9 min-w-9 border-b border-r border-neutral-100 p-0.5 dark:border-neutral-800/80",
         boroKhana && !preview && "bg-orange-50/90 dark:bg-orange-950/25",
         isToday && !preview && !boroKhana && "bg-primary/[0.04]",
         locked && !tag && !boroKhana && "bg-neutral-50/80 dark:bg-neutral-900/40",
@@ -1261,12 +1446,14 @@ function RegisterCell({
       <button
         type="button"
         title={title}
-        disabled={locked}
+        // No HTML disabled — greys stored tags. Block paint via pointer guard only.
+        aria-disabled={locked || undefined}
         className={cellClass}
         data-reg-user={locked ? undefined : userId}
         data-reg-date={locked ? undefined : date}
         onPointerDown={(e) => {
-          if (locked || e.button !== 0) return;
+          // Inactive never paints — even when prior tag shows full color.
+          if (locked || inactive || e.button !== 0) return;
           e.preventDefault();
           onDragStart();
         }}

@@ -7,10 +7,10 @@ import {
   IconCashBanknote,
   IconFileReport,
   IconClipboardList,
-  IconSoup,
+  IconUsersGroup,
   IconCalendarEvent,
   IconClockHour4,
-  IconUserPlus,
+  IconCake,
   IconSettings,
   type Icon,
 } from "@tabler/icons-react";
@@ -38,6 +38,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "amber",
     },
     {
+      href: "/daily/manpower",
+      labelKey: "nav.manpower",
+      icon: IconUsersGroup,
+      chip: "sky",
+    },
+    {
       href: "/daily/roster",
       labelKey: "nav.roster",
       icon: IconUserCheck,
@@ -52,22 +58,10 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
-      href: "/mess/today",
-      labelKey: "nav.todaysMess",
-      icon: IconSoup,
-      chip: "orange",
-    },
-    {
       href: "/mess/shifts",
       labelKey: "nav.shifts",
       icon: IconClockHour4,
       chip: "purple",
-    },
-    {
-      href: "/mess/planning",
-      labelKey: "nav.mealPlanning",
-      icon: IconCalendarEvent,
-      chip: "amber",
     },
     {
       href: "/mess/reports",
@@ -76,10 +70,10 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "indigo",
     },
     {
-      href: "/mess/guests",
-      labelKey: "nav.guestMeals",
-      icon: IconUserPlus,
-      chip: "red",
+      href: "/mess/pritibhoj",
+      labelKey: "nav.pritibhoj",
+      icon: IconCake,
+      chip: "amber",
     },
   ],
   consume: [
@@ -172,12 +166,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       icon: IconFileReport,
       chip: "indigo",
     },
-    {
-      href: "/mess/guests",
-      labelKey: "nav.guestMeals",
-      icon: IconUserPlus,
-      chip: "red",
-    },
   ],
 };
 
@@ -200,6 +188,7 @@ export const CHIP_CLASS: Record<string, string> = {
   emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
   cyan: "bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300",
   red: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300",
+  violet: "bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",
   neutral: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -31,9 +31,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
-import { MESS_LEDGER_TAGS, RANKS, WINGS } from "@/lib/constants";
+import { ApiClientError } from "@/lib/api/client";
+import {
+  ledgerRowApiToLedgerRow,
+  listMessLedger,
+} from "@/lib/api/mess";
+import { isApiEnabled } from "@/lib/api/mode";
+import { MESS_LEDGER_TAGS } from "@/lib/constants";
 import { formatDateLong, monthDateBounds } from "@/lib/date";
-import { buildRangeLedger } from "@/lib/reports";
+import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
+import { useToast } from "@/components/shared/toast-provider";
 import { listBoroKhanaDates } from "@/lib/store/boro-khana";
 import { getMessEaters } from "@/lib/store/mess";
 import type { DailyTag } from "@/lib/types";
@@ -49,7 +56,10 @@ function defaultRange() {
 export default function MessLedgerClient() {
   const t = useT();
   const { locale } = useI18n();
+  const { toast } = useToast();
+  const apiOn = isApiEnabled();
   const state = useStore();
+  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const initial = defaultRange();
 
@@ -59,6 +69,13 @@ export default function MessLedgerClient() {
   const [tagFilter, setTagFilter] = useState<MessTagFilter>("all");
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
+  const [loading, setLoading] = useState(false);
+  const [apiLedger, setApiLedger] = useState<{
+    rows: LedgerRow[];
+    dates: string[];
+    tagCodes: DailyTag[];
+    bkDays: { date: string; eaters: number }[];
+  }>({ rows: [], dates: [], tagCodes: [...MESS_LEDGER_TAGS], bkDays: [] });
 
   const month = dateFrom.slice(0, 7) || initial.from.slice(0, 7);
 
@@ -79,7 +96,46 @@ export default function MessLedgerClient() {
       : { from: dateTo, to: dateFrom };
   }, [dateFrom, dateTo]);
 
-  const ledger = useMemo(() => {
+  useEffect(() => {
+    if (!apiOn) return;
+    let cancelled = false;
+    setLoading(true);
+    void listMessLedger(rangeBounds.from, rangeBounds.to)
+      .then((res) => {
+        if (cancelled) return;
+        setApiLedger({
+          rows: res.rows.map(ledgerRowApiToLedgerRow),
+          dates: res.dates,
+          tagCodes: res.tag_codes as DailyTag[],
+          bkDays: res.boro_khana_days.map((row) => ({
+            date: row.date,
+            eaters: row.eater_count,
+          })),
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiLedger({
+          rows: [],
+          dates: [],
+          tagCodes: [...MESS_LEDGER_TAGS],
+          bkDays: [],
+        });
+        const detail =
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not load mess ledger from API.";
+        toast(detail, "error");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, rangeBounds, toast]);
+
+  const demoLedger = useMemo(() => {
     const range = buildRangeLedger(
       rangeBounds.from,
       rangeBounds.to,
@@ -100,6 +156,16 @@ export default function MessLedgerClient() {
     month,
     rangeBounds,
   ]);
+
+  const ledger = apiOn
+    ? {
+        month,
+        dayCount: apiLedger.dates.length,
+        tagCodes: apiLedger.tagCodes,
+        rows: apiLedger.rows,
+        columnDates: apiLedger.dates,
+      }
+    : demoLedger;
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -141,7 +207,7 @@ export default function MessLedgerClient() {
     return [tagFilter];
   }, [tagFilter, ledger.tagCodes]);
 
-  const bkDaysInRange = useMemo(() => {
+  const demoBkDaysInRange = useMemo(() => {
     return listBoroKhanaDates()
       .filter((d) => d >= rangeBounds.from && d <= rangeBounds.to)
       .map((d) => ({
@@ -154,6 +220,8 @@ export default function MessLedgerClient() {
     state.users,
     state.assignments,
   ]);
+
+  const bkDaysInRange = apiOn ? apiLedger.bkDays : demoBkDaysInRange;
 
   function selectTagFilter(next: MessTagFilter) {
     setTagFilter((cur) => (cur === next && next !== "all" ? "all" : next));
@@ -265,7 +333,7 @@ export default function MessLedgerClient() {
               {bkDaysInRange.map((row) => (
                 <Link
                   key={row.date}
-                  href={`/mess/today?date=${row.date}`}
+                  href={`/mess/reports?from=${row.date}&to=${row.date}`}
                   title={`${t("mess.bkDaysInRange")}: ${formatDateLong(row.date, locale === "bn" ? "bn-BD" : "en-GB")} · ${t("mess.openBkList")}`}
                   className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-orange-200/90 bg-orange-50 px-3 text-orange-900 shadow-sm transition hover:brightness-[0.97] dark:border-orange-800/50 dark:bg-orange-950/40 dark:text-orange-200 dark:hover:brightness-110"
                 >
@@ -299,7 +367,7 @@ export default function MessLedgerClient() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {RANKS.map((r) => (
+                {ranks.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
@@ -314,7 +382,7 @@ export default function MessLedgerClient() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {WINGS.map((w) => (
+                {wings.map((w) => (
                   <SelectItem key={w} value={w}>
                     {w}
                   </SelectItem>
@@ -334,7 +402,11 @@ export default function MessLedgerClient() {
           />
         </SearchFilterBar>
 
-        {ledger.rows.length === 0 ? (
+        {loading ? (
+          <p className="py-10 text-center text-sm text-neutral-500">
+            {t("common.loading")}
+          </p>
+        ) : ledger.rows.length === 0 ? (
           <EmptyState title={t("mess.ledgerEmpty")} />
         ) : boardRows.length === 0 ? (
           <EmptyState title={t("common.noResults")} />

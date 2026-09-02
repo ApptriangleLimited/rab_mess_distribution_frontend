@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  IconCircleCheck,
-  IconCopy,
+  IconBuilding,
+  IconClockHour4,
+  IconCoffee,
   IconDownload,
   IconFileReport,
+  IconMoonStars,
   IconPrinter,
-  IconSum,
+  IconRefresh,
+  IconSun,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
@@ -25,6 +28,7 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { MessPageTabs } from "@/components/layout/mess-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -33,64 +37,190 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
-import { WINGS } from "@/lib/constants";
+import { useToast } from "@/components/shared/toast-provider";
+
 import { downloadCsv } from "@/lib/csv";
-import { formatDateLong, monthDateBounds } from "@/lib/date";
+import { eachISODate, formatDateLong, monthDateBounds } from "@/lib/date";
+import { listGuestMeals } from "@/lib/store/guest-meals";
 import {
   isMealAssignStatus,
   listMealAssigns,
 } from "@/lib/store/meal-assigns";
+import { getMessEaters, listConsumedMemberIds } from "@/lib/store/mess";
 import { getMealShift, listMealShifts, mealShiftLabel } from "@/lib/store/meal-shifts";
+import {
+  fetchZkAttendance,
+  fetchZkUsers,
+  isZkDemoEnabled,
+  type ZkAttendanceRow,
+  type ZkUserRow,
+} from "@/lib/api/zk-demo";
+import { ApiClientError } from "@/lib/api/client";
+import { zkAttendanceToReportRows } from "@/lib/zk/attendance-report";
 import type { MealAssignStatus, MealShiftId, User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 type StatusFilter = "all" | MealAssignStatus;
+type AudienceFilter = "all" | "member" | "guest";
+type ViewFilter = "checkins" | "missing";
+type ReportMode = "total" | "consume" | "duplicate" | "missing";
+
+type ReportRow = {
+  id: string;
+  kind: "member" | "guest";
+  date: string;
+  check_in_time: string;
+  shift_id: MealShiftId | null;
+  name: string;
+  rab_id: string;
+  wing: string;
+  rank: string;
+  status: MealAssignStatus | null;
+  info: string;
+  ref: string;
+  missing?: boolean;
+};
 
 function defaultRange() {
   return monthDateBounds();
 }
 
+function isAudienceFilter(v: string | null): v is AudienceFilter {
+  return v === "all" || v === "member" || v === "guest";
+}
+
+function isViewFilter(v: string | null): v is ViewFilter {
+  return v === "checkins" || v === "missing";
+}
+
+function isISODate(v: string | null): v is string {
+  return !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+
+function toReportMode(view: ViewFilter, status: StatusFilter): ReportMode {
+  if (view === "missing") return "missing";
+  if (status === 1) return "consume";
+  if (status === 2) return "duplicate";
+  return "total";
+}
+
 function shiftLabel(
   t: ReturnType<typeof useT>,
-  shiftId: MealShiftId,
+  shiftId: MealShiftId | null,
 ) {
+  if (!shiftId) return "—";
   const shift = getMealShift(shiftId);
   return mealShiftLabel(shiftId, shift?.name ?? shiftId, t);
 }
 
+function ShiftChip({
+  t,
+  shiftId,
+}: {
+  t: ReturnType<typeof useT>;
+  shiftId: MealShiftId | null;
+}) {
+  if (!shiftId) {
+    return <span className="text-neutral-400">—</span>;
+  }
+  const label = shiftLabel(t, shiftId);
+  const Icon =
+    shiftId === "breakfast"
+      ? IconCoffee
+      : shiftId === "lunch"
+        ? IconSun
+        : shiftId === "dinner"
+          ? IconMoonStars
+          : IconClockHour4;
+  const tone =
+    shiftId === "breakfast"
+      ? "bg-amber-100 text-amber-950 dark:bg-amber-900/50 dark:text-amber-100"
+      : shiftId === "lunch"
+        ? "bg-sky-100 text-sky-950 dark:bg-sky-900/50 dark:text-sky-100"
+        : shiftId === "dinner"
+          ? "bg-indigo-100 text-indigo-950 dark:bg-indigo-900/50 dark:text-indigo-100"
+          : "bg-violet-100 text-violet-950 dark:bg-violet-900/50 dark:text-violet-100";
+  return (
+    <Badge
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
+        tone,
+      )}
+    >
+      <Icon className="h-3 w-3 shrink-0" stroke={2} />
+      {label}
+    </Badge>
+  );
+}
+
+function WingChip({ wing }: { wing: string }) {
+  if (!wing) {
+    return <span className="text-neutral-400">—</span>;
+  }
+  return (
+    <Badge className="inline-flex items-center gap-1 rounded-md bg-teal-100 px-1.5 py-0.5 text-[10px] font-semibold text-teal-950 dark:bg-teal-900/50 dark:text-teal-100">
+      <IconBuilding className="h-3 w-3 shrink-0" stroke={2} />
+      {wing}
+    </Badge>
+  );
+}
+
 function formatCheckInTime(iso: string, locale: string) {
+  if (!iso) return "—";
   const d = new Date(iso.includes("T") ? iso : `${iso}T12:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleTimeString(locale, {
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   });
 }
 
 export default function MessReportsClient() {
   const t = useT();
   const { locale } = useI18n();
+  const { toast } = useToast();
   const state = useStore();
+  const { wings } = state;
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
+  const zkOn = isZkDemoEnabled();
   const initial = defaultRange();
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   const statusParam = searchParams.get("status");
+  const audienceParam = searchParams.get("audience");
+  const viewParam = searchParams.get("view");
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
 
   const [q, setQ] = useState("");
+  const [view, setView] = useState<ViewFilter>(
+    isViewFilter(viewParam) ? viewParam : "checkins",
+  );
+  const [audience, setAudience] = useState<AudienceFilter>(
+    isAudienceFilter(audienceParam) ? audienceParam : "all",
+  );
   const [shift, setShift] = useState<MealShiftId | "all">("all");
   const [wing, setWing] = useState("all");
   const [status, setStatus] = useState<StatusFilter>(
     statusParam && isMealAssignStatus(statusParam)
-      ? Number(statusParam) as MealAssignStatus
+      ? (Number(statusParam) as MealAssignStatus)
       : "all",
   );
-  const [dateFrom, setDateFrom] = useState(initial.from);
-  const [dateTo, setDateTo] = useState(initial.to);
+  const [dateFrom, setDateFrom] = useState(
+    isISODate(fromParam) ? fromParam : initial.from,
+  );
+  const [dateTo, setDateTo] = useState(
+    isISODate(toParam) ? toParam : isISODate(fromParam) ? fromParam : initial.to,
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [zkPunches, setZkPunches] = useState<ZkAttendanceRow[]>([]);
+  const [zkUsers, setZkUsers] = useState<ZkUserRow[]>([]);
+  const [zkLoading, setZkLoading] = useState(() => isZkDemoEnabled());
+  const [zkTick, setZkTick] = useState(0);
 
   useEffect(() => {
     if (statusParam && isMealAssignStatus(statusParam)) {
@@ -100,6 +230,36 @@ export default function MessReportsClient() {
     }
     setPage(1);
   }, [statusParam]);
+
+  useEffect(() => {
+    if (isAudienceFilter(audienceParam)) {
+      setAudience(audienceParam);
+    } else {
+      setAudience("all");
+    }
+    setPage(1);
+  }, [audienceParam]);
+
+  useEffect(() => {
+    if (isViewFilter(viewParam)) {
+      setView(viewParam);
+      if (viewParam === "missing") {
+        setAudience("member");
+        setStatus("all");
+      }
+    } else {
+      setView("checkins");
+    }
+    setPage(1);
+  }, [viewParam]);
+
+  useEffect(() => {
+    if (isISODate(fromParam)) {
+      setDateFrom(fromParam);
+      setDateTo(isISODate(toParam) ? toParam : fromParam);
+      setPage(1);
+    }
+  }, [fromParam, toParam]);
 
   const rangeBounds = useMemo(() => {
     return dateFrom <= dateTo
@@ -118,26 +278,241 @@ export default function MessReportsClient() {
     [state.meal_shifts],
   );
 
-  const rows = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    return listMealAssigns().filter((row) => {
-      if (row.date < rangeBounds.from || row.date > rangeBounds.to) {
-        return false;
-      }
-      if (shift !== "all" && row.shift_id !== shift) return false;
-      if (status !== "all" && row.status !== status) return false;
-      const member = usersById.get(row.member_id);
-      if (wing !== "all" && member?.wing !== wing) return false;
-      if (!query) return true;
-      return [member?.name, member?.rab_id, member?.rank, member?.wing]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
-  }, [state.meal_assigns, q, rangeBounds, shift, status, wing, usersById]);
+  useEffect(() => {
+    if (!zkOn) return;
+    setAudience("member");
+  }, [zkOn]);
 
-  const uniqueCount = rows.filter((r) => r.status === 1).length;
-  const dupCount = rows.filter((r) => r.status === 2).length;
+  useEffect(() => {
+    if (!zkOn) return;
+    let cancelled = false;
+    setZkLoading(true);
+    void Promise.all([
+      fetchZkAttendance({ from: rangeBounds.from, to: rangeBounds.to }),
+      fetchZkUsers(),
+    ])
+      .then(([att, users]) => {
+        if (cancelled) return;
+        setZkPunches(att.items);
+        setZkUsers(users.items);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setZkPunches([]);
+        setZkUsers([]);
+        const detail =
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not load ZK attendance.";
+        toast(detail, "error");
+      })
+      .finally(() => {
+        if (!cancelled) setZkLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [zkOn, rangeBounds.from, rangeBounds.to, zkTick, toast]);
+
+  const zkClassified = useMemo(() => {
+    if (!zkOn) return [];
+    return zkAttendanceToReportRows(
+      zkPunches,
+      zkUsers,
+      state.users,
+      shifts,
+    );
+  }, [zkOn, zkPunches, zkUsers, state.users, shifts]);
+
+  const missingRows = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    const merged: ReportRow[] = [];
+    for (const date of eachISODate(rangeBounds.from, rangeBounds.to)) {
+      let ate: Set<string>;
+      if (zkOn && zkClassified.length) {
+        ate = new Set();
+        for (const r of zkClassified) {
+          if (r.date !== date || r.status !== 1 || !r.member_id) continue;
+          if (shift !== "all" && r.shift_id !== shift) continue;
+          ate.add(r.member_id);
+        }
+      } else {
+        ate = listConsumedMemberIds(date, shift);
+      }
+      for (const u of getMessEaters(date)) {
+        if (ate.has(u.id)) continue;
+        if (wing !== "all" && u.wing !== wing) continue;
+        if (
+          query &&
+          ![u.name, u.rab_id, u.rank, u.wing]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        ) {
+          continue;
+        }
+        merged.push({
+          id: `missing-${date}-${u.id}`,
+          kind: "member",
+          date,
+          check_in_time: "",
+          shift_id: shift === "all" ? null : shift,
+          name: u.name,
+          rab_id: u.rab_id,
+          wing: u.wing,
+          rank: u.rank,
+          status: null,
+          info: "",
+          ref: "",
+          missing: true,
+        });
+      }
+    }
+    return merged.sort((a, b) => {
+      const byDate = b.date.localeCompare(a.date);
+      if (byDate !== 0) return byDate;
+      return a.name.localeCompare(b.name);
+    });
+  }, [
+    q,
+    rangeBounds,
+    shift,
+    wing,
+    zkOn,
+    zkClassified,
+    state.meal_assigns,
+    state.users,
+    state.assignments,
+    state.boro_khana_dates,
+  ]);
+
+  const checkinBase = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    const merged: ReportRow[] = [];
+
+    if (audience !== "guest") {
+      if (zkOn) {
+        for (const row of zkClassified) {
+          if (shift !== "all" && row.shift_id !== shift) continue;
+          if (wing !== "all" && row.wing !== wing) continue;
+          if (
+            query &&
+            ![row.name, row.rab_id, row.rank, row.wing, row.zk_user_id, row.info]
+              .join(" ")
+              .toLowerCase()
+              .includes(query)
+          ) {
+            continue;
+          }
+          merged.push({
+            id: row.id,
+            kind: "member",
+            date: row.date,
+            check_in_time: row.check_in_time,
+            shift_id: row.shift_id,
+            name: row.name,
+            rab_id: row.rab_id,
+            wing: row.wing,
+            rank: row.rank,
+            status: row.status,
+            info: row.info,
+            ref: row.ref,
+          });
+        }
+      } else {
+        for (const row of listMealAssigns()) {
+          if (row.date < rangeBounds.from || row.date > rangeBounds.to) continue;
+          if (shift !== "all" && row.shift_id !== shift) continue;
+          const member = usersById.get(row.member_id);
+          if (wing !== "all" && member?.wing !== wing) continue;
+          if (
+            query &&
+            ![member?.name, member?.rab_id, member?.rank, member?.wing]
+              .join(" ")
+              .toLowerCase()
+              .includes(query)
+          ) {
+            continue;
+          }
+          merged.push({
+            id: row.id,
+            kind: "member",
+            date: row.date,
+            check_in_time: row.check_in_time,
+            shift_id: row.shift_id,
+            name: member?.name ?? "—",
+            rab_id: member?.rab_id ?? "",
+            wing: member?.wing ?? "",
+            rank: member?.rank ?? "",
+            status: row.status,
+            info: "",
+            ref: "",
+          });
+        }
+      }
+    }
+
+    if (!zkOn && audience !== "member") {
+      for (const row of listGuestMeals()) {
+        if (row.date < rangeBounds.from || row.date > rangeBounds.to) continue;
+        if (shift !== "all" && row.shift_id !== shift) continue;
+        if (wing !== "all") continue;
+        if (
+          query &&
+          ![row.guest_name, row.guest_info, row.ref_info]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        ) {
+          continue;
+        }
+        merged.push({
+          id: row.id,
+          kind: "guest",
+          date: row.date,
+          check_in_time: row.check_in_time,
+          shift_id: row.shift_id,
+          name: row.guest_name,
+          rab_id: "",
+          wing: "",
+          rank: "",
+          status: null,
+          info: row.guest_info,
+          ref: row.ref_info,
+        });
+      }
+    }
+
+    return merged.sort((a, b) => {
+      const byTime = b.check_in_time.localeCompare(a.check_in_time);
+      if (byTime !== 0) return byTime;
+      return b.id.localeCompare(a.id);
+    });
+  }, [
+    state.meal_assigns,
+    state.guest_meals,
+    q,
+    rangeBounds,
+    shift,
+    wing,
+    audience,
+    usersById,
+    zkOn,
+    zkClassified,
+  ]);
+
+  const checkinRows = useMemo(() => {
+    if (status === "all") return checkinBase;
+    return checkinBase.filter((r) => r.status === status);
+  }, [checkinBase, status]);
+
+  const rows = view === "missing" ? missingRows : checkinRows;
+  const reportMode = toReportMode(view, status);
+
+  const uniqueCount = checkinBase.filter((r) => r.status === 1).length;
+  const dupCount = checkinBase.filter((r) => r.status === 2).length;
+  const checkinTotal = checkinBase.length;
+  const missingCount = missingRows.length;
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -147,6 +522,8 @@ export default function MessReportsClient() {
   );
 
   const filtersActive =
+    view !== "checkins" ||
+    audience !== "all" ||
     shift !== "all" ||
     wing !== "all" ||
     status !== "all" ||
@@ -157,34 +534,64 @@ export default function MessReportsClient() {
     setPage(1);
   }
 
+  function setViewMode(next: ViewFilter) {
+    setView(next);
+    if (next === "missing") {
+      setAudience("member");
+      setStatus("all");
+    }
+    resetPage();
+  }
+
+  function setReportMode(mode: ReportMode) {
+    if (mode === "missing") {
+      setViewMode("missing");
+      return;
+    }
+    setView("checkins");
+    setStatus(mode === "consume" ? 1 : mode === "duplicate" ? 2 : "all");
+    resetPage();
+  }
+
   function onExport() {
     const header = [
+      t("mess.reports.colType"),
       t("mess.planning.date"),
       t("mess.reports.colTime"),
       t("mess.colName"),
       t("mess.colRabId"),
       t("mess.colRank"),
       t("mess.colWing"),
+      t("mess.guests.colInfo"),
+      t("mess.guests.colRef"),
       t("mess.reports.colShift"),
       t("mess.reports.colStatus"),
     ];
-    const body = rows.map((row) => {
-      const member = usersById.get(row.member_id);
-      return [
-        row.date,
-        formatCheckInTime(row.check_in_time, dateLocale),
-        member?.name ?? "",
-        member?.rab_id ?? "",
-        member?.rank ?? "",
-        member?.wing ?? "",
-        shiftLabel(t, row.shift_id),
-        row.status === 1
+    const body = rows.map((row) => [
+      row.missing
+        ? t("mess.reports.didNotConsume")
+        : row.kind === "guest"
+          ? t("mess.reports.audienceGuest")
+          : t("mess.reports.audienceMember"),
+      row.date,
+      formatCheckInTime(row.check_in_time, dateLocale),
+      row.name,
+      row.rab_id,
+      row.rank,
+      row.wing,
+      row.info,
+      row.ref,
+      shiftLabel(t, row.shift_id),
+      row.missing
+        ? t("mess.reports.didNotConsume")
+        : row.status === 1
           ? t("mess.reports.unique")
-          : t("mess.reports.duplicate"),
-      ];
-    });
+          : row.status === 2
+            ? t("mess.reports.duplicate")
+            : "",
+    ]);
     downloadCsv(
-      `meal-assigns-${rangeBounds.from}_${rangeBounds.to}.csv`,
+      `meal-reports-${view}-${rangeBounds.from}_${rangeBounds.to}.csv`,
       [header, ...body],
     );
   }
@@ -204,16 +611,23 @@ export default function MessReportsClient() {
           <div className="relative">
             <PageHeader
               title={t("pages.messReports.title")}
-              subtitle={t("pages.messReports.subtitle", {
-                count: rows.length,
-              })}
+              subtitle={
+                zkOn
+                  ? `${t("pages.messReports.subtitle", { count: rows.length })}${
+                      zkLoading
+                        ? ` · ${t("mess.reports.zkLoading")}`
+                        : ` · ${t("mess.reports.zkSource")}`
+                    }`
+                  : t("pages.messReports.subtitle", { count: rows.length })
+              }
               center={<MessPageTabs />}
               actions={
                 <div className="flex flex-wrap items-center gap-2 no-print">
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
-                    className="h-9 rounded-xl"
+                    className="h-9 gap-1.5 rounded-xl"
                     onClick={onExport}
                     disabled={!rows.length}
                   >
@@ -221,9 +635,10 @@ export default function MessReportsClient() {
                     {t("mess.exportCsv")}
                   </Button>
                   <Button
+                    type="button"
                     variant="cta"
                     size="sm"
-                    className="h-9 rounded-xl shadow-sm shadow-primary/20"
+                    className="h-9 gap-1.5 rounded-xl shadow-sm shadow-primary/20"
                     onClick={() => window.print()}
                     disabled={!rows.length}
                   >
@@ -244,40 +659,22 @@ export default function MessReportsClient() {
             resetPage();
           }}
           searchPlaceholder={t("mess.reports.searchPlaceholder")}
-          tiles={
-            <>
-              <StatChip
-                icon={<IconSum className="h-3.5 w-3.5" stroke={2.25} />}
-                label={t("mess.reports.checkIns")}
-                value={String(rows.length)}
-                accent
-                selected={status === "all"}
-                onClick={() => {
-                  setStatus("all");
-                  resetPage();
-                }}
-              />
-              <StatChip
-                icon={<IconCircleCheck className="h-3.5 w-3.5" stroke={2.25} />}
-                label={t("mess.reports.unique")}
-                value={String(uniqueCount)}
-                selected={status === 1}
-                onClick={() => {
-                  setStatus(1);
-                  resetPage();
-                }}
-              />
-              <StatChip
-                icon={<IconCopy className="h-3.5 w-3.5" stroke={2.25} />}
-                label={t("mess.reports.duplicate")}
-                value={String(dupCount)}
-                selected={status === 2}
-                onClick={() => {
-                  setStatus(2);
-                  resetPage();
-                }}
-              />
-            </>
+          trailing={
+            zkOn ? (
+              <Button
+                type="button"
+                variant="cta"
+                size="sm"
+                className="h-10 shrink-0 gap-1.5 rounded-xl shadow-sm shadow-primary/20"
+                onClick={() => setZkTick((n) => n + 1)}
+                disabled={zkLoading}
+              >
+                <IconRefresh
+                  className={cn("h-4 w-4", zkLoading && "animate-spin")}
+                />
+                {t("mess.reports.zkRefresh")}
+              </Button>
+            ) : null
           }
         >
           <DateRangePicker
@@ -298,6 +695,60 @@ export default function MessReportsClient() {
             label={t("common.dateRange")}
             triggerClassName="min-w-[10rem] w-[10rem] px-2 text-xs"
           />
+          <div className="w-[13rem] shrink-0">
+            <Select
+              value={reportMode}
+              onValueChange={(v) => setReportMode(v as ReportMode)}
+            >
+              <SelectTrigger className={cn(searchFilterFieldClass, "w-full")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="total">
+                  {t("mess.reports.checkIns")} ({checkinTotal})
+                </SelectItem>
+                <SelectItem value="consume">
+                  {t("mess.reports.unique")} ({uniqueCount})
+                </SelectItem>
+                <SelectItem value="duplicate">
+                  {t("mess.reports.duplicate")} ({dupCount})
+                </SelectItem>
+                <SelectItem value="missing">
+                  {t("mess.reports.didNotConsume")} ({missingCount})
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {view === "checkins" && !zkOn ? (
+            <div className="w-[10rem] shrink-0">
+              <Select
+                value={audience}
+                onValueChange={(v) => {
+                  setAudience(v as AudienceFilter);
+                  if (v === "guest") {
+                    setStatus("all");
+                    setWing("all");
+                  }
+                  resetPage();
+                }}
+              >
+                <SelectTrigger className={cn(searchFilterFieldClass, "w-full")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {t("mess.reports.audienceAll")}
+                  </SelectItem>
+                  <SelectItem value="member">
+                    {t("mess.reports.audienceMember")}
+                  </SelectItem>
+                  <SelectItem value="guest">
+                    {t("mess.reports.audienceGuest")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="w-[10rem] shrink-0">
             <Select
               value={shift}
@@ -319,54 +770,36 @@ export default function MessReportsClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[10rem] shrink-0">
-            <Select
-              value={wing}
-              onValueChange={(v) => {
-                setWing(v);
-                resetPage();
-              }}
-            >
-              <SelectTrigger className={cn(searchFilterFieldClass, "w-full")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {WINGS.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[10rem] shrink-0">
-            <Select
-              value={String(status)}
-              onValueChange={(v) => {
-                setStatus(
-                  isMealAssignStatus(v) ? (Number(v) as MealAssignStatus) : "all",
-                );
-                resetPage();
-              }}
-            >
-              <SelectTrigger className={cn(searchFilterFieldClass, "w-full")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  {t("mess.reports.allStatus")}
-                </SelectItem>
-                <SelectItem value="1">{t("mess.reports.unique")}</SelectItem>
-                <SelectItem value="2">{t("mess.reports.duplicate")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {view === "missing" || audience !== "guest" ? (
+            <div className="w-[10rem] shrink-0">
+              <Select
+                value={wing}
+                onValueChange={(v) => {
+                  setWing(v);
+                  resetPage();
+                }}
+              >
+                <SelectTrigger className={cn(searchFilterFieldClass, "w-full")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("common.allWing")}</SelectItem>
+                  {wings.map((w) => (
+                    <SelectItem key={w} value={w}>
+                      {w}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <ClearFiltersButton
             disabled={!filtersActive && !q.trim()}
             onClick={() => {
               const next = defaultRange();
               setQ("");
+              setView("checkins");
+              setAudience("all");
               setShift("all");
               setWing("all");
               setStatus("all");
@@ -377,10 +810,20 @@ export default function MessReportsClient() {
           />
         </SearchFilterBar>
 
-        {rows.length === 0 ? (
+        {zkOn && zkLoading ? (
+          <ReportsTableSkeleton />
+        ) : rows.length === 0 ? (
           <EmptyState
-            title={t("mess.reports.empty")}
-            description={t("mess.reports.emptyHint")}
+            title={
+              view === "missing"
+                ? t("mess.reports.emptyMissing")
+                : t("mess.reports.empty")
+            }
+            description={
+              view === "missing"
+                ? t("mess.reports.emptyMissingHint")
+                : t("mess.reports.emptyHint")
+            }
           />
         ) : (
           <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-950">
@@ -397,6 +840,7 @@ export default function MessReportsClient() {
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900 print:bg-white">
                   <tr>
+                    <th className="px-4 py-3">{t("mess.reports.colType")}</th>
                     <th className="px-4 py-3">{t("mess.colName")}</th>
                     <th className="px-4 py-3">{t("mess.planning.date")}</th>
                     <th className="px-4 py-3">{t("mess.reports.colTime")}</th>
@@ -406,57 +850,77 @@ export default function MessReportsClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((row) => {
-                    const member = usersById.get(row.member_id);
-                    return (
-                      <tr
-                        key={row.id}
-                        className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <UserAvatar name={member?.name ?? "?"} />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
-                                {member?.name ?? "—"}
-                              </p>
-                              <p className="font-mono text-xs text-neutral-500">
-                                {member?.rab_id ?? "—"}
-                              </p>
-                            </div>
+                  {pageRows.map((row) => (
+                    <tr
+                      key={`${row.kind}-${row.id}`}
+                      className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
+                    >
+                      <td className="px-4 py-3">
+                        {row.missing ? (
+                          <Badge className="rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-950 dark:bg-orange-900/50 dark:text-orange-100">
+                            {t("mess.reports.didNotConsume")}
+                          </Badge>
+                        ) : row.kind === "guest" ? (
+                          <Badge className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-950 dark:bg-amber-900/50 dark:text-amber-100">
+                            {t("mess.reports.audienceGuest")}
+                          </Badge>
+                        ) : (
+                          <Badge className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-950 dark:bg-sky-900/50 dark:text-sky-100">
+                            {t("mess.reports.audienceMember")}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <UserAvatar name={row.name || "?"} />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
+                              {row.name}
+                            </p>
+                            <p className="truncate text-xs text-neutral-500">
+                              {row.kind === "guest"
+                                ? row.info || row.ref || "—"
+                                : row.rab_id || "—"}
+                            </p>
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-neutral-800 dark:text-neutral-200">
-                            {formatDateLong(row.date, dateLocale)}
-                          </p>
-                          <p className="font-mono text-xs text-neutral-500">
-                            {row.date}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-neutral-700 dark:text-neutral-300">
-                          {formatCheckInTime(row.check_in_time, dateLocale)}
-                        </td>
-                        <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">
-                          {shiftLabel(t, row.shift_id)}
-                        </td>
-                        <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">
-                          {member?.wing || "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          {row.status === 1 ? (
-                            <Badge className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-950 dark:bg-emerald-900/50 dark:text-emerald-100">
-                              {t("mess.reports.unique")}
-                            </Badge>
-                          ) : (
-                            <Badge className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-950 dark:bg-rose-900/50 dark:text-rose-100">
-                              {t("mess.reports.duplicate")}
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-neutral-800 dark:text-neutral-200">
+                          {formatDateLong(row.date, dateLocale)}
+                        </p>
+                        <p className="font-mono text-xs text-neutral-500">
+                          {row.date}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-neutral-700 dark:text-neutral-300">
+                        {formatCheckInTime(row.check_in_time, dateLocale)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <ShiftChip t={t} shiftId={row.shift_id} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <WingChip wing={row.wing} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.missing ? (
+                          <Badge className="rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-950 dark:bg-orange-900/50 dark:text-orange-100">
+                            {t("mess.reports.didNotConsume")}
+                          </Badge>
+                        ) : row.status === 1 ? (
+                          <Badge className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-950 dark:bg-emerald-900/50 dark:text-emerald-100">
+                            {t("mess.reports.unique")}
+                          </Badge>
+                        ) : row.status === 2 ? (
+                          <Badge className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-950 dark:bg-rose-900/50 dark:text-rose-100">
+                            {t("mess.reports.duplicate")}
+                          </Badge>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -481,56 +945,37 @@ export default function MessReportsClient() {
   );
 }
 
-function StatChip({
-  icon,
-  label,
-  value,
-  accent,
-  selected,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  accent?: boolean;
-  selected?: boolean;
-  onClick?: () => void;
-}) {
+function ReportsTableSkeleton() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5",
-        selected
-          ? "border-primary/40 bg-primary/[0.12] ring-1 ring-primary/20"
-          : accent
-            ? "border-primary/20 bg-primary/[0.08]"
-            : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
-      )}
-    >
-      <span
-        className={cn(
-          "opacity-80",
-          selected || accent ? "text-primary" : "text-neutral-500",
-        )}
-        aria-hidden
-      >
-        {icon}
-      </span>
-      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
-        {label}
-      </span>
-      <span
-        className={cn(
-          "text-base font-bold tabular-nums",
-          selected || accent
-            ? "text-primary"
-            : "text-neutral-900 dark:text-white",
-        )}
-      >
-        {value}
-      </span>
-    </button>
+    <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+      <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <Skeleton className="h-4 w-4 rounded" />
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="ml-auto h-3 w-12" />
+      </div>
+      <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex w-full items-center gap-3 px-4 py-3 sm:gap-4"
+          >
+            <Skeleton className="h-5 w-14 shrink-0 rounded-md" />
+            <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-[1.4] space-y-1.5">
+              <Skeleton className="h-3.5 w-full max-w-[12rem]" />
+              <Skeleton className="h-3 w-14" />
+            </div>
+            <div className="hidden min-w-0 flex-1 space-y-1.5 sm:block">
+              <Skeleton className="h-3.5 w-full max-w-[9rem]" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="hidden h-3.5 w-16 shrink-0 md:block" />
+            <Skeleton className="h-5 w-[4.5rem] shrink-0 rounded-md" />
+            <Skeleton className="h-5 w-14 shrink-0 rounded-md" />
+            <Skeleton className="h-5 w-16 shrink-0 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

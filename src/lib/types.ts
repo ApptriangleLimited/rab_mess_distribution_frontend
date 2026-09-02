@@ -4,7 +4,7 @@ export type ApprovalStatus = "pending" | "approved" | "rejected" | "ended";
 export type UserStatus = "0" | "1";
 
 /** How the member is classified on create/edit. */
-export type MemberType = "new" | "attached" | "permanent";
+export type MemberType = "new" | "attached" | "permanent" | "guest" | "civilian";
 
 export type BuiltInDailyTag =
   | "FR"
@@ -15,7 +15,13 @@ export type BuiltInDailyTag =
   | "WIT"
   | "MED"
   | "TRG"
-  | "MS";
+  | "MS"
+  | "MOL"
+  | "CMH"
+  | "RBH"
+  | "BGH"
+  | "AWL"
+  | "OSL";
 
 /** Built-in duty tags + custom allowance codes (ration). */
 export type DailyTag = BuiltInDailyTag | (string & {});
@@ -41,11 +47,16 @@ export interface User {
   rfid: string;
   rank: string;
   wing: string;
-  /** new | attached | permanent — New has no rank/wing. */
+  /** Parent force (Army, Navy, …). */
+  force: string;
+  religion: string;
+  /** new | attached | permanent | civilian */
   member_type: MemberType;
   dropdown_no: string;
   phone: string;
   documents: DocumentMeta[];
+  /** Civilian: staff confirmed NID/birth-cert docs. */
+  documents_verified: boolean;
   status: UserStatus;
   approval_status: ApprovalStatus;
   bank_name: string;
@@ -53,10 +64,16 @@ export interface User {
   account_number: string;
   routing: string;
   branch: string;
+  branch_location: string;
   /** ISO `YYYY-MM-DD` — when member joined. */
   joining_date: string;
   /** ISO `YYYY-MM-DD` — when member left; empty if still active. */
   out_date: string;
+  /**
+   * Standing duty tag. Empty cockpit cells project this (not last painted tag).
+   * Temp paints (e.g. CL) only affect stored days; after them, default resumes.
+   */
+  default_tag: DailyTag;
   emergency_contacts: EmergencyContact[];
   created_at: string;
   updated_at: string;
@@ -79,7 +96,10 @@ export interface SenderAccount {
   account_number: string;
   routing: string;
   branch: string;
+  branch_location: string;
   mapped_tags: DailyTag[];
+  /** false = deactivated; hidden from payout pickers. Default active. */
+  active?: boolean;
 }
 
 export interface AllowanceRate {
@@ -178,11 +198,67 @@ export interface GuestMeal {
   updated_at: string;
 }
 
+
+/** Authorized strength row (Settings → Authorized). */
+export interface AuthorizedStrength {
+  id: string;
+  label: string;
+  /** HQ / category total — equals sum of `wings` when any wing set. */
+  count: number;
+  /** Per-wing প্রাধিকৃত (root wing label → count). */
+  wings: Record<string, number>;
+  /**
+   * Officer-only per-wing প্রাপ্ত (held).
+   * Form 1: wing Officer প্রাপ্ত + HQ Officer প্রাপ্ত = sum.
+   */
+  held_wings?: Record<string, number>;
+}
+
 export interface AppState {
   users: User[];
   assignments: DailyAssignment[];
   senders: SenderAccount[];
   rates: AllowanceRate[];
+  /** Editable rank ladder (order = seniority for sort). */
+  ranks: string[];
+  /** Editable wing / unit labels (flat catalog; tree via wing_parent). Short forms. */
+  wings: string[];
+  /** Child wing → parent wing. Roots omit / missing. Nested sub-wings OK. */
+  wing_parent: Record<string, string>;
+  /** Elaborate names for wings (`short` → full), overrides defaults. */
+  wing_labels: Record<string, string>;
+  /** Parent forces (Army, Navy, …) — editable in Settings. */
+  forces: string[];
+  /** Ranks assigned under each force (`force` → service rank labels). */
+  force_ranks: Record<string, string[]>;
+  /** User-added service ranks beyond defaults (`force` → short labels). */
+  force_rank_extras: Record<string, string[]>;
+  /** Default ladder ranks hidden by user (`force` → short labels). */
+  force_rank_removed: Record<string, string[]>;
+  /** Elaborate names for force service ranks (`force` → short → full). */
+  force_rank_labels: Record<string, Record<string, string>>;
+  /** Elaborate names for RAB ranks (`short` → full), overrides defaults. */
+  rank_labels: Record<string, string>;
+  /** Forces linked under each RAB rank (`rab rank` → force labels). */
+  rank_forces: Record<string, string[]>;
+  /**
+   * RAB rank ↔ force service-rank equivalents
+   * (`rab rank` → `force` → service ranks).
+   * e.g. DAD → Army → [OR, L/CPL]; DAD → Police → [Insp].
+   */
+  rank_equivalents: Record<string, Record<string, string[]>>;
+  /** Wings under each rank+force (`rank` → `force` → wing labels). */
+  rank_force_wings: Record<string, Record<string, string[]>>;
+  /** Bank names for member register / edit form picklist. */
+  member_banks: string[];
+  /** Authorized strength categories (label + count). */
+  authorized: AuthorizedStrength[];
+  /**
+   * Form 1 Officer অনুপস্থিত by date + wing
+   * (`YYYY-MM-DD` → wing label → count).
+   * উপস্থিত = প্রাপ্ত − this.
+   */
+  manpower_officer_absent: Record<string, Record<string, number>>;
   /** ISO dates Daily has confirmed (carry + edits locked as approved). */
   approved_dates: string[];
   /** `${userId}|${date}` — hide carry ghost until Approve restores or new tag set. */

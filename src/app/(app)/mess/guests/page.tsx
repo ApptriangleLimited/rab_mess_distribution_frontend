@@ -1,18 +1,6 @@
-import { Suspense } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-import MessGuestsClient from "./guests-client";
+import { redirect } from "next/navigation";
 
+/** Guest meals live under Meal reports (`?audience=guest`). */
 export default function MessGuestsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="page-pane">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="mt-4 h-40 w-full" />
-        </div>
-      }
-    >
-      <MessGuestsClient />
-    </Suspense>
-  );
+  redirect("/mess/reports?audience=guest");
 }

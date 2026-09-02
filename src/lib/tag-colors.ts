@@ -24,6 +24,12 @@ const TAG_CELL: Record<string, string> = {
   TRG: "bg-cyan-100 text-cyan-950 dark:bg-cyan-900/55 dark:text-cyan-100",
   /** Fuel rate-only — yellow */
   FUEL: "bg-yellow-100 text-yellow-950 dark:bg-yellow-900/55 dark:text-yellow-100",
+  MOL: "bg-teal-100 text-teal-950 dark:bg-teal-900/55 dark:text-teal-100",
+  CMH: "bg-blue-100 text-blue-950 dark:bg-blue-900/55 dark:text-blue-100",
+  RBH: "bg-sky-100 text-sky-950 dark:bg-sky-900/55 dark:text-sky-100",
+  BGH: "bg-orange-100 text-orange-950 dark:bg-orange-900/55 dark:text-orange-100",
+  AWL: "bg-pink-100 text-pink-950 dark:bg-pink-900/55 dark:text-pink-100",
+  OSL: "bg-purple-100 text-purple-950 dark:bg-purple-900/55 dark:text-purple-100",
 };
 
 /** Extra slots for custom tags — no overlap with built-in hues above. */

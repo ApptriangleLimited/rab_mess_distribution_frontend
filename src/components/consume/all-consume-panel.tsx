@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useStore } from "@/hooks/use-store";
 import { IconUsers } from "@tabler/icons-react";
 import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ListPagination } from "@/components/shared/list-pagination";
@@ -19,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePagination } from "@/hooks/use-pagination";
-import { RANKS, WINGS } from "@/lib/constants";
+
 import { monthKey } from "@/lib/date";
 import { formatBdt } from "@/lib/reports";
 import type { User } from "@/lib/types";
@@ -48,6 +49,7 @@ export function AllConsumePanel({
   tiles,
 }: Props) {
   const t = useT();
+  const { ranks, wings } = useStore();
   const defaultMonth = monthKey();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -122,7 +124,7 @@ export function AllConsumePanel({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("common.allRank")}</SelectItem>
-              {RANKS.map((r) => (
+              {ranks.map((r) => (
                 <SelectItem key={r} value={r}>
                   {r}
                 </SelectItem>
@@ -140,7 +142,7 @@ export function AllConsumePanel({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("common.allWing")}</SelectItem>
-              {WINGS.map((w) => (
+              {wings.map((w) => (
                 <SelectItem key={w} value={w}>
                   {w}
                 </SelectItem>

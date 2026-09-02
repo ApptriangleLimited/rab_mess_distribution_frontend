@@ -170,7 +170,7 @@ export function UserDetail({ user }: { user: User }) {
         <dl className="grid gap-2.5 p-5 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField
             icon={IconId}
-            label={t("cc.fields.personalId")}
+            label={t("cc.fields.personalNo")}
             value={user.personal_id}
             mono
           />
@@ -183,6 +183,16 @@ export function UserDetail({ user }: { user: User }) {
             icon={IconBuilding}
             label={t("cc.fields.wing")}
             value={user.wing}
+          />
+          <DetailField
+            icon={IconShield}
+            label={t("cc.fields.force")}
+            value={user.force}
+          />
+          <DetailField
+            icon={IconId}
+            label={t("cc.fields.religion")}
+            value={user.religion}
           />
           <DetailField
             icon={IconPhone}
@@ -277,6 +287,11 @@ export function UserDetail({ user }: { user: User }) {
             icon={IconBuilding}
             label={t("cc.fields.branch")}
             value={user.branch}
+          />
+          <DetailField
+            icon={IconBuilding}
+            label={t("cc.fields.branchLocation")}
+            value={user.branch_location}
           />
         </dl>
       </DetailSection>

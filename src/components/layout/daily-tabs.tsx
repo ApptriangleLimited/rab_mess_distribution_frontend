@@ -1,7 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { IconClipboardList, IconTags, IconUserCheck } from "@tabler/icons-react";
+import {
+  IconClipboardList,
+  IconTags,
+  IconUserCheck,
+  IconUsersGroup,
+} from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
 import { useT } from "@/i18n/provider";
 
@@ -20,6 +25,13 @@ const TABS = [
     match: (path: string) =>
       path === "/daily/state-report" ||
       path.startsWith("/daily/state-report/"),
+  },
+  {
+    href: "/daily/manpower",
+    labelKey: "nav.manpower" as const,
+    icon: IconUsersGroup,
+    match: (path: string) =>
+      path === "/daily/manpower" || path.startsWith("/daily/manpower/"),
   },
   {
     href: "/daily/roster",

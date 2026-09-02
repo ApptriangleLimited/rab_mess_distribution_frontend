@@ -14,9 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RANKS, WINGS } from "@/lib/constants";
 import type { ApprovalStatus, UserStatus } from "@/lib/types";
 import type { UserFilters } from "@/lib/store/users";
+import { wingDisplayLabel } from "@/lib/constants";
+import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +77,7 @@ export function UserFiltersBar({
   wrapTiles = false,
 }: Props) {
   const t = useT();
+  const { ranks, wings, wing_labels } = useStore();
 
   function patch(partial: Partial<UserFilters>) {
     onChange({ ...value, ...partial });
@@ -144,9 +146,9 @@ export function UserFiltersBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("common.allWing")}</SelectItem>
-            {WINGS.map((w) => (
+            {wings.map((w) => (
               <SelectItem key={w} value={w}>
-                {w}
+                {wingDisplayLabel(w, wing_labels)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -162,7 +164,7 @@ export function UserFiltersBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("common.allRank")}</SelectItem>
-            {RANKS.map((r) => (
+            {ranks.map((r) => (
               <SelectItem key={r} value={r}>
                 {r}
               </SelectItem>

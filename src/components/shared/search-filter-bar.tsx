@@ -21,6 +21,10 @@ type Props = {
   filtersActive?: boolean;
   /** Stat tiles (collapse: after filter btn; flat: after fields). */
   tiles?: ReactNode;
+  /** Hide built-in search (e.g. search lives in page header). */
+  hideSearch?: boolean;
+  /** Hide filter fields row (e.g. filters live in page header). */
+  hideFilters?: boolean;
   /**
    * Put tiles on their own row under filters (one line, own X-scroll).
    * Keeps filter row from stretching with many stats.
@@ -49,6 +53,8 @@ export function SearchFilterBar({
   filtersActive = false,
   tiles,
   wrapTiles = false,
+  hideSearch = false,
+  hideFilters = false,
   trailing,
   children,
   flat = true,
@@ -65,19 +71,21 @@ export function SearchFilterBar({
       )}
     >
       <div className="flex w-full min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto">
-        <div className={cn("w-64 shrink-0 sm:w-72", searchClassName)}>
-          <Input
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={searchPlaceholder ?? t("common.search")}
-            className={cn(fieldClass, "w-full")}
-            aria-label={t("common.search")}
-          />
-        </div>
+        {hideSearch ? null : (
+          <div className={cn("w-64 shrink-0 sm:w-72", searchClassName)}>
+            <Input
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={searchPlaceholder ?? t("common.search")}
+              className={cn(fieldClass, "w-full")}
+              aria-label={t("common.search")}
+            />
+          </div>
+        )}
 
-        {flat ? (
+        {flat && !hideFilters ? (
           children
-        ) : (
+        ) : !flat ? (
           <Button
             type="button"
             variant="outline"
@@ -102,7 +110,7 @@ export function SearchFilterBar({
               />
             ) : null}
           </Button>
-        )}
+        ) : null}
 
         {tiles && !wrapTiles ? (
           <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1">

@@ -1,4 +1,4 @@
-import { nowISO, previousISODate } from "@/lib/date";
+import { nowISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import { canAssignOnDate } from "@/lib/store/daily";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
@@ -225,23 +225,19 @@ export function markDateApproved(date: string) {
   });
 }
 
-/** Walk back up to `maxDays` looking for last saved tag before `date`. */
+/** Empty-cell projection: member `default_tag` (not last painted tag). */
 export function findPriorTag(
   userId: string,
-  date: string,
-  maxDays = 62,
+  _date?: string,
+  _maxDays = 62,
 ): DailyTag | null {
-  let cursor = previousISODate(date);
-  for (let i = 0; i < maxDays; i++) {
-    const found = getAssignment(userId, cursor);
-    if (found) return found.tag;
-    cursor = previousISODate(cursor);
-  }
-  return null;
+  const user = findUser(userId);
+  if (!user?.default_tag) return null;
+  return user.default_tag;
 }
 
 /**
- * Approve day: fill empty / suppressed cells from prior tag, then mark approved.
+ * Approve day: fill empty / suppressed cells from member default_tag, then lock.
  */
 export function approveCarryForward(
   userIds: string[],
@@ -266,19 +262,8 @@ export function approveCarryForward(
       // Already has saved tag and not an explicit clear → skip
       if (idx >= 0 && !suppressedHere) continue;
 
-      let prior: DailyTag | null = null;
-      let cursor = previousISODate(date);
-      for (let i = 0; i < 62; i++) {
-        const stored = next.find(
-          (a) => a.user_id === userId && a.date === cursor,
-        );
-        if (stored) {
-          prior = stored.tag;
-          break;
-        }
-        cursor = previousISODate(cursor);
-      }
-      if (!prior) {
+      const fillTag = user.default_tag || null;
+      if (!fillTag) {
         suppressed = withoutCarry(suppressed, userId, date);
         continue;
       }
@@ -286,7 +271,7 @@ export function approveCarryForward(
       if (idx >= 0) {
         next[idx] = {
           ...next[idx],
-          tag: prior,
+          tag: fillTag,
           updated_by: updatedBy,
           updated_at: ts,
         };
@@ -295,7 +280,7 @@ export function approveCarryForward(
           id: newId(),
           user_id: userId,
           date,
-          tag: prior,
+          tag: fillTag,
           updated_by: updatedBy,
           updated_at: ts,
         });
@@ -316,7 +301,7 @@ export function approveCarryForward(
 }
 
 /**
- * Auto-apply prior tags to empty cells for `date`.
+ * Auto-apply member default_tag to empty cells for `date`.
  * Skips explicit clears (suppressed). Does not rewrite saved tags.
  */
 export function autoApplyCarryForward(
@@ -340,25 +325,14 @@ export function autoApplyCarryForward(
     if (idx >= 0) continue;
     if (suppressed.includes(carryKey(userId, date))) continue;
 
-    let prior: DailyTag | null = null;
-    let cursor = previousISODate(date);
-    for (let i = 0; i < 62; i++) {
-      const stored = next.find(
-        (a) => a.user_id === userId && a.date === cursor,
-      );
-      if (stored) {
-        prior = stored.tag;
-        break;
-      }
-      cursor = previousISODate(cursor);
-    }
-    if (!prior) continue;
+    const fillTag = user.default_tag;
+    if (!fillTag) continue;
 
     next.push({
       id: newId(),
       user_id: userId,
       date,
-      tag: prior,
+      tag: fillTag,
       updated_by: updatedBy,
       updated_at: ts,
     });

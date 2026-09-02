@@ -10,7 +10,6 @@ import {
   IconLayoutDashboard,
   IconSettings,
   IconTags,
-  IconUserPlus,
   IconUsers,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
@@ -83,12 +82,6 @@ const ADMIN_MEAL_TABS: Tab[] = [
     labelKey: "nav.mealReports",
     icon: IconFileReport,
     match: (path) => path.startsWith("/mess/reports"),
-  },
-  {
-    href: "/mess/guests",
-    labelKey: "nav.guestMeals",
-    icon: IconUserPlus,
-    match: (path) => path.startsWith("/mess/guests"),
   },
 ];
 
