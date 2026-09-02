@@ -973,12 +973,13 @@ function writeStorage(state: AppState) {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
 }
 
-function isCurrentSeed(state: AppState | null): state is AppState {
+/** Version check only — not a type predicate (stale disk is still AppState). */
+function isCurrentSeed(state: AppState | null): boolean {
   return !!state && (state.version ?? 0) >= SEED_VERSION;
 }
 
 export function getState(): AppState {
-  if (isCurrentSeed(memory)) {
+  if (memory && isCurrentSeed(memory)) {
     const hasBanned = memory.wings.some((w) =>
       LEGACY_WINGS.some((b) => b.toLowerCase() === w.toLowerCase()),
     );
@@ -996,7 +997,7 @@ export function getState(): AppState {
   }
 
   const fromDisk = readStorage();
-  if (isCurrentSeed(fromDisk)) {
+  if (fromDisk && isCurrentSeed(fromDisk)) {
     memory = normalizeState(fromDisk);
     writeStorage(memory);
     return memory;

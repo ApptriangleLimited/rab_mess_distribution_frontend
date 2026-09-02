@@ -65,6 +65,7 @@ function user(
     | "created_at"
     | "updated_at"
     | "documents"
+    | "documents_verified"
     | "joining_date"
     | "out_date"
     | "member_type"
@@ -73,6 +74,7 @@ function user(
     | "default_tag"
   > & {
     documents?: User["documents"];
+    documents_verified?: boolean;
     joining_date?: string;
     out_date?: string;
     member_type?: User["member_type"];
@@ -83,17 +85,17 @@ function user(
 ): User {
   const ts = nowISO();
   return {
-    documents: [],
-    documents_verified: false,
-    joining_date: todayISO(),
-    out_date: "",
-    member_type: "permanent",
-    personal_id: "",
-    emergency_contacts: [],
-    default_tag: "MS",
+    ...partial,
+    documents: partial.documents ?? [],
+    documents_verified: partial.documents_verified ?? false,
+    joining_date: partial.joining_date ?? todayISO(),
+    out_date: partial.out_date ?? "",
+    member_type: partial.member_type ?? "permanent",
+    personal_id: partial.personal_id ?? "",
+    emergency_contacts: partial.emergency_contacts ?? [],
+    default_tag: partial.default_tag ?? "MS",
     created_at: ts,
     updated_at: ts,
-    ...partial,
   };
 }
 
@@ -711,6 +713,7 @@ export function createSeedState(): AppState {
       account_number: "9001001001",
       routing: "000000001",
       branch: "Head Office",
+      branch_location: "Dhaka",
       mapped_tags: ["FR"],
       active: true,
     },
@@ -722,6 +725,7 @@ export function createSeedState(): AppState {
       account_number: "9001001002",
       routing: "000000002",
       branch: "HQ Branch",
+      branch_location: "Dhaka",
       mapped_tags: ["MS"],
       active: true,
     },
@@ -733,6 +737,7 @@ export function createSeedState(): AppState {
       account_number: "9001001003",
       routing: "000000003",
       branch: "Central",
+      branch_location: "Dhaka",
       mapped_tags: ["CD", "TRG"],
       active: true,
     },
@@ -744,6 +749,7 @@ export function createSeedState(): AppState {
       account_number: "9001001004",
       routing: "000000004",
       branch: "HQ Branch",
+      branch_location: "Dhaka",
       mapped_tags: ["MED", "WIT"],
       active: true,
     },
@@ -755,6 +761,7 @@ export function createSeedState(): AppState {
       account_number: "9001001005",
       routing: "000000005",
       branch: "Banani",
+      branch_location: "Dhaka",
       mapped_tags: ["CL", "PL", "WR"],
       active: true,
     },
