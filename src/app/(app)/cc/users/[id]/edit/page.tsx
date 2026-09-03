@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { CcTabs } from "@/components/layout/cc-tabs";
 import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ export default function CcEditUserPage() {
         <PageHeader
           title={t("pages.ccEditUser.title")}
           subtitle={t("pages.ccEditUser.subtitle")}
+          center={<CcTabs />}
           leading={
             <Button
               asChild

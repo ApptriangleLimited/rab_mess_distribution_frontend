@@ -8,6 +8,7 @@ import {
   IconClipboardList,
   IconFileReport,
   IconLayoutDashboard,
+  IconSend,
   IconSettings,
   IconTags,
   IconUsers,
@@ -46,6 +47,18 @@ const BASE_TABS: Tab[] = [
     icon: IconTags,
     match: (path) =>
       path.startsWith("/ration/monthly") || path.startsWith("/ration/report"),
+  },
+  {
+    href: "/ration/requests",
+    labelKey: "nav.requests",
+    icon: IconSend,
+    match: (path) => path.startsWith("/ration/requests"),
+  },
+  {
+    href: "/consume/requests",
+    labelKey: "nav.consumeRequests",
+    icon: IconSend,
+    match: (path) => path.startsWith("/consume/requests"),
   },
   {
     href: "/consume/monthly",

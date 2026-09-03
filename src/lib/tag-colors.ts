@@ -30,6 +30,16 @@ const TAG_CELL: Record<string, string> = {
   BGH: "bg-orange-100 text-orange-950 dark:bg-orange-900/55 dark:text-orange-100",
   AWL: "bg-pink-100 text-pink-950 dark:bg-pink-900/55 dark:text-pink-100",
   OSL: "bg-purple-100 text-purple-950 dark:bg-purple-900/55 dark:text-purple-100",
+  /** Recreation Leave — emerald */
+  RL: "bg-emerald-100 text-emerald-950 dark:bg-emerald-900/55 dark:text-emerald-100",
+  /** Joining Leave — red */
+  JL: "bg-red-100 text-red-950 dark:bg-red-900/55 dark:text-red-100",
+  /** Promotion Exam — slate */
+  PE: "bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100",
+  /** Link — green */
+  LNK: "bg-green-100 text-green-950 dark:bg-green-900/55 dark:text-green-100",
+  /** Locked standing tag — yellow */
+  MFR: "bg-yellow-200 text-yellow-950 dark:bg-yellow-800/60 dark:text-yellow-50",
 };
 
 /** Extra slots for custom tags — no overlap with built-in hues above. */

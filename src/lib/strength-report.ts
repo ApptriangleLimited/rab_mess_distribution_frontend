@@ -117,6 +117,10 @@ const ABSENT_TAGS = new Set<string>([
   "OSL",
   "MOL",
   "CD",
+  "RL",
+  "JL",
+  "PE",
+  "LNK",
 ]);
 
 function emptyCounts(): StrengthCounts {
@@ -336,6 +340,7 @@ function bumpAbsence(
       row.pl += 1;
       break;
     case "WR":
+    case "RL":
       row.rl += 1;
       break;
     case "MED":
@@ -348,6 +353,7 @@ function bumpAbsence(
       row.training += 1;
       break;
     case "CD":
+    case "PE":
       row.exam += 1;
       break;
     case "CMH":

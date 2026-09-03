@@ -19,6 +19,7 @@ import {
   LEGACY_MEMBER_BANKS,
   DEFAULT_AUTHORIZED,
   MEMBER_BANKS,
+  DAILY_TAGS,
   RATE_ONLY_TAGS,
   RANKS,
   STORE_KEY,
@@ -31,6 +32,7 @@ import type {
   AllowanceRate,
   AppState,
   EmergencyContact,
+  TagRequest,
   User,
 } from "@/lib/types";
 
@@ -946,6 +948,21 @@ function ensureRateOnlyRates(rates: AllowanceRate[]): AllowanceRate[] {
     ...r,
     amount_per_day: parseMoney(r.amount_per_day),
   }));
+  for (const builtIn of DAILY_TAGS) {
+    const exists = next.some(
+      (r) => r.tag.toLowerCase() === builtIn.code.toLowerCase(),
+    );
+    if (!exists) {
+      next.push({
+        tag: builtIn.code,
+        amount_per_day: builtIn.allowance
+          ? builtIn.code === "MS"
+            ? 180
+            : 220
+          : 0,
+      });
+    }
+  }
   for (const only of RATE_ONLY_TAGS) {
     const exists = next.some(
       (r) => r.tag.toLowerCase() === only.code.toLowerCase(),
@@ -1044,6 +1061,9 @@ function normalizeState(state: AppState): AppState {
         ...rest,
         joining_date: legacy.joining_date ?? "",
         out_date: legacy.out_date ?? "",
+        inactive_spans: Array.isArray(legacy.inactive_spans)
+          ? legacy.inactive_spans
+          : [],
         member_type: legacy.member_type ?? "permanent",
         personal_id: legacy.personal_id ?? "",
         force: legacy.force ?? "",
@@ -1236,6 +1256,24 @@ function normalizeState(state: AppState): AppState {
     meal_assigns: Array.isArray(state.meal_assigns) ? state.meal_assigns : [],
     meal_shifts: Array.isArray(state.meal_shifts) ? state.meal_shifts : [],
     guest_meals: Array.isArray(state.guest_meals) ? state.guest_meals : [],
+    tag_requests: Array.isArray(state.tag_requests)
+      ? state.tag_requests.map((raw: TagRequest) => ({
+          ...raw,
+          queue:
+            raw.queue === "ration" || raw.queue === "consume"
+              ? raw.queue
+              : "daily",
+          from_date: raw.from_date || raw.date,
+          to_date: raw.to_date || raw.date,
+          trg_tone:
+            raw.to_tag === "TRG" &&
+            (raw.trg_tone === "black" || raw.trg_tone === "red")
+              ? raw.trg_tone
+              : undefined,
+          trg_sarda:
+            raw.to_tag === "TRG" ? Boolean(raw.trg_sarda) : undefined,
+        }))
+      : [],
   };
 }
 
@@ -1290,6 +1328,7 @@ export function getServerSnapshot(): AppState {
     meal_assigns: [],
     meal_shifts: [],
     guest_meals: [],
+    tag_requests: [],
     version: 0,
   };
 }

@@ -158,6 +158,44 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
   doc.text("Sincerely Yours,", 10, y);
 }
 
+function bankSlug(name: string) {
+  const slug = name
+    .trim()
+    .replace(/[^\w]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "unknown";
+}
+
+function filenameForBank(filename: string, bank: string) {
+  const slug = bankSlug(bank);
+  if (filename.toLowerCase().endsWith(".pdf")) {
+    return `${filename.slice(0, -4)}-${slug}.pdf`;
+  }
+  return `${filename}-${slug}.pdf`;
+}
+
+function sheetBankName(
+  sheet: { memberBank?: string; lines: { user: { bank_name: string } }[] },
+) {
+  return sheet.memberBank || sheet.lines[0]?.user.bank_name || "unknown";
+}
+
+function savePdfsStaggered(jobs: { write: (doc: jsPDF) => void; filename: string; landscape?: boolean }[]) {
+  jobs.forEach((job, i) => {
+    const run = () => {
+      const doc = new jsPDF({
+        orientation: job.landscape ? "landscape" : "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      job.write(doc);
+      doc.save(job.filename);
+    };
+    if (i === 0) run();
+    else setTimeout(run, i * 400);
+  });
+}
+
 export function downloadFrTransferPdf(
   sheet: RationTransferSheet | RationTransferSheet[],
   filename: string,
@@ -165,12 +203,101 @@ export function downloadFrTransferPdf(
   const sheets = Array.isArray(sheet) ? sheet : [sheet];
   if (sheets.length === 0) return;
 
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  sheets.forEach((s, i) => {
-    if (i > 0) doc.addPage();
-    writeFrTransferLetter(doc, s);
+  savePdfsStaggered(
+    sheets.map((s) => ({
+      landscape: true,
+      filename: filenameForBank(filename, sheetBankName(s)),
+      write: (doc) => writeFrTransferLetter(doc, s),
+    })),
+  );
+}
+
+function writeStaffPayoutLetter(
+  doc: jsPDF,
+  sheet: RationStaffSheet,
+  subjectOverride?: string,
+) {
+  const pageW = doc.internal.pageSize.getWidth();
+  let y = writeHeader(doc, 14);
+  const monthLabel = formatMonthLong(sheet.month);
+  const subject =
+    subjectOverride ??
+    (sheet.memberBank
+      ? RATION_REPORT_META.subjectTagBill
+          .replace("{monthLabel}", monthLabel)
+          .replace("{bank}", sheet.memberBank)
+      : RATION_REPORT_META.subjectFreshMoney.replace(
+          "{month}",
+          monthLabel,
+        ));
+
+  doc.setFontSize(9);
+  doc.text(`${RATION_REPORT_META.refPrefix}/${sheet.month}`, 14, y);
+  doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
+  y += 6;
+
+  doc.text("To: Manager", 14, y);
+  y += 4;
+  doc.text(sheet.sender.bank_name || sheet.sender.label, 14, y);
+  y += 4;
+  if (sheet.sender.branch) {
+    doc.text(sheet.sender.branch, 14, y);
+    y += 4;
+  }
+  y += 2;
+
+  doc.setFont("helvetica", "bold");
+  doc.text(`SUBJECT : ${subject}`, 14, y);
+  const subW = doc.getTextWidth(`SUBJECT : ${subject}`);
+  doc.line(14, y + 1, 14 + Math.min(subW, pageW - 28), y + 1);
+  doc.setFont("helvetica", "normal");
+  y += 6;
+
+  doc.text("Dear Sir,", 14, y);
+  y += 5;
+  doc.text(
+    `We would request you to disburse of payment Fresh Money bills for the following employees for the month of ${monthLabel}.`,
+    14,
+    y,
+    { maxWidth: pageW - 28 },
+  );
+  y += 8;
+
+  autoTable(doc, {
+    startY: y,
+    head: [
+      [
+        "Ser",
+        "Pers No",
+        "Rank",
+        "Name",
+        "Acct No",
+        "Routing",
+        "Bank",
+        "Amount",
+        "Remarks",
+      ],
+    ],
+    body: sheet.lines.map((row) => [
+      String(row.ser),
+      row.user.rab_id,
+      row.user.rank || "",
+      row.user.name,
+      row.user.account_number || "—",
+      row.user.routing || "—",
+      row.user.bank_name || "—",
+      amt(row.amount),
+      row.remarks || (row.missingBank ? "Missing bank details" : ""),
+    ]),
+    styles: { fontSize: 7, cellPadding: 1.2 },
+    headStyles: {
+      fillColor: [240, 240, 240],
+      textColor: 20,
+      fontStyle: "bold",
+    },
+    theme: "grid",
+    margin: { left: 12, right: 12 },
   });
-  doc.save(filename);
 }
 
 export function downloadStaffPayoutPdf(
@@ -180,93 +307,10 @@ export function downloadStaffPayoutPdf(
 ) {
   if (!sheets.length) return;
 
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();
-
-  sheets.forEach((sheet, sheetIndex) => {
-    if (sheetIndex > 0) doc.addPage();
-
-    let y = writeHeader(doc, 14);
-    const monthLabel = formatMonthLong(sheet.month);
-    const subject =
-      subjectOverride ??
-      (sheet.memberBank
-        ? RATION_REPORT_META.subjectTagBill
-            .replace("{monthLabel}", monthLabel)
-            .replace("{bank}", sheet.memberBank)
-        : RATION_REPORT_META.subjectFreshMoney.replace(
-            "{month}",
-            monthLabel,
-          ));
-
-    doc.setFontSize(9);
-    doc.text(`${RATION_REPORT_META.refPrefix}/${sheet.month}`, 14, y);
-    doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
-    y += 6;
-
-    doc.text("To: Manager", 14, y);
-    y += 4;
-    doc.text(sheet.sender.bank_name || sheet.sender.label, 14, y);
-    y += 4;
-    if (sheet.sender.branch) {
-      doc.text(sheet.sender.branch, 14, y);
-      y += 4;
-    }
-    y += 2;
-
-    doc.setFont("helvetica", "bold");
-    doc.text(`SUBJECT : ${subject}`, 14, y);
-    const subW = doc.getTextWidth(`SUBJECT : ${subject}`);
-    doc.line(14, y + 1, 14 + Math.min(subW, pageW - 28), y + 1);
-    doc.setFont("helvetica", "normal");
-    y += 6;
-
-    doc.text("Dear Sir,", 14, y);
-    y += 5;
-    doc.text(
-      `We would request you to disburse of payment Fresh Money bills for the following employees for the month of ${monthLabel}.`,
-      14,
-      y,
-      { maxWidth: pageW - 28 },
-    );
-    y += 8;
-
-    autoTable(doc, {
-      startY: y,
-      head: [
-        [
-          "Ser",
-          "Pers No",
-          "Rank",
-          "Name",
-          "Acct No",
-          "Routing",
-          "Bank",
-          "Amount",
-          "Remarks",
-        ],
-      ],
-      body: sheet.lines.map((row) => [
-        String(row.ser),
-        row.user.rab_id,
-        row.user.rank || "",
-        row.user.name,
-        row.user.account_number || "—",
-        row.user.routing || "—",
-        row.user.bank_name || "—",
-        amt(row.amount),
-        row.remarks || (row.missingBank ? "Missing bank details" : ""),
-      ]),
-      styles: { fontSize: 7, cellPadding: 1.2 },
-      headStyles: {
-        fillColor: [240, 240, 240],
-        textColor: 20,
-        fontStyle: "bold",
-      },
-      theme: "grid",
-      margin: { left: 12, right: 12 },
-    });
-  });
-
-  doc.save(filename);
+  savePdfsStaggered(
+    sheets.map((sheet) => ({
+      filename: filenameForBank(filename, sheetBankName(sheet)),
+      write: (doc) => writeStaffPayoutLetter(doc, sheet, subjectOverride),
+    })),
+  );
 }

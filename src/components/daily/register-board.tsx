@@ -34,19 +34,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { dateInMonth, eachISODate, formatDateLong } from "@/lib/date";
-import type { DailyAssignment, DailyTag, User } from "@/lib/types";
+import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
-import { canAssignOnDate } from "@/lib/store/daily";
+import {
+  canAssignOnDate,
+  isMfrLocked,
+  isUserInactiveOnDate,
+  MFR_TAG,
+} from "@/lib/store/daily";
 import { setBoroKhana } from "@/lib/store/boro-khana";
 import { getProjectedTagMembers } from "@/lib/store/mess";
 import { listAllTags } from "@/lib/store/rates";
 import { compareUsers } from "@/lib/store/users";
 import { downloadDayMsCdPdf } from "@/lib/download-day-ms-cd-pdf";
 import { TAG_CELL, tagCellClass } from "@/lib/tag-colors";
+import { tagDisplayClass } from "@/lib/trg-tone";
+import {
+  isTrgTag,
+  needsTrgSardaPrompt,
+  resolveTrgTone,
+} from "@/lib/trg-tone";
+import { ColoredTagGrid } from "@/components/daily/colored-tag-grid";
+import { TrgSardaDialog } from "@/components/daily/trg-sarda-dialog";
+import { useToast } from "@/components/shared/toast-provider";
+import {
+  createDutyTagRequest,
+  dutyTagQueue,
+} from "@/lib/store/tag-requests";
 import { cn } from "@/lib/utils";
 
 export { TAG_CELL, tagCellClass };
@@ -77,6 +95,8 @@ type RangeMenu = {
   userName: string;
   dates: string[];
   anchorDate: string;
+  fromDate: string;
+  toDate: string;
   /** Single-cell ghost carry (accept) */
   ghostTag?: DailyTag;
   storedTag?: DailyTag;
@@ -130,9 +150,10 @@ export function RegisterBoard({
 
   const t = useT();
   const { locale } = useI18n();
+  const { toast } = useToast();
   const state = useStore();
   /** Sticky tag-count + All cols (consume-style totals). */
-  const [showResultCols, setShowResultCols] = useState(true);
+  const [showResultCols, setShowResultCols] = useState(false);
   const reduceMotion = useReducedMotion();
   const resultColMotion = reduceMotion
     ? undefined
@@ -189,9 +210,12 @@ export function RegisterBoard({
   );
 
   const byUserDate = useMemo(() => {
-    const map = new Map<string, DailyTag>();
+    const map = new Map<string, { tag: DailyTag; trg_tone?: TrgTone }>();
     for (const a of assignments) {
-      map.set(`${a.user_id}|${a.date}`, a.tag);
+      map.set(`${a.user_id}|${a.date}`, {
+        tag: a.tag,
+        trg_tone: a.trg_tone,
+      });
     }
     return map;
   }, [assignments]);
@@ -201,6 +225,13 @@ export function RegisterBoard({
   const dragRef = useRef<DragStroke | null>(null);
   const [rangeMenu, setRangeMenu] = useState<RangeMenu | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const [sardaPrompt, setSardaPrompt] = useState<{
+    userId: string;
+    userName: string;
+    fromDate: string;
+    toDate: string;
+  } | null>(null);
+  const [sardaChecked, setSardaChecked] = useState(false);
 
   const closeRangeMenu = useCallback(() => {
     setRangeMenu(null);
@@ -224,17 +255,21 @@ export function RegisterBoard({
           ? stroke.endDate
           : stroke.startDate;
       const dates = eachISODate(lo, hi).filter(
-        (date) => date > todayISO && canAssignOnDate(user, date),
+        (date) => date >= todayISO && canAssignOnDate(user, date),
       );
       if (dates.length === 0) {
         setDrag(null);
         return;
       }
 
+      const selected =
+        stroke.startDate >= todayISO && canAssignOnDate(user, stroke.startDate)
+          ? stroke.startDate
+          : dates[0];
       const menuDate = dates.includes(stroke.endDate)
         ? stroke.endDate
         : dates[dates.length - 1];
-      const storedTag = byUserDate.get(`${stroke.userId}|${menuDate}`);
+      const storedTag = byUserDate.get(`${stroke.userId}|${menuDate}`)?.tag;
 
       let ghostTag: DailyTag | undefined;
       if (!storedTag && dates.length === 1) {
@@ -248,12 +283,12 @@ export function RegisterBoard({
       ) as HTMLElement | null;
       if (el) {
         const rect = el.getBoundingClientRect();
-        const width = 224;
+        const width = 288;
         const left = Math.min(
           Math.max(8, rect.left + rect.width / 2 - width / 2),
           window.innerWidth - width - 8,
         );
-        const top = Math.min(rect.bottom + 6, window.innerHeight - 280);
+        const top = Math.min(rect.bottom + 6, window.innerHeight - 420);
         setMenuPos({ top, left });
       }
 
@@ -263,6 +298,8 @@ export function RegisterBoard({
         userName: user.name,
         dates,
         anchorDate: menuDate,
+        fromDate: selected,
+        toDate: "",
         ghostTag,
         storedTag,
       });
@@ -294,7 +331,7 @@ export function RegisterBoard({
       const userId = cell.dataset.regUser;
       const date = cell.dataset.regDate;
       if (!userId || !date || userId !== stroke.userId) return;
-      if (date <= todayISO) return;
+      if (date < todayISO) return;
       if (stroke.endDate === date) return;
       const next = { ...stroke, endDate: date };
       dragRef.current = next;
@@ -326,9 +363,10 @@ export function RegisterBoard({
 
   function startDrag(userId: string, date: string) {
     if (rangeMenu) return;
-    if (date <= todayISO) return;
+    if (date < todayISO) return;
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
+    if (user && isMfrLocked(user)) return;
     const stroke: DragStroke = {
       userId,
       startDate: date,
@@ -347,20 +385,76 @@ export function RegisterBoard({
     return date >= lo && date <= hi;
   }
 
+  function queuePaint(
+    userId: string,
+    tag: DailyTag,
+    fromDate: string,
+    toDate: string,
+    sarda = false,
+  ) {
+    const queue = dutyTagQueue(tag);
+    if (queue === "immediate") return false;
+    const user = users.find((u) => u.id === userId);
+    const row = createDutyTagRequest({
+      userId,
+      toTag: tag,
+      fromDate,
+      toDate,
+      queue,
+      trg_tone: isTrgTag(tag)
+        ? resolveTrgTone(user?.force ?? "", sarda)
+        : undefined,
+      trg_sarda: isTrgTag(tag) ? sarda : undefined,
+    });
+    if (row) {
+      toast(
+        queue === "ration"
+          ? t("daily.queuedRation", { tag })
+          : t("daily.queuedConsume", { tag }),
+        "success",
+      );
+    }
+    return true;
+  }
+
   function applyRangeTag(tag: DailyTag | "") {
     if (!rangeMenu) return;
-    if (rangeMenu.dates.length === 1) {
-      onTagChange(rangeMenu.userId, rangeMenu.dates[0], tag);
+    const user = users.find((u) => u.id === rangeMenu.userId);
+    const from = rangeMenu.fromDate || rangeMenu.anchorDate;
+    const to = rangeMenu.toDate || from;
+    const dates = eachISODate(from, to).filter(
+      (date) => date >= todayISO && (!user || canAssignOnDate(user, date)),
+    );
+    if (dates.length === 0) return;
+    const fromDate = dates[0]!;
+    const toDate = dates[dates.length - 1]!;
+    if (isTrgTag(tag) && user && needsTrgSardaPrompt(user.force)) {
+      setSardaPrompt({
+        userId: user.id,
+        userName: user.name,
+        fromDate,
+        toDate,
+      });
+      setSardaChecked(false);
+      closeRangeMenu();
+      return;
+    }
+    if (tag && queuePaint(rangeMenu.userId, tag, fromDate, toDate)) {
+      closeRangeMenu();
+      return;
+    }
+    if (dates.length === 1) {
+      onTagChange(rangeMenu.userId, dates[0], tag);
     } else {
-      onPaintRange(rangeMenu.userId, rangeMenu.dates, tag);
+      onPaintRange(rangeMenu.userId, dates, tag);
     }
     closeRangeMenu();
   }
 
   const rangeLabel = rangeMenu
-    ? rangeMenu.dates.length === 1
-      ? rangeMenu.dates[0]
-      : `${rangeMenu.dates[0]} → ${rangeMenu.dates[rangeMenu.dates.length - 1]}`
+    ? rangeMenu.toDate && rangeMenu.toDate !== rangeMenu.fromDate
+      ? `${rangeMenu.fromDate} → ${rangeMenu.toDate}`
+      : rangeMenu.fromDate
     : "";
 
   const resetKey = useMemo(
@@ -482,7 +576,7 @@ export function RegisterBoard({
                 </th>
                 {columnDates.map((date, i) => {
                   const isToday = date === todayISO;
-                  const past = date <= todayISO;
+                  const past = date < todayISO;
                   const isBk = bkDates.has(date);
                   const dayNum = Number(date.slice(8, 10));
                   const showMonth =
@@ -575,35 +669,78 @@ export function RegisterBoard({
                   : "bg-neutral-50 dark:bg-neutral-900";
 
                 const defaultGhost: DailyTag | undefined =
-                  user.status === "1" ? priorByUser.get(user.id) : undefined;
+                  priorByUser.get(user.id);
                 const rowMeta: {
                   date: string;
                   stored?: DailyTag;
                   ghost?: DailyTag;
+                  trgTone?: TrgTone;
                   afterOut: boolean;
+                  inactiveOnDate: boolean;
+                  mfrLocked: boolean;
                 }[] = [];
                 for (const date of columnDates) {
+                  const inactiveOnDate = isUserInactiveOnDate(user, date);
                   const afterOut = !canAssignOnDate(user, date);
-                  if (afterOut) {
-                    // Inactive / after out: lock paint, no default ghost.
-                    // Stored history still shows (prior days).
+                  const mfrLocked = isMfrLocked(user) && !inactiveOnDate && !afterOut;
+                  if (inactiveOnDate) {
                     rowMeta.push({
                       date,
-                      stored: byUserDate.get(`${user.id}|${date}`),
+                      stored: undefined,
                       ghost: undefined,
                       afterOut: true,
+                      inactiveOnDate: true,
+                      mfrLocked: false,
+                    });
+                    continue;
+                  }
+                  if (mfrLocked) {
+                    rowMeta.push({
+                      date,
+                      stored: MFR_TAG,
+                      ghost: undefined,
+                      afterOut: false,
+                      inactiveOnDate: false,
+                      mfrLocked: true,
+                    });
+                    continue;
+                  }
+                  if (afterOut) {
+                    // After out: lock paint, no default ghost.
+                    // Stored history still shows (prior days).
+                    const afterEntry = byUserDate.get(`${user.id}|${date}`);
+                    rowMeta.push({
+                      date,
+                      stored: afterEntry?.tag,
+                      ghost: undefined,
+                      trgTone: isTrgTag(afterEntry?.tag)
+                        ? (afterEntry?.trg_tone ?? resolveTrgTone(user.force))
+                        : undefined,
+                      afterOut: true,
+                      inactiveOnDate: false,
+                      mfrLocked: false,
                     });
                     continue;
                   }
                   const key = `${user.id}|${date}`;
-                  const stored = byUserDate.get(key);
+                  const entry = byUserDate.get(key);
+                  const stored = entry?.tag;
                   const suppressed = suppressedSet.has(key);
+                  const ghost = stored || suppressed ? undefined : defaultGhost;
+                  const trgTone = isTrgTag(stored)
+                    ? (entry?.trg_tone ?? resolveTrgTone(user.force))
+                    : isTrgTag(ghost)
+                      ? resolveTrgTone(user.force)
+                      : undefined;
                   rowMeta.push({
                     date,
                     stored,
                     // Empty cell → member default_tag only (not last paint).
-                    ghost: stored || suppressed ? undefined : defaultGhost,
+                    ghost,
+                    trgTone,
                     afterOut: false,
+                    inactiveOnDate: false,
+                    mfrLocked: false,
                   });
                 }
 
@@ -707,30 +844,39 @@ export function RegisterBoard({
                       );
                     })()}
                     {rowMeta.map((cell, cellIdx) => {
-                      const { date, stored, ghost, afterOut } = cell;
-                      const inactive = user.status !== "1";
+                      const {
+                        date,
+                        stored,
+                        ghost,
+                        trgTone,
+                        afterOut,
+                        inactiveOnDate,
+                        mfrLocked,
+                      } = cell;
+                      const inactive = inactiveOnDate;
                       const preview = inDragPreview(user.id, date);
-                      // Inactive + prior stored tag → full color, not "disabled" look.
-                      // Inactive + empty → locked blank. Active: past/out lock as before.
-                      const locked = inactive
-                        ? !stored
-                        : afterOut || date <= todayISO;
+                      const locked = afterOut || date < todayISO || mfrLocked;
                       let tag = stored;
                       let isGhost = false;
                       if (!stored && ghost && !afterOut) {
                         tag = ghost;
                         // Future only — past/today show solid (not preview fade)
-                        isGhost = !locked;
+                        isGhost = date > todayISO;
                       }
 
                       const prevMeta = rowMeta[cellIdx - 1];
                       const nextMeta = rowMeta[cellIdx + 1];
                       const displayPrev = prevMeta?.stored ?? prevMeta?.ghost;
                       const displayNext = nextMeta?.stored ?? nextMeta?.ghost;
+                      const sameTone =
+                        (trgTone ?? "") === (prevMeta?.trgTone ?? "");
+                      const sameToneR =
+                        (trgTone ?? "") === (nextMeta?.trgTone ?? "");
                       const contL = Boolean(
                         tag &&
                         !isGhost &&
                         displayPrev === tag &&
+                        sameTone &&
                         (prevMeta?.stored ||
                           (prevMeta?.ghost &&
                             (prevMeta.date ?? "") <= todayISO)),
@@ -739,6 +885,7 @@ export function RegisterBoard({
                         tag &&
                         !isGhost &&
                         displayNext === tag &&
+                        sameToneR &&
                         (nextMeta?.stored ||
                           (nextMeta?.ghost &&
                             (nextMeta.date ?? "") <= todayISO)),
@@ -749,6 +896,7 @@ export function RegisterBoard({
                           key={date}
                           userId={user.id}
                           tag={tag}
+                          trgTone={trgTone}
                           ghost={isGhost}
                           date={date}
                           userName={user.name}
@@ -757,9 +905,10 @@ export function RegisterBoard({
                           locked={locked}
                           afterOut={afterOut}
                           inactive={inactive}
+                          mfrLocked={mfrLocked}
                           contL={contL}
                           contR={contR}
-                          preview={preview && date > todayISO && !afterOut}
+                          preview={preview && date >= todayISO && !afterOut}
                           locale={locale}
                           onDragStart={() => startDrag(user.id, date)}
                         />
@@ -792,7 +941,7 @@ export function RegisterBoard({
             onClick={closeRangeMenu}
           />
           <div
-            className="fixed z-[190] w-56 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl dark:border-neutral-700 dark:bg-neutral-950"
+            className="fixed z-[190] w-72 rounded-xl border border-neutral-200 bg-white p-2.5 shadow-xl dark:border-neutral-700 dark:bg-neutral-950"
             style={{ top: menuPos.top, left: menuPos.left }}
             role="dialog"
             aria-label={t("daily.tagFor")}
@@ -802,8 +951,19 @@ export function RegisterBoard({
               ghost={Boolean(rangeMenu.ghostTag)}
               tag={rangeMenu.storedTag ?? rangeMenu.ghostTag}
               locale={locale}
+              fromDate={rangeMenu.fromDate}
+              toDate={rangeMenu.toDate}
+              minDate={todayISO}
+              onFromDate={(fromDate) =>
+                setRangeMenu((cur) => (cur ? { ...cur, fromDate } : cur))
+              }
+              onToDate={(toDate) =>
+                setRangeMenu((cur) => (cur ? { ...cur, toDate } : cur))
+              }
               onAcceptCarry={
-                rangeMenu.ghostTag && rangeMenu.dates.length === 1
+                rangeMenu.ghostTag &&
+                !rangeMenu.toDate &&
+                rangeMenu.fromDate === rangeMenu.anchorDate
                   ? () => applyRangeTag(rangeMenu.ghostTag!)
                   : undefined
               }
@@ -821,6 +981,29 @@ export function RegisterBoard({
         boroKhanaDates={boroKhanaDates}
         onBoroKhanaToggle={onBoroKhanaToggle}
         projectedTagMembers={projectedTagMembers}
+      />
+
+      <TrgSardaDialog
+        open={!!sardaPrompt}
+        name={sardaPrompt?.userName ?? ""}
+        checked={sardaChecked}
+        onCheckedChange={setSardaChecked}
+        onCancel={() => {
+          setSardaPrompt(null);
+          setSardaChecked(false);
+        }}
+        onConfirm={() => {
+          if (!sardaPrompt) return;
+          queuePaint(
+            sardaPrompt.userId,
+            "TRG",
+            sardaPrompt.fromDate,
+            sardaPrompt.toDate,
+            sardaChecked,
+          );
+          setSardaPrompt(null);
+          setSardaChecked(false);
+        }}
       />
     </div>
   );
@@ -1296,6 +1479,11 @@ function TagPickerPanel({
   ghost,
   tag,
   locale,
+  fromDate,
+  toDate,
+  minDate,
+  onFromDate,
+  onToDate,
   onAcceptCarry,
   onPick,
   onClear,
@@ -1304,14 +1492,18 @@ function TagPickerPanel({
   ghost?: boolean;
   tag?: DailyTag;
   locale: Locale;
+  fromDate: string;
+  toDate: string;
+  minDate: string;
+  onFromDate: (date: string) => void;
+  onToDate: (date: string) => void;
   onAcceptCarry?: () => void;
   onPick: (tag: DailyTag) => void;
   onClear: () => void;
 }) {
   const t = useT();
-  const state = useStore();
-  const tags = listAllTags();
-  void state.rates;
+  const dateField =
+    "h-8 rounded-md border-neutral-200 bg-white px-2 text-[11px] shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
   return (
     <>
@@ -1319,6 +1511,32 @@ function TagPickerPanel({
         {label}
         {ghost && tag ? ` · ${t("daily.carried")}` : ""}
       </p>
+      <div className="mb-2 grid grid-cols-2 gap-1.5 px-0.5">
+        <label className="min-w-0">
+          <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
+            {t("common.dateFrom")}
+          </span>
+          <Input
+            type="date"
+            value={fromDate}
+            min={minDate}
+            onChange={(e) => onFromDate(e.target.value)}
+            className={dateField}
+          />
+        </label>
+        <label className="min-w-0">
+          <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
+            {t("common.dateTo")}
+          </span>
+          <Input
+            type="date"
+            value={toDate}
+            min={fromDate || minDate}
+            onChange={(e) => onToDate(e.target.value)}
+            className={dateField}
+          />
+        </label>
+      </div>
       {onAcceptCarry && ghost && tag ? (
         <button
           type="button"
@@ -1329,23 +1547,11 @@ function TagPickerPanel({
           {t("daily.acceptCarry", { tag })}
         </button>
       ) : null}
-      <div className="grid grid-cols-3 gap-1">
-        {tags.map((code) => (
-          <button
-            key={code}
-            type="button"
-            onClick={() => onPick(code)}
-            className={cn(
-              "rounded-md px-1.5 py-1.5 font-mono text-[11px] font-bold transition hover:opacity-90",
-              tagCellClass(code),
-              !ghost && tag === code && "ring-2 ring-primary ring-offset-1",
-            )}
-            title={tagLabel(code, locale)}
-          >
-            {code}
-          </button>
-        ))}
-      </div>
+      <ColoredTagGrid
+        value={!ghost ? tag : undefined}
+        onPick={onPick}
+        locale={locale}
+      />
       <button
         type="button"
         onClick={onClear}
@@ -1361,6 +1567,7 @@ function TagPickerPanel({
 function RegisterCell({
   userId,
   tag,
+  trgTone,
   ghost,
   date,
   userName,
@@ -1369,6 +1576,7 @@ function RegisterCell({
   locked,
   afterOut,
   inactive,
+  mfrLocked,
   contL,
   contR,
   preview,
@@ -1377,6 +1585,7 @@ function RegisterCell({
 }: {
   userId: string;
   tag?: DailyTag;
+  trgTone?: TrgTone;
   ghost?: boolean;
   date: string;
   userName: string;
@@ -1385,6 +1594,7 @@ function RegisterCell({
   locked: boolean;
   afterOut?: boolean;
   inactive?: boolean;
+  mfrLocked?: boolean;
   contL: boolean;
   contR: boolean;
   preview: boolean;
@@ -1403,7 +1613,7 @@ function RegisterCell({
         : "cursor-pointer hover:ring-1 hover:ring-inset hover:ring-primary/35",
     tag
       ? cn(
-          tagCellClass(tag),
+          tagDisplayClass(tag, trgTone),
           contL ? "rounded-l-none" : "rounded-l-md",
           contR ? "rounded-r-none" : "rounded-r-md",
           // Carry ghost only — soft wash, no hard outline
@@ -1418,9 +1628,11 @@ function RegisterCell({
 
   const lockReason = inactive
     ? t("daily.inactiveLocked")
-    : afterOut
-      ? t("daily.afterOutLocked")
-      : t("daily.pastLocked");
+    : mfrLocked
+      ? t("daily.mfrLocked")
+      : afterOut
+        ? t("daily.afterOutLocked")
+        : t("daily.pastLocked");
   // Prior stored tags: normal title (not "disabled"). Empty locked: lock reason.
   const title =
     tag && !ghost

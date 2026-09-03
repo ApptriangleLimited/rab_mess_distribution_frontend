@@ -70,6 +70,11 @@ export const DAILY_TAGS: {
   { code: "BGH", labelKey: "tags.BGH", allowance: true, mess: false },
   { code: "AWL", labelKey: "tags.AWL", allowance: true, mess: false },
   { code: "OSL", labelKey: "tags.OSL", allowance: true, mess: false },
+  { code: "RL", labelKey: "tags.RL", allowance: false, mess: false },
+  { code: "JL", labelKey: "tags.JL", allowance: false, mess: false },
+  { code: "PE", labelKey: "tags.PE", allowance: false, mess: false },
+  { code: "LNK", labelKey: "tags.LNK", allowance: false, mess: false },
+  { code: "MFR", labelKey: "tags.MFR", allowance: true, mess: false },
 ];
 
 /** Rate-only codes — Settings list yes, daily/consume tag pickers no. */

@@ -3,6 +3,12 @@ export type Role = "cc" | "daily" | "mess" | "consume" | "ration" | "admin";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "ended";
 export type UserStatus = "0" | "1";
 
+/** Inclusive ISO dates. `to` is null while the member is still inactive. */
+export interface InactiveSpan {
+  from: string;
+  to: string | null;
+}
+
 /** How the member is classified on create/edit. */
 export type MemberType = "new" | "attached" | "permanent" | "guest" | "civilian";
 
@@ -21,7 +27,12 @@ export type BuiltInDailyTag =
   | "RBH"
   | "BGH"
   | "AWL"
-  | "OSL";
+  | "OSL"
+  | "RL"
+  | "JL"
+  | "PE"
+  | "LNK"
+  | "MFR";
 
 /** Built-in duty tags + custom allowance codes (ration). */
 export type DailyTag = BuiltInDailyTag | (string & {});
@@ -58,6 +69,11 @@ export interface User {
   /** Civilian: staff confirmed NID/birth-cert docs. */
   documents_verified: boolean;
   status: UserStatus;
+  /**
+   * Days the member was inactive. Those cockpit cells stay empty
+   * (no default/carry) even after they are activated again.
+   */
+  inactive_spans: InactiveSpan[];
   approval_status: ApprovalStatus;
   bank_name: string;
   account_name: string;
@@ -79,13 +95,45 @@ export interface User {
   updated_at: string;
 }
 
+/** TRG day color — Army/Navy/Air Force (or Police + Sarda) vs everyone else. */
+export type TrgTone = "black" | "red";
+
 export interface DailyAssignment {
   id: string;
   user_id: string;
   date: string;
   tag: DailyTag;
+  /** Set when `tag` is TRG. Black = white label; red = other forces. */
+  trg_tone?: TrgTone;
   updated_by: string;
   updated_at: string;
+}
+
+export type TagRequestStatus = "requested" | "updated";
+
+/** Who must approve the cockpit tag change. */
+export type TagRequestQueue = "daily" | "ration" | "consume";
+
+/** CC→Daily, or Daily→Ration (FR/CD), or Daily→Consume (other tags). */
+export interface TagRequest {
+  id: string;
+  user_id: string;
+  /** ISO date the request was made for (usually today). */
+  date: string;
+  /** Inclusive range to apply on approve. */
+  from_date: string;
+  to_date: string;
+  from_tag: DailyTag | "";
+  to_tag: DailyTag;
+  /** Snapshot when Daily requests TRG. Applied to cockpit days on approve. */
+  trg_tone?: TrgTone;
+  trg_sarda?: boolean;
+  queue: TagRequestQueue;
+  status: TagRequestStatus;
+  requested_by: string;
+  requested_at: string;
+  updated_by?: string;
+  updated_at?: string;
 }
 
 export interface SenderAccount {
@@ -217,6 +265,8 @@ export interface AuthorizedStrength {
 export interface AppState {
   users: User[];
   assignments: DailyAssignment[];
+  /** CC → Daily cockpit tag change requests. */
+  tag_requests: TagRequest[];
   senders: SenderAccount[];
   rates: AllowanceRate[];
   /** Editable rank ladder (order = seniority for sort). */

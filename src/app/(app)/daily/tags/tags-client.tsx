@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Children,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -12,13 +18,9 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { EmptyState } from "@/components/shared/empty-state";
-import {
-  SearchFilterBar,
-  searchFilterFieldClass,
-} from "@/components/shared/search-filter-bar";
+import { searchFilterFieldClass } from "@/components/shared/search-filter-bar";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +55,7 @@ import {
 } from "@/lib/store/assignments";
 import { getProjectedTagMembers } from "@/lib/store/mess";
 import { listAllTags } from "@/lib/store/rates";
+import { canAssignOnDate } from "@/lib/store/daily";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -186,10 +189,6 @@ export default function TagsPageClient() {
     [dateFrom, dateTo],
   );
 
-  const defaultDates = defaultRange();
-  const datesAreDefault =
-    dateFrom === defaultDates.from && dateTo === defaultDates.to;
-
   const demoTagCounts = useMemo(() => {
     const allowed = new Set(users.map((u) => u.id));
     const counts: Record<string, number> = {};
@@ -292,7 +291,7 @@ export default function TagsPageClient() {
 
   function onTagChange(userId: string, date: string, tag: DailyTag | "") {
     const user = users.find((u) => u.id === userId);
-    if (user && user.status !== "1") return;
+    if (user && !canAssignOnDate(user, date)) return;
     if (apiOn) void cockpit.onTagChange(userId, date, tag);
     else if (!tag) clearTag(userId, date);
     else setTag(userId, date, tag);
@@ -300,7 +299,7 @@ export default function TagsPageClient() {
 
   function onPaintRange(userId: string, dates: string[], tag: DailyTag | "") {
     const user = users.find((u) => u.id === userId);
-    if (user && user.status !== "1") return;
+    if (user && dates.every((d) => !canAssignOnDate(user, d))) return;
     if (apiOn) void cockpit.onPaintRange(userId, dates, tag);
     else setTagRange(userId, dates, tag);
   }
@@ -308,12 +307,6 @@ export default function TagsPageClient() {
   const loading = apiOn && cockpit.loading;
 
   const fieldClass = searchFilterFieldClass;
-  const filtersActive =
-    memberStatus !== "1" ||
-    rank !== "all" ||
-    wing !== "all" ||
-    !datesAreDefault ||
-    tagFilter !== "all";
 
   const printBtn =
     users.length > 0 && visibleDates.length > 0 ? (
@@ -444,60 +437,37 @@ export default function TagsPageClient() {
                     label={t("common.dateRange")}
                     triggerClassName="h-9 w-40 min-w-0 shrink-0 rounded-xl px-2 text-xs"
                   />
-                  <ClearFiltersButton
-                    className="h-9 w-9 shrink-0"
-                    disabled={!filtersActive && !q.trim()}
-                    onClick={() => {
-                      setQ("");
-                      setMemberStatus("1");
-                      setRank("all");
-                      setWing("all");
-                      setTagFilter("all");
-                      applyDateRange("", "");
-                    }}
-                  />
+                  {printBtn}
                 </div>
               }
             />
           </div>
         </div>
 
-        <SearchFilterBar
-          search={q}
-          onSearchChange={setQ}
-          hideSearch
-          hideFilters
-          filtersActive={filtersActive}
-          wrapTiles={false}
-          trailing={printBtn}
-          className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
-          tiles={
-            <>
+        <div className="rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 p-2.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900">
+          <EqualTagRows>
+            <MiniStat
+              icon={<IconUsers className="h-3.5 w-3.5" />}
+              label={t("daily.rosterStatAll")}
+              value={String(allTaggedCount)}
+              toneClass="border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100"
+              selected={tagFilter === "all"}
+              onClick={() => setTagFilter("all")}
+            />
+            {allTags.map((tag) => (
               <MiniStat
-                icon={<IconUsers className="h-3.5 w-3.5" />}
-                label={t("daily.rosterStatAll")}
-                value={String(allTaggedCount)}
-                toneClass="border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100"
-                selected={tagFilter === "all"}
-                onClick={() => setTagFilter("all")}
+                key={tag}
+                icon={tagTileIcon(tag)}
+                label={tag}
+                value={String(tagCounts[tag] ?? 0)}
+                title={`${tag} — ${tagLabel(tag, locale)}`}
+                toneClass={tagCellClass(tag)}
+                selected={tagFilter === tag}
+                onClick={() => selectTagFilter(tag)}
               />
-              {allTags.map((tag) => (
-                <MiniStat
-                  key={tag}
-                  icon={tagTileIcon(tag)}
-                  label={tag}
-                  value={String(tagCounts[tag] ?? 0)}
-                  title={`${tag} — ${tagLabel(tag, locale)}`}
-                  toneClass={tagCellClass(tag)}
-                  selected={tagFilter === tag}
-                  onClick={() => selectTagFilter(tag)}
-                />
-              ))}
-            </>
-          }
-        >
-          <></>
-        </SearchFilterBar>
+            ))}
+          </EqualTagRows>
+        </div>
 
         {loading ? (
           <p className="py-10 text-center text-sm text-neutral-500">
@@ -536,6 +506,29 @@ export default function TagsPageClient() {
   );
 }
 
+/** Two even rows: first half on top, second half on bottom, same column count. */
+function EqualTagRows({ children }: { children: ReactNode }) {
+  const items = Children.toArray(children);
+  const cols = Math.max(1, Math.ceil(items.length / 2));
+  const top = items.slice(0, cols);
+  const bottom = items.slice(cols);
+  const rowClass = "grid w-full min-w-0 gap-1.5";
+  const rowStyle = { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
+
+  return (
+    <div className="flex w-full min-w-0 flex-col gap-1.5">
+      <div className={rowClass} style={rowStyle}>
+        {top}
+      </div>
+      {bottom.length > 0 ? (
+        <div className={rowClass} style={rowStyle}>
+          {bottom}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function tagTileIcon(tag: DailyTag) {
   if (tag === "MS") return <IconSoup className="h-3.5 w-3.5" />;
   if (tag === "CD") return <IconShield className="h-3.5 w-3.5" />;
@@ -568,7 +561,7 @@ function MiniStat({
       disabled={!interactive}
       aria-pressed={interactive ? selected : undefined}
       className={cn(
-        "inline-flex h-9 min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 transition",
+        "flex h-9 w-full min-w-0 items-center justify-center gap-1 rounded-xl px-2 transition",
         toneClass ??
           "border border-neutral-200/80 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
         toneClass && "border border-transparent",

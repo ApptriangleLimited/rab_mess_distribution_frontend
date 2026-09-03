@@ -7,10 +7,15 @@ import { IconArrowLeft, IconPencil } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { SectionCard } from "@/components/shared/section-card";
+import { CcTabs } from "@/components/layout/cc-tabs";
 import { Button } from "@/components/ui/button";
 import { UserDetail } from "@/components/users/user-detail";
 import { MemberAcceptActions } from "@/components/users/member-accept-actions";
+import { TagChip } from "@/components/tag-requests/tag-chip";
+import { RequestTagButton } from "@/components/tag-requests/request-tag-dialog";
 import { useStore } from "@/hooks/use-store";
+import { getCockpitTagOnDate } from "@/lib/store/tag-requests";
+import { todayISO } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 
 export default function CcUserDetailPage() {
@@ -42,6 +47,7 @@ export default function CcUserDetailPage() {
         <PageHeader
           title={user.name}
           subtitle={t("pages.ccUserDetail.subtitle")}
+          center={<CcTabs />}
           leading={
             <Button
               asChild
@@ -74,6 +80,17 @@ export default function CcUserDetailPage() {
             />
           }
         />
+        <SectionCard className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              {t("tagRequest.dutyToday")}
+            </p>
+            <div className="mt-1.5">
+              <TagChip tag={getCockpitTagOnDate(user, todayISO())} />
+            </div>
+          </div>
+          <RequestTagButton user={user} />
+        </SectionCard>
         <UserDetail user={user} />
       </motion.div>
     </PagePane>

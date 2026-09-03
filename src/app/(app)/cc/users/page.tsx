@@ -12,6 +12,7 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { CcTabs } from "@/components/layout/cc-tabs";
 import { Button } from "@/components/ui/button";
 import { UserFiltersBar } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";
@@ -206,6 +207,7 @@ export default function CcUsersPage() {
                   ? t("common.loading")
                   : t("pages.ccUsers.subtitle", { count: subtitleCount })
               }
+              center={<CcTabs />}
               actions={
                 <Button
                   asChild

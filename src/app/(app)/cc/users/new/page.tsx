@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { CcTabs } from "@/components/layout/cc-tabs";
 import { Button } from "@/components/ui/button";
 import { UserForm, type UserFormValues } from "@/components/users/user-form";
 import { useToast } from "@/components/shared/toast-provider";
@@ -78,6 +79,7 @@ export default function CcNewUserPage() {
         <PageHeader
           title={t("pages.ccNewUser.title")}
           subtitle={t("pages.ccNewUser.subtitle")}
+          center={<CcTabs />}
           leading={
             <Button
               asChild

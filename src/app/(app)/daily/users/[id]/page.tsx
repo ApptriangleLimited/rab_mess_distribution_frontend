@@ -61,7 +61,7 @@ export default function DailyUserDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3"
       >
         <PageHeader
           title={user.name}

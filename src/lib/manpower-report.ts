@@ -102,6 +102,10 @@ const ABSENT_TAGS = new Set<string>([
   "OSL",
   "MOL",
   "CD",
+  "RL",
+  "JL",
+  "PE",
+  "LNK",
 ]);
 
 const RANK_ALIASES: Record<string, string[]> = {
@@ -356,6 +360,7 @@ export function buildManpowerReport(
         wing.absence.pl += 1;
         break;
       case "WR":
+      case "RL":
         wing.absence.rl += 1;
         break;
       case "MED":
@@ -371,6 +376,7 @@ export function buildManpowerReport(
         wing.absence.witness += 1;
         break;
       case "CD":
+      case "PE":
         wing.absence.exam += 1;
         break;
       case "CMH":

@@ -5,7 +5,7 @@ import {
   isCarrySuppressed,
 } from "@/lib/store/assignments";
 import { isBoroKhana } from "@/lib/store/boro-khana";
-import { canAssignOnDate } from "@/lib/store/daily";
+import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
 import { listMealAssigns } from "@/lib/store/meal-assigns";
 import { isCockpitMember } from "@/lib/store/users";
 import { nextISODate, todayISO } from "@/lib/date";
@@ -26,6 +26,8 @@ export type MessEater = User & {
 
 /** Projected duty tag for user on date (explicit or carry). */
 function projectedTagOnDate(userId: string, date: string): DailyTag | null {
+  const user = getState().users.find((u) => u.id === userId);
+  if (user && isMfrLocked(user) && canAssignOnDate(user, date)) return MFR_TAG;
   const direct = getAssignment(userId, date);
   if (direct) return direct.tag;
   if (isCarrySuppressed(userId, date)) return null;
@@ -154,6 +156,14 @@ export function getProjectedTagMembers(
     if (user.status !== "1") continue;
     if (!isCockpitMember(user)) continue;
     if (!canAssignOnDate(user, date)) continue;
+
+    if (isMfrLocked(user)) {
+      if (tag === MFR_TAG) {
+        members.push(user);
+        tagged += 1;
+      }
+      continue;
+    }
 
     const direct = getAssignment(user.id, date);
     if (direct) {

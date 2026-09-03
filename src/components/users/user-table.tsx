@@ -12,6 +12,11 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { usePagination } from "@/hooks/use-pagination";
 import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
+import { TagChip } from "@/components/tag-requests/tag-chip";
+import { RequestTagButton } from "@/components/tag-requests/request-tag-dialog";
+import { useStore } from "@/hooks/use-store";
+import { getCockpitTagOnDate } from "@/lib/store/tag-requests";
+import { todayISO } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +67,10 @@ export function UserTable({
 }) {
   const t = useT();
   const router = useRouter();
+  const state = useStore();
+  void state.assignments;
+  void state.tag_requests;
+  const today = todayISO();
   const resetKey = useMemo(
     () => users.map((u) => u.id).join("|"),
     [users],
@@ -111,11 +120,11 @@ export function UserTable({
         {pageItems.map((user) => {
           const href = detailHref(user.id);
           return (
-            <li key={user.id}>
+            <li key={user.id} className="px-4 py-3.5">
               <button
                 type="button"
                 onClick={() => openRow(user.id)}
-                className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition hover:bg-primary/[0.04] focus-visible:bg-primary/[0.06] focus-visible:outline-none dark:hover:bg-primary/[0.08]"
+                className="flex w-full items-start gap-3 text-left transition hover:opacity-90 focus-visible:outline-none"
               >
                 <UserAvatar
                   name={user.name}
@@ -157,6 +166,7 @@ export function UserTable({
                     >
                       {approvalLabel(user.approval_status, t)}
                     </Badge>
+                    <TagChip tag={getCockpitTagOnDate(user, today)} />
                     {user.phone ? (
                       <span className="inline-flex items-center gap-1 text-[11px] text-neutral-500">
                         <IconPhone className="h-3 w-3" />
@@ -169,6 +179,9 @@ export function UserTable({
                   </a>
                 </div>
               </button>
+              <div className="mt-2 pl-[52px]">
+                <RequestTagButton user={user} size="xs" />
+              </div>
             </li>
           );
         })}
@@ -207,7 +220,13 @@ export function UserTable({
                 {t("cc.fields.status")}
               </th>
               <th className="px-4 py-3.5 font-semibold">
+                {t("cc.currentTag")}
+              </th>
+              <th className="px-4 py-3.5 font-semibold">
                 {t("cc.fields.approval")}
+              </th>
+              <th className="px-4 py-3.5 font-semibold">
+                {t("cc.requestTag")}
               </th>
               <th className="w-10 px-2 py-3.5" aria-hidden />
             </tr>
@@ -291,6 +310,9 @@ export function UserTable({
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
+                    <TagChip tag={getCockpitTagOnDate(user, today)} />
+                  </td>
+                  <td className="px-4 py-3">
                     <Badge
                       className={cn(
                         "border font-semibold",
@@ -299,6 +321,12 @@ export function UserTable({
                     >
                       {approvalLabel(user.approval_status, t)}
                     </Badge>
+                  </td>
+                  <td
+                    className="px-4 py-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <RequestTagButton user={user} size="xs" />
                   </td>
                   <td className="px-2 py-3">
                     <IconChevronRight className="h-4 w-4 text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-primary dark:text-neutral-600" />

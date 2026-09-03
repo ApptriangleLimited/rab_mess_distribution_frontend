@@ -1,7 +1,24 @@
 import { nowISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
-import { canAssignOnDate } from "@/lib/store/daily";
-import type { DailyAssignment, DailyTag, User } from "@/lib/types";
+import { canAssignOnDate, isMfrLocked, isMfrTag, MFR_TAG } from "@/lib/store/daily";
+import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
+import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
+
+export type TagWriteMeta = {
+  trg_tone?: TrgTone;
+};
+
+function trgToneForWrite(
+  userId: string,
+  tag: DailyTag | "",
+  meta?: TagWriteMeta,
+): TrgTone | undefined {
+  if (!isTrgTag(tag)) return undefined;
+  if (meta?.trg_tone === "black" || meta?.trg_tone === "red") {
+    return meta.trg_tone;
+  }
+  return resolveTrgTone(findUser(userId)?.force ?? "");
+}
 
 function newId() {
   return `a_${Math.random().toString(36).slice(2, 10)}`;
@@ -15,6 +32,25 @@ function isAssignable(userId: string, date: string): boolean {
   const user = findUser(userId);
   if (!user) return false;
   return canAssignOnDate(user, date);
+}
+
+function canWriteTag(
+  userId: string,
+  date: string,
+  tag: DailyTag | "",
+): boolean {
+  const user = findUser(userId);
+  if (!user || !canAssignOnDate(user, date)) return false;
+  if (isMfrLocked(user) && !isMfrTag(tag)) return false;
+  return true;
+}
+
+function lockUsersToMfr(users: User[], userIds: string[], tag: DailyTag | ""): User[] {
+  if (!isMfrTag(tag)) return users;
+  const ids = new Set(userIds);
+  return users.map((u) =>
+    ids.has(u.id) ? { ...u, default_tag: MFR_TAG } : u,
+  );
 }
 
 export function getAssignmentsByDate(date: string) {
@@ -34,22 +70,27 @@ export function setTag(
   date: string,
   tag: DailyTag,
   updatedBy = "daily",
+  meta?: TagWriteMeta,
 ): DailyAssignment | null {
-  if (!isAssignable(userId, date)) {
+  if (!canWriteTag(userId, date, tag)) {
     return getAssignment(userId, date);
   }
   const existing = getAssignment(userId, date);
   const ts = nowISO();
+  const trg_tone = trgToneForWrite(userId, tag, meta);
 
   if (existing) {
     const updated: DailyAssignment = {
       ...existing,
       tag,
+      trg_tone,
       updated_by: updatedBy,
       updated_at: ts,
     };
+    if (!trg_tone) delete updated.trg_tone;
     setState((prev) => ({
       ...prev,
+      users: lockUsersToMfr(prev.users, [userId], tag),
       assignments: prev.assignments.map((a) =>
         a.id === existing.id ? updated : a,
       ),
@@ -64,11 +105,14 @@ export function setTag(
     user_id: userId,
     date,
     tag,
+    trg_tone,
     updated_by: updatedBy,
     updated_at: ts,
   };
+  if (!trg_tone) delete created.trg_tone;
   setState((prev) => ({
     ...prev,
+    users: lockUsersToMfr(prev.users, [userId], tag),
     assignments: [...prev.assignments, created],
     approved_dates: unmarkDate(prev.approved_dates, date),
     suppressed_carries: withoutCarry(prev.suppressed_carries, userId, date),
@@ -81,34 +125,43 @@ export function setTagBulk(
   date: string,
   tag: DailyTag,
   updatedBy = "daily",
+  meta?: TagWriteMeta,
 ) {
   const ts = nowISO();
-  const eligible = userIds.filter((id) => isAssignable(id, date));
+  const eligible = userIds.filter((id) => canWriteTag(id, date, tag));
   if (eligible.length === 0) return 0;
   setState((prev) => {
     const next = [...prev.assignments];
     for (const userId of eligible) {
+      const trg_tone = trgToneForWrite(userId, tag, meta);
       const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
       if (idx >= 0) {
-        next[idx] = {
+        const row: DailyAssignment = {
           ...next[idx],
           tag,
+          trg_tone,
           updated_by: updatedBy,
           updated_at: ts,
         };
+        if (!trg_tone) delete row.trg_tone;
+        next[idx] = row;
       } else {
-        next.push({
+        const row: DailyAssignment = {
           id: newId(),
           user_id: userId,
           date,
           tag,
+          trg_tone,
           updated_by: updatedBy,
           updated_at: ts,
-        });
+        };
+        if (!trg_tone) delete row.trg_tone;
+        next.push(row);
       }
     }
     return {
       ...prev,
+      users: lockUsersToMfr(prev.users, eligible, tag),
       assignments: next,
       approved_dates: unmarkDate(prev.approved_dates, date),
       suppressed_carries: eligible.reduce(
@@ -121,7 +174,7 @@ export function setTagBulk(
 }
 
 export function clearTag(userId: string, date: string) {
-  if (!isAssignable(userId, date)) return;
+  if (!canWriteTag(userId, date, "")) return;
   setState((prev) => ({
     ...prev,
     assignments: prev.assignments.filter(
@@ -139,25 +192,30 @@ export function setTagRange(
   dates: string[],
   tag: DailyTag | "",
   updatedBy = "daily",
+  meta?: TagWriteMeta,
 ) {
-  const allowed = dates.filter((d) => isAssignable(userId, d));
+  const allowed = dates.filter((d) => canWriteTag(userId, d, tag));
   if (allowed.length === 0) return 0;
   const ts = nowISO();
   const dateSet = new Set(allowed);
+  const trg_tone = trgToneForWrite(userId, tag, meta);
   setState((prev) => {
     let next = prev.assignments.filter(
       (a) => !(a.user_id === userId && dateSet.has(a.date)),
     );
     if (tag) {
       for (const date of allowed) {
-        next.push({
+        const row: DailyAssignment = {
           id: newId(),
           user_id: userId,
           date,
           tag,
+          trg_tone,
           updated_by: updatedBy,
           updated_at: ts,
-        });
+        };
+        if (!trg_tone) delete row.trg_tone;
+        next.push(row);
       }
     }
     let approved = prev.approved_dates ?? [];
@@ -172,6 +230,7 @@ export function setTagRange(
     }
     return {
       ...prev,
+      users: lockUsersToMfr(prev.users, [userId], tag),
       assignments: next,
       approved_dates: approved,
       suppressed_carries: suppressed,
@@ -268,22 +327,29 @@ export function approveCarryForward(
         continue;
       }
 
+      const trg_tone = trgToneForWrite(userId, fillTag);
       if (idx >= 0) {
-        next[idx] = {
+        const row: DailyAssignment = {
           ...next[idx],
           tag: fillTag,
+          trg_tone,
           updated_by: updatedBy,
           updated_at: ts,
         };
+        if (!trg_tone) delete row.trg_tone;
+        next[idx] = row;
       } else {
-        next.push({
+        const row: DailyAssignment = {
           id: newId(),
           user_id: userId,
           date,
           tag: fillTag,
+          trg_tone,
           updated_by: updatedBy,
           updated_at: ts,
-        });
+        };
+        if (!trg_tone) delete row.trg_tone;
+        next.push(row);
       }
       suppressed = withoutCarry(suppressed, userId, date);
       filled += 1;
@@ -328,14 +394,18 @@ export function autoApplyCarryForward(
     const fillTag = user.default_tag;
     if (!fillTag) continue;
 
-    next.push({
+    const trg_tone = trgToneForWrite(userId, fillTag);
+    const row: DailyAssignment = {
       id: newId(),
       user_id: userId,
       date,
       tag: fillTag,
+      trg_tone,
       updated_by: updatedBy,
       updated_at: ts,
-    });
+    };
+    if (!trg_tone) delete row.trg_tone;
+    next.push(row);
     filled += 1;
   }
 

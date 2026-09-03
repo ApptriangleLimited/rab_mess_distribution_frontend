@@ -238,6 +238,24 @@ export function UserForm({
     </Field>
   );
 
+  const statusField =
+    variant !== "public" ? (
+      <Field label={t("cc.fields.status")}>
+        <Select
+          value={values.status}
+          onValueChange={(v) => patch("status", v as UserStatus)}
+        >
+          <SelectTrigger className={selectTriggerClass}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1">{t("cc.statusActive")}</SelectItem>
+            <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+    ) : null;
+
   function setParentWing(parent: string) {
     setValues((prev) => ({ ...prev, wing: parent }));
   }
@@ -507,6 +525,7 @@ export function UserForm({
                   triggerClassName={inputClass}
                 />
               </Field>
+              {statusField}
             </>
           ) : isGuest ? (
             <>
@@ -548,26 +567,12 @@ export function UserForm({
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {variant !== "cc" && (mode === "edit" || variant === "daily") ? (
-                <Field label={t("cc.fields.status")}>
-                  <Select
-                    value={values.status}
-                    onValueChange={(v) => patch("status", v as UserStatus)}
-                  >
-                    <SelectTrigger className={selectTriggerClass}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">{t("cc.statusActive")}</SelectItem>
-                      <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              ) : null}
+              {statusField}
               {variant === "daily" ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
+                    disabled={mode === "edit" && values.default_tag === "MFR"}
                     onChange={(tag) => {
                       if (!tag) return;
                       if (mode === "create") setTodayTag(tag);
@@ -694,26 +699,12 @@ export function UserForm({
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {variant !== "cc" && (mode === "edit" || variant === "daily") ? (
-                <Field label={t("cc.fields.status")}>
-                  <Select
-                    value={values.status}
-                    onValueChange={(v) => patch("status", v as UserStatus)}
-                  >
-                    <SelectTrigger className={selectTriggerClass}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">{t("cc.statusActive")}</SelectItem>
-                      <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              ) : null}
+              {statusField}
               {variant === "daily" ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
+                    disabled={mode === "edit" && values.default_tag === "MFR"}
                     onChange={(tag) => {
                       if (!tag) return;
                       if (mode === "create") setTodayTag(tag);

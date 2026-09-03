@@ -105,6 +105,7 @@ export function memberToUser(row: MemberApiRow): User {
     joining_date: row.joining_date ?? "",
     out_date: row.out_date ?? "",
     default_tag: ((row.default_tag || "MS").toUpperCase() || "MS") as DailyTag,
+    inactive_spans: [],
     emergency_contacts: row.emergency_contacts ?? [],
     created_at: row.created_at,
     updated_at: row.updated_at,

@@ -17,11 +17,13 @@ export function TagSelector({
   value,
   onChange,
   allowEmpty = false,
+  disabled = false,
   className,
 }: {
   value: DailyTag | "" | null;
   onChange: (tag: DailyTag | "") => void;
   allowEmpty?: boolean;
+  disabled?: boolean;
   className?: string;
 }) {
   const t = useT();
@@ -34,6 +36,7 @@ export function TagSelector({
   return (
     <Select
       value={current || (allowEmpty ? "__none__" : undefined)}
+      disabled={disabled}
       onValueChange={(v) => onChange(v === "__none__" ? "" : (v as DailyTag))}
     >
       <SelectTrigger className={className}>

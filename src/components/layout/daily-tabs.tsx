@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import {
-  IconClipboardList,
+  IconSend,
   IconTags,
   IconUserCheck,
   IconUsersGroup,
@@ -19,12 +19,11 @@ const TABS = [
       path === "/daily/tags" || path.startsWith("/daily/tags/"),
   },
   {
-    href: "/daily/state-report",
-    labelKey: "nav.stateReport" as const,
-    icon: IconClipboardList,
+    href: "/daily/requests",
+    labelKey: "nav.requests" as const,
+    icon: IconSend,
     match: (path: string) =>
-      path === "/daily/state-report" ||
-      path.startsWith("/daily/state-report/"),
+      path === "/daily/requests" || path.startsWith("/daily/requests/"),
   },
   {
     href: "/daily/manpower",

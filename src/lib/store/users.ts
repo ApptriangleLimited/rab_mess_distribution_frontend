@@ -1,7 +1,8 @@
-import { nowISO } from "@/lib/date";
+import { nowISO, todayISO } from "@/lib/date";
 import { digitsOnly, isValidBdPhone, normalizeBdPhone } from "@/lib/utils";
 import { listRanks, listMemberBanks } from "@/lib/store/org-options";
 import { getState, setState } from "@/lib/store";
+import { applyStatusToSpans, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
 import type {
   ApprovalStatus,
   DailyTag,
@@ -218,6 +219,7 @@ export function createUser(
     status: input.status,
     approval_status,
     default_tag: (input.default_tag || "MS") as DailyTag,
+    inactive_spans: [],
     created_at: ts,
     updated_at: ts,
   };
@@ -228,6 +230,10 @@ export function createUser(
 export function updateUser(id: string, input: UserInput): User | null {
   const existing = getUser(id);
   if (!existing) return null;
+  const statusChanged = input.status !== existing.status;
+  const inactive_spans = statusChanged
+    ? applyStatusToSpans(existing.inactive_spans, input.status)
+    : (existing.inactive_spans ?? []);
   const updated: User = {
     ...existing,
     ...input,
@@ -246,12 +252,21 @@ export function updateUser(id: string, input: UserInput): User | null {
       (input.member_type || existing.member_type) === "civilian"
         ? !!input.documents_verified
         : false,
-    default_tag: (input.default_tag || existing.default_tag || "MS") as DailyTag,
+    default_tag: (isMfrLocked(existing)
+      ? MFR_TAG
+      : input.default_tag || existing.default_tag || "MS") as DailyTag,
+    inactive_spans,
     updated_at: nowISO(),
   };
+  const clearFrom = statusChanged && input.status === "0" ? todayISO() : null;
   setState((prev) => ({
     ...prev,
     users: prev.users.map((u) => (u.id === id ? updated : u)),
+    assignments: clearFrom
+      ? prev.assignments.filter(
+          (a) => !(a.user_id === id && a.date >= clearFrom),
+        )
+      : prev.assignments,
   }));
   return updated;
 }

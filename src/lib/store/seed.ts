@@ -72,6 +72,7 @@ function user(
     | "personal_id"
     | "emergency_contacts"
     | "default_tag"
+    | "inactive_spans"
   > & {
     documents?: User["documents"];
     documents_verified?: boolean;
@@ -81,6 +82,7 @@ function user(
     personal_id?: string;
     emergency_contacts?: User["emergency_contacts"];
     default_tag?: DailyTag;
+    inactive_spans?: User["inactive_spans"];
   },
 ): User {
   const ts = nowISO();
@@ -94,6 +96,7 @@ function user(
     personal_id: partial.personal_id ?? "",
     emergency_contacts: partial.emergency_contacts ?? [],
     default_tag: partial.default_tag ?? "MS",
+    inactive_spans: partial.inactive_spans ?? [],
     created_at: ts,
     updated_at: ts,
   };
@@ -827,6 +830,7 @@ export function createSeedState(): AppState {
     meal_assigns: seedMealAssigns(users, meal_plans),
     meal_shifts,
     guest_meals: seedGuestMeals(users),
+    tag_requests: [],
     version: SEED_VERSION,
   };
 }

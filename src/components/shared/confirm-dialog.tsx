@@ -46,6 +46,7 @@ export function ConfirmDialog({
   confirmLabel,
   danger,
   tone,
+  compact,
   children,
   panelClassName,
   rootClassName,
@@ -58,6 +59,8 @@ export function ConfirmDialog({
   confirmLabel?: string;
   danger?: boolean;
   tone?: Tone;
+  /** Tighter chrome so a full preview still fits one viewport. */
+  compact?: boolean;
   children?: React.ReactNode;
   panelClassName?: string;
   /** Applied to fixed overlay root (e.g. no-print). */
@@ -120,41 +123,59 @@ export function ConfirmDialog({
             exit={reduceMotion ? undefined : { opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.2 }}
             className={cn(
-              "relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]",
+              "relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]",
               "dark:border-neutral-700 dark:bg-neutral-950",
               "ring-1",
               meta.ring,
               panelClassName,
             )}
           >
-            <div className={cn("h-1 w-full bg-gradient-to-r", meta.bar)} />
+            <div className={cn("h-1 w-full shrink-0 bg-gradient-to-r", meta.bar)} />
 
-            <div className="p-5 sm:p-6">
-              <div className="flex items-start gap-3">
+            <div className={cn("flex min-h-0 flex-col", compact ? "p-3.5 sm:p-4" : "p-5 sm:p-6")}>
+              <div className="flex shrink-0 items-start gap-3">
                 <span
                   className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
+                    "flex shrink-0 items-center justify-center rounded-2xl",
+                    compact ? "h-9 w-9 rounded-xl" : "h-11 w-11",
                     meta.chip,
                   )}
                 >
-                  <ToneIcon className="h-5 w-5" stroke={2.25} />
+                  <ToneIcon className={compact ? "h-4 w-4" : "h-5 w-5"} stroke={2.25} />
                 </span>
                 <div className="min-w-0 pt-0.5">
                   <h2
                     id={titleId}
-                    className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white"
+                    className={cn(
+                      "font-semibold tracking-tight text-neutral-900 dark:text-white",
+                      compact ? "text-base" : "text-lg",
+                    )}
                   >
                     {title}
                   </h2>
-                  <p className="mt-1 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                  <p
+                    className={cn(
+                      "text-neutral-500 dark:text-neutral-400",
+                      compact
+                        ? "mt-0.5 text-xs leading-snug"
+                        : "mt-1 text-sm leading-relaxed",
+                    )}
+                  >
                     {body}
                   </p>
                 </div>
               </div>
 
-              {children ? <div className="mt-5">{children}</div> : null}
+              {children ? (
+                <div className={compact ? "mt-3 min-h-0" : "mt-5"}>{children}</div>
+              ) : null}
 
-              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <div
+                className={cn(
+                  "flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+                  compact ? "mt-3" : "mt-6",
+                )}
+              >
                 <Button
                   ref={cancelRef}
                   type="button"

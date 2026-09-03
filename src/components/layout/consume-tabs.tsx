@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { IconChartBar, IconFileReport, IconTags } from "@tabler/icons-react";
+import { IconChartBar, IconFileReport, IconSend, IconTags } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
 import { useT } from "@/i18n/provider";
 
@@ -11,6 +11,12 @@ const TABS = [
     labelKey: "nav.consumeLedger" as const,
     icon: IconTags,
     match: (path: string) => path.startsWith("/consume/monthly/ledger"),
+  },
+  {
+    href: "/consume/requests",
+    labelKey: "nav.requests" as const,
+    icon: IconSend,
+    match: (path: string) => path.startsWith("/consume/requests"),
   },
   {
     href: "/consume/monthly",

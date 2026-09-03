@@ -3,6 +3,7 @@ import type { MessageKey } from "@/i18n";
 import {
   IconUserCheck,
   IconTags,
+  IconSend,
   IconChartBar,
   IconCashBanknote,
   IconFileReport,
@@ -23,7 +24,20 @@ export type NavItem = {
 };
 
 export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
-  cc: [],
+  cc: [
+    {
+      href: "/cc/users",
+      labelKey: "nav.users",
+      icon: IconUsersGroup,
+      chip: "teal",
+    },
+    {
+      href: "/cc/requested",
+      labelKey: "nav.requested",
+      icon: IconSend,
+      chip: "amber",
+    },
+  ],
   daily: [
     {
       href: "/daily/tags",
@@ -32,9 +46,9 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
-      href: "/daily/state-report",
-      labelKey: "nav.stateReport",
-      icon: IconClipboardList,
+      href: "/daily/requests",
+      labelKey: "nav.requests",
+      icon: IconSend,
       chip: "amber",
     },
     {
@@ -84,6 +98,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
+      href: "/consume/requests",
+      labelKey: "nav.requests",
+      icon: IconSend,
+      chip: "amber",
+    },
+    {
       href: "/consume/monthly",
       labelKey: "nav.monthlyConsume",
       icon: IconChartBar,
@@ -102,6 +122,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.monthlyRation",
       icon: IconCashBanknote,
       chip: "cyan",
+    },
+    {
+      href: "/ration/requests",
+      labelKey: "nav.requests",
+      icon: IconSend,
+      chip: "amber",
     },
     {
       href: "/ration/report",
