@@ -55,14 +55,14 @@ export function formatDateLong(iso: string, locale = "en-GB") {
   });
 }
 
-/** `2026-08-04` → `Jan 04, 2026`. Empty → `""`. */
+/** `2026-09-26` → `26 Sep 2026`. Empty → `""`. */
 export function formatDateDisplay(iso: string) {
   if (!iso.trim()) return "";
   const d = new Date(`${iso}T12:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
     month: "short",
-    day: "2-digit",
     year: "numeric",
   });
 }

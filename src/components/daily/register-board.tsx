@@ -33,7 +33,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListPagination } from "@/components/shared/list-pagination";
-import { dateInMonth, eachISODate, formatDateLong } from "@/lib/date";
+import { FormattedDateInput } from "@/components/shared/date-picker";
+import { dateInMonth, eachISODate, formatDateDisplay, formatDateLong } from "@/lib/date";
 import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
@@ -64,6 +65,7 @@ import { useToast } from "@/components/shared/toast-provider";
 import {
   createDutyTagRequest,
   dutyTagQueue,
+  pendingDutyByUserDate,
 } from "@/lib/store/tag-requests";
 import { cn } from "@/lib/utils";
 
@@ -220,6 +222,11 @@ export function RegisterBoard({
     return map;
   }, [assignments]);
 
+  const pendingByUserDate = useMemo(
+    () => pendingDutyByUserDate(state.tag_requests),
+    [state.tag_requests],
+  );
+
   const [dayPeek, setDayPeek] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragStroke | null>(null);
   const dragRef = useRef<DragStroke | null>(null);
@@ -255,7 +262,10 @@ export function RegisterBoard({
           ? stroke.endDate
           : stroke.startDate;
       const dates = eachISODate(lo, hi).filter(
-        (date) => date >= todayISO && canAssignOnDate(user, date),
+        (date) =>
+          date >= todayISO &&
+          canAssignOnDate(user, date) &&
+          !pendingByUserDate.has(`${stroke.userId}|${date}`),
       );
       if (dates.length === 0) {
         setDrag(null);
@@ -304,7 +314,15 @@ export function RegisterBoard({
         storedTag,
       });
     },
-    [byUserDate, columnDates, priorByUser, suppressedSet, todayISO, users],
+    [
+      byUserDate,
+      columnDates,
+      pendingByUserDate,
+      priorByUser,
+      suppressedSet,
+      todayISO,
+      users,
+    ],
   );
 
   const commitDrag = useCallback(() => {
@@ -367,6 +385,7 @@ export function RegisterBoard({
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
     if (user && isMfrLocked(user)) return;
+    if (pendingByUserDate.has(`${userId}|${date}`)) return;
     const stroke: DragStroke = {
       userId,
       startDate: date,
@@ -423,7 +442,10 @@ export function RegisterBoard({
     const from = rangeMenu.fromDate || rangeMenu.anchorDate;
     const to = rangeMenu.toDate || from;
     const dates = eachISODate(from, to).filter(
-      (date) => date >= todayISO && (!user || canAssignOnDate(user, date)),
+      (date) =>
+        date >= todayISO &&
+        (!user || canAssignOnDate(user, date)) &&
+        !pendingByUserDate.has(`${rangeMenu.userId}|${date}`),
     );
     if (dates.length === 0) return;
     const fromDate = dates[0]!;
@@ -453,8 +475,8 @@ export function RegisterBoard({
 
   const rangeLabel = rangeMenu
     ? rangeMenu.toDate && rangeMenu.toDate !== rangeMenu.fromDate
-      ? `${rangeMenu.fromDate} → ${rangeMenu.toDate}`
-      : rangeMenu.fromDate
+      ? `${formatDateDisplay(rangeMenu.fromDate)} → ${formatDateDisplay(rangeMenu.toDate)}`
+      : formatDateDisplay(rangeMenu.fromDate)
     : "";
 
   const resetKey = useMemo(
@@ -675,6 +697,7 @@ export function RegisterBoard({
                   stored?: DailyTag;
                   ghost?: DailyTag;
                   trgTone?: TrgTone;
+                  pendingTag?: DailyTag;
                   afterOut: boolean;
                   inactiveOnDate: boolean;
                   mfrLocked: boolean;
@@ -723,6 +746,22 @@ export function RegisterBoard({
                     continue;
                   }
                   const key = `${user.id}|${date}`;
+                  const pending = pendingByUserDate.get(key);
+                  if (pending) {
+                    rowMeta.push({
+                      date,
+                      stored: undefined,
+                      ghost: undefined,
+                      pendingTag: pending.to_tag,
+                      trgTone: isTrgTag(pending.to_tag)
+                        ? (pending.trg_tone ?? resolveTrgTone(user.force))
+                        : undefined,
+                      afterOut: false,
+                      inactiveOnDate: false,
+                      mfrLocked: false,
+                    });
+                    continue;
+                  }
                   const entry = byUserDate.get(key);
                   const stored = entry?.tag;
                   const suppressed = suppressedSet.has(key);
@@ -796,6 +835,7 @@ export function RegisterBoard({
                       const tagCounts: Partial<Record<DailyTag, number>> = {};
                       let totalDays = 0;
                       for (const cell of rowMeta) {
+                        if (cell.pendingTag) continue;
                         const shown =
                           cell.stored ??
                           (!cell.afterOut && cell.ghost ? cell.ghost : undefined);
@@ -849,16 +889,23 @@ export function RegisterBoard({
                         stored,
                         ghost,
                         trgTone,
+                        pendingTag,
                         afterOut,
                         inactiveOnDate,
                         mfrLocked,
                       } = cell;
                       const inactive = inactiveOnDate;
-                      const preview = inDragPreview(user.id, date);
-                      const locked = afterOut || date < todayISO || mfrLocked;
+                      const pending = Boolean(pendingTag);
+                      const preview =
+                        inDragPreview(user.id, date) && !pending;
+                      const locked =
+                        afterOut || date < todayISO || mfrLocked || pending;
                       let tag = stored;
                       let isGhost = false;
-                      if (!stored && ghost && !afterOut) {
+                      if (pendingTag) {
+                        tag = pendingTag;
+                        isGhost = true;
+                      } else if (!stored && ghost && !afterOut) {
                         tag = ghost;
                         // Future only — past/today show solid (not preview fade)
                         isGhost = date > todayISO;
@@ -898,6 +945,7 @@ export function RegisterBoard({
                           tag={tag}
                           trgTone={trgTone}
                           ghost={isGhost}
+                          pending={pending}
                           date={date}
                           userName={user.name}
                           isToday={date === todayISO}
@@ -1516,11 +1564,11 @@ function TagPickerPanel({
           <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
             {t("common.dateFrom")}
           </span>
-          <Input
-            type="date"
+          <FormattedDateInput
             value={fromDate}
             min={minDate}
-            onChange={(e) => onFromDate(e.target.value)}
+            onChange={onFromDate}
+            aria-label={t("common.dateFrom")}
             className={dateField}
           />
         </label>
@@ -1528,11 +1576,11 @@ function TagPickerPanel({
           <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
             {t("common.dateTo")}
           </span>
-          <Input
-            type="date"
+          <FormattedDateInput
             value={toDate}
             min={fromDate || minDate}
-            onChange={(e) => onToDate(e.target.value)}
+            onChange={onToDate}
+            aria-label={t("common.dateTo")}
             className={dateField}
           />
         </label>
@@ -1569,6 +1617,7 @@ function RegisterCell({
   tag,
   trgTone,
   ghost,
+  pending,
   date,
   userName,
   isToday,
@@ -1587,6 +1636,7 @@ function RegisterCell({
   tag?: DailyTag;
   trgTone?: TrgTone;
   ghost?: boolean;
+  pending?: boolean;
   date: string;
   userName: string;
   isToday: boolean;
@@ -1616,8 +1666,10 @@ function RegisterCell({
           tagDisplayClass(tag, trgTone),
           contL ? "rounded-l-none" : "rounded-l-md",
           contR ? "rounded-r-none" : "rounded-r-md",
-          // Carry ghost only — soft wash, no hard outline
-          ghost && "opacity-40",
+          // Carry ghost / pending request — faded so Daily can see it is not saved
+          (ghost || pending) && "opacity-40",
+          pending &&
+            "ring-1 ring-inset ring-dashed ring-amber-500/90 dark:ring-amber-300/80",
         )
       : locked
         ? "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600"
@@ -1626,16 +1678,19 @@ function RegisterCell({
       "bg-primary/25 ring-2 ring-inset ring-primary/60 dark:bg-primary/40",
   );
 
-  const lockReason = inactive
-    ? t("daily.inactiveLocked")
-    : mfrLocked
-      ? t("daily.mfrLocked")
-      : afterOut
-        ? t("daily.afterOutLocked")
-        : t("daily.pastLocked");
+  const lockReason = pending
+    ? t("daily.pendingRequestLocked")
+    : inactive
+      ? t("daily.inactiveLocked")
+      : mfrLocked
+        ? t("daily.mfrLocked")
+        : afterOut
+          ? t("daily.afterOutLocked")
+          : t("daily.pastLocked");
   // Prior stored tags: normal title (not "disabled"). Empty locked: lock reason.
-  const title =
-    tag && !ghost
+  const title = pending && tag
+    ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)} · ${t("daily.pendingRequest")}`
+    : tag && !ghost
       ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)}${locked ? ` · ${lockReason}` : ""}`
       : locked
         ? `${userName} · ${date} · ${lockReason}`

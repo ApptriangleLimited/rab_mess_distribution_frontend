@@ -3,13 +3,8 @@
 import { useMemo } from "react";
 import { IconCake } from "@tabler/icons-react";
 import { formatDateLong } from "@/lib/date";
-import {
-  PRITIBHOJ_ADMIN_ROWS,
-  PRITIBHOJ_DEMO_META,
-  PRITIBHOJ_MAIN_ROWS,
-  sumPritibhojRows,
-  type PritibhojRow,
-} from "@/lib/pritibhoj-demo";
+import { PRITIBHOJ_DEMO_META, sumPritibhojRows } from "@/lib/pritibhoj-demo";
+import type { PritibhojEvent, PritibhojRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function bnDigits(n: number) {
@@ -95,7 +90,7 @@ function PritibhojTable({
         <tbody>
           {rows.map((row, i) => (
             <tr
-              key={row.wing}
+              key={`${row.wing}-${i}`}
               className="hover:bg-neutral-50/80 dark:hover:bg-neutral-900/50"
             >
               <td className="sticky left-0 z-[1] border border-neutral-300 bg-white px-2 py-1.5 text-center tabular-nums dark:border-neutral-600 dark:bg-neutral-950">
@@ -160,7 +155,7 @@ function PritibhojTable({
                 colSpan={13}
                 className="border border-neutral-300 px-3 py-2.5 text-center dark:border-neutral-600"
               >
-                সর্বমোট জনবল = {bnDigits(PRITIBHOJ_DEMO_META.grandTotalManpower)}
+                সর্বমোট জনবল = {bnDigits(totals.total)}
               </td>
             </tr>
           ) : null}
@@ -172,13 +167,17 @@ function PritibhojTable({
 
 /** Both Pritibhoj sheets — web + print preview. */
 export function PritibhojSheets({
+  event,
   dateLocale,
   className,
 }: {
+  event: PritibhojEvent;
   dateLocale: string;
   className?: string;
 }) {
-  const dateLabel = formatDateLong(PRITIBHOJ_DEMO_META.dateISO, dateLocale);
+  const dateLabel = formatDateLong(event.date, dateLocale);
+  const heading = event.title || event.occasion || PRITIBHOJ_DEMO_META.titleBn;
+  const org = event.org || PRITIBHOJ_DEMO_META.orgBn;
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
@@ -188,15 +187,18 @@ export function PritibhojSheets({
             <IconCake className="h-5 w-5" />
           </div>
           <h2 className="text-sm font-bold leading-snug text-neutral-900 dark:text-white sm:text-base">
-            {PRITIBHOJ_DEMO_META.titleBn}
+            {heading}
           </h2>
+          {event.occasion && event.occasion !== heading ? (
+            <p className="mt-1 text-xs text-neutral-500">{event.occasion}</p>
+          ) : null}
           <p className="mt-1 text-xs font-medium text-neutral-600 dark:text-neutral-400">
-            {PRITIBHOJ_DEMO_META.orgBn}
+            {org}
           </p>
           <p className="mt-0.5 text-xs text-neutral-500">তারিখঃ {dateLabel}</p>
         </div>
         <PritibhojTable
-          rows={PRITIBHOJ_MAIN_ROWS}
+          rows={event.main_rows}
           showGrand
           footLabel="মোট জনবল ="
         />
@@ -208,10 +210,10 @@ export function PritibhojSheets({
             {PRITIBHOJ_DEMO_META.adminTitleBn}
           </h2>
           <p className="mt-1 text-xs font-medium text-neutral-600 dark:text-neutral-400">
-            {PRITIBHOJ_DEMO_META.orgBn}
+            {org}
           </p>
         </div>
-        <PritibhojTable rows={PRITIBHOJ_ADMIN_ROWS} footLabel="মোট =" />
+        <PritibhojTable rows={event.admin_rows} footLabel="মোট =" />
       </section>
     </div>
   );

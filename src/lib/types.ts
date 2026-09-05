@@ -109,7 +109,7 @@ export interface DailyAssignment {
   updated_at: string;
 }
 
-export type TagRequestStatus = "requested" | "updated";
+export type TagRequestStatus = "requested" | "updated" | "rejected";
 
 /** Who must approve the cockpit tag change. */
 export type TagRequestQueue = "daily" | "ration" | "consume";
@@ -262,6 +262,32 @@ export interface AuthorizedStrength {
   held_wings?: Record<string, number>;
 }
 
+export type PritibhojRow = {
+  wing: string;
+  officer: number;
+  dad: number;
+  azadHall: number;
+  distribution: number;
+  others: number;
+  civilian: number;
+  nonMuslim: number;
+  total: number;
+  azadHallDist: number;
+  distribution2: number;
+  totalDistribution: number;
+};
+
+export type PritibhojEvent = {
+  id: string;
+  title: string;
+  occasion: string;
+  date: string;
+  org: string;
+  created_at: string;
+  main_rows: PritibhojRow[];
+  admin_rows: PritibhojRow[];
+};
+
 export interface AppState {
   users: User[];
   assignments: DailyAssignment[];
@@ -325,5 +351,7 @@ export interface AppState {
   meal_shifts: MealShift[];
   /** Named guest check-ins (CMS guest_meals). */
   guest_meals: GuestMeal[];
+  /** Saved Pritibhoj feast manpower sheets. */
+  pritibhoj_events: PritibhojEvent[];
   version: number;
 }

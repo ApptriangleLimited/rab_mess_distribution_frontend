@@ -229,7 +229,6 @@ export default function CcUsersPage() {
           value={filters}
           onChange={setFiltersAndResetPage}
           tiles={tiles}
-          wrapTiles={false}
         />
         {loading ? (
           <p className="py-10 text-center text-sm text-neutral-500">
@@ -289,7 +288,7 @@ function StatChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-3 shadow-sm transition",
+        "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 shadow-sm transition",
         tones,
         active
           ? "border-black ring-1 ring-black brightness-95 dark:border-white dark:ring-white dark:brightness-110"

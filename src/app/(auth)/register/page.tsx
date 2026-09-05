@@ -66,7 +66,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-dvh bg-page-canvas">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-8 md:px-6 md:py-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-4 md:px-6 md:py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">

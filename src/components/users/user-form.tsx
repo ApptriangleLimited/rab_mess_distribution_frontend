@@ -3,13 +3,19 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  IconAccessPoint,
   IconBuildingBank,
   IconCloudUpload,
+  IconCreditCard,
   IconFile,
   IconFileUpload,
+  IconFolder,
   IconId,
+  IconMapPin,
+  IconPhone,
   IconPhoneCall,
   IconPlus,
+  IconShield,
   IconTrash,
   IconUserPlus,
   type Icon,
@@ -29,7 +35,7 @@ import { DatePicker } from "@/components/shared/date-picker";
 import { TagSelector } from "@/components/daily/tag-selector";
 import { MEMBER_TYPES, RELIGIONS, BRANCH_DISTRICTS, wingDisplayLabel } from "@/lib/constants";
 import { SearchableSelect } from "@/components/shared/searchable-select";
-import type { DailyTag, DocumentMeta, MemberType, User, UserStatus } from "@/lib/types";
+import type { DailyTag, DocumentMeta, MemberType, User } from "@/lib/types";
 import {
   emptyEmergencyContact,
   missingUserFormRequired,
@@ -111,10 +117,16 @@ export function userToFormValues(user: User): UserFormValues {
 }
 
 const inputClass =
-  "h-9 rounded-lg border-neutral-200 bg-neutral-50/80 px-3 text-sm shadow-none transition focus-visible:ring-primary dark:border-neutral-600 dark:bg-neutral-900/80";
+  "h-8 rounded-md border-neutral-200 bg-neutral-50/80 px-2.5 text-sm shadow-none transition focus-visible:ring-primary dark:border-neutral-600 dark:bg-neutral-900/80";
 
 const selectTriggerClass =
-  "h-9 rounded-lg border-neutral-200 bg-neutral-50/80 text-sm shadow-none focus:ring-primary dark:border-neutral-600 dark:bg-neutral-900/80";
+  "h-8 py-0 rounded-md border-neutral-200 bg-neutral-50/80 text-sm shadow-none focus:ring-primary dark:border-neutral-600 dark:bg-neutral-900/80";
+
+const fieldGridClass =
+  "grid items-start grid-cols-2 gap-x-2 gap-y-1.5 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,12.25rem))]";
+
+const personalGridClass =
+  "grid items-start grid-cols-2 gap-x-2 gap-y-1.5 lg:grid-cols-6";
 
 function resolveWingParts(
   wing: string,
@@ -127,14 +139,6 @@ function resolveWingParts(
 
 function rootWings(wings: string[], wingParent: Record<string, string>) {
   return wings.filter((w) => !wingParent[w]);
-}
-
-function subWingsFor(
-  parent: string,
-  wings: string[],
-  wingParent: Record<string, string>,
-) {
-  return wings.filter((w) => wingParent[w] === parent);
 }
 
 function formatDocSize(bytes: number) {
@@ -173,7 +177,6 @@ export function UserForm({
   const [dragOver, setDragOver] = useState(false);
   const wingParts = resolveWingParts(values.wing, wing_parent);
   const parentWingOptions = rootWings(wings, wing_parent);
-  const subWingOptions = subWingsFor(wingParts.parent, wings, wing_parent);
   const isCivilian = values.member_type === "civilian";
   const isGuest = values.member_type === "guest";
   const wingLabel = (w: string) => wingDisplayLabel(w, wing_labels);
@@ -203,21 +206,6 @@ export function UserForm({
     </Field>
   );
 
-  const subWingField =
-    subWingOptions.length > 0 ? (
-      <Field label={t("cc.fields.subWing")}>
-        <SearchableSelect
-          options={subWingOptions}
-          value={wingParts.sub}
-          onChange={setSubWing}
-          getOptionLabel={wingLabel}
-          clearLabel="—"
-          placeholder={t("cc.selectSubWing")}
-          triggerClassName={selectTriggerClass}
-        />
-      </Field>
-    ) : null;
-
   const memberTypeField = (
     <Field label={t("cc.fields.memberType")}>
       <Select
@@ -238,33 +226,18 @@ export function UserForm({
     </Field>
   );
 
-  const statusField =
+  const statusToggle =
     variant !== "public" ? (
-      <Field label={t("cc.fields.status")}>
-        <Select
-          value={values.status}
-          onValueChange={(v) => patch("status", v as UserStatus)}
-        >
-          <SelectTrigger className={selectTriggerClass}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">{t("cc.statusActive")}</SelectItem>
-            <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
+      <StatusSwitch
+        active={values.status === "1"}
+        onChange={(active) => patch("status", active ? "1" : "0")}
+        activeLabel={t("cc.statusActive")}
+        inactiveLabel={t("cc.statusInactive")}
+      />
     ) : null;
 
   function setParentWing(parent: string) {
     setValues((prev) => ({ ...prev, wing: parent }));
-  }
-
-  function setSubWing(sub: string) {
-    setValues((prev) => {
-      const { parent } = resolveWingParts(prev.wing, wing_parent);
-      return { ...prev, wing: sub || parent };
-    });
   }
 
   function patch<K extends keyof UserFormValues>(
@@ -423,11 +396,11 @@ export function UserForm({
     : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 } };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       {mode === "create" && variant === "public" ? (
         <motion.div
           {...fade}
-          className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/[0.06] px-3 py-2 dark:bg-primary/10"
+          className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.06] px-2.5 py-1.5 dark:bg-primary/10"
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
             <IconUserPlus className="h-3.5 w-3.5" />
@@ -442,93 +415,15 @@ export function UserForm({
       ) : null}
 
       <FormSection
-        step="01"
         icon={IconId}
         title={t("cc.sectionPersonal")}
-        hint={t("cc.sectionPersonalHint")}
         delay={0.03}
         reduceMotion={!!reduceMotion}
+        headerActions={statusToggle}
       >
-        <div
-          className={cn(
-            "grid grid-cols-1 gap-3 sm:grid-cols-2",
-            variant === "cc" ? "lg:grid-cols-4" : "xl:grid-cols-4",
-          )}
-        >
-          {isCivilian ? (
-            <>
-              {memberTypeField}
-              <Field label={t("cc.fields.cardNumber")} required>
-                <Input
-                  value={values.dropdown_no}
-                  onChange={(e) => patch("dropdown_no", e.target.value)}
-                  required
-                  className={inputClass}
-                  placeholder={t("cc.placeholders.cardNumber")}
-                />
-              </Field>
-              {rankField}
-              <Field label={t("cc.fields.name")} required>
-                <Input
-                  value={values.name}
-                  onChange={(e) => patch("name", e.target.value)}
-                  required
-                  className={inputClass}
-                  placeholder={t("cc.placeholders.name")}
-                />
-              </Field>
-              {wingField}
-              {subWingField}
-              <Field label={t("cc.fields.phone")}>
-                <Input
-                  value={values.phone}
-                  onChange={(e) =>
-                    patch("phone", normalizeBdPhone(e.target.value))
-                  }
-                  inputMode="numeric"
-                  className={inputClass}
-                  placeholder={t("cc.placeholders.phone")}
-                />
-              </Field>
-              <Field label={t("cc.fields.nid")} required>
-                <Input
-                  value={values.personal_id}
-                  onChange={(e) => patch("personal_id", e.target.value)}
-                  required
-                  className={inputClass}
-                  placeholder={t("cc.placeholders.nid")}
-                />
-              </Field>
-              <Field label={t("cc.fields.joiningDate")}>
-                <DatePicker
-                  value={values.joining_date}
-                  onChange={(iso) => {
-                    setValues((prev) => ({
-                      ...prev,
-                      joining_date: iso,
-                      out_date:
-                        prev.out_date && iso && prev.out_date < iso
-                          ? ""
-                          : prev.out_date,
-                    }));
-                  }}
-                  label={t("cc.fields.joiningDate")}
-                  triggerClassName={inputClass}
-                />
-              </Field>
-              <Field label={t("cc.fields.outDate")}>
-                <DatePicker
-                  value={values.out_date}
-                  onChange={(iso) => patch("out_date", iso)}
-                  min={values.joining_date || undefined}
-                  label={t("cc.fields.outDate")}
-                  triggerClassName={inputClass}
-                />
-              </Field>
-              {statusField}
-            </>
-          ) : isGuest ? (
-            <>
+        <div className="flex flex-col gap-y-1.5">
+          {isGuest ? (
+            <div className={personalGridClass}>
               {memberTypeField}
               <Field label={t("cc.fields.rabId")}>
                 <Input
@@ -549,25 +444,24 @@ export function UserForm({
                 />
               </Field>
               <Field label={t("cc.fields.phone")}>
-                <Input
+                <FieldInput
+                  icon={IconPhone}
                   value={values.phone}
                   onChange={(e) =>
                     patch("phone", normalizeBdPhone(e.target.value))
                   }
                   inputMode="numeric"
-                  className={inputClass}
                   placeholder={t("cc.placeholders.phone")}
                 />
               </Field>
               <Field label={t("cc.fields.rfid")}>
-                <Input
+                <FieldInput
+                  icon={IconAccessPoint}
                   value={values.rfid}
                   onChange={(e) => patch("rfid", e.target.value)}
-                  className={inputClass}
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {statusField}
               {variant === "daily" ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
@@ -582,9 +476,9 @@ export function UserForm({
                   />
                 </Field>
               ) : null}
-            </>
+            </div>
           ) : (
-            <>
+            <div className={personalGridClass}>
               {memberTypeField}
               <Field label={t("cc.fields.personalNo")} required>
                 <Input
@@ -615,22 +509,23 @@ export function UserForm({
                 />
               </Field>
               {wingField}
-              {subWingField}
               <Field label={t("cc.fields.phone")}>
-                <Input
+                <FieldInput
+                  icon={IconPhone}
                   value={values.phone}
                   onChange={(e) =>
                     patch("phone", normalizeBdPhone(e.target.value))
                   }
                   inputMode="numeric"
-                  className={inputClass}
                   placeholder={t("cc.placeholders.phone")}
                 />
               </Field>
               <Field label={t("cc.fields.force")}>
                 <Select
                   value={values.force || "__none__"}
-                  onValueChange={(v) => patch("force", v === "__none__" ? "" : v)}
+                  onValueChange={(v) =>
+                    patch("force", v === "__none__" ? "" : v)
+                  }
                 >
                   <SelectTrigger className={selectTriggerClass}>
                     <SelectValue placeholder={t("cc.selectForce")} />
@@ -692,14 +587,13 @@ export function UserForm({
                 />
               </Field>
               <Field label={t("cc.fields.rfid")}>
-                <Input
+                <FieldInput
+                  icon={IconAccessPoint}
                   value={values.rfid}
                   onChange={(e) => patch("rfid", e.target.value)}
-                  className={inputClass}
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {statusField}
               {variant === "daily" ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
@@ -714,44 +608,36 @@ export function UserForm({
                   />
                 </Field>
               ) : null}
-            </>
+            </div>
           )}
         </div>
       </FormSection>
 
       {!isGuest ? (
         <FormSection
-          step="02"
           icon={IconPhoneCall}
           title={t("cc.sectionEmergency")}
-          hint={t("cc.sectionEmergencyHint")}
           delay={0.04}
           reduceMotion={!!reduceMotion}
-        >
-        <div className="flex flex-col gap-3">
-          {values.emergency_contacts.map((contact, index) => (
-            <div
-              key={index}
-              className="rounded-xl border border-neutral-200/90 bg-white/60 p-3 dark:border-neutral-700 dark:bg-neutral-950/40"
+          titleActions={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-md border-primary/30 bg-white px-2 text-xs text-primary hover:bg-primary/5 dark:bg-neutral-900"
+              onClick={addEmergency}
             >
-              <div className="mb-2.5 flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  {t("cc.emergencyContactN", { n: String(index + 1) })}
-                </p>
-                {values.emergency_contacts.length > 1 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-neutral-400 hover:text-red-600"
-                    onClick={() => removeEmergency(index)}
-                    aria-label={t("cc.removeEmergency")}
-                  >
-                    <IconTrash className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <IconPlus className="h-3.5 w-3.5" />
+              {t("cc.addEmergency")}
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-1.5">
+            {values.emergency_contacts.map((contact, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-2 items-end gap-x-2 gap-y-1.5 sm:grid-cols-[repeat(3,minmax(10.5rem,12.25rem))_auto]"
+              >
                 <Field label={t("cc.fields.emergencyName")}>
                   <Input
                     value={contact.name}
@@ -773,7 +659,8 @@ export function UserForm({
                   />
                 </Field>
                 <Field label={t("cc.fields.emergencyPhone")}>
-                  <Input
+                  <FieldInput
+                    icon={IconPhone}
                     value={contact.phone}
                     onChange={(e) =>
                       patchEmergency(
@@ -783,39 +670,35 @@ export function UserForm({
                       )
                     }
                     inputMode="numeric"
-                    className={inputClass}
                     placeholder={t("cc.placeholders.emergencyPhone")}
                   />
                 </Field>
+                {values.emergency_contacts.length > 1 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-neutral-400 hover:text-red-600"
+                    onClick={() => removeEmergency(index)}
+                    aria-label={t("cc.removeEmergency")}
+                  >
+                    <IconTrash className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
               </div>
-            </div>
-          ))}
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-lg"
-              onClick={addEmergency}
-            >
-              <IconPlus className="h-3.5 w-3.5" />
-              {t("cc.addEmergency")}
-            </Button>
-          </div>
+            ))}
           </div>
         </FormSection>
       ) : null}
 
       {!isGuest ? (
         <FormSection
-          step="03"
           icon={IconBuildingBank}
           title={t("cc.sectionBank")}
-          hint={t("cc.sectionBankHint")}
           delay={0.05}
           reduceMotion={!!reduceMotion}
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <div className={fieldGridClass}>
             <Field label={t("cc.fields.bankName")}>
               <Select
                 value={values.bank_name || undefined}
@@ -842,13 +725,13 @@ export function UserForm({
               />
             </Field>
             <Field label={t("cc.fields.accountNumber")}>
-              <Input
+              <FieldInput
+                icon={IconCreditCard}
                 value={values.account_number}
                 onChange={(e) =>
                   patch("account_number", digitsOnly(e.target.value))
                 }
                 inputMode="numeric"
-                className={inputClass}
               />
             </Field>
             <Field label={t("cc.fields.routing")}>
@@ -869,10 +752,10 @@ export function UserForm({
               />
             </Field>
             <Field label={t("cc.fields.branchLocation")}>
-              <Input
+              <FieldInput
+                icon={IconMapPin}
                 value={values.branch_location}
                 onChange={(e) => patch("branch_location", e.target.value)}
-                className={inputClass}
                 placeholder={t("cc.placeholders.branchLocation")}
               />
             </Field>
@@ -882,15 +765,13 @@ export function UserForm({
 
       {!isGuest ? (
         <FormSection
-          step="04"
           icon={IconFileUpload}
           title={t("cc.sectionDocs")}
-          hint={t("cc.docsHint")}
           required
           delay={0.07}
           reduceMotion={!!reduceMotion}
         >
-        <div className="space-y-3 p-3.5 md:p-4">
+        <div className="flex flex-col gap-1.5">
           <label
             onDragOver={(e) => {
               e.preventDefault();
@@ -903,32 +784,33 @@ export function UserForm({
               onFiles(e.dataTransfer.files);
             }}
             className={cn(
-              "group relative flex cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border-2 border-dashed px-5 py-8 text-center transition-all duration-200",
+              "group flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-2 transition-colors",
               dragOver
-                ? "scale-[1.01] border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                : "border-neutral-200/90 bg-gradient-to-b from-neutral-50/90 via-white to-white hover:border-primary/45 hover:bg-primary/[0.02] dark:border-neutral-700 dark:from-neutral-900/60 dark:via-neutral-950/40 dark:to-neutral-950/20 dark:hover:border-primary/40",
+                ? "border-primary bg-primary/5"
+                : "border-neutral-200/90 bg-emerald-50/40 hover:border-primary/45 dark:border-neutral-700 dark:bg-neutral-950/40 dark:hover:border-primary/40",
             )}
           >
             <span
               className={cn(
-                "flex h-14 w-14 items-center justify-center rounded-2xl ring-1 transition-transform duration-200 group-hover:scale-105",
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
                 dragOver
-                  ? "bg-primary text-white ring-primary/30"
-                  : "bg-primary/10 text-primary ring-primary/15 dark:bg-primary/15",
+                  ? "bg-primary text-white"
+                  : "bg-primary/10 text-primary dark:bg-primary/15",
               )}
             >
-              <IconCloudUpload className="h-7 w-7" stroke={1.75} />
+              <IconCloudUpload className="h-4 w-4" stroke={1.75} />
             </span>
-            <div className="max-w-sm space-y-1">
-              <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-neutral-900 dark:text-white">
                 {isCivilian ? t("cc.dropDocsCivilian") : t("cc.dropDocs")}
               </p>
-              <p className="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-                {t("cc.addDocuments")}
+              <p className="truncate text-[11px] text-neutral-500 dark:text-neutral-400">
+                {t("cc.addDocuments")} · {t("cc.docsFormats")}
               </p>
             </div>
-            <span className="rounded-full border border-neutral-200/80 bg-white/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-400">
-              {t("cc.docsFormats")}
+            <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary/30 bg-white px-2.5 text-xs font-medium text-primary dark:bg-neutral-900">
+              <IconFolder className="h-3.5 w-3.5" />
+              {t("cc.chooseFiles")}
             </span>
             <input
               type="file"
@@ -940,14 +822,14 @@ export function UserForm({
           </label>
 
           {isCivilian ? (
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-neutral-200/90 bg-white/80 px-3 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-900/70">
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-neutral-200/90 bg-white/80 px-2.5 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900/70">
               <input
                 type="checkbox"
                 checked={values.documents_verified}
                 onChange={(e) =>
                   patch("documents_verified", e.target.checked)
                 }
-                className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
+                className="h-3.5 w-3.5 rounded border-neutral-300 text-primary accent-primary"
               />
               <span className="font-medium text-neutral-800 dark:text-neutral-100">
                 {t("cc.verifyDocuments")}
@@ -956,116 +838,155 @@ export function UserForm({
           ) : null}
 
           {values.documents.length > 0 ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 px-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                  {t("cc.fields.documents")}
-                </p>
-                <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-primary">
-                  {values.documents.length}
-                </span>
-              </div>
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {values.documents.map((doc, i) => (
-                  <li
-                    key={`${doc.name}-${i}`}
-                    className="group/doc flex items-center gap-3 rounded-xl border border-neutral-200/90 bg-white/80 p-2.5 shadow-sm transition hover:border-primary/25 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-900/70"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
-                      <IconFile className="h-5 w-5" stroke={1.75} />
+            <ul className="grid gap-1.5 sm:grid-cols-2">
+              {values.documents.map((doc, i) => (
+                <li
+                  key={`${doc.name}-${i}`}
+                  className="group/doc flex items-center gap-2 rounded-md border border-neutral-200/90 bg-white/80 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900/70"
+                >
+                  <IconFile className="h-4 w-4 shrink-0 text-neutral-400" stroke={1.75} />
+                  <p className="min-w-0 flex-1 truncate text-sm text-neutral-800 dark:text-neutral-100">
+                    {doc.name}
+                    <span className="ml-1.5 text-[11px] text-neutral-400">
+                      {formatDocSize(doc.size)}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                        {doc.name}
-                      </p>
-                      <p className="mt-0.5 text-[11px] font-medium text-neutral-400">
-                        {formatDocSize(doc.size)}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 rounded-lg text-neutral-400 opacity-70 transition hover:bg-red-50 hover:text-red-600 group-hover/doc:opacity-100 dark:hover:bg-red-950/40"
-                      onClick={() => removeDoc(i)}
-                      aria-label={t("cc.removeDoc")}
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                    onClick={() => removeDoc(i)}
+                    aria-label={t("cc.removeDoc")}
+                  >
+                    <IconTrash className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
       </FormSection>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="rounded-lg"
-          onClick={onCancel}
-          disabled={busy}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button type="submit" variant="cta" size="sm" className="rounded-lg" disabled={busy}>
-          {mode === "create" ? (
-            <>
-              <IconPlus className="h-3.5 w-3.5" />
-              {variant === "public"
-                ? t("register.submit")
-                : t("cc.createUser")}
-            </>
-          ) : (
-            t("cc.saveUser")
-          )}
-        </Button>
+      <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200/80 bg-white/95 px-1 py-2 backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/95">
+        <p className="flex min-w-0 items-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+          <IconShield className="h-4 w-4 shrink-0 text-primary" stroke={1.75} />
+          <span className="min-w-0">{t("cc.formSecure")}</span>
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            onClick={onCancel}
+            disabled={busy}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button type="submit" variant="cta" size="sm" className="rounded-lg" disabled={busy}>
+            {mode === "create" ? (
+              <>
+                <IconPlus className="h-3.5 w-3.5" />
+                {variant === "public"
+                  ? t("register.submit")
+                  : t("cc.createUser")}
+              </>
+            ) : (
+              t("cc.saveUser")
+            )}
+          </Button>
+        </div>
       </div>
     </form>
   );
 }
 
+function StatusSwitch({
+  active,
+  onChange,
+  activeLabel,
+  inactiveLabel,
+}: {
+  active: boolean;
+  onChange: (active: boolean) => void;
+  activeLabel: string;
+  inactiveLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={active}
+      onClick={() => onChange(!active)}
+      className="inline-flex h-8 shrink-0 items-center gap-2 rounded-full border border-neutral-200 bg-white px-2 dark:border-neutral-600 dark:bg-neutral-900"
+    >
+      <span
+        className={cn(
+          "text-[11px] font-semibold",
+          active ? "text-neutral-400" : "text-neutral-700 dark:text-neutral-200",
+        )}
+      >
+        {inactiveLabel}
+      </span>
+      <span
+        className={cn(
+          "relative h-5 w-9 rounded-full transition-colors",
+          active ? "bg-primary" : "bg-neutral-300 dark:bg-neutral-600",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left]",
+            active ? "left-4" : "left-0.5",
+          )}
+        />
+      </span>
+      <span
+        className={cn(
+          "text-[11px] font-semibold",
+          active ? "text-primary" : "text-neutral-400",
+        )}
+      >
+        {activeLabel}
+      </span>
+    </button>
+  );
+}
+
 function FormSection({
-  step,
   icon: Icon,
   title,
-  hint,
   required,
   children,
   delay,
   reduceMotion,
   headerActions,
+  titleActions,
 }: {
-  step: string;
   icon: Icon;
   title: string;
-  hint: string;
   required?: boolean;
   children: React.ReactNode;
   delay: number;
   reduceMotion: boolean;
   headerActions?: React.ReactNode;
+  titleActions?: React.ReactNode;
 }) {
   return (
     <motion.div
-      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: reduceMotion ? 0 : delay }}
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25, delay: reduceMotion ? 0 : delay }}
     >
-      <SectionCard className="overflow-hidden rounded-xl border-neutral-200/90 p-0 shadow-sm dark:border-neutral-700">
-        <div className="flex items-center gap-2.5 border-b border-neutral-100 px-3.5 py-2.5 dark:border-neutral-700/80 md:px-4">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20">
+      <SectionCard className="overflow-visible rounded-lg border-neutral-200/90 p-0 shadow-sm dark:border-neutral-700">
+        <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-1.5 dark:border-neutral-700/80">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary dark:bg-primary/20">
             <Icon className="h-3.5 w-3.5" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-              <span className="font-mono text-[10px] font-semibold tracking-wider text-primary">
-                {step}
-              </span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
                 {title}
                 {required ? (
@@ -1075,16 +996,32 @@ function FormSection({
                   </span>
                 ) : null}
               </h2>
-              <span className="truncate text-[11px] text-neutral-400">{hint}</span>
+              {titleActions}
             </div>
           </div>
           {headerActions ? (
             <div className="shrink-0">{headerActions}</div>
           ) : null}
         </div>
-        <div className="px-3.5 py-3 md:px-4 md:py-3.5">{children}</div>
+        <div className="px-3 py-2">{children}</div>
       </SectionCard>
     </motion.div>
+  );
+}
+
+function FieldInput({
+  icon: Glyph,
+  className,
+  ...props
+}: React.ComponentProps<typeof Input> & { icon: Icon }) {
+  return (
+    <div className="relative">
+      <Glyph
+        className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400"
+        stroke={1.75}
+      />
+      <Input className={cn(inputClass, "pl-8", className)} {...props} />
+    </div>
   );
 }
 
@@ -1100,8 +1037,8 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-1", className)}>
-      <Label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+    <div className={cn("min-w-0 space-y-0.5", className)}>
+      <Label className="text-[10px] font-medium leading-none text-neutral-500 dark:text-neutral-400">
         {label}
         {required ? (
           <span className="text-primary" aria-hidden>

@@ -830,6 +830,7 @@ export function createSeedState(): AppState {
     meal_assigns: seedMealAssigns(users, meal_plans),
     meal_shifts,
     guest_meals: seedGuestMeals(users),
+    pritibhoj_events: [],
     tag_requests: [],
     version: SEED_VERSION,
   };

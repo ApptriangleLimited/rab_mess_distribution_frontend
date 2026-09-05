@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import {
   SearchFilterBar,
@@ -29,17 +28,10 @@ type Props = {
   wrapTiles?: boolean;
 };
 
-const EMPTY_FILTERS: UserFilters = {
-  q: "",
-  status: "all",
-  approval: "all",
-  wing: "all",
-  rank: "all",
-  date_from: "",
-  date_to: "",
-};
-
-const fieldClass = searchFilterFieldClass;
+const fieldClass = cn(
+  searchFilterFieldClass,
+  "min-w-0 w-full [&>span]:min-w-0 [&>span]:truncate",
+);
 
 /** Travel-style range picker for member joining / out dates. */
 export function MemberDateFilter({
@@ -48,12 +40,14 @@ export function MemberDateFilter({
   onFrom,
   onTo,
   className,
+  triggerClassName,
 }: {
   from: string;
   to: string;
   onFrom: (v: string) => void;
   onTo: (v: string) => void;
   className?: string;
+  triggerClassName?: string;
 }) {
   const t = useT();
   return (
@@ -66,6 +60,7 @@ export function MemberDateFilter({
       }}
       label={t("cc.fields.memberDate")}
       className={className}
+      triggerClassName={triggerClassName}
     />
   );
 }
@@ -91,8 +86,6 @@ export function UserFiltersBar({
     Boolean(value.date_from?.trim()) ||
     Boolean(value.date_to?.trim());
 
-  const dirty = filtersActive || Boolean(value.q?.trim());
-
   return (
     <SearchFilterBar
       search={value.q ?? ""}
@@ -101,9 +94,10 @@ export function UserFiltersBar({
       filtersActive={filtersActive}
       tiles={tiles}
       wrapTiles={wrapTiles}
+      singleLine
       className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
     >
-      <div className="w-[9.5rem] shrink-0">
+      <div className="min-w-0 flex-1">
         <Select
           value={value.status ?? "all"}
           onValueChange={(v) => patch({ status: v as UserStatus | "all" })}
@@ -118,7 +112,7 @@ export function UserFiltersBar({
           </SelectContent>
         </Select>
       </div>
-      <div className="w-[10.5rem] shrink-0">
+      <div className="min-w-0 flex-1">
         <Select
           value={value.approval ?? "all"}
           onValueChange={(v) =>
@@ -136,7 +130,7 @@ export function UserFiltersBar({
           </SelectContent>
         </Select>
       </div>
-      <div className="w-[9rem] shrink-0">
+      <div className="min-w-0 flex-1">
         <Select
           value={value.wing ?? "all"}
           onValueChange={(v) => patch({ wing: v })}
@@ -154,7 +148,7 @@ export function UserFiltersBar({
           </SelectContent>
         </Select>
       </div>
-      <div className="w-[10rem] shrink-0">
+      <div className="min-w-0 flex-1">
         <Select
           value={value.rank ?? "all"}
           onValueChange={(v) => patch({ rank: v })}
@@ -177,10 +171,7 @@ export function UserFiltersBar({
         to={value.date_to ?? ""}
         onFrom={(v) => patch({ date_from: v })}
         onTo={(v) => patch({ date_to: v })}
-      />
-      <ClearFiltersButton
-        disabled={!dirty}
-        onClick={() => onChange({ ...EMPTY_FILTERS })}
+        className="min-w-0 flex-1"
       />
     </SearchFilterBar>
   );

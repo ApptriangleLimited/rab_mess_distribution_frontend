@@ -36,6 +36,8 @@ type Props = {
   children: ReactNode;
   /** Few fields: show everything one row, no filter toggle. */
   flat?: boolean;
+  /** Keep search + filter fields on one row (shrink instead of wrap). */
+  singleLine?: boolean;
   className?: string;
 };
 
@@ -58,6 +60,7 @@ export function SearchFilterBar({
   trailing,
   children,
   flat = true,
+  singleLine = false,
   className,
 }: Props) {
   const t = useT();
@@ -77,9 +80,21 @@ export function SearchFilterBar({
       )}
     >
       {hasTopControls || (trailing && !trailingOnTileRow) ? (
-        <div className="flex w-full min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto">
+        <div
+          className={cn(
+            "flex w-full min-w-0 items-center gap-1.5",
+            singleLine ? "flex-nowrap" : "flex-wrap",
+          )}
+        >
           {hideSearch ? null : (
-            <div className={cn("w-64 shrink-0 sm:w-72", searchClassName)}>
+            <div
+              className={cn(
+                singleLine
+                  ? "min-w-0 flex-[1.15]"
+                  : "min-w-[10rem] flex-1 basis-[12rem] sm:max-w-xs",
+                searchClassName,
+              )}
+            >
               <Input
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
@@ -120,7 +135,7 @@ export function SearchFilterBar({
           ) : null}
 
           {tiles && !wrapTiles ? (
-            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1">
+            <div className="ml-auto flex shrink-0 items-center gap-1.5">
               {tiles}
             </div>
           ) : null}
@@ -165,7 +180,7 @@ export function SearchFilterBar({
               transition={{ duration: 0.2, ease: "easeOut" }}
               className="overflow-hidden"
             >
-              <div className="flex w-full flex-nowrap items-center gap-2.5 overflow-x-auto border-t border-neutral-200/80 pt-2.5 dark:border-neutral-700/80">
+              <div className="flex w-full flex-wrap items-center gap-2.5 border-t border-neutral-200/80 pt-2.5 dark:border-neutral-700/80">
                 {children}
               </div>
             </motion.div>

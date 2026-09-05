@@ -1,19 +1,8 @@
 /** Demo Pritibhoj feast manpower — mirrors HQ farewell sheet layout. */
 
-export type PritibhojRow = {
-  wing: string;
-  officer: number;
-  dad: number;
-  azadHall: number;
-  distribution: number;
-  others: number;
-  civilian: number;
-  nonMuslim: number;
-  total: number;
-  azadHallDist: number;
-  distribution2: number;
-  totalDistribution: number;
-};
+import type { PritibhojEvent, PritibhojRow } from "@/lib/types";
+
+export type { PritibhojEvent, PritibhojRow };
 
 /** Main wings — demo from ADG Admin farewell sheet (06 Jul 2023). */
 export const PRITIBHOJ_MAIN_ROWS: PritibhojRow[] = [
@@ -409,6 +398,44 @@ export const PRITIBHOJ_DEMO_META = {
   adminTitleBn: "প্রশাসন ও অর্থ উইং",
   grandTotalManpower: 1913,
 };
+
+export function emptyPritibhojRow(wing: string): PritibhojRow {
+  return {
+    wing,
+    officer: 0,
+    dad: 0,
+    azadHall: 0,
+    distribution: 0,
+    others: 0,
+    civilian: 0,
+    nonMuslim: 0,
+    total: 0,
+    azadHallDist: 0,
+    distribution2: 0,
+    totalDistribution: 0,
+  };
+}
+
+export function finalizePritibhojRow(row: PritibhojRow): PritibhojRow {
+  return {
+    ...row,
+    total: row.officer + row.dad + row.others + row.civilian,
+    totalDistribution: row.azadHallDist + row.distribution2,
+  };
+}
+
+export function demoPritibhojEvent(): PritibhojEvent {
+  return {
+    id: "pb_demo_20230706",
+    title: PRITIBHOJ_DEMO_META.titleBn,
+    occasion: PRITIBHOJ_DEMO_META.titleBn,
+    date: PRITIBHOJ_DEMO_META.dateISO,
+    org: PRITIBHOJ_DEMO_META.orgBn,
+    created_at: "2023-07-06T00:00:00.000Z",
+    main_rows: PRITIBHOJ_MAIN_ROWS,
+    admin_rows: PRITIBHOJ_ADMIN_ROWS,
+  };
+}
 
 export function sumPritibhojRows(rows: PritibhojRow[]): PritibhojRow {
   return rows.reduce(

@@ -1,5 +1,6 @@
-import MessPritibhojPrintClient from "./print-client";
+import { redirect } from "next/navigation";
 
-export default function MessPritibhojPrintPage() {
-  return <MessPritibhojPrintClient />;
+/** Legacy demo print URL — sheets now live on each saved event. */
+export default function MessPritibhojLegacyPrintPage() {
+  redirect("/mess/pritibhoj");
 }

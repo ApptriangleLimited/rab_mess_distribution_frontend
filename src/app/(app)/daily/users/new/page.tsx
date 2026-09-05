@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconUser } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
@@ -145,27 +145,32 @@ export default function DailyNewUserPage() {
   }
 
   return (
-    <PagePane>
+    <PagePane className="!min-h-0 gap-3 p-3 md:p-4">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-2.5"
       >
         <PageHeader
           title={t("pages.dailyNewUser.title")}
           subtitle={t("pages.dailyNewUser.subtitle")}
           leading={
-            <Button
-              asChild
-              variant="outline"
-              size="icon"
-              className="rounded-xl"
-              aria-label={t("common.back")}
-            >
-              <Link href="/daily/roster">
-                <IconArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                asChild
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl"
+                aria-label={t("common.back")}
+              >
+                <Link href="/daily/roster">
+                  <IconArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
+                <IconUser className="h-4 w-4" stroke={1.75} />
+              </span>
+            </div>
           }
         />
         <UserForm

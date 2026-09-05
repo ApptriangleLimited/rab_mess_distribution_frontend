@@ -27,11 +27,14 @@ import {
   authorizedIdForLabel,
 } from "@/lib/constants";
 import { parseMoney } from "@/lib/money";
+import { demoPritibhojEvent } from "@/lib/pritibhoj-demo";
 import { createSeedState, SEED_VERSION } from "@/lib/store/seed";
 import type {
   AllowanceRate,
   AppState,
   EmergencyContact,
+  PritibhojEvent,
+  PritibhojRow,
   TagRequest,
   User,
 } from "@/lib/types";
@@ -82,6 +85,67 @@ function ensureStringList(
     out.push(label);
   }
   return out;
+}
+
+function asFiniteNumber(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function sanitizePritibhojRow(raw: unknown): PritibhojRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const wing = String(row.wing ?? "").trim();
+  if (!wing) return null;
+  return {
+    wing,
+    officer: asFiniteNumber(row.officer),
+    dad: asFiniteNumber(row.dad),
+    azadHall: asFiniteNumber(row.azadHall),
+    distribution: asFiniteNumber(row.distribution),
+    others: asFiniteNumber(row.others),
+    civilian: asFiniteNumber(row.civilian),
+    nonMuslim: asFiniteNumber(row.nonMuslim),
+    total: asFiniteNumber(row.total),
+    azadHallDist: asFiniteNumber(row.azadHallDist),
+    distribution2: asFiniteNumber(row.distribution2),
+    totalDistribution: asFiniteNumber(row.totalDistribution),
+  };
+}
+
+function sanitizePritibhojEvent(raw: unknown): PritibhojEvent | null {
+  if (!raw || typeof raw !== "object") return null;
+  const event = raw as Record<string, unknown>;
+  const id = String(event.id ?? "").trim();
+  if (!id) return null;
+  return {
+    id,
+    title: String(event.title ?? "").trim() || "Pritibhoj",
+    occasion: String(event.occasion ?? "").trim(),
+    date: String(event.date ?? "").trim(),
+    org: String(event.org ?? "").trim(),
+    created_at: String(event.created_at ?? ""),
+    main_rows: Array.isArray(event.main_rows)
+      ? event.main_rows
+          .map(sanitizePritibhojRow)
+          .filter((row): row is PritibhojRow => row !== null)
+      : [],
+    admin_rows: Array.isArray(event.admin_rows)
+      ? event.admin_rows
+          .map(sanitizePritibhojRow)
+          .filter((row): row is PritibhojRow => row !== null)
+      : [],
+  };
+}
+
+function ensurePritibhojEvents(state: AppState): PritibhojEvent[] {
+  if (!Object.prototype.hasOwnProperty.call(state, "pritibhoj_events")) {
+    return [demoPritibhojEvent()];
+  }
+  if (!Array.isArray(state.pritibhoj_events)) return [];
+  return state.pritibhoj_events
+    .map(sanitizePritibhojEvent)
+    .filter((event): event is PritibhojEvent => event !== null);
 }
 
 /** Swap battalion-era defaults → parent-force list once. */
@@ -1256,6 +1320,7 @@ function normalizeState(state: AppState): AppState {
     meal_assigns: Array.isArray(state.meal_assigns) ? state.meal_assigns : [],
     meal_shifts: Array.isArray(state.meal_shifts) ? state.meal_shifts : [],
     guest_meals: Array.isArray(state.guest_meals) ? state.guest_meals : [],
+    pritibhoj_events: ensurePritibhojEvents(state),
     tag_requests: Array.isArray(state.tag_requests)
       ? state.tag_requests.map((raw: TagRequest) => ({
           ...raw,
@@ -1265,6 +1330,10 @@ function normalizeState(state: AppState): AppState {
               : "daily",
           from_date: raw.from_date || raw.date,
           to_date: raw.to_date || raw.date,
+          status:
+            raw.status === "updated" || raw.status === "rejected"
+              ? raw.status
+              : "requested",
           trg_tone:
             raw.to_tag === "TRG" &&
             (raw.trg_tone === "black" || raw.trg_tone === "red")
@@ -1328,6 +1397,7 @@ export function getServerSnapshot(): AppState {
     meal_assigns: [],
     meal_shifts: [],
     guest_meals: [],
+    pritibhoj_events: [],
     tag_requests: [],
     version: 0,
   };

@@ -6,6 +6,7 @@ import {
   IconCircleCheck,
   IconClockHour4,
   IconSend,
+  IconX,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
@@ -36,6 +37,7 @@ import {
   applyTagRequest,
   getCockpitTagOnDate,
   getCockpitToneOnDate,
+  rejectTagRequest,
 } from "@/lib/store/tag-requests";
 import { listAllTags } from "@/lib/store/rates";
 import { todayISO } from "@/lib/date";
@@ -96,6 +98,7 @@ export function TagRequestBoard({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [pendingUpdate, setPendingUpdate] = useState<TagRequest | null>(null);
+  const [pendingReject, setPendingReject] = useState<TagRequest | null>(null);
 
   const usersById = useMemo(
     () => new Map(state.users.map((u) => [u.id, u])),
@@ -145,6 +148,7 @@ export function TagRequestBoard({
   );
   const requestedCount = queued.filter((r) => r.status === "requested").length;
   const updatedCount = queued.filter((r) => r.status === "updated").length;
+  const rejectedCount = queued.filter((r) => r.status === "rejected").length;
 
   const resetKey = rows.map((r) => r.id).join("|");
   const page = usePagination(rows, resetKey);
@@ -176,8 +180,23 @@ export function TagRequestBoard({
     setPendingUpdate(null);
   }
 
+  function confirmReject() {
+    if (!pendingReject) return;
+    const ok = rejectTagRequest(pendingReject.id);
+    if (!ok) {
+      toast(t("tagRequest.cannotRequest"), "error");
+      setPendingReject(null);
+      return;
+    }
+    toast(t("tagRequest.rejectToast"), "success");
+    setPendingReject(null);
+  }
+
   const updateUser = pendingUpdate
     ? usersById.get(pendingUpdate.user_id)
+    : undefined;
+  const rejectUser = pendingReject
+    ? usersById.get(pendingReject.user_id)
     : undefined;
 
   return (
@@ -234,6 +253,14 @@ export function TagRequestBoard({
                   tone="emerald"
                   selected={view === "updated"}
                   onClick={() => setView("updated")}
+                />
+                <StatChip
+                  icon={<IconX className="h-3.5 w-3.5" />}
+                  label={t("tagRequest.rejected")}
+                  value={String(rejectedCount)}
+                  tone="rose"
+                  selected={view === "rejected"}
+                  onClick={() => setView("rejected")}
                 />
               </>
             ) : (
@@ -368,6 +395,11 @@ export function TagRequestBoard({
                         mode={mode}
                         canAct={canAct}
                         onUpdate={() => setPendingUpdate(req)}
+                        onReject={
+                          mode === "ration" || mode === "consume"
+                            ? () => setPendingReject(req)
+                            : undefined
+                        }
                       />
                     );
                   })}
@@ -431,6 +463,33 @@ export function TagRequestBoard({
           </div>
         ) : null}
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={!!pendingReject}
+        tone="danger"
+        title={t("tagRequest.rejectTitle")}
+        body={t("tagRequest.rejectBody", {
+          name: rejectUser?.name ?? "",
+          tag: pendingReject?.to_tag ?? "",
+        })}
+        confirmLabel={t("tagRequest.reject")}
+        onCancel={() => setPendingReject(null)}
+        onConfirm={confirmReject}
+      >
+        {pendingReject && rejectUser ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50/80 px-3 py-2.5 dark:border-neutral-700 dark:bg-neutral-900/60">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
+                {rejectUser.name}
+              </p>
+              <p className="font-mono text-xs text-neutral-500">
+                {rejectUser.rab_id}
+              </p>
+            </div>
+            <TagChip tag={pendingReject.to_tag} tone={pendingReject.trg_tone} />
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </PagePane>
   );
 }
@@ -442,6 +501,7 @@ function RequestRow({
   mode,
   canAct,
   onUpdate,
+  onReject,
 }: {
   req: TagRequest;
   user: User;
@@ -449,6 +509,7 @@ function RequestRow({
   mode: Mode;
   canAct: boolean;
   onUpdate: () => void;
+  onReject?: () => void;
 }) {
   const t = useT();
   const current = getCockpitTagOnDate(user, today);
@@ -484,12 +545,16 @@ function RequestRow({
             "rounded-md border text-[10px] font-semibold uppercase tracking-wide",
             req.status === "requested"
               ? "border-amber-200/90 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200"
-              : "border-emerald-200/90 bg-emerald-50 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200",
+              : req.status === "rejected"
+                ? "border-rose-200/90 bg-rose-50 text-rose-900 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-200"
+                : "border-emerald-200/90 bg-emerald-50 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200",
           )}
         >
           {req.status === "requested"
             ? t("tagRequest.requested")
-            : t("tagRequest.updated")}
+            : req.status === "rejected"
+              ? t("tagRequest.rejected")
+              : t("tagRequest.updated")}
         </Badge>
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
@@ -502,15 +567,28 @@ function RequestRow({
       </td>
       {canAct && req.status === "requested" ? (
         <td className="px-4 py-3">
-          <Button
-            type="button"
-            variant="cta"
-            size="sm"
-            className="rounded-lg"
-            onClick={onUpdate}
-          >
-            {mode === "daily" ? t("tagRequest.update") : t("tagRequest.approve")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="cta"
+              size="sm"
+              className="rounded-lg"
+              onClick={onUpdate}
+            >
+              {mode === "daily" ? t("tagRequest.update") : t("tagRequest.approve")}
+            </Button>
+            {onReject ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-lg"
+                onClick={onReject}
+              >
+                {t("tagRequest.reject")}
+              </Button>
+            ) : null}
+          </div>
         </td>
       ) : canAct ? (
         <td className="px-4 py-3" />
@@ -530,7 +608,7 @@ function StatChip({
   icon: ReactNode;
   label: string;
   value: string;
-  tone: "teal" | "amber" | "emerald";
+  tone: "teal" | "amber" | "emerald" | "rose";
   selected?: boolean;
   onClick?: () => void;
 }) {
@@ -540,6 +618,7 @@ function StatChip({
       "border-amber-200/90 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200",
     emerald:
       "border-emerald-200/90 bg-emerald-50 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200",
+    rose: "border-rose-200/90 bg-rose-50 text-rose-900 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-200",
   }[tone];
 
   return (

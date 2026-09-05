@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconUser } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { SectionCard } from "@/components/shared/section-card";
@@ -60,27 +60,32 @@ export default function DailyEditUserPage() {
   }
 
   return (
-    <PagePane>
+    <PagePane className="!min-h-0 gap-3 p-3 md:p-4">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-2.5"
       >
         <PageHeader
           title={t("pages.dailyEditUser.title")}
           subtitle={t("pages.dailyEditUser.subtitle")}
           leading={
-            <Button
-              asChild
-              variant="outline"
-              size="icon"
-              className="rounded-xl"
-              aria-label={t("common.back")}
-            >
-              <Link href={detailHref}>
-                <IconArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                asChild
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl"
+                aria-label={t("common.back")}
+              >
+                <Link href={detailHref}>
+                  <IconArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
+                <IconUser className="h-4 w-4" stroke={1.75} />
+              </span>
+            </div>
           }
         />
         <UserForm

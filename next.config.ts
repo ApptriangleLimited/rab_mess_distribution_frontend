@@ -21,6 +21,8 @@ const API_BASE = (
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  /** Hide the Next.js “N” route/bundler badge in local dev. */
+  devIndicators: false,
   async rewrites() {
     if (!PROXY_API) return [];
     return [

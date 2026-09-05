@@ -24,7 +24,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FormattedDateInput } from "@/components/shared/date-picker";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
 import { formatDateLong, nextISODate, previousISODate, todayISO } from "@/lib/date";
@@ -226,14 +226,14 @@ export default function StateReportClient() {
                 </Button>
                 <div className="relative w-44 shrink-0">
                   <IconCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-                  <Input
-                    type="date"
+                  <FormattedDateInput
                     value={date}
-                    onChange={(e) => {
-                      if (e.target.value) pushDate(e.target.value);
+                    onChange={(next) => {
+                      if (next) pushDate(next);
                     }}
-                    className="h-10 rounded-xl border-neutral-200 bg-white pl-9 shadow-none dark:border-neutral-600 dark:bg-neutral-950"
                     aria-label={t("mess.date")}
+                    className="h-10 rounded-xl border-neutral-200 bg-white pl-9 shadow-none dark:border-neutral-600 dark:bg-neutral-950"
+                    overlayClassName="left-9 text-sm"
                   />
                 </div>
                 <Button

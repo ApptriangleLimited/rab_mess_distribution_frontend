@@ -458,3 +458,51 @@ export function DatePicker({
     </div>
   );
 }
+
+/** Native date control with day-month-year text, e.g. `26 Sep 2026`. */
+export function FormattedDateInput({
+  value,
+  onChange,
+  min,
+  max,
+  className,
+  overlayClassName,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (iso: string) => void;
+  min?: string;
+  max?: string;
+  className?: string;
+  overlayClassName?: string;
+  "aria-label"?: string;
+}) {
+  return (
+    <div className="relative">
+      <Input
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        aria-label={ariaLabel}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          "text-transparent caret-transparent [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:text-transparent [&::-webkit-datetime-edit-day-field]:text-transparent [&::-webkit-datetime-edit-fields-wrapper]:text-transparent [&::-webkit-datetime-edit-month-field]:text-transparent [&::-webkit-datetime-edit-text]:text-transparent [&::-webkit-datetime-edit-year-field]:text-transparent",
+          className,
+        )}
+      />
+      <span
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-y-0 left-2 right-8 flex items-center truncate text-[11px] font-medium",
+          value
+            ? "text-neutral-800 dark:text-neutral-100"
+            : "text-neutral-400",
+          overlayClassName,
+        )}
+      >
+        {value ? formatDateDisplay(value) : "dd MMM yyyy"}
+      </span>
+    </div>
+  );
+}

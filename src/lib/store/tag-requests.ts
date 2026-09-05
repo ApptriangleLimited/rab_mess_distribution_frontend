@@ -94,6 +94,55 @@ export function listTagRequests(): TagRequest[] {
   return getState().tag_requests;
 }
 
+/** Pending Daily→Ration/Consume requests keyed `userId|YYYY-MM-DD`. */
+export function pendingDutyByUserDate(
+  requests: TagRequest[] = getState().tag_requests,
+): Map<string, TagRequest> {
+  const map = new Map<string, TagRequest>();
+  for (const r of requests) {
+    if (r.status !== "requested") continue;
+    if (r.queue !== "ration" && r.queue !== "consume") continue;
+    const from = r.from_date || r.date;
+    const to = r.to_date || r.date || from;
+    for (const d of eachISODate(from, to)) {
+      const key = `${r.user_id}|${d}`;
+      const prev = map.get(key);
+      if (!prev || r.requested_at > prev.requested_at) map.set(key, r);
+    }
+  }
+  return map;
+}
+
+export function rejectTagRequest(
+  requestId: string,
+  rejectedBy?: string,
+): boolean {
+  const req = getState().tag_requests.find((r) => r.id === requestId);
+  if (!req || req.status !== "requested") return false;
+  const actor =
+    rejectedBy ??
+    (req.queue === "ration"
+      ? "ration"
+      : req.queue === "consume"
+        ? "consume"
+        : "daily");
+  const ts = nowISO();
+  setState((prev) => ({
+    ...prev,
+    tag_requests: prev.tag_requests.map((r) =>
+      r.id === requestId
+        ? {
+            ...r,
+            status: "rejected" as const,
+            updated_by: actor,
+            updated_at: ts,
+          }
+        : r,
+    ),
+  }));
+  return true;
+}
+
 export function createTagRequest(
   userId: string,
   toTag: DailyTag,

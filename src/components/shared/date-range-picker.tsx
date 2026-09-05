@@ -13,7 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { monthKey, shiftMonthKey } from "@/lib/date";
+import { formatDateDisplay, monthKey, shiftMonthKey } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -38,12 +38,7 @@ function startOfMonth(month: string): Date {
 }
 
 function formatShort(iso: string): string {
-  const d = parseISO(iso);
-  if (!d) return iso;
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
+  return formatDateDisplay(iso) || iso;
 }
 
 function daysInMonthGrid(month: string): (string | null)[] {
@@ -214,13 +209,13 @@ export function DateRangePicker({
   });
 
   return (
-    <div className={cn("shrink-0", className)}>
+    <div className={cn("min-w-0", className)}>
       <Popover open={open} onOpenChange={syncOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             className={cn(
-              "inline-flex h-10 min-w-[15rem] items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 text-left text-sm shadow-none transition hover:border-neutral-300 dark:border-neutral-600 dark:bg-neutral-950 dark:hover:border-neutral-500",
+              "inline-flex h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 text-left text-sm shadow-none transition hover:border-neutral-300 dark:border-neutral-600 dark:bg-neutral-950 dark:hover:border-neutral-500",
               hasValue
                 ? "text-neutral-900 dark:text-white"
                 : "text-neutral-400",
