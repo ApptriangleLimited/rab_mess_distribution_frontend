@@ -14,7 +14,6 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ListPagination } from "@/components/shared/list-pagination";
 import {
   SearchFilterBar,
@@ -368,19 +367,6 @@ export default function RosterPage() {
             to={dateTo}
             onFrom={setDateFrom}
             onTo={setDateTo}
-          />
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              setWing("all");
-              setTagFilter("all");
-              setStatus("all");
-              setView("all");
-              setDateFrom("");
-              setDateTo("");
-            }}
           />
         </SearchFilterBar>
 

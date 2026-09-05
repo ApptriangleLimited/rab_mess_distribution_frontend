@@ -11,7 +11,6 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   SearchFilterBar,
@@ -139,10 +138,6 @@ export default function MessShiftsClient() {
           searchPlaceholder={t("mess.shifts.searchPlaceholder")}
           searchClassName="w-64 shrink-0 sm:w-72"
         >
-          <ClearFiltersButton
-            disabled={!q.trim()}
-            onClick={() => setQ("")}
-          />
         </SearchFilterBar>
 
         {filtered.length === 0 ? (

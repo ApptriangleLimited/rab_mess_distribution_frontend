@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { IconSend } from "@tabler/icons-react";
+import { IconSend, IconSend2 } from "@tabler/icons-react";
+import { rowActionClass } from "@/components/users/row-action-btn";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ColoredTagGrid } from "@/components/daily/colored-tag-grid";
 import { TagChip } from "@/components/tag-requests/tag-chip";
@@ -22,10 +23,12 @@ import type { DailyTag, User } from "@/lib/types";
 export function RequestTagButton({
   user,
   size = "sm",
+  iconOnly = false,
   className,
 }: {
   user: User;
   size?: "sm" | "xs";
+  iconOnly?: boolean;
   className?: string;
 }) {
   const t = useT();
@@ -67,19 +70,30 @@ export function RequestTagButton({
     setOpen(false);
   }
 
-  if (!allowed) return null;
+  if (!allowed && !iconOnly) return null;
 
   return (
     <>
       <Button
         type="button"
-        variant={pending ? "outline" : "cta"}
-        size={size === "xs" ? "sm" : "sm"}
-        className={cn("rounded-lg", size === "xs" && "h-7 px-2 text-[11px]", className)}
+        variant={iconOnly ? "ghost" : pending ? "outline" : "cta"}
+        size={iconOnly ? "icon" : "sm"}
+        disabled={!allowed}
+        className={cn(
+          iconOnly
+            ? rowActionClass(pending ? "requestPending" : "request")
+            : cn("rounded-lg", size === "xs" && "h-7 px-2 text-[11px]"),
+          className,
+        )}
+        aria-label={pending ? t("tagRequest.requested") : t("tagRequest.request")}
         onClick={openDialog}
       >
-        <IconSend className="h-3.5 w-3.5" />
-        {pending ? t("tagRequest.requested") : t("tagRequest.request")}
+        {iconOnly ? (
+          <IconSend2 className="h-4 w-4" />
+        ) : (
+          <IconSend className="h-3.5 w-3.5" />
+        )}
+        {iconOnly ? null : pending ? t("tagRequest.requested") : t("tagRequest.request")}
       </Button>
       <ConfirmDialog
         open={open}

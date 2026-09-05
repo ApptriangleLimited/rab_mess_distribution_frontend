@@ -22,7 +22,6 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { useToast } from "@/components/shared/toast-provider";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -176,7 +175,6 @@ export default function AdminStateReportsClient() {
 
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   const today = todayISO();
-  const filtersActive = filter !== "pending";
 
   return (
     <PagePane className="gap-5">
@@ -311,13 +309,6 @@ export default function AdminStateReportsClient() {
             </>
           }
         >
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setQuery({ filter: "pending", id: null });
-            }}
-          />
         </SearchFilterBar>
 
         {list.length === 0 ? (

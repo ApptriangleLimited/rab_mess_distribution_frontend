@@ -12,7 +12,6 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
@@ -390,16 +389,6 @@ export default function MessLedgerClient() {
               </SelectContent>
             </Select>
           </div>
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              setWing("all");
-              setTagFilter("all");
-              applyDateRange("", "");
-            }}
-          />
         </SearchFilterBar>
 
         {loading ? (

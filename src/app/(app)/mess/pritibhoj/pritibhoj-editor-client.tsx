@@ -12,7 +12,7 @@ import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/shared/toast-provider";
-import { useStore } from "@/hooks/use-store";
+import { usePritibhojCountCtx } from "@/hooks/use-pritibhoj-counts";
 import { todayISO } from "@/lib/date";
 import {
   createPritibhojEvent,
@@ -21,6 +21,8 @@ import {
   updatePritibhojEvent,
   type PritibhojInput,
 } from "@/lib/store/pritibhoj";
+import { lockPritibhojSheets } from "@/lib/pritibhoj-demo";
+import { applyPritibhojInputLookups } from "@/lib/store/pritibhoj-counts";
 import type { PritibhojEvent } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
@@ -36,14 +38,14 @@ export function emptyPritibhojInput(org: string): PritibhojInput {
 }
 
 export function eventToInput(event: PritibhojEvent): PritibhojInput {
-  return {
+  return lockPritibhojSheets({
     title: event.title,
     occasion: event.occasion,
     date: event.date,
     org: event.org,
     main_rows: event.main_rows,
     admin_rows: event.admin_rows,
-  };
+  });
 }
 
 export default function MessPritibhojEditorClient({
@@ -53,13 +55,13 @@ export default function MessPritibhojEditorClient({
 }) {
   const t = useT();
   const router = useRouter();
-  const state = useStore();
   const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const [value, setValue] = useState<PritibhojInput | null>(
     event ? eventToInput(event) : null,
   );
   const [saving, setSaving] = useState(false);
+  const { ctx } = usePritibhojCountCtx(value?.date ?? todayISO());
 
   useEffect(() => {
     if (value) return;
@@ -67,9 +69,18 @@ export default function MessPritibhojEditorClient({
       setValue(eventToInput(event));
       return;
     }
-    if (state.wings.length === 0) return;
     setValue(emptyPritibhojInput(t("mess.pritibhoj.defaultOrg")));
-  }, [event, state.wings, state.wing_parent, t, value]);
+  }, [event, t, value]);
+
+  useEffect(() => {
+    if (!ctx) return;
+    setValue((prev) => (prev ? applyPritibhojInputLookups(prev, ctx) : prev));
+  }, [ctx]);
+
+  function handleChange(next: PritibhojInput) {
+    const locked = lockPritibhojSheets(next);
+    setValue(ctx ? applyPritibhojInputLookups(locked, ctx) : locked);
+  }
 
   const isEdit = Boolean(event);
 
@@ -156,7 +167,7 @@ export default function MessPritibhojEditorClient({
         </div>
 
         {value ? (
-          <PritibhojForm value={value} onChange={setValue} />
+          <PritibhojForm value={value} onChange={handleChange} />
         ) : (
           <div className="flex flex-col gap-3">
             <Skeleton className="h-36 w-full" />

@@ -20,7 +20,6 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import {
   SearchFilterBar,
   searchFilterFieldClass,
@@ -226,7 +225,6 @@ export default function RationSenderReportClient() {
   const backHref = `/ration/report?month=${month}`;
   const hasLines = Boolean(staffSheet?.lines.length);
   const fieldClass = searchFilterFieldClass;
-  const filtersActive = rank !== "all" || month !== defaultMonth;
 
   if (!senderId) return null;
 
@@ -405,14 +403,6 @@ export default function RationSenderReportClient() {
               </SelectContent>
             </Select>
           </div>
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              if (month !== defaultMonth) setMonth(defaultMonth);
-            }}
-          />
         </SearchFilterBar>
 
         {!hasLines ? (

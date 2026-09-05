@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
@@ -12,6 +13,7 @@ import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
 import { formatDateLong } from "@/lib/date";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import { getPritibhojEvent } from "@/lib/store/pritibhoj";
 import { useI18n, useT } from "@/i18n/provider";
 
@@ -20,9 +22,27 @@ export default function MessPritibhojPreviewPage() {
   const { locale } = useI18n();
   const params = useParams<{ id: string }>();
   const reduceMotion = useReducedMotion();
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
   useStore();
   const event = getPritibhojEvent(params.id);
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
+
+  async function onPrint() {
+    const el = printRef.current;
+    if (!el || printing) return;
+    setPrinting(true);
+    try {
+      await printLetterElement(
+        el,
+        event ? `pritibhoj-${event.date}.pdf` : "pritibhoj.pdf",
+        "landscape",
+        { preserveColors: true },
+      );
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   if (!event) {
     return (
@@ -75,15 +95,15 @@ export default function MessPritibhojPreviewPage() {
                     </Link>
                   </Button>
                   <Button
-                    asChild
+                    type="button"
                     variant="cta"
                     size="sm"
                     className="h-10 rounded-xl shadow-sm shadow-primary/20"
+                    disabled={printing}
+                    onClick={() => void onPrint()}
                   >
-                    <Link href={`/mess/pritibhoj/${event.id}/print`}>
-                      <IconPrinter className="h-4 w-4" />
-                      {t("mess.print")}
-                    </Link>
+                    <IconPrinter className="h-4 w-4" />
+                    {printing ? t("common.loading") : t("mess.print")}
                   </Button>
                 </div>
               }
@@ -91,7 +111,9 @@ export default function MessPritibhojPreviewPage() {
           </div>
         </div>
 
-        <PritibhojSheets event={event} dateLocale={dateLocale} />
+        <div ref={printRef}>
+          <PritibhojSheets event={event} dateLocale={dateLocale} />
+        </div>
       </motion.div>
     </PagePane>
   );

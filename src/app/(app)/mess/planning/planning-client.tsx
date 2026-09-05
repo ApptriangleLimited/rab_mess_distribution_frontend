@@ -6,7 +6,6 @@ import { IconCalendarEvent, IconSoup } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { ListPagination } from "@/components/shared/list-pagination";
 import {
@@ -107,11 +106,6 @@ export default function MessPlanningClient() {
     setPage(1);
   }
 
-  const filtersActive =
-    shift !== "all" ||
-    dateFrom !== initial.from ||
-    dateTo !== initial.to;
-
   return (
     <PagePane className="gap-5">
       <motion.div
@@ -195,17 +189,6 @@ export default function MessPlanningClient() {
               </SelectContent>
             </Select>
           </div>
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              const next = defaultRange();
-              setQ("");
-              setShift("all");
-              setDateFrom(next.from);
-              setDateTo(next.to);
-              resetPage();
-            }}
-          />
         </SearchFilterBar>
 
         {rows.length === 0 ? (

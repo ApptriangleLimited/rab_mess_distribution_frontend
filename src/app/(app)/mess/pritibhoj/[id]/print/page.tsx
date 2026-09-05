@@ -46,7 +46,9 @@ export default function MessPritibhojPrintPage() {
     if (!el || printing) return;
     setPrinting(true);
     try {
-      await printLetterElement(el, pdfName, "landscape");
+      await printLetterElement(el, pdfName, "landscape", {
+        preserveColors: true,
+      });
     } finally {
       setPrinting(false);
     }

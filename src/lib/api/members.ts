@@ -30,6 +30,8 @@ export type MemberApiRow = {
   rfid: string;
   rank: string;
   wing: string;
+  force?: string;
+  religion?: string;
   member_type: string;
   dropdown_no: string;
   phone: string;
@@ -85,8 +87,8 @@ export function memberToUser(row: MemberApiRow): User {
     rfid: row.rfid ?? "",
     rank: row.rank ?? "",
     wing: row.wing ?? "",
-    force: "",
-    religion: "",
+    force: row.force ?? "",
+    religion: row.religion ?? "",
     member_type: asMemberType(row.member_type),
     dropdown_no: row.dropdown_no ?? "",
     phone: row.phone ?? "",

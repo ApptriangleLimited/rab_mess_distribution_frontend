@@ -1,33 +1,17 @@
 "use client";
 
-import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { DatePicker } from "@/components/shared/date-picker";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  emptyPritibhojRow,
-  finalizePritibhojRow,
-  sumPritibhojRows,
-} from "@/lib/pritibhoj-demo";
+import { finalizePritibhojRow, sumPritibhojRows } from "@/lib/pritibhoj-demo";
 import type { PritibhojInput } from "@/lib/store/pritibhoj";
 import type { PritibhojRow } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
-const NUM_KEYS = [
-  "officer",
-  "dad",
-  "azadHall",
-  "distribution",
-  "others",
-  "civilian",
-  "nonMuslim",
-  "azadHallDist",
-  "distribution2",
-] as const;
+const INPUT_KEYS = ["officer", "azadHall", "others", "azadHallDist"] as const;
 
-type NumKey = (typeof NUM_KEYS)[number];
+type InputKey = (typeof INPUT_KEYS)[number];
 
 function parseCount(value: string): number {
   const n = Number(value);
@@ -41,19 +25,67 @@ function patchRow(rows: PritibhojRow[], index: number, patch: Partial<PritibhojR
   );
 }
 
+function ReadCell({
+  value,
+  className,
+}: {
+  value: number;
+  className?: string;
+}) {
+  return (
+    <td
+      className={cn(
+        "border border-neutral-300 bg-neutral-50 px-2 py-1 text-center text-sm tabular-nums dark:border-neutral-600 dark:bg-neutral-900/70",
+        className,
+      )}
+    >
+      {value}
+    </td>
+  );
+}
+
+function NumberInput({
+  value,
+  onChange,
+  className,
+}: {
+  value: number;
+  onChange: (next: string) => void;
+  className?: string;
+}) {
+  return (
+    <td
+      className={cn(
+        "border border-neutral-300 p-1 dark:border-neutral-600",
+        className,
+      )}
+    >
+      <Input
+        type="number"
+        min={0}
+        step={1}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 px-1.5 text-center tabular-nums"
+      />
+    </td>
+  );
+}
+
 function EditableTable({
   rows,
   onChange,
   footLabel,
+  othersHeader,
 }: {
   rows: PritibhojRow[];
   onChange: (rows: PritibhojRow[]) => void;
   footLabel: string;
+  othersHeader: string;
 }) {
-  const t = useT();
   const totals = sumPritibhojRows(rows.map(finalizePritibhojRow));
 
-  function setNum(index: number, key: NumKey, value: string) {
+  function setNum(index: number, key: InputKey, value: string) {
     onChange(patchRow(rows, index, { [key]: parseCount(value) }));
   }
 
@@ -63,46 +95,43 @@ function EditableTable({
         <thead>
           <tr className="bg-neutral-100 text-[11px] font-semibold dark:bg-neutral-800">
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              #
+              ক্রমিক
             </th>
             <th className="border border-neutral-300 px-2 py-2 text-left dark:border-neutral-600">
-              {t("mess.pritibhoj.wing")}
+              উইং/শাখা/সেল
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.officer")}
+              অফিসার
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.dad")}
+              ডিএডি
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.azadHall")}
+              আজাদ হল
             </th>
             <th className="border border-neutral-300 bg-sky-100 px-2 py-2 dark:border-neutral-600 dark:bg-sky-950/50">
-              {t("mess.pritibhoj.distribution")}
+              বিতরণ
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.others")}
+              {othersHeader}
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.civilian")}
+              বেসামরিক
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.nonMuslim")}
+              নন-মুসলিম
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.total")}
+              মোট
             </th>
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("mess.pritibhoj.azadHallDist")}
+              আজাদ হল
             </th>
             <th className="border border-neutral-300 bg-sky-100 px-2 py-2 dark:border-neutral-600 dark:bg-sky-950/50">
-              {t("mess.pritibhoj.distribution2")}
+              বিতরণ
             </th>
             <th className="border border-neutral-300 bg-amber-100 px-2 py-2 dark:border-neutral-600 dark:bg-amber-950/40">
-              {t("mess.pritibhoj.totalDistribution")}
-            </th>
-            <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
-              {t("common.actions")}
+              মোট বিতরণ
             </th>
           </tr>
         </thead>
@@ -114,72 +143,44 @@ function EditableTable({
                 <td className="border border-neutral-300 px-2 py-1 text-center tabular-nums dark:border-neutral-600">
                   {i + 1}
                 </td>
-                <td className="border border-neutral-300 p-1 dark:border-neutral-600">
-                  <Input
-                    value={row.wing}
-                    onChange={(e) =>
-                      onChange(patchRow(rows, i, { wing: e.target.value }))
-                    }
-                    className="h-8 min-w-[9rem] px-2"
-                  />
+                <td className="border border-neutral-300 bg-neutral-50 px-2 py-1.5 text-left font-medium dark:border-neutral-600 dark:bg-neutral-900/70">
+                  {row.wing}
                 </td>
-                {NUM_KEYS.slice(0, 7).map((key) => (
-                  <td
-                    key={key}
-                    className={cn(
-                      "border border-neutral-300 p-1 dark:border-neutral-600",
-                      key === "distribution" && "bg-sky-50 dark:bg-sky-950/30",
-                    )}
-                  >
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={row[key] || ""}
-                      onChange={(e) => setNum(i, key, e.target.value)}
-                      className="h-8 px-1.5 text-center tabular-nums"
-                    />
-                  </td>
-                ))}
-                <td className="border border-neutral-300 px-2 py-1 text-center text-sm font-semibold tabular-nums dark:border-neutral-600">
-                  {live.total}
-                </td>
-                {NUM_KEYS.slice(7).map((key) => (
-                  <td
-                    key={key}
-                    className={cn(
-                      "border border-neutral-300 p-1 dark:border-neutral-600",
-                      key === "distribution2" && "bg-sky-50 dark:bg-sky-950/30",
-                    )}
-                  >
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={row[key] || ""}
-                      onChange={(e) => setNum(i, key, e.target.value)}
-                      className="h-8 px-1.5 text-center tabular-nums"
-                    />
-                  </td>
-                ))}
-                <td className="border border-neutral-300 bg-amber-50 px-2 py-1 text-center text-sm font-semibold tabular-nums dark:border-neutral-600 dark:bg-amber-950/30">
-                  {live.totalDistribution}
-                </td>
-                <td className="border border-neutral-300 p-1 text-center dark:border-neutral-600">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-red-600 hover:text-red-700"
-                    disabled={rows.length <= 1}
-                    aria-label={t("mess.pritibhoj.removeRow")}
-                    onClick={() =>
-                      onChange(rows.filter((_, idx) => idx !== i))
-                    }
-                  >
-                    <IconTrash className="h-3.5 w-3.5" />
-                  </Button>
-                </td>
+                <NumberInput
+                  value={row.officer}
+                  onChange={(next) => setNum(i, "officer", next)}
+                />
+                <ReadCell value={live.dad} />
+                <NumberInput
+                  value={row.azadHall}
+                  onChange={(next) => setNum(i, "azadHall", next)}
+                />
+                <ReadCell
+                  value={live.distribution}
+                  className="bg-sky-50 dark:bg-sky-950/30"
+                />
+                <NumberInput
+                  value={row.others}
+                  onChange={(next) => setNum(i, "others", next)}
+                />
+                <ReadCell value={live.civilian} />
+                <ReadCell value={live.nonMuslim} />
+                <ReadCell
+                  value={live.total}
+                  className="font-semibold"
+                />
+                <NumberInput
+                  value={row.azadHallDist}
+                  onChange={(next) => setNum(i, "azadHallDist", next)}
+                />
+                <ReadCell
+                  value={live.distribution2}
+                  className="bg-sky-50 dark:bg-sky-950/30"
+                />
+                <ReadCell
+                  value={live.totalDistribution}
+                  className="bg-amber-50 font-semibold dark:bg-amber-950/30"
+                />
               </tr>
             );
           })}
@@ -190,40 +191,26 @@ function EditableTable({
             >
               {footLabel}
             </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.officer}
-            </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.dad}
-            </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.azadHall}
-            </td>
-            <td className="border border-neutral-300 bg-sky-100 px-2 py-2 text-center tabular-nums dark:border-neutral-600 dark:bg-sky-950/50">
-              {totals.distribution}
-            </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.others}
-            </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.civilian}
-            </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.nonMuslim}
-            </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.total}
-            </td>
-            <td className="border border-neutral-300 px-2 py-2 text-center tabular-nums dark:border-neutral-600">
-              {totals.azadHallDist}
-            </td>
-            <td className="border border-neutral-300 bg-sky-100 px-2 py-2 text-center tabular-nums dark:border-neutral-600 dark:bg-sky-950/50">
-              {totals.distribution2}
-            </td>
-            <td className="border border-neutral-300 bg-amber-100 px-2 py-2 text-center tabular-nums dark:border-neutral-600 dark:bg-amber-950/40">
-              {totals.totalDistribution}
-            </td>
-            <td className="border border-neutral-300 dark:border-neutral-600" />
+            <ReadCell value={totals.officer} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell value={totals.dad} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell value={totals.azadHall} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell
+              value={totals.distribution}
+              className="bg-sky-100 dark:bg-sky-950/50"
+            />
+            <ReadCell value={totals.others} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell value={totals.civilian} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell value={totals.nonMuslim} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell value={totals.total} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell value={totals.azadHallDist} className="bg-sky-50 dark:bg-sky-950/40" />
+            <ReadCell
+              value={totals.distribution2}
+              className="bg-sky-100 dark:bg-sky-950/50"
+            />
+            <ReadCell
+              value={totals.totalDistribution}
+              className="bg-amber-100 dark:bg-amber-950/40"
+            />
           </tr>
         </tbody>
       </table>
@@ -283,54 +270,26 @@ export function PritibhojForm({
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-        <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <div className="border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
           <h2 className="text-sm font-semibold">{t("mess.pritibhoj.mainSheet")}</h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-xl"
-            onClick={() =>
-              onChange({
-                ...value,
-                main_rows: [...value.main_rows, emptyPritibhojRow("")],
-              })
-            }
-          >
-            <IconPlus className="h-3.5 w-3.5" />
-            {t("mess.pritibhoj.addWing")}
-          </Button>
         </div>
         <EditableTable
           rows={value.main_rows}
           onChange={(main_rows) => onChange({ ...value, main_rows })}
-          footLabel={t("mess.pritibhoj.footMain")}
+          footLabel="মোট জনবল ="
+          othersHeader="অন্যান্য"
         />
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-        <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <div className="border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
           <h2 className="text-sm font-semibold">{t("mess.pritibhoj.adminSheet")}</h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-xl"
-            onClick={() =>
-              onChange({
-                ...value,
-                admin_rows: [...value.admin_rows, emptyPritibhojRow("")],
-              })
-            }
-          >
-            <IconPlus className="h-3.5 w-3.5" />
-            {t("mess.pritibhoj.addWing")}
-          </Button>
         </div>
         <EditableTable
           rows={value.admin_rows}
           onChange={(admin_rows) => onChange({ ...value, admin_rows })}
-          footLabel={t("mess.pritibhoj.footAdmin")}
+          footLabel="মোট ="
+          othersHeader="অন্যান্য পদ"
         />
       </section>
     </div>

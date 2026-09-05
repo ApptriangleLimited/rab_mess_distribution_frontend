@@ -38,11 +38,16 @@ type Props = {
   flat?: boolean;
   /** Keep search + filter fields on one row (shrink instead of wrap). */
   singleLine?: boolean;
+  /** Shorter fields, no horizontal scroll — use with `singleLine`. */
+  compact?: boolean;
   className?: string;
 };
 
 const fieldClass =
   "h-10 rounded-xl border-neutral-200 bg-white text-sm shadow-none dark:border-neutral-600 dark:bg-neutral-950";
+
+const compactFieldClass =
+  "h-8 rounded-lg border-neutral-200 bg-white text-xs shadow-none dark:border-neutral-600 dark:bg-neutral-950";
 
 /** Search · (filter | fields) · tiles · trailing. */
 export function SearchFilterBar({
@@ -61,6 +66,7 @@ export function SearchFilterBar({
   children,
   flat = true,
   singleLine = false,
+  compact = false,
   className,
 }: Props) {
   const t = useT();
@@ -76,22 +82,26 @@ export function SearchFilterBar({
     <div
       className={cn(
         "rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50",
+        compact && "p-1.5",
         className,
       )}
     >
       {hasTopControls || (trailing && !trailingOnTileRow) ? (
         <div
           className={cn(
-            "flex w-full min-w-0 items-center gap-1.5",
-            singleLine ? "flex-nowrap" : "flex-wrap",
+            "flex w-full min-w-0 items-center",
+            compact ? "gap-1" : "gap-1.5",
+            singleLine ? "flex-nowrap overflow-hidden" : "flex-wrap",
           )}
         >
           {hideSearch ? null : (
             <div
               className={cn(
-                singleLine
-                  ? "min-w-0 flex-[1.15]"
-                  : "min-w-[10rem] flex-1 basis-[12rem] sm:max-w-xs",
+                compact
+                  ? "min-w-0 max-w-[11rem] flex-1"
+                  : singleLine
+                    ? "min-w-[9rem] max-w-[16rem] shrink"
+                    : "min-w-[10rem] flex-1 basis-[12rem] sm:max-w-xs",
                 searchClassName,
               )}
             >
@@ -99,7 +109,7 @@ export function SearchFilterBar({
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder={searchPlaceholder ?? t("common.search")}
-                className={cn(fieldClass, "w-full")}
+                className={cn(compact ? compactFieldClass : fieldClass, "w-full")}
                 aria-label={t("common.search")}
               />
             </div>
@@ -135,7 +145,13 @@ export function SearchFilterBar({
           ) : null}
 
           {tiles && !wrapTiles ? (
-            <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <div
+              className={cn(
+                "ml-auto flex min-w-0 items-center",
+                compact ? "gap-1" : "gap-1.5",
+                singleLine ? "shrink" : "shrink-0 flex-wrap",
+              )}
+            >
               {tiles}
             </div>
           ) : null}
@@ -191,4 +207,4 @@ export function SearchFilterBar({
   );
 }
 
-export { fieldClass as searchFilterFieldClass };
+export { fieldClass as searchFilterFieldClass, compactFieldClass as searchFilterCompactFieldClass };

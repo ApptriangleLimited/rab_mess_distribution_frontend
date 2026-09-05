@@ -11,11 +11,10 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ListPagination } from "@/components/shared/list-pagination";
 import {
   SearchFilterBar,
-  searchFilterFieldClass,
+  searchFilterCompactFieldClass,
 } from "@/components/shared/search-filter-bar";
 import { MemberDateFilter } from "@/components/users/user-filters";
 import { TagChip } from "@/components/tag-requests/tag-chip";
@@ -152,16 +151,7 @@ export function TagRequestBoard({
 
   const resetKey = rows.map((r) => r.id).join("|");
   const page = usePagination(rows, resetKey);
-  const filtersActive =
-    rank !== "all" ||
-    wing !== "all" ||
-    tag !== "all" ||
-    status !== "all" ||
-    !!dateFrom ||
-    !!dateTo ||
-    (showStatusChips && view !== "all");
-
-  const fieldClass = searchFilterFieldClass;
+  const fieldClass = searchFilterCompactFieldClass;
 
   function confirmUpdate() {
     if (!pendingUpdate) return;
@@ -221,17 +211,19 @@ export function TagRequestBoard({
         </div>
 
         <SearchFilterBar
+          flat
+          singleLine
+          compact
           search={q}
           onSearchChange={setQ}
           searchPlaceholder={t("cc.searchPlaceholder")}
-          filtersActive={filtersActive}
           wrapTiles={false}
           className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={
             showStatusChips ? (
               <>
                 <StatChip
-                  icon={<IconSend className="h-3.5 w-3.5" />}
+                  icon={<IconSend className="h-3 w-3" />}
                   label={t("tagRequest.statAll")}
                   value={String(queued.length)}
                   tone="teal"
@@ -239,7 +231,7 @@ export function TagRequestBoard({
                   onClick={() => setView("all")}
                 />
                 <StatChip
-                  icon={<IconClockHour4 className="h-3.5 w-3.5" />}
+                  icon={<IconClockHour4 className="h-3 w-3" />}
                   label={t("tagRequest.requested")}
                   value={String(requestedCount)}
                   tone="amber"
@@ -247,7 +239,7 @@ export function TagRequestBoard({
                   onClick={() => setView("requested")}
                 />
                 <StatChip
-                  icon={<IconCircleCheck className="h-3.5 w-3.5" />}
+                  icon={<IconCircleCheck className="h-3 w-3" />}
                   label={t("tagRequest.updated")}
                   value={String(updatedCount)}
                   tone="emerald"
@@ -255,7 +247,7 @@ export function TagRequestBoard({
                   onClick={() => setView("updated")}
                 />
                 <StatChip
-                  icon={<IconX className="h-3.5 w-3.5" />}
+                  icon={<IconX className="h-3 w-3" />}
                   label={t("tagRequest.rejected")}
                   value={String(rejectedCount)}
                   tone="rose"
@@ -265,7 +257,7 @@ export function TagRequestBoard({
               </>
             ) : (
               <StatChip
-                icon={<IconClockHour4 className="h-3.5 w-3.5" />}
+                icon={<IconClockHour4 className="h-3 w-3" />}
                 label={t("tagRequest.requested")}
                 value={String(requestedCount)}
                 tone="amber"
@@ -274,7 +266,7 @@ export function TagRequestBoard({
             )
           }
         >
-          <div className="w-[9.5rem] shrink-0">
+          <div className="w-[6.75rem] shrink">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectRank")} />
@@ -289,7 +281,7 @@ export function TagRequestBoard({
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[9rem] shrink-0">
+          <div className="w-[6.5rem] shrink">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder={t("cc.selectWing")} />
@@ -304,7 +296,7 @@ export function TagRequestBoard({
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[10rem] shrink-0">
+          <div className="w-[6.75rem] shrink">
             <Select value={tag} onValueChange={setTagFilter}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
@@ -319,7 +311,7 @@ export function TagRequestBoard({
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[9.5rem] shrink-0">
+          <div className="w-[6.75rem] shrink">
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>
                 <SelectValue />
@@ -336,19 +328,8 @@ export function TagRequestBoard({
             to={dateTo}
             onFrom={setDateFrom}
             onTo={setDateTo}
-          />
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              setWing("all");
-              setTagFilter("all");
-              setStatus("all");
-              setView(mode === "daily" ? "requested" : "all");
-              setDateFrom("");
-              setDateTo("");
-            }}
+            className="w-[14.25rem] shrink-0"
+            triggerClassName="h-8 rounded-lg px-2 text-xs"
           />
         </SearchFilterBar>
 
@@ -627,7 +608,7 @@ function StatChip({
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-3 shadow-sm transition",
+        "inline-flex h-8 min-w-0 shrink items-center gap-1 rounded-lg border px-1.5 shadow-sm transition",
         tones,
         selected
           ? "border-black ring-1 ring-black brightness-95 dark:border-white dark:ring-white dark:brightness-110"
@@ -637,10 +618,10 @@ function StatChip({
       <span className="shrink-0 opacity-90" aria-hidden>
         {icon}
       </span>
-      <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wide">
+      <span className="hidden whitespace-nowrap text-[9px] font-bold uppercase tracking-wide lg:inline">
         {label}
       </span>
-      <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
+      <span className="shrink-0 rounded-md bg-black/5 px-1 py-px text-[11px] font-extrabold tabular-nums dark:bg-white/10">
         {value}
       </span>
     </button>

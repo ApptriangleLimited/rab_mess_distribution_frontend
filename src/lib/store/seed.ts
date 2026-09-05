@@ -24,6 +24,8 @@ import {
   shiftMonthKey,
   todayISO,
 } from "@/lib/date";
+import { demoPritibhojEvents } from "@/lib/pritibhoj-demo";
+import { demoTagRequests } from "@/lib/tag-request-demo";
 import type {
   AllowanceRate,
   AppState,
@@ -830,8 +832,8 @@ export function createSeedState(): AppState {
     meal_assigns: seedMealAssigns(users, meal_plans),
     meal_shifts,
     guest_meals: seedGuestMeals(users),
-    pritibhoj_events: [],
-    tag_requests: [],
+    pritibhoj_events: demoPritibhojEvents(),
+    tag_requests: demoTagRequests(users),
     version: SEED_VERSION,
   };
 }

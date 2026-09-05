@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { IconChevronRight, IconPhone } from "@tabler/icons-react";
+import { IconEdit, IconEyeFilled, IconPhone } from "@tabler/icons-react";
+import { rowActionClass } from "@/components/users/row-action-btn";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,6 +15,7 @@ import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { RequestTagButton } from "@/components/tag-requests/request-tag-dialog";
+import { MemberAcceptActions } from "@/components/users/member-accept-actions";
 import { useStore } from "@/hooks/use-store";
 import { getCockpitTagOnDate } from "@/lib/store/tag-requests";
 import { todayISO } from "@/lib/date";
@@ -53,16 +55,50 @@ export type UserTablePagination = {
   onPageSizeChange: (size: number) => void;
 };
 
+function MemberListActions({
+  user,
+  detailHref,
+  editHref,
+}: {
+  user: User;
+  detailHref: string;
+  editHref: string;
+}) {
+  const t = useT();
+  return (
+    <div
+      className="flex flex-nowrap items-center gap-1.5"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <Button asChild variant="ghost" size="icon" className={rowActionClass("view")}>
+        <Link href={detailHref} aria-label={t("common.view")}>
+          <IconEyeFilled className="h-4 w-4" />
+        </Link>
+      </Button>
+      <Button asChild variant="ghost" size="icon" className={rowActionClass("edit")}>
+        <Link href={editHref} aria-label={t("common.edit")}>
+          <IconEdit className="h-4 w-4" />
+        </Link>
+      </Button>
+      <MemberAcceptActions user={user} iconOnly />
+      <RequestTagButton user={user} iconOnly />
+    </div>
+  );
+}
+
 export function UserTable({
   users,
   pagination,
   detailHref = (id: string) => `/cc/users/${id}`,
+  editHref = (id: string) => `/cc/users/${id}/edit`,
   onEmptyCreateHref = "/cc/users/new",
 }: {
   users: User[];
   /** When set, `users` is already one page — no client slice. */
   pagination?: UserTablePagination;
   detailHref?: (id: string) => string;
+  editHref?: (id: string) => string;
   onEmptyCreateHref?: string;
 }) {
   const t = useT();
@@ -145,7 +181,6 @@ export function UserTable({
                         {user.wing ? ` · ${user.wing}` : ""}
                       </p>
                     </div>
-                    <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-neutral-300" />
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                     <Badge
@@ -180,7 +215,11 @@ export function UserTable({
                 </div>
               </button>
               <div className="mt-2 pl-[52px]">
-                <RequestTagButton user={user} size="xs" />
+                <MemberListActions
+                  user={user}
+                  detailHref={href}
+                  editHref={editHref(user.id)}
+                />
               </div>
             </li>
           );
@@ -226,9 +265,8 @@ export function UserTable({
                 {t("cc.fields.approval")}
               </th>
               <th className="px-4 py-3.5 font-semibold">
-                {t("cc.requestTag")}
+                {t("common.actions")}
               </th>
-              <th className="w-10 px-2 py-3.5" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -322,14 +360,12 @@ export function UserTable({
                       {approvalLabel(user.approval_status, t)}
                     </Badge>
                   </td>
-                  <td
-                    className="px-4 py-3"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <RequestTagButton user={user} size="xs" />
-                  </td>
-                  <td className="px-2 py-3">
-                    <IconChevronRight className="h-4 w-4 text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-primary dark:text-neutral-600" />
+                  <td className="px-3 py-2">
+                    <MemberListActions
+                      user={user}
+                      detailHref={href}
+                      editHref={editHref(user.id)}
+                    />
                   </td>
                 </tr>
               );

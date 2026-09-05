@@ -11,7 +11,6 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ListPagination } from "@/components/shared/list-pagination";
 import {
   SearchFilterBar,
@@ -106,8 +105,6 @@ export default function RationMembersPage() {
   } = usePagination(roster, resetKey);
 
   const fieldClass = searchFilterFieldClass;
-  const filtersActive =
-    rank !== "all" || wing !== "all" || status !== "all";
 
   function toggleStatus(next: "1" | "0" | "all") {
     setStatus((prev) => (prev === next ? "all" : next));
@@ -223,10 +220,6 @@ export default function RationMembersPage() {
               </SelectContent>
             </Select>
           </div>
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={clearAll}
-          />
         </SearchFilterBar>
 
         {approved.length === 0 ? (

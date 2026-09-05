@@ -1,13 +1,172 @@
 /** Demo Pritibhoj feast manpower — mirrors HQ farewell sheet layout. */
 
-import type { PritibhojEvent, PritibhojRow } from "@/lib/types";
+import type { DailyTag, PritibhojEvent, PritibhojRow } from "@/lib/types";
 
 export type { PritibhojEvent, PritibhojRow };
+
+/** Printed-sheet wing row: Bengali label + catalog wings used for cockpit counts. */
+export type PritibhojWingDef = {
+  label: string;
+  wings: readonly string[];
+  /** Older printed or catalog spellings that map onto this row. */
+  aliases?: readonly string[];
+  /** When set, counts members with this cockpit tag (any wing). */
+  tag?: DailyTag;
+};
+
+/** Main sheet — exact labels from the HQ Pritibhoj form. */
+export const PRITIBHOJ_MAIN_WING_DEFS: readonly PritibhojWingDef[] = [
+  {
+    label: "অপারেশনস্ উইং",
+    wings: ["Ops Wg"],
+    aliases: ["অপারেশনস উইং", "Operations Wing"],
+  },
+  {
+    label: "ইন্টেলিজেন্স উইং",
+    wings: ["Int Wg"],
+    aliases: ["Intelligence Wing"],
+  },
+  {
+    label: "যোগাযোগ উইং",
+    wings: ["Comm & MIS Wg"],
+    aliases: ["Communication & MIS Wing"],
+  },
+  {
+    label: "লিঃ এন্ড মিডিঃ উইং",
+    wings: ["L & M Wg"],
+    aliases: ["এল এন্ড এম উইং", "Legal & Media Wing"],
+  },
+  {
+    label: "ট্রেনিং উইং",
+    wings: ["Trg Wg", "Training School", "RFTS"],
+    aliases: ["Training & Orientation Wing"],
+  },
+  {
+    label: "তদন্ত উইং",
+    wings: ["Inv Wg"],
+    aliases: ["Investigation & Forensic Wing"],
+  },
+  {
+    label: "আরএন্ডডি সেল",
+    wings: ["R & D Cell"],
+    aliases: ["আর এন্ড ডি সেল"],
+  },
+  { label: "এয়ার উইং", wings: ["Air Wg"], aliases: ["Air Wing"] },
+  {
+    label: "প্রশাসন ও অর্থ উইং",
+    wings: ["Admin"],
+    aliases: ["Admin (New)", "Admin (Old)", "Administration & Finance Wing"],
+  },
+  { label: "সিএমএইচ রোগী", wings: [], tag: "CMH" },
+];
+
+/** Admin & Finance sheet — exact labels from the HQ Pritibhoj form. */
+export const PRITIBHOJ_ADMIN_WING_DEFS: readonly PritibhojWingDef[] = [
+  { label: "ডিজি দপ্তর", wings: ["DG Office"] },
+  { label: "এডিজি (অপস) দপ্তর", wings: ["ADG (Ops) Office"] },
+  { label: "এডিজি (এ্যাডমিন) দপ্তর", wings: ["ADG (Admin) Office"] },
+  { label: "পরিচালক (এ্যাডমিন) দপ্তর", wings: [] },
+  { label: "জেনারেল শাখা", wings: ["Gen Br"] },
+  {
+    label: "পার্সোনাল শাখা",
+    wings: ["Per Br"],
+    aliases: ["পার্সোনেল শাখা"],
+  },
+  { label: "রেকর্ড শাখা", wings: ["Rec Br", "Record Branch"] },
+  {
+    label: "সরবরাহ শাখা",
+    wings: ["Sup Br"],
+    aliases: ["সাপ্লাই শাখা"],
+  },
+  {
+    label: "উন্নয়ন শাখা",
+    wings: ["Dev Br"],
+    aliases: ["ডেভেলপমেন্ট শাখা"],
+  },
+  {
+    label: "প্রকল্প শাখা",
+    wings: ["Proj Br"],
+    aliases: ["প্রজেক্ট শাখা"],
+  },
+  { label: "ওয়ার্কশপ শাখা", wings: ["Wksp Br"] },
+  {
+    label: "অর্থ শাখা",
+    wings: ["Fin Br"],
+    aliases: ["ফিন্যান্স শাখা"],
+  },
+  {
+    label: "প্রকিউরমেন্ট",
+    wings: ["Proc Br"],
+    aliases: ["প্রকিউরমেন্ট শাখা"],
+  },
+  {
+    label: "চিকিৎসা শাখা",
+    wings: ["Med Br"],
+    aliases: ["মেডিকেল শাখা"],
+  },
+  {
+    label: "নিরাপত্তা শাখা",
+    wings: ["Security Branch", "Security Branch - IEC Cell"],
+  },
+  {
+    label: "সদর দপ্তর শাখা",
+    wings: ["HQ Br", "Headquarters Branch", "Headquarters Office"],
+    aliases: ["এইচকিউ শাখা"],
+  },
+  { label: "এ্যাডমিন এমটি", wings: ["MT Br", "MT Branch"] },
+  { label: "নতুন সদস্য ও সংযুক্ত", wings: ["New / Temporary Attached"] },
+];
+
+const ALL_WING_DEFS = [
+  ...PRITIBHOJ_MAIN_WING_DEFS,
+  ...PRITIBHOJ_ADMIN_WING_DEFS,
+];
+
+function wingKeys(def: PritibhojWingDef): string[] {
+  return [def.label, ...def.wings, ...(def.aliases ?? [])];
+}
+
+export function pritibhojWingDef(label: string): PritibhojWingDef | undefined {
+  const key = label.trim();
+  return ALL_WING_DEFS.find((row) => wingKeys(row).includes(key));
+}
+
+/** Catalog wing keys (plus the printed label) that count for this sheet row. */
+export function pritibhojLookupWings(label: string): string[] {
+  const key = label.trim();
+  const def = pritibhojWingDef(key);
+  if (!def) return key ? [key] : [];
+  return wingKeys(def);
+}
+
+export function lockPritibhojRows(
+  defs: readonly PritibhojWingDef[],
+  existing: PritibhojRow[] = [],
+): PritibhojRow[] {
+  return defs.map((def) => {
+    const keys = new Set(wingKeys(def));
+    const found = existing.find((row) => keys.has(row.wing.trim()));
+    return finalizePritibhojRow({
+      ...(found ?? emptyPritibhojRow(def.label)),
+      wing: def.label,
+    });
+  });
+}
+
+export function lockPritibhojSheets<
+  T extends { main_rows: PritibhojRow[]; admin_rows: PritibhojRow[] },
+>(value: T): T {
+  return {
+    ...value,
+    main_rows: lockPritibhojRows(PRITIBHOJ_MAIN_WING_DEFS, value.main_rows),
+    admin_rows: lockPritibhojRows(PRITIBHOJ_ADMIN_WING_DEFS, value.admin_rows),
+  };
+}
 
 /** Main wings — demo from ADG Admin farewell sheet (06 Jul 2023). */
 export const PRITIBHOJ_MAIN_ROWS: PritibhojRow[] = [
   {
-    wing: "অপারেশনস উইং",
+    wing: "অপারেশনস্ উইং",
     officer: 7,
     dad: 16,
     azadHall: 12,
@@ -49,7 +208,7 @@ export const PRITIBHOJ_MAIN_ROWS: PritibhojRow[] = [
     totalDistribution: 124,
   },
   {
-    wing: "এল এন্ড এম উইং",
+    wing: "লিঃ এন্ড মিডিঃ উইং",
     officer: 7,
     dad: 8,
     azadHall: 1,
@@ -91,7 +250,7 @@ export const PRITIBHOJ_MAIN_ROWS: PritibhojRow[] = [
     totalDistribution: 49,
   },
   {
-    wing: "আর এন্ড ডি সেল",
+    wing: "আরএন্ডডি সেল",
     officer: 2,
     dad: 3,
     azadHall: 0,
@@ -417,15 +576,20 @@ export function emptyPritibhojRow(wing: string): PritibhojRow {
 }
 
 export function finalizePritibhojRow(row: PritibhojRow): PritibhojRow {
+  const distribution = Math.max(0, row.dad - row.azadHall);
+  const total = row.others + row.civilian + row.nonMuslim;
+  const distribution2 = Math.max(0, total - row.azadHallDist);
   return {
     ...row,
-    total: row.officer + row.dad + row.others + row.civilian,
-    totalDistribution: row.azadHallDist + row.distribution2,
+    distribution,
+    total,
+    distribution2,
+    totalDistribution: distribution + distribution2,
   };
 }
 
 export function demoPritibhojEvent(): PritibhojEvent {
-  return {
+  return lockPritibhojSheets({
     id: "pb_demo_20230706",
     title: PRITIBHOJ_DEMO_META.titleBn,
     occasion: PRITIBHOJ_DEMO_META.titleBn,
@@ -434,7 +598,40 @@ export function demoPritibhojEvent(): PritibhojEvent {
     created_at: "2023-07-06T00:00:00.000Z",
     main_rows: PRITIBHOJ_MAIN_ROWS,
     admin_rows: PRITIBHOJ_ADMIN_ROWS,
+  });
+}
+
+function cloneDemoSheets(event: PritibhojEvent): Pick<PritibhojEvent, "main_rows" | "admin_rows"> {
+  return {
+    main_rows: event.main_rows.map((row) => ({ ...row })),
+    admin_rows: event.admin_rows.map((row) => ({ ...row })),
   };
+}
+
+/** Sample feast sheets shown when the list is empty. */
+export function demoPritibhojEvents(): PritibhojEvent[] {
+  const farewell = demoPritibhojEvent();
+  return [
+    farewell,
+    lockPritibhojSheets({
+      id: "pb_demo_20251216",
+      title: "বিজয় দিবস উপলক্ষে প্রীতিভোজের পরিসংখ্যান",
+      occasion: "বিজয় দিবস",
+      date: "2025-12-16",
+      org: PRITIBHOJ_DEMO_META.orgBn,
+      created_at: "2025-12-16T00:00:00.000Z",
+      ...cloneDemoSheets(farewell),
+    }),
+    lockPritibhojSheets({
+      id: "pb_demo_20260326",
+      title: "স্বাধীনতা দিবস উপলক্ষে প্রীতিভোজের পরিসংখ্যান",
+      occasion: "স্বাধীনতা দিবস",
+      date: "2026-03-26",
+      org: PRITIBHOJ_DEMO_META.orgBn,
+      created_at: "2026-03-26T00:00:00.000Z",
+      ...cloneDemoSheets(farewell),
+    }),
+  ];
 }
 
 export function sumPritibhojRows(rows: PritibhojRow[]): PritibhojRow {

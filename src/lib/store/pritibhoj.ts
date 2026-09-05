@@ -1,6 +1,10 @@
-import { ADMIN_SUB_WINGS } from "@/lib/constants";
 import { nowISO } from "@/lib/date";
-import { emptyPritibhojRow, finalizePritibhojRow } from "@/lib/pritibhoj-demo";
+import {
+  lockPritibhojRows,
+  lockPritibhojSheets,
+  PRITIBHOJ_ADMIN_WING_DEFS,
+  PRITIBHOJ_MAIN_WING_DEFS,
+} from "@/lib/pritibhoj-demo";
 import { getState, setState } from "@/lib/store";
 import type { PritibhojEvent, PritibhojRow } from "@/lib/types";
 
@@ -15,14 +19,11 @@ export function getPritibhojEvent(id: string): PritibhojEvent | null {
 }
 
 export function defaultPritibhojMainRows(): PritibhojRow[] {
-  const { wings, wing_parent } = getState();
-  const roots = wings.filter((w) => !wing_parent[w]);
-  const labels = roots.length > 0 ? roots : ["Ops Wg", "Int Wg", "Admin"];
-  return labels.map(emptyPritibhojRow);
+  return lockPritibhojRows(PRITIBHOJ_MAIN_WING_DEFS);
 }
 
 export function defaultPritibhojAdminRows(): PritibhojRow[] {
-  return ADMIN_SUB_WINGS.map((wing) => emptyPritibhojRow(wing));
+  return lockPritibhojRows(PRITIBHOJ_ADMIN_WING_DEFS);
 }
 
 export type PritibhojInput = {
@@ -35,17 +36,14 @@ export type PritibhojInput = {
 };
 
 function normalizeEvent(input: PritibhojInput): Omit<PritibhojEvent, "id" | "created_at"> {
+  const locked = lockPritibhojSheets(input);
   return {
     title: input.title.trim(),
     occasion: input.occasion.trim(),
     date: input.date,
     org: input.org.trim(),
-    main_rows: input.main_rows
-      .filter((r) => r.wing.trim())
-      .map(finalizePritibhojRow),
-    admin_rows: input.admin_rows
-      .filter((r) => r.wing.trim())
-      .map(finalizePritibhojRow),
+    main_rows: locked.main_rows,
+    admin_rows: locked.admin_rows,
   };
 }
 

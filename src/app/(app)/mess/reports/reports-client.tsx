@@ -17,7 +17,6 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { ListPagination } from "@/components/shared/list-pagination";
 import {
@@ -521,15 +520,6 @@ export default function MessReportsClient() {
     safePage * pageSize,
   );
 
-  const filtersActive =
-    view !== "checkins" ||
-    audience !== "all" ||
-    shift !== "all" ||
-    wing !== "all" ||
-    status !== "all" ||
-    dateFrom !== initial.from ||
-    dateTo !== initial.to;
-
   function resetPage() {
     setPage(1);
   }
@@ -793,21 +783,6 @@ export default function MessReportsClient() {
               </Select>
             </div>
           ) : null}
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              const next = defaultRange();
-              setQ("");
-              setView("checkins");
-              setAudience("all");
-              setShift("all");
-              setWing("all");
-              setStatus("all");
-              setDateFrom(next.from);
-              setDateTo(next.to);
-              resetPage();
-            }}
-          />
         </SearchFilterBar>
 
         {zkOn && zkLoading ? (

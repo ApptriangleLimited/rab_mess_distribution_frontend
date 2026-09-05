@@ -135,25 +135,25 @@ export default function ConsumeMonthlyClient() {
   const statsTiles = (
     <>
       <StatChip
-        icon={<IconCalendarStats className="h-3.5 w-3.5" />}
+        icon={<IconCalendarStats className="h-3 w-3" />}
         label={t("consume.statDays")}
         value={String(headerStats.days)}
         tone="sky"
       />
       <StatChip
-        icon={<IconUsers className="h-3.5 w-3.5" />}
+        icon={<IconUsers className="h-3 w-3" />}
         label={t("consume.statMembers")}
         value={String(headerStats.members)}
         tone="teal"
       />
       <StatChip
-        icon={<IconUserCheck className="h-3.5 w-3.5" />}
+        icon={<IconUserCheck className="h-3 w-3" />}
         label={t("consume.statAllowance")}
         value={String(headerStats.allowance)}
         tone="lime"
       />
       <StatChip
-        icon={<IconCoin className="h-3.5 w-3.5" />}
+        icon={<IconCoin className="h-3 w-3" />}
         label={amountLabel}
         value={formatBdt(amountValue)}
         tone="primary"
@@ -280,19 +280,20 @@ function StatChip({
 
   return (
     <div
+      title={`${label} ${value}`}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5 shadow-sm",
+        "inline-flex h-8 min-w-0 shrink items-center gap-1 rounded-lg border px-1.5 shadow-sm",
         toneClass,
       )}
     >
-      <span className="opacity-80">{icon}</span>
-      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] opacity-80">
+      <span className="shrink-0 opacity-80">{icon}</span>
+      <span className="hidden whitespace-nowrap text-[9px] font-semibold uppercase tracking-wide opacity-80 lg:inline">
         {label}
       </span>
       <span
         className={cn(
-          "text-sm font-bold tabular-nums",
-          accent ? "font-mono text-base" : "",
+          "text-xs font-bold tabular-nums",
+          accent && "font-mono",
         )}
       >
         {value}

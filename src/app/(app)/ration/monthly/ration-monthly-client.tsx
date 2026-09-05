@@ -6,7 +6,6 @@ import { IconDownload, IconFileAnalytics } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import {
   SearchFilterBar,
@@ -128,12 +127,6 @@ export default function RationMonthlyClient() {
   }
 
   const fieldClass = searchFilterFieldClass;
-  const defaultDates = defaultRange();
-  const datesAreDefault =
-    dateFrom === defaultDates.from && dateTo === defaultDates.to;
-  const filtersActive =
-    rank !== "all" || wing !== "all" || !datesAreDefault;
-
   return (
     <PagePane className="gap-4">
       <motion.div
@@ -226,15 +219,6 @@ export default function RationMonthlyClient() {
               </SelectContent>
             </Select>
           </div>
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              setWing("all");
-              applyDateRange("", "");
-            }}
-          />
         </SearchFilterBar>
 
         {ledger.rows.length === 0 ? (

@@ -1200,7 +1200,7 @@ export const en = {
       footMain: "Total manpower =",
       footAdmin: "Total =",
       formHint:
-        "Fill counts per wing. Totals update automatically. Save to open the preview.",
+        "Wings and branches are fixed from the official sheet and cannot be edited. Officer, Azad Hall, and Others are typed. DAD, Civilian, and Non-Muslim come from Daily Cockpit for the date above. Other columns calculate automatically.",
       deleteTitle: "Delete this Pritibhoj?",
       deleteBody: "Remove “{title}” from the list. This cannot be undone.",
       savePreview: "Save & preview",

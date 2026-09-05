@@ -5,17 +5,17 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconCake,
-  IconEye,
-  IconPencil,
+  IconEdit,
+  IconEyeFilled,
   IconPlus,
   IconPrinter,
   IconTrash,
 } from "@tabler/icons-react";
+import { rowActionClass } from "@/components/users/row-action-btn";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { SearchFilterBar } from "@/components/shared/search-filter-bar";
 import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
@@ -96,7 +96,6 @@ export default function MessPritibhojClient() {
           searchPlaceholder={t("mess.pritibhoj.searchPlaceholder")}
           searchClassName="w-64 shrink-0 sm:w-72"
         >
-          <ClearFiltersButton disabled={!q.trim()} onClick={() => setQ("")} />
         </SearchFilterBar>
 
         {filtered.length === 0 ? (
@@ -160,38 +159,38 @@ export default function MessPritibhojClient() {
                         {eventManpower(event)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1.5">
                           <Button
                             asChild
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 rounded-xl"
+                            className={rowActionClass("view")}
                           >
                             <Link
                               href={`/mess/pritibhoj/${event.id}`}
                               aria-label={t("mess.pritibhoj.preview")}
                             >
-                              <IconEye className="h-4 w-4" />
+                              <IconEyeFilled className="h-4 w-4" />
                             </Link>
                           </Button>
                           <Button
                             asChild
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 rounded-xl"
+                            className={rowActionClass("edit")}
                           >
                             <Link
                               href={`/mess/pritibhoj/${event.id}/edit`}
                               aria-label={t("common.edit")}
                             >
-                              <IconPencil className="h-4 w-4" />
+                              <IconEdit className="h-4 w-4" />
                             </Link>
                           </Button>
                           <Button
                             asChild
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 rounded-xl"
+                            className={rowActionClass("print")}
                           >
                             <Link
                               href={`/mess/pritibhoj/${event.id}/print`}
@@ -204,7 +203,7 @@ export default function MessPritibhojClient() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 rounded-xl text-red-600 hover:text-red-700"
+                            className={rowActionClass("delete")}
                             aria-label={t("common.delete")}
                             onClick={() => setDeleting(event)}
                           >

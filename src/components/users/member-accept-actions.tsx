@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { IconCheck, IconX } from "@tabler/icons-react";
+import { IconCircleCheckFilled, IconCircleXFilled } from "@tabler/icons-react";
+import { rowActionClass } from "@/components/users/row-action-btn";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { UserConfirmCard } from "@/components/daily/user-confirm-card";
 import { UserDetail } from "@/components/users/user-detail";
@@ -31,10 +32,13 @@ type PendingAction = "accept" | "reject" | null;
 export function MemberAcceptActions({
   user,
   withTag = false,
+  iconOnly = false,
   after,
 }: {
   user: User;
   withTag?: boolean;
+  /** Compact icon buttons for list rows. */
+  iconOnly?: boolean;
   /** Renders after Accept/Reject (e.g. Edit). */
   after?: ReactNode;
 }) {
@@ -121,25 +125,31 @@ export function MemberAcceptActions({
 
   return (
     <>
-      {pending ? (
+      {iconOnly || pending ? (
         <>
           <Button
-            variant="cta"
-            size="sm"
-            className="rounded-lg"
+            type="button"
+            variant={iconOnly ? "ghost" : "cta"}
+            size={iconOnly ? "icon" : "sm"}
+            disabled={iconOnly && !pending}
+            className={iconOnly ? rowActionClass("approve") : "rounded-lg"}
+            aria-label={t("daily.approve")}
             onClick={() => open("accept")}
           >
-            <IconCheck className="h-3.5 w-3.5" />
-            {t("daily.approve")}
+            <IconCircleCheckFilled className="h-4 w-4" />
+            {iconOnly ? null : t("daily.approve")}
           </Button>
           <Button
-            variant="outline"
-            size="sm"
-            className="rounded-lg"
+            type="button"
+            variant={iconOnly ? "ghost" : "outline"}
+            size={iconOnly ? "icon" : "sm"}
+            disabled={iconOnly && !pending}
+            className={iconOnly ? rowActionClass("reject") : "rounded-lg"}
+            aria-label={t("daily.reject")}
             onClick={() => open("reject")}
           >
-            <IconX className="h-3.5 w-3.5" />
-            {t("daily.reject")}
+            <IconCircleXFilled className="h-4 w-4" />
+            {iconOnly ? null : t("daily.reject")}
           </Button>
         </>
       ) : null}

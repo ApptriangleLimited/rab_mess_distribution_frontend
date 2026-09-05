@@ -224,7 +224,7 @@ export function DateRangePicker({
             aria-label={label ?? t("common.dateRange")}
           >
             <IconCalendar className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-            <span className="min-w-0 flex-1 truncate font-medium tabular-nums">
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-medium tabular-nums">
               {display}
             </span>
             {hasValue ? (

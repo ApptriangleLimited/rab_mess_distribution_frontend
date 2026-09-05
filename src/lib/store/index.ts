@@ -27,7 +27,11 @@ import {
   authorizedIdForLabel,
 } from "@/lib/constants";
 import { parseMoney } from "@/lib/money";
-import { demoPritibhojEvent } from "@/lib/pritibhoj-demo";
+import { demoPritibhojEvents, lockPritibhojSheets } from "@/lib/pritibhoj-demo";
+import {
+  ensureTagRequests,
+  MIN_TAG_REQUESTS_PER_QUEUE,
+} from "@/lib/tag-request-demo";
 import { createSeedState, SEED_VERSION } from "@/lib/store/seed";
 import type {
   AllowanceRate,
@@ -35,7 +39,6 @@ import type {
   EmergencyContact,
   PritibhojEvent,
   PritibhojRow,
-  TagRequest,
   User,
 } from "@/lib/types";
 
@@ -118,7 +121,7 @@ function sanitizePritibhojEvent(raw: unknown): PritibhojEvent | null {
   const event = raw as Record<string, unknown>;
   const id = String(event.id ?? "").trim();
   if (!id) return null;
-  return {
+  return lockPritibhojSheets({
     id,
     title: String(event.title ?? "").trim() || "Pritibhoj",
     occasion: String(event.occasion ?? "").trim(),
@@ -135,15 +138,17 @@ function sanitizePritibhojEvent(raw: unknown): PritibhojEvent | null {
           .map(sanitizePritibhojRow)
           .filter((row): row is PritibhojRow => row !== null)
       : [],
-  };
+  });
 }
 
 function ensurePritibhojEvents(state: AppState): PritibhojEvent[] {
-  if (!Object.prototype.hasOwnProperty.call(state, "pritibhoj_events")) {
-    return [demoPritibhojEvent()];
+  const raw = Object.prototype.hasOwnProperty.call(state, "pritibhoj_events")
+    ? state.pritibhoj_events
+    : undefined;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return demoPritibhojEvents();
   }
-  if (!Array.isArray(state.pritibhoj_events)) return [];
-  return state.pritibhoj_events
+  return raw
     .map(sanitizePritibhojEvent)
     .filter((event): event is PritibhojEvent => event !== null);
 }
@@ -1070,7 +1075,14 @@ export function getState(): AppState {
       const sum = sumAuthorizedWings(wings);
       return row.count !== sum;
     });
-    if (hasBanned || authStale) {
+    const shortRequestQueues = (
+      ["daily", "ration", "consume"] as const
+    ).some(
+      (queue) =>
+        memory!.tag_requests.filter((r) => (r.queue ?? "daily") === queue)
+          .length < MIN_TAG_REQUESTS_PER_QUEUE,
+    );
+    if (hasBanned || authStale || shortRequestQueues) {
       memory = normalizeState(memory);
       writeStorage(memory);
     }
@@ -1321,28 +1333,7 @@ function normalizeState(state: AppState): AppState {
     meal_shifts: Array.isArray(state.meal_shifts) ? state.meal_shifts : [],
     guest_meals: Array.isArray(state.guest_meals) ? state.guest_meals : [],
     pritibhoj_events: ensurePritibhojEvents(state),
-    tag_requests: Array.isArray(state.tag_requests)
-      ? state.tag_requests.map((raw: TagRequest) => ({
-          ...raw,
-          queue:
-            raw.queue === "ration" || raw.queue === "consume"
-              ? raw.queue
-              : "daily",
-          from_date: raw.from_date || raw.date,
-          to_date: raw.to_date || raw.date,
-          status:
-            raw.status === "updated" || raw.status === "rejected"
-              ? raw.status
-              : "requested",
-          trg_tone:
-            raw.to_tag === "TRG" &&
-            (raw.trg_tone === "black" || raw.trg_tone === "red")
-              ? raw.trg_tone
-              : undefined,
-          trg_sarda:
-            raw.to_tag === "TRG" ? Boolean(raw.trg_sarda) : undefined,
-        }))
-      : [],
+    tag_requests: ensureTagRequests(state.tag_requests, state.users ?? []),
   };
 }
 

@@ -3,12 +3,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { IconUsers } from "@tabler/icons-react";
-import { ClearFiltersButton } from "@/components/shared/clear-filters-button";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { MonthNav } from "@/components/shared/month-nav";
 import {
   SearchFilterBar,
-  searchFilterFieldClass,
+  searchFilterCompactFieldClass,
 } from "@/components/shared/search-filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -21,7 +20,6 @@ import {
 } from "@/components/ui/select";
 import { usePagination } from "@/hooks/use-pagination";
 
-import { monthKey } from "@/lib/date";
 import { buildTagBill, formatBdt } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
@@ -46,7 +44,6 @@ export function TagBillPanel({
   const state = useStore();
   const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
-  const defaultMonth = monthKey();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
@@ -108,9 +105,7 @@ export function TagBillPanel({
     to,
   } = usePagination(members, resetKey);
 
-  const fieldClass = searchFilterFieldClass;
-  const filtersActive =
-    rank !== "all" || wing !== "all" || month !== defaultMonth;
+  const fieldClass = searchFilterCompactFieldClass;
 
   return (
     <div className="flex flex-col gap-0">
@@ -123,14 +118,16 @@ export function TagBillPanel({
       >
         <SearchFilterBar
           flat
+          singleLine
+          compact
           search={q}
           onSearchChange={setQ}
           searchPlaceholder={t("consume.searchPlaceholder")}
           className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={tiles}
         >
-          <MonthNav month={month} onChange={onMonthChange} />
-          <div className="w-[9.5rem] shrink-0">
+          <MonthNav compact month={month} onChange={onMonthChange} />
+          <div className="w-[6.75rem] shrink">
             <Select value={rank} onValueChange={setRank}>
               <SelectTrigger
                 className={cn(fieldClass, "w-full")}
@@ -148,7 +145,7 @@ export function TagBillPanel({
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[9rem] shrink-0">
+          <div className="w-[6.5rem] shrink">
             <Select value={wing} onValueChange={setWing}>
               <SelectTrigger
                 className={cn(fieldClass, "w-full")}
@@ -166,15 +163,6 @@ export function TagBillPanel({
               </SelectContent>
             </Select>
           </div>
-          <ClearFiltersButton
-            disabled={!filtersActive && !q.trim()}
-            onClick={() => {
-              setQ("");
-              setRank("all");
-              setWing("all");
-              if (month !== defaultMonth) onMonthChange(defaultMonth);
-            }}
-          />
         </SearchFilterBar>
 
         {bill.rows.length === 0 ? (

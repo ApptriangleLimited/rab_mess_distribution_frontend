@@ -55,12 +55,6 @@ const BASE_TABS: Tab[] = [
     match: (path) => path.startsWith("/ration/requests"),
   },
   {
-    href: "/consume/requests",
-    labelKey: "nav.consumeRequests",
-    icon: IconSend,
-    match: (path) => path.startsWith("/consume/requests"),
-  },
-  {
     href: "/consume/monthly",
     labelKey: "nav.monthlyConsume",
     icon: IconChartBar,
