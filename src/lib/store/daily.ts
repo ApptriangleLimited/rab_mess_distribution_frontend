@@ -24,9 +24,13 @@ export function isMfrTag(tag: DailyTag | "" | undefined): boolean {
  * the day before they are activated again).
  */
 export function isUserInactiveOnDate(
-  user: Pick<User, "status" | "inactive_spans">,
+  user: Pick<User, "status" | "inactive_spans"> & { joining_date?: string },
   date: string,
 ): boolean {
+  const join = (user.joining_date ?? "").trim();
+  if (join && date < join) {
+    return true;
+  }
   const spans = user.inactive_spans ?? [];
   for (const span of spans) {
     if (!span?.from) continue;
@@ -41,13 +45,17 @@ export function isUserInactiveOnDate(
 }
 
 /**
- * False when the date is in an inactive stretch, or after out_date
- * (out day itself still allowed).
+ * False when the date is before joining_date, in an inactive stretch,
+ * or after out_date (out day itself still allowed).
  */
 export function canAssignOnDate(
-  user: Pick<User, "out_date" | "status" | "inactive_spans">,
+  user: Pick<User, "out_date" | "status" | "inactive_spans"> & {
+    joining_date?: string;
+  },
   date: string,
 ): boolean {
+  const join = (user.joining_date ?? "").trim();
+  if (join && date < join) return false;
   if (isUserInactiveOnDate(user, date)) return false;
   const out = (user.out_date ?? "").trim();
   if (out && date > out) return false;
