@@ -1054,9 +1054,32 @@ function readStorage(): AppState | null {
   }
 }
 
+let writeTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingState: AppState | null = null;
+
+export function flushStorage() {
+  if (!pendingState || typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(pendingState));
+  } catch {
+    // Ignore quota errors
+  }
+  pendingState = null;
+  if (writeTimer) {
+    clearTimeout(writeTimer);
+    writeTimer = null;
+  }
+}
+
 function writeStorage(state: AppState) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  pendingState = state;
+  if (writeTimer) clearTimeout(writeTimer);
+  writeTimer = setTimeout(flushStorage, 50);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", flushStorage);
 }
 
 /** Version check only — not a type predicate (stale disk is still AppState). */

@@ -53,9 +53,8 @@ import {
   setTag,
   setTagRange,
 } from "@/lib/store/assignments";
-import { getProjectedTagMembers } from "@/lib/store/mess";
 import { listAllTags } from "@/lib/store/rates";
-import { canAssignOnDate } from "@/lib/store/daily";
+import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -140,7 +139,7 @@ export default function TagsPageClient() {
       .map((u) => u.id);
     if (!ids.length) return;
     autoApplyCarryForward(ids, today);
-  }, [apiOn, today, state.users, state.assignments, state.suppressed_carries]);
+  }, [apiOn, today, state.users]);
 
   /** Approved roster — filter by Active / Inactive / All (default Active). */
   const demoUsers = useMemo(() => {
@@ -189,27 +188,62 @@ export default function TagsPageClient() {
     [dateFrom, dateTo],
   );
 
-  const demoTagCounts = useMemo(() => {
+  const { demoTagCounts, demoTagMemberIds } = useMemo(() => {
     const allowed = new Set(users.map((u) => u.id));
     const counts: Record<string, number> = {};
-    for (const tag of allTags) counts[tag] = 0;
+    const memberIds = new Map<string, Set<string>>();
+    for (const tag of allTags) {
+      counts[tag] = 0;
+      memberIds.set(tag, new Set());
+    }
 
-    for (const date of visibleDates) {
-      for (const tag of allTags) {
-        counts[tag] += getProjectedTagMembers(tag, date).members.filter((u) =>
-          allowed.has(u.id),
-        ).length;
+    const byUserDate = new Map<string, DailyTag>();
+    for (const a of state.assignments) {
+      byUserDate.set(`${a.user_id}|${a.date}`, a.tag);
+    }
+    const suppressedSet = new Set(state.suppressed_carries ?? []);
+
+    for (const user of users) {
+      if (
+        !allowed.has(user.id) ||
+        user.approval_status !== "approved" ||
+        user.status !== "1" ||
+        !isCockpitMember(user)
+      ) {
+        continue;
+      }
+      const isMfr = isMfrLocked(user);
+      const defaultTag = user.default_tag;
+
+      for (const date of visibleDates) {
+        if (!canAssignOnDate(user, date)) continue;
+
+        let tag: DailyTag | undefined;
+        if (isMfr) {
+          tag = MFR_TAG;
+        } else {
+          const direct = byUserDate.get(`${user.id}|${date}`);
+          if (direct) {
+            tag = direct;
+          } else if (!suppressedSet.has(`${user.id}|${date}`)) {
+            tag = defaultTag;
+          }
+        }
+
+        if (tag && counts[tag] !== undefined) {
+          counts[tag] += 1;
+          memberIds.get(tag)?.add(user.id);
+        }
       }
     }
-    return counts;
+
+    return { demoTagCounts: counts, demoTagMemberIds: memberIds };
   }, [
     allTags,
     visibleDates,
     users,
     state.assignments,
-    state.users,
     state.suppressed_carries,
-    state.rates,
   ]);
 
   const tagCounts = apiOn ? cockpit.tagCounts : demoTagCounts;
@@ -218,28 +252,6 @@ export default function TagsPageClient() {
     () => allTags.reduce((sum, tag) => sum + (tagCounts[tag] ?? 0), 0),
     [allTags, tagCounts],
   );
-
-  const demoTagMemberIds = useMemo(() => {
-    const allowed = new Set(users.map((u) => u.id));
-    const map = new Map<string, Set<string>>();
-    for (const tag of allTags) {
-      const ids = new Set<string>();
-      for (const date of visibleDates) {
-        for (const u of getProjectedTagMembers(tag, date).members) {
-          if (allowed.has(u.id)) ids.add(u.id);
-        }
-      }
-      map.set(tag, ids);
-    }
-    return map;
-  }, [
-    allTags,
-    visibleDates,
-    users,
-    state.assignments,
-    state.users,
-    state.suppressed_carries,
-  ]);
 
   const apiTagMemberIds = useMemo(() => {
     const map = new Map<string, Set<string>>();

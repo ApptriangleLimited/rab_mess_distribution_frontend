@@ -9,7 +9,7 @@ import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
 import { listMealAssigns } from "@/lib/store/meal-assigns";
 import { isCockpitMember } from "@/lib/store/users";
 import { nextISODate, todayISO } from "@/lib/date";
-import type { DailyTag, MealShiftId, User } from "@/lib/types";
+import type { DailyAssignment, DailyTag, MealShiftId, User } from "@/lib/types";
 
 export type MessEaterReason = "MS" | "FR" | "BK";
 
@@ -146,10 +146,16 @@ export function getProjectedTagMembers(
   tagged: number;
   carried: number;
 } {
-  const { users } = getState();
+  const { users, assignments, suppressed_carries } = getState();
   const members: User[] = [];
   let tagged = 0;
   let carried = 0;
+
+  const dateAssignMap = new Map<string, DailyAssignment>();
+  for (const a of assignments) {
+    if (a.date === date) dateAssignMap.set(a.user_id, a);
+  }
+  const suppressedSet = new Set(suppressed_carries ?? []);
 
   for (const user of users) {
     if (user.approval_status !== "approved") continue;
@@ -165,7 +171,7 @@ export function getProjectedTagMembers(
       continue;
     }
 
-    const direct = getAssignment(user.id, date);
+    const direct = dateAssignMap.get(user.id);
     if (direct) {
       if (direct.tag === tag) {
         members.push(user);
@@ -174,7 +180,7 @@ export function getProjectedTagMembers(
       continue;
     }
 
-    if (isCarrySuppressed(user.id, date)) continue;
+    if (suppressedSet.has(`${user.id}|${date}`)) continue;
     const prior = findPriorTag(user.id, date);
     if (prior === tag) {
       members.push(user);
