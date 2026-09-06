@@ -85,6 +85,7 @@ type Props = {
   label?: string;
   className?: string;
   triggerClassName?: string;
+  contentClassName?: string;
 };
 
 export function DateRangePicker({
@@ -97,6 +98,7 @@ export function DateRangePicker({
   label,
   className,
   triggerClassName,
+  contentClassName,
 }: Props) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -253,7 +255,10 @@ export function DateRangePicker({
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="w-auto max-w-[calc(100vw-1.5rem)] border-neutral-200/90 p-0 shadow-xl dark:border-neutral-700"
+          className={cn(
+            "z-[300] w-auto max-w-[calc(100vw-1.5rem)] border-neutral-200/90 p-0 shadow-xl dark:border-neutral-700",
+            contentClassName,
+          )}
         >
           <div className="border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">

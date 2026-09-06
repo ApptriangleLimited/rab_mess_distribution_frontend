@@ -4,6 +4,7 @@ import { useState } from "react";
 import { IconSend, IconSend2 } from "@tabler/icons-react";
 import { rowActionClass } from "@/components/users/row-action-btn";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { ColoredTagGrid } from "@/components/daily/colored-tag-grid";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,12 @@ export function RequestTagButton({
   const state = useStore();
   void state.tag_requests;
   const [open, setOpen] = useState(false);
-  const current = getCockpitTagOnDate(user, todayISO());
   const pending = getPendingTagRequest(user.id);
+  const today = todayISO();
   const [tag, setTag] = useState<DailyTag | "">(pending?.to_tag ?? "");
+  const [from, setFrom] = useState(pending?.from_date || today);
+  const [to, setTo] = useState(pending?.to_date || pending?.from_date || today);
+  const current = getCockpitTagOnDate(user, from || today);
   const allowed = canRequestTag(user);
 
   function openDialog(e?: { stopPropagation?: () => void }) {
@@ -49,10 +53,16 @@ export function RequestTagButton({
       return;
     }
     setTag(pending?.to_tag ?? "");
+    setFrom(pending?.from_date || today);
+    setTo(pending?.to_date || pending?.from_date || today);
     setOpen(true);
   }
 
   function confirm() {
+    if (!from || !to) {
+      toast(t("tagRequest.dateRangeRequired"), "error");
+      return;
+    }
     if (!tag) {
       toast(t("daily.tagRequired"), "error");
       return;
@@ -61,7 +71,7 @@ export function RequestTagButton({
       toast(t("tagRequest.sameTag"), "error");
       return;
     }
-    const row = createTagRequest(user.id, tag);
+    const row = createTagRequest(user.id, tag, "cc", { from, to });
     if (!row) {
       toast(t("tagRequest.cannotRequest"), "error");
       return;
@@ -112,6 +122,23 @@ export function RequestTagButton({
               {t("tagRequest.currentTag")}
             </span>
             <TagChip tag={current} />
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              {t("common.dateRange")}
+            </p>
+            <DateRangePicker
+              from={from}
+              to={to}
+              min={user.joining_date || undefined}
+              max={user.out_date || undefined}
+              maxSpanDays={31}
+              onChange={({ from: nextFrom, to: nextTo }) => {
+                setFrom(nextFrom);
+                setTo(nextTo);
+              }}
+              label={t("common.dateRange")}
+            />
           </div>
           <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">

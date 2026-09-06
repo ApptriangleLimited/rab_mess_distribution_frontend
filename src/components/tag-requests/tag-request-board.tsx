@@ -39,7 +39,7 @@ import {
   rejectTagRequest,
 } from "@/lib/store/tag-requests";
 import { listAllTags } from "@/lib/store/rates";
-import { todayISO } from "@/lib/date";
+import { formatDateDisplay, todayISO } from "@/lib/date";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -433,13 +433,22 @@ export function TagRequestBoard({
                 {updateUser.rab_id}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <TagChip
-                tag={getCockpitTagOnDate(updateUser, today)}
-                tone={getCockpitToneOnDate(updateUser, today)}
-              />
-              <span className="text-neutral-400">→</span>
-              <TagChip tag={pendingUpdate.to_tag} tone={pendingUpdate.trg_tone} />
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                <TagChip
+                  tag={getCockpitTagOnDate(updateUser, today)}
+                  tone={getCockpitToneOnDate(updateUser, today)}
+                />
+                <span className="text-neutral-400">→</span>
+                <TagChip tag={pendingUpdate.to_tag} tone={pendingUpdate.trg_tone} />
+              </div>
+              <p className="text-[11px] tabular-nums text-neutral-500">
+                {pendingUpdate.from_date &&
+                pendingUpdate.to_date &&
+                pendingUpdate.from_date !== pendingUpdate.to_date
+                  ? `${formatDateDisplay(pendingUpdate.from_date)} – ${formatDateDisplay(pendingUpdate.to_date)}`
+                  : formatDateDisplay(pendingUpdate.from_date || pendingUpdate.date)}
+              </p>
             </div>
           </div>
         ) : null}
@@ -540,8 +549,8 @@ function RequestRow({
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
         {req.from_date && req.to_date && req.from_date !== req.to_date
-          ? `${req.from_date} → ${req.to_date}`
-          : req.from_date || req.date}
+          ? `${formatDateDisplay(req.from_date)} – ${formatDateDisplay(req.to_date)}`
+          : formatDateDisplay(req.from_date || req.date) || req.from_date || req.date}
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
         {requestDay(req.requested_at)}

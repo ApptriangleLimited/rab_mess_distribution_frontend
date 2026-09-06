@@ -147,12 +147,21 @@ export function createTagRequest(
   userId: string,
   toTag: DailyTag,
   requestedBy = "cc",
+  range?: { from: string; to: string },
 ): TagRequest | null {
   const user = getState().users.find((u) => u.id === userId);
   if (!user || !toTag) return null;
-  const date = todayISO();
-  if (!canRequestTag(user, date)) return null;
-  const fromTag = getCockpitTagOnDate(user, date);
+  const today = todayISO();
+  const rawFrom = range?.from || today;
+  const rawTo = range?.to || rawFrom;
+  const fromDate = rawFrom <= rawTo ? rawFrom : rawTo;
+  const toDate = rawFrom <= rawTo ? rawTo : rawFrom;
+  if (!canRequestTag(user, fromDate)) return null;
+  const assignable = eachISODate(fromDate, toDate).filter((d) =>
+    canAssignOnDate(user, d),
+  );
+  if (assignable.length === 0) return null;
+  const fromTag = getCockpitTagOnDate(user, fromDate);
   if (fromTag === toTag) return null;
 
   const existing = getPendingTagRequest(userId, "daily");
@@ -160,9 +169,9 @@ export function createTagRequest(
   const row: TagRequest = {
     id: existing?.id ?? newId(),
     user_id: userId,
-    date,
-    from_date: date,
-    to_date: date,
+    date: fromDate,
+    from_date: fromDate,
+    to_date: toDate,
     from_tag: fromTag,
     to_tag: toTag,
     queue: "daily",
