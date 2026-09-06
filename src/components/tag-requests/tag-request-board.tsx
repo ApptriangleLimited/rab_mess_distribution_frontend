@@ -126,7 +126,21 @@ export function TagRequestBoard({
           .toLowerCase()
           .includes(query);
       })
-      .sort((a, b) => b.requested_at.localeCompare(a.requested_at));
+      .sort((a, b) => {
+        const isDemoA = a.id.startsWith("tr_demo_");
+        const isDemoB = b.id.startsWith("tr_demo_");
+        if (isDemoA !== isDemoB) {
+          return isDemoA ? 1 : -1;
+        }
+        const timeA = a.updated_at || a.requested_at || "";
+        const timeB = b.updated_at || b.requested_at || "";
+        const c = timeB.localeCompare(timeA);
+        if (c !== 0) return c;
+        return (
+          (b.requested_at || "").localeCompare(a.requested_at || "") ||
+          b.id.localeCompare(a.id)
+        );
+      });
   }, [
     state.tag_requests,
     usersById,

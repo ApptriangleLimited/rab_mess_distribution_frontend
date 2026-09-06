@@ -64,7 +64,8 @@ function dateDaysAgo(offset: number): string {
 }
 
 function stamp(isoDate: string, hour: number): string {
-  return `${isoDate}T${String(hour).padStart(2, "0")}:18:00.000Z`;
+  const h = (hour % 5) + 1;
+  return `${isoDate}T${String(h).padStart(2, "0")}:18:00.000Z`;
 }
 
 function normalizeRequest(raw: TagRequest): TagRequest {
@@ -76,7 +77,14 @@ function normalizeRequest(raw: TagRequest): TagRequest {
     raw.status === "updated" || raw.status === "rejected"
       ? raw.status
       : "requested";
-  return { ...raw, queue, from_date, to_date, status };
+  let requested_at = raw.requested_at || "";
+  if (raw.id?.startsWith("tr_demo_") && requested_at.includes("T")) {
+    const [d] = requested_at.split("T");
+    if (d === todayISO()) {
+      requested_at = `${d}T02:18:00.000Z`;
+    }
+  }
+  return { ...raw, queue, from_date, to_date, status, requested_at };
 }
 
 function buildRows(users: User[], specs: DemoSpec[], idPrefix: string): TagRequest[] {
@@ -168,5 +176,5 @@ export function ensureTagRequests(
     }
   }
 
-  return extra.length ? [...extra, ...current] : current;
+  return extra.length ? [...current, ...extra] : current;
 }

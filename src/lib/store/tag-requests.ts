@@ -127,19 +127,23 @@ export function rejectTagRequest(
         ? "consume"
         : "daily");
   const ts = nowISO();
-  setState((prev) => ({
-    ...prev,
-    tag_requests: prev.tag_requests.map((r) =>
-      r.id === requestId
-        ? {
-            ...r,
-            status: "rejected" as const,
-            updated_by: actor,
-            updated_at: ts,
-          }
-        : r,
-    ),
-  }));
+  setState((prev) => {
+    const existing = prev.tag_requests.find((r) => r.id === requestId);
+    if (!existing) return prev;
+    const modified: TagRequest = {
+      ...existing,
+      status: "rejected" as const,
+      updated_by: actor,
+      updated_at: ts,
+    };
+    return {
+      ...prev,
+      tag_requests: [
+        modified,
+        ...prev.tag_requests.filter((r) => r.id !== requestId),
+      ],
+    };
+  });
   return true;
 }
 
@@ -167,7 +171,10 @@ export function createTagRequest(
   const existing = getPendingTagRequest(userId, "daily");
   const ts = nowISO();
   const row: TagRequest = {
-    id: existing?.id ?? newId(),
+    id:
+      existing?.id && !existing.id.startsWith("tr_demo_")
+        ? existing.id
+        : newId(),
     user_id: userId,
     date: fromDate,
     from_date: fromDate,
@@ -177,7 +184,8 @@ export function createTagRequest(
     queue: "daily",
     status: "requested",
     requested_by: requestedBy,
-    requested_at: existing?.requested_at ?? ts,
+    requested_at: ts,
+    updated_at: ts,
   };
 
   setState((prev) => ({
@@ -222,7 +230,10 @@ export function createDutyTagRequest(input: {
     ? Boolean(input.trg_sarda)
     : undefined;
   const row: TagRequest = {
-    id: existing?.id ?? newId(),
+    id:
+      existing?.id && !existing.id.startsWith("tr_demo_")
+        ? existing.id
+        : newId(),
     user_id: input.userId,
     date: fromDate,
     from_date: fromDate,
@@ -234,7 +245,8 @@ export function createDutyTagRequest(input: {
     queue: input.queue,
     status: "requested",
     requested_by: input.requestedBy ?? "daily",
-    requested_at: existing?.requested_at ?? ts,
+    requested_at: ts,
+    updated_at: ts,
   };
   if (!trg_tone) delete row.trg_tone;
   if (trg_sarda === undefined) delete row.trg_sarda;
@@ -292,18 +304,22 @@ export function applyTagRequest(
   }
 
   const ts = nowISO();
-  setState((prev) => ({
-    ...prev,
-    tag_requests: prev.tag_requests.map((r) =>
-      r.id === requestId
-        ? {
-            ...r,
-            status: "updated" as const,
-            updated_by: actor,
-            updated_at: ts,
-          }
-        : r,
-    ),
-  }));
+  setState((prev) => {
+    const existing = prev.tag_requests.find((r) => r.id === requestId);
+    if (!existing) return prev;
+    const modified: TagRequest = {
+      ...existing,
+      status: "updated" as const,
+      updated_by: actor,
+      updated_at: ts,
+    };
+    return {
+      ...prev,
+      tag_requests: [
+        modified,
+        ...prev.tag_requests.filter((r) => r.id !== requestId),
+      ],
+    };
+  });
   return true;
 }
