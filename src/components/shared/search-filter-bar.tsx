@@ -33,7 +33,7 @@ type Props = {
   /** Optional trailing control (e.g. print). */
   trailing?: ReactNode;
   /** Filter fields — inline when `flat`, else expand panel. */
-  children: ReactNode;
+  children?: ReactNode;
   /** Few fields: show everything one row, no filter toggle. */
   flat?: boolean;
   /** Keep search + filter fields on one row (shrink instead of wrap). */

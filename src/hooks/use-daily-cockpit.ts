@@ -20,6 +20,22 @@ import { useToast } from "@/components/shared/toast-provider";
 import { compareUsers, filterCockpitMembers } from "@/lib/store/users";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 
+/**
+ * Merge updated cells from an API response into the existing cell array.
+ * Replaces any cell with the same member_id+date; appends new ones.
+ */
+function mergeUpdatedCells(
+  prev: AssignmentCell[],
+  updated: AssignmentCell[],
+): AssignmentCell[] {
+  if (!updated.length) return prev;
+  const keys = new Set(updated.map((c) => `${c.member_id}|${c.date}`));
+  return [
+    ...prev.filter((c) => !keys.has(`${c.member_id}|${c.date}`)),
+    ...updated,
+  ];
+}
+
 type Params = {
   dateFrom: string;
   dateTo: string;
@@ -148,13 +164,28 @@ export function useDailyCockpit({
   const onTagChange = useCallback(
     async (userId: string, date: string, tag: DailyTag | "") => {
       try {
-        if (!tag) await deleteAssignment(userId, date);
-        else await putAssignment({ member_id: userId, date, tag });
-        await load();
+        if (!tag) {
+          const res = await deleteAssignment(userId, date);
+          // Optimistically drop the cell so the row clears immediately.
+          setCells((prev) =>
+            mergeUpdatedCells(
+              prev.filter((c) => !(c.member_id === userId && c.date === date)),
+              res.items,
+            ),
+          );
+        } else {
+          const res = await putAssignment({ member_id: userId, date, tag });
+          // Apply the server's canonical cell(s) right away — no loading flash.
+          setCells((prev) => mergeUpdatedCells(prev, res.items));
+        }
+        // Background refresh for counts / carry state — don't await.
+        void load();
       } catch (err) {
         const detail =
           err instanceof ApiClientError ? err.detail : "Could not save tag.";
         toast(detail, "error");
+        // Reload to restore consistent state after a failed write.
+        void load();
       }
     },
     [load, toast],
@@ -163,16 +194,21 @@ export function useDailyCockpit({
   const onPaintRange = useCallback(
     async (userId: string, dates: string[], tag: DailyTag | "") => {
       try {
-        await putAssignmentRange({
+        const res = await putAssignmentRange({
           member_id: userId,
           dates,
           tag: tag || "",
         });
-        await load();
+        // Merge all returned cells immediately so every day in the range
+        // shows the new tag without waiting for the background reload.
+        setCells((prev) => mergeUpdatedCells(prev, res.items));
+        // Background refresh for summary counts / carry state.
+        void load();
       } catch (err) {
         const detail =
           err instanceof ApiClientError ? err.detail : "Could not paint range.";
         toast(detail, "error");
+        void load();
       }
     },
     [load, toast],

@@ -1137,9 +1137,12 @@ function normalizeState(state: AppState): AppState {
         ...rest,
         joining_date: legacy.joining_date ?? "",
         out_date: legacy.out_date ?? "",
-        inactive_spans: Array.isArray(legacy.inactive_spans)
-          ? legacy.inactive_spans
-          : [],
+        inactive_spans:
+          Array.isArray(legacy.inactive_spans) && legacy.inactive_spans.length > 0
+            ? legacy.inactive_spans
+            : legacy.status !== "1"
+              ? [{ from: legacy.joining_date || "2020-01-01", to: null }]
+              : [],
         member_type: legacy.member_type ?? "permanent",
         personal_id: legacy.personal_id ?? "",
         force: legacy.force ?? "",

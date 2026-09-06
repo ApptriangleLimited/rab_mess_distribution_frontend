@@ -90,7 +90,6 @@ export function setTag(
     if (!trg_tone) delete updated.trg_tone;
     setState((prev) => ({
       ...prev,
-      users: lockUsersToMfr(prev.users, [userId], tag),
       assignments: prev.assignments.map((a) =>
         a.id === existing.id ? updated : a,
       ),
@@ -112,7 +111,6 @@ export function setTag(
   if (!trg_tone) delete created.trg_tone;
   setState((prev) => ({
     ...prev,
-    users: lockUsersToMfr(prev.users, [userId], tag),
     assignments: [...prev.assignments, created],
     approved_dates: unmarkDate(prev.approved_dates, date),
     suppressed_carries: withoutCarry(prev.suppressed_carries, userId, date),
@@ -161,7 +159,6 @@ export function setTagBulk(
     }
     return {
       ...prev,
-      users: lockUsersToMfr(prev.users, eligible, tag),
       assignments: next,
       approved_dates: unmarkDate(prev.approved_dates, date),
       suppressed_carries: eligible.reduce(
@@ -230,7 +227,6 @@ export function setTagRange(
     }
     return {
       ...prev,
-      users: lockUsersToMfr(prev.users, [userId], tag),
       assignments: next,
       approved_dates: approved,
       suppressed_carries: suppressed,

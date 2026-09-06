@@ -309,7 +309,10 @@ export function RegisterBoard({
         dates,
         anchorDate: menuDate,
         fromDate: selected,
-        toDate: "",
+        // Pre-fill toDate with the last valid date so the full drag range
+        // is applied when the user picks a tag (MS, TRG, etc.).
+        // For a single-cell click, toDate stays empty (no range).
+        toDate: dates.length > 1 ? dates[dates.length - 1] : "",
         ghostTag,
         storedTag,
       });

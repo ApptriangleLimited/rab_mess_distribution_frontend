@@ -98,7 +98,11 @@ function user(
     personal_id: partial.personal_id ?? "",
     emergency_contacts: partial.emergency_contacts ?? [],
     default_tag: partial.default_tag ?? "MS",
-    inactive_spans: partial.inactive_spans ?? [],
+    inactive_spans:
+      partial.inactive_spans ??
+      (partial.status === "0"
+        ? [{ from: partial.joining_date ?? "2020-01-01", to: null }]
+        : []),
     created_at: ts,
     updated_at: ts,
   };

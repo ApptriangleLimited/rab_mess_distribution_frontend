@@ -34,8 +34,8 @@ export function isUserInactiveOnDate(
     if (span.to && date > span.to) continue;
     return true;
   }
-  if (user.status !== "1" && spans.length === 0) {
-    return date >= todayISO();
+  if (user.status !== "1") {
+    return true;
   }
   return false;
 }
@@ -57,19 +57,37 @@ export function canAssignOnDate(
 export function applyStatusToSpans(
   spans: InactiveSpan[] | undefined,
   status: UserStatus,
+  joiningDate?: string,
 ): InactiveSpan[] {
   const today = todayISO();
   const next = [...(spans ?? [])];
   if (status === "0") {
     if (!next.some((s) => !s.to)) {
-      next.push({ from: today, to: null });
+      const fromDate =
+        joiningDate && joiningDate < today ? joiningDate : today;
+      next.push({ from: fromDate, to: null });
     }
     return next;
   }
   const yesterday = previousISODate(today);
+  const hasOpenSpan = next.some((s) => !s.to);
+  if (!hasOpenSpan) {
+    const fromDate =
+      joiningDate && joiningDate <= yesterday
+        ? joiningDate
+        : next.length
+          ? yesterday
+          : "1970-01-01";
+    if (fromDate <= yesterday) {
+      next.push({ from: fromDate, to: yesterday });
+    }
+    return next;
+  }
   return next.flatMap((span) => {
     if (span.to) return [span];
-    if (span.from > yesterday) return [];
+    if (span.from > yesterday) {
+      return [];
+    }
     return [{ ...span, to: yesterday }];
   });
 }
@@ -83,7 +101,7 @@ function patchUser(
   const statusChanged =
     patch.status !== undefined && patch.status !== existing.status;
   const inactive_spans = statusChanged
-    ? applyStatusToSpans(existing.inactive_spans, patch.status!)
+    ? applyStatusToSpans(existing.inactive_spans, patch.status!, existing.joining_date)
     : (existing.inactive_spans ?? []);
   const updated: User = {
     ...existing,
@@ -91,16 +109,12 @@ function patchUser(
     inactive_spans,
     updated_at: nowISO(),
   };
-  const clearFrom =
-    statusChanged && patch.status === "0" ? todayISO() : null;
   setState((prev) => ({
     ...prev,
     users: prev.users.map((u) => (u.id === id ? updated : u)),
-    assignments: clearFrom
-      ? prev.assignments.filter(
-          (a) => !(a.user_id === id && a.date >= clearFrom),
-        )
-      : prev.assignments,
+    assignments: prev.assignments.filter(
+      (a) => !(a.user_id === id && isUserInactiveOnDate(updated, a.date)),
+    ),
   }));
   return updated;
 }
