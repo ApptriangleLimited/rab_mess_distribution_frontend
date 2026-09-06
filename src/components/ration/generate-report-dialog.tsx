@@ -46,22 +46,20 @@ export function GenerateReportDialog({
   }, [open, defaultMonth]);
 
   const senders = activeSenders(state.senders);
-  // Only show senders whose mapped_tags include the selected tag.
-  // Fall back to all senders when no tag is chosen yet.
-  const eligibleSenders = tag
-    ? senders.filter((s) => s.mapped_tags.includes(tag))
-    : senders;
   const canGenerate = Boolean(tag && senderId);
 
+  function senderForTag(nextTag: DailyTag) {
+    return (
+      senders.find((s) => s.mapped_tags.includes(nextTag)) ??
+      senders[0] ??
+      null
+    );
+  }
 
   function onTagChange(nextTag: DailyTag) {
     setTag(nextTag);
-    const mapped = senders.filter((s) => s.mapped_tags.includes(nextTag));
-    // Keep existing sender if it handles the new tag; otherwise pick first eligible.
-    const keeps = mapped.find((s) => s.id === senderId);
-    if (!keeps) {
-      setSenderId(mapped[0]?.id ?? "");
-    }
+    const match = senderForTag(nextTag);
+    if (match) setSenderId(match.id);
   }
 
   function onGenerate() {
@@ -128,7 +126,7 @@ export function GenerateReportDialog({
               <SelectValue placeholder={t("ration.selectBank")} />
             </SelectTrigger>
             <SelectContent>
-              {eligibleSenders.map((s) => (
+              {senders.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.label}
                   {s.bank_name ? ` · ${s.bank_name}` : ""}
