@@ -120,7 +120,9 @@ export default function ConsumeLedgerPrintClient() {
     if (!el || !canAct) return;
     setPrinting(true);
     try {
-      await printLetterElement(el, `consume-ledger-${month}.pdf`, "landscape");
+      await printLetterElement(el, `consume-ledger-${month}.pdf`, "landscape", {
+        skipInlineStyles: true,
+      });
     } finally {
       setPrinting(false);
     }

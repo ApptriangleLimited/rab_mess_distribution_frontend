@@ -6,6 +6,7 @@ import { HeaderBar } from "@/components/layout/header-bar";
 import { MobileDrawer, Sidebar } from "@/components/layout/sidebar";
 import { useSession } from "@/hooks/use-session";
 import { hydrateStore } from "@/lib/store";
+import { applyDueJlInactivations } from "@/lib/store/daily";
 import { useT } from "@/i18n/provider";
 
 const SIDEBAR_KEY = "mess_sidebar_collapsed_v1";
@@ -20,6 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     hydrateStore();
+    applyDueJlInactivations();
   }, []);
 
   useEffect(() => {

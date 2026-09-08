@@ -142,6 +142,7 @@ export default function DailyRegisterPrintClient() {
         el,
         `attendance-register-${month}.pdf`,
         "landscape",
+        { preserveColors: true, skipInlineStyles: true },
       );
     } finally {
       setPrinting(false);
@@ -158,15 +159,10 @@ export default function DailyRegisterPrintClient() {
             count: printRows.length,
           })}
           leading={
-            <Button
-              asChild
-              variant="outline"
-              size="icon"
-              className="rounded-xl"
-              aria-label={t("common.back")}
-            >
+            <Button asChild variant="outline" size="sm" className="rounded-xl">
               <Link href={backHref}>
                 <IconArrowLeft className="h-4 w-4" />
+                {t("common.back")}
               </Link>
             </Button>
           }
@@ -187,12 +183,12 @@ export default function DailyRegisterPrintClient() {
                 type="button"
                 size="sm"
                 variant="cta"
-                className="rounded-lg"
+                className="rounded-xl"
                 disabled={!canAct || printing}
                 onClick={() => void onPrint()}
               >
-                <IconPrinter className="h-3.5 w-3.5" />
-                {t("mess.print")}
+                <IconPrinter className="h-4 w-4" />
+                {printing ? t("common.loading") : t("mess.print")}
               </Button>
             </>
           }
@@ -208,15 +204,13 @@ export default function DailyRegisterPrintClient() {
       ) : !dayNumbers.length ? (
         <EmptyState title={t("common.noResults")} />
       ) : (
-        <div className="overflow-x-auto">
-          <MonthRegisterPrint
-            ref={printRef}
-            month={month}
-            dayNumbers={dayNumbers}
-            rows={printRows}
-            preview
-          />
-        </div>
+        <MonthRegisterPrint
+          ref={printRef}
+          month={month}
+          dayNumbers={dayNumbers}
+          rows={printRows}
+          preview
+        />
       )}
     </PagePane>
   );

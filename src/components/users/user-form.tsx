@@ -33,7 +33,13 @@ import {
 import { SectionCard } from "@/components/shared/section-card";
 import { DatePicker } from "@/components/shared/date-picker";
 import { TagSelector } from "@/components/daily/tag-selector";
-import { MEMBER_TYPES, RELIGIONS, BRANCH_DISTRICTS, wingDisplayLabel } from "@/lib/constants";
+import {
+  BLOOD_GROUPS,
+  MEMBER_TYPES,
+  RELIGIONS,
+  BRANCH_DISTRICTS,
+  wingDisplayLabel,
+} from "@/lib/constants";
 import { SearchableSelect } from "@/components/shared/searchable-select";
 import type { DailyTag, DocumentMeta, MemberType, User } from "@/lib/types";
 import {
@@ -68,6 +74,7 @@ const emptyValues = (): UserFormValues => ({
   member_type: "permanent",
   dropdown_no: "",
   phone: "",
+  blood_group: "",
   documents: [],
   documents_verified: false,
   status: "1",
@@ -100,6 +107,7 @@ export function userToFormValues(user: User): UserFormValues {
     member_type: user.member_type ?? "permanent",
     dropdown_no: user.dropdown_no,
     phone: user.phone,
+    blood_group: user.blood_group ?? "",
     documents: user.documents,
     documents_verified: Boolean(user.documents_verified),
     status: user.status,
@@ -203,6 +211,27 @@ export function UserForm({
         placeholder={t("cc.selectWing")}
         triggerClassName={selectTriggerClass}
       />
+    </Field>
+  );
+
+  const bloodGroupField = (
+    <Field label={t("cc.fields.bloodGroup")}>
+      <Select
+        value={values.blood_group || "__none__"}
+        onValueChange={(v) => patch("blood_group", v === "__none__" ? "" : v)}
+      >
+        <SelectTrigger className={selectTriggerClass}>
+          <SelectValue placeholder={t("cc.selectBloodGroup")} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">—</SelectItem>
+          {BLOOD_GROUPS.map((group) => (
+            <SelectItem key={group} value={group}>
+              {group}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </Field>
   );
 
@@ -454,6 +483,7 @@ export function UserForm({
                   placeholder={t("cc.placeholders.phone")}
                 />
               </Field>
+              {bloodGroupField}
               <Field label={t("cc.fields.rfid")}>
                 <FieldInput
                   icon={IconAccessPoint}
@@ -466,7 +496,11 @@ export function UserForm({
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
-                    disabled={mode === "edit" && values.default_tag === "MFR"}
+                    allowedTags={
+                      mode === "edit" && values.default_tag === "MFR"
+                        ? ["FR", "MFR"]
+                        : undefined
+                    }
                     onChange={(tag) => {
                       if (!tag) return;
                       if (mode === "create") setTodayTag(tag);
@@ -520,6 +554,7 @@ export function UserForm({
                   placeholder={t("cc.placeholders.phone")}
                 />
               </Field>
+              {bloodGroupField}
               <Field label={t("cc.fields.force")}>
                 <Select
                   value={values.force || "__none__"}
@@ -598,7 +633,11 @@ export function UserForm({
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
-                    disabled={mode === "edit" && values.default_tag === "MFR"}
+                    allowedTags={
+                      mode === "edit" && values.default_tag === "MFR"
+                        ? ["FR", "MFR"]
+                        : undefined
+                    }
                     onChange={(tag) => {
                       if (!tag) return;
                       if (mode === "create") setTodayTag(tag);

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { IconChartBar, IconFileReport, IconSend, IconTags } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
+import { useRequestMenuBadge } from "@/hooks/use-pending-request-counts";
 import { useT } from "@/i18n/provider";
 
 const TABS = [
@@ -37,6 +38,7 @@ const TABS = [
 export function ConsumeTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();
+  const requestBadge = useRequestMenuBadge("/consume/requests");
 
   return (
     <RoleNavTabs
@@ -48,6 +50,7 @@ export function ConsumeTabs({ className }: { className?: string }) {
         label: t(tab.labelKey),
         icon: tab.icon,
         active: tab.match(pathname),
+        badge: tab.href === "/consume/requests" ? requestBadge : undefined,
       }))}
     />
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadWingSummaryPdf } from "@/lib/download-consume-pdfs";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildWingSummary } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 
@@ -25,6 +26,8 @@ export default function ConsumeSummaryPrintClient() {
   const t = useT();
   const state = useStore();
   const searchParams = useSearchParams();
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
 
   const rawMonth = searchParams.get("month");
   const month = rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : monthKey();
@@ -46,6 +49,22 @@ export default function ConsumeSummaryPrintClient() {
       totals: summary.totals,
       filename: `consume-wing-summary-${month}.pdf`,
     });
+  }
+
+  async function onPrint() {
+    const el = printRef.current;
+    if (!el || !canAct) return;
+    setPrinting(true);
+    try {
+      await printLetterElement(
+        el,
+        `consume-wing-summary-${month}.pdf`,
+        "landscape",
+        { skipInlineStyles: true },
+      );
+    } finally {
+      setPrinting(false);
+    }
   }
 
   return (
@@ -87,11 +106,11 @@ export default function ConsumeSummaryPrintClient() {
                 size="sm"
                 variant="cta"
                 className="rounded-lg"
-                disabled={!canAct}
-                onClick={() => window.print()}
+                disabled={!canAct || printing}
+                onClick={() => void onPrint()}
               >
                 <IconPrinter className="h-3.5 w-3.5" />
-                {t("mess.print")}
+                {printing ? t("common.loading") : t("mess.print")}
               </Button>
             </>
           }
@@ -102,6 +121,7 @@ export default function ConsumeSummaryPrintClient() {
         <EmptyState title={t("consume.wingSummaryEmpty")} />
       ) : (
         <WingSummaryPrint
+          ref={printRef}
           month={month}
           tagCodes={summary.tagCodes}
           rows={summary.rows}

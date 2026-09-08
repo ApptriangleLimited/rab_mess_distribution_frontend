@@ -1,6 +1,16 @@
 import { nowISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
-import { canAssignOnDate, isMfrLocked, isMfrTag, MFR_TAG } from "@/lib/store/daily";
+import {
+  canAssignOnDate,
+  canWriteMfrLockedTag,
+  isFrTag,
+  isMfrLocked,
+  isMfrTag,
+  isUserInactiveOnDate,
+  syncUsersAfterJl,
+  FR_TAG,
+  MFR_TAG,
+} from "@/lib/store/daily";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
 
@@ -41,16 +51,49 @@ function canWriteTag(
 ): boolean {
   const user = findUser(userId);
   if (!user || !canAssignOnDate(user, date)) return false;
-  if (isMfrLocked(user) && !isMfrTag(tag)) return false;
+  if (isMfrLocked(user) && !isMfrTag(tag) && !canWriteMfrLockedTag(tag)) {
+    return false;
+  }
   return true;
 }
 
-function lockUsersToMfr(users: User[], userIds: string[], tag: DailyTag | ""): User[] {
-  if (!isMfrTag(tag)) return users;
+/** Lock on MFR; unlock to FR so the member paints like others. */
+function withJlSync(
+  users: User[],
+  assignments: DailyAssignment[],
+  userIds: string[],
+): { users: User[]; assignments: DailyAssignment[] } {
+  const nextUsers = syncUsersAfterJl(users, assignments, userIds);
+  if (nextUsers.every((user, i) => user === users[i])) {
+    return { users: nextUsers, assignments };
+  }
+  const byId = new Map(nextUsers.map((user) => [user.id, user]));
+  return {
+    users: nextUsers,
+    assignments: assignments.filter((row) => {
+      const user = byId.get(row.user_id);
+      return !user || !isUserInactiveOnDate(user, row.date);
+    }),
+  };
+}
+
+function applyMfrDefaultTag(
+  users: User[],
+  userIds: string[],
+  tag: DailyTag | "",
+): User[] {
   const ids = new Set(userIds);
-  return users.map((u) =>
-    ids.has(u.id) ? { ...u, default_tag: MFR_TAG } : u,
-  );
+  if (isMfrTag(tag)) {
+    return users.map((u) =>
+      ids.has(u.id) ? { ...u, default_tag: MFR_TAG } : u,
+    );
+  }
+  if (isFrTag(tag)) {
+    return users.map((u) =>
+      ids.has(u.id) && isMfrLocked(u) ? { ...u, default_tag: FR_TAG } : u,
+    );
+  }
+  return users;
 }
 
 export function getAssignmentsByDate(date: string) {
@@ -88,14 +131,22 @@ export function setTag(
       updated_at: ts,
     };
     if (!trg_tone) delete updated.trg_tone;
-    setState((prev) => ({
-      ...prev,
-      assignments: prev.assignments.map((a) =>
+    setState((prev) => {
+      const assignments = prev.assignments.map((a) =>
         a.id === existing.id ? updated : a,
-      ),
-      approved_dates: unmarkDate(prev.approved_dates, date),
-      suppressed_carries: withoutCarry(prev.suppressed_carries, userId, date),
-    }));
+      );
+      const synced = withJlSync(
+        applyMfrDefaultTag(prev.users, [userId], tag),
+        assignments,
+        [userId],
+      );
+      return {
+        ...prev,
+        ...synced,
+        approved_dates: unmarkDate(prev.approved_dates, date),
+        suppressed_carries: withoutCarry(prev.suppressed_carries, userId, date),
+      };
+    });
     return updated;
   }
 
@@ -109,12 +160,20 @@ export function setTag(
     updated_at: ts,
   };
   if (!trg_tone) delete created.trg_tone;
-  setState((prev) => ({
-    ...prev,
-    assignments: [...prev.assignments, created],
-    approved_dates: unmarkDate(prev.approved_dates, date),
-    suppressed_carries: withoutCarry(prev.suppressed_carries, userId, date),
-  }));
+  setState((prev) => {
+    const assignments = [...prev.assignments, created];
+    const synced = withJlSync(
+      applyMfrDefaultTag(prev.users, [userId], tag),
+      assignments,
+      [userId],
+    );
+    return {
+      ...prev,
+      ...synced,
+      approved_dates: unmarkDate(prev.approved_dates, date),
+      suppressed_carries: withoutCarry(prev.suppressed_carries, userId, date),
+    };
+  });
   return created;
 }
 
@@ -157,9 +216,14 @@ export function setTagBulk(
         next.push(row);
       }
     }
+    const synced = withJlSync(
+      applyMfrDefaultTag(prev.users, eligible, tag),
+      next,
+      eligible,
+    );
     return {
       ...prev,
-      assignments: next,
+      ...synced,
       approved_dates: unmarkDate(prev.approved_dates, date),
       suppressed_carries: eligible.reduce(
         (acc, userId) => withoutCarry(acc, userId, date),
@@ -172,15 +236,19 @@ export function setTagBulk(
 
 export function clearTag(userId: string, date: string) {
   if (!canWriteTag(userId, date, "")) return;
-  setState((prev) => ({
-    ...prev,
-    assignments: prev.assignments.filter(
+  setState((prev) => {
+    const assignments = prev.assignments.filter(
       (a) => !(a.user_id === userId && a.date === date),
-    ),
-    approved_dates: unmarkDate(prev.approved_dates, date),
-    // Explicit no-tag: hide carry ghost until Approve restores
-    suppressed_carries: withCarry(prev.suppressed_carries, userId, date),
-  }));
+    );
+    const synced = withJlSync(prev.users, assignments, [userId]);
+    return {
+      ...prev,
+      ...synced,
+      approved_dates: unmarkDate(prev.approved_dates, date),
+      // Explicit no-tag: hide carry ghost until Approve restores
+      suppressed_carries: withCarry(prev.suppressed_carries, userId, date),
+    };
+  });
 }
 
 /** Set or clear one user's tags across many dates in one store write. */
@@ -225,9 +293,14 @@ export function setTagRange(
         suppressed = withCarry(suppressed, userId, date);
       }
     }
+    const synced = withJlSync(
+      applyMfrDefaultTag(prev.users, [userId], tag),
+      next,
+      [userId],
+    );
     return {
       ...prev,
-      assignments: next,
+      ...synced,
       approved_dates: approved,
       suppressed_carries: suppressed,
     };

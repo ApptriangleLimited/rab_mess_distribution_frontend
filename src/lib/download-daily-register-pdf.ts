@@ -25,7 +25,30 @@ export function downloadDailyRegisterPdf({
 }: Args) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   const monthLabel = formatMonthLong(month);
+
+  doc.setFillColor(244, 226, 90);
+  doc.rect(0, 0, pageW, pageH, "F");
+  const boxW = 110;
+  const boxH = 52;
+  const boxX = (pageW - boxW) / 2;
+  const boxY = (pageH - boxH) / 2;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(1.1);
+  doc.rect(boxX, boxY, boxW, boxH, "FD");
+  doc.setLineWidth(0.35);
+  doc.rect(boxX + 2.2, boxY + 2.2, boxW - 4.4, boxH - 4.4, "S");
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Attendance Register", pageW / 2, boxY + 22, { align: "center" });
+  doc.setFontSize(13);
+  doc.text(monthLabel.replace(" ", "-"), pageW / 2, boxY + 34, {
+    align: "center",
+  });
+  doc.addPage();
 
   let y = 8;
   doc.setFont("helvetica", "bold");

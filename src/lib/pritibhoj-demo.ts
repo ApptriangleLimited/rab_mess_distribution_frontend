@@ -57,7 +57,12 @@ export const PRITIBHOJ_MAIN_WING_DEFS: readonly PritibhojWingDef[] = [
     wings: ["Admin"],
     aliases: ["Admin (New)", "Admin (Old)", "Administration & Finance Wing"],
   },
-  { label: "সিএমএইচ রোগী", wings: [], tag: "CMH" },
+  {
+    label: "সিএমএইচ ভর্তি রোগী",
+    wings: [],
+    tag: "CMH",
+    aliases: ["সিএমএইচ রোগী"],
+  },
 ];
 
 /** Admin & Finance sheet — exact labels from the HQ Pritibhoj form. */
@@ -292,7 +297,7 @@ export const PRITIBHOJ_MAIN_ROWS: PritibhojRow[] = [
     totalDistribution: 713,
   },
   {
-    wing: "সিএমএইচ রোগী",
+    wing: "সিএমএইচ ভর্তি রোগী",
     officer: 0,
     dad: 0,
     azadHall: 0,

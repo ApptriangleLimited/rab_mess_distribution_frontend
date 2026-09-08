@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { flushSync } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   useParams,
@@ -45,6 +44,7 @@ import {
   shiftMonthKey,
 } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   buildRationStaffLines,
   buildRationTransferLines,
@@ -71,7 +71,9 @@ export default function RationSenderReportClient() {
 
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
-  const [printKind, setPrintKind] = useState<PrintKind>("staff");
+  const [printing, setPrinting] = useState(false);
+  const staffPrintRef = useRef<HTMLDivElement>(null);
+  const transferPrintRef = useRef<HTMLDivElement>(null);
 
   const rawMonth = searchParams.get("month");
   const defaultMonth = monthKey();
@@ -143,9 +145,23 @@ export default function RationSenderReportClient() {
     router.replace(`${pathname}?${params.toString()}`);
   }
 
-  function printAs(kind: PrintKind) {
-    flushSync(() => setPrintKind(kind));
-    window.print();
+  async function printAs(kind: PrintKind) {
+    const el =
+      kind === "staff" ? staffPrintRef.current : transferPrintRef.current;
+    if (!el) return;
+    setPrinting(true);
+    try {
+      await printLetterElement(
+        el,
+        kind === "staff"
+          ? `ration-staff-${month}.pdf`
+          : `ration-transfer-${month}.pdf`,
+        kind === "staff" ? "portrait" : "landscape",
+        { skipInlineStyles: true },
+      );
+    } finally {
+      setPrinting(false);
+    }
   }
 
   function onExportStaff() {
@@ -251,15 +267,9 @@ export default function RationSenderReportClient() {
 
   return (
     <PagePane className="gap-5 print:border-0 print:p-0">
-      <StaffPayoutPrint
-        sheets={[staffSheet]}
-        active={printKind === "staff"}
-      />
+      <StaffPayoutPrint ref={staffPrintRef} sheets={[staffSheet]} />
       {transferSheet ? (
-        <TransferSheetPrint
-          sheets={[transferSheet]}
-          active={printKind === "transfer"}
-        />
+        <TransferSheetPrint ref={transferPrintRef} sheets={[transferSheet]} />
       ) : null}
 
       <div className="no-print flex flex-col gap-5">
@@ -300,8 +310,8 @@ export default function RationSenderReportClient() {
                   variant="outline"
                   size="sm"
                   className="h-9 rounded-xl"
-                  onClick={() => printAs("staff")}
-                  disabled={!hasLines}
+                  onClick={() => void printAs("staff")}
+                  disabled={!hasLines || printing}
                 >
                   <IconPrinter className="h-3.5 w-3.5" />
                   {t("ration.printStaff")}
@@ -320,8 +330,8 @@ export default function RationSenderReportClient() {
                   variant="cta"
                   size="sm"
                   className="h-9 rounded-xl"
-                  onClick={() => printAs("transfer")}
-                  disabled={!hasLines}
+                  onClick={() => void printAs("transfer")}
+                  disabled={!hasLines || printing}
                 >
                   <IconPrinter className="h-3.5 w-3.5" />
                   {t("ration.printTransfer")}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -25,6 +25,7 @@ import {
 } from "@/components/shared/search-filter-bar";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { MessPageTabs } from "@/components/layout/mess-tabs";
+import { MessReportsLetter } from "@/components/mess/mess-reports-letter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,6 +60,7 @@ import { zkAttendanceToReportRows } from "@/lib/zk/attendance-report";
 import type { MealAssignStatus, MealShiftId, User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import { PAGE_SIZE } from "@/lib/pagination";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import { cn } from "@/lib/utils";
 
 type StatusFilter = "all" | MealAssignStatus;
@@ -220,6 +222,8 @@ export default function MessReportsClient() {
   const [zkUsers, setZkUsers] = useState<ZkUserRow[]>([]);
   const [zkLoading, setZkLoading] = useState(() => isZkDemoEnabled());
   const [zkTick, setZkTick] = useState(0);
+  const [printing, setPrinting] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (statusParam && isMealAssignStatus(statusParam)) {
@@ -586,6 +590,22 @@ export default function MessReportsClient() {
     );
   }
 
+  async function onPrint() {
+    const el = printRef.current;
+    if (!el || !rows.length) return;
+    setPrinting(true);
+    try {
+      await printLetterElement(
+        el,
+        `meal-reports-${view}-${rangeBounds.from}_${rangeBounds.to}.pdf`,
+        "landscape",
+        { skipInlineStyles: true },
+      );
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   return (
     <PagePane className="gap-5 print:border-0 print:p-0">
       <motion.div
@@ -629,8 +649,8 @@ export default function MessReportsClient() {
                     variant="cta"
                     size="sm"
                     className="h-9 gap-1.5 rounded-xl shadow-sm shadow-primary/20"
-                    onClick={() => window.print()}
-                    disabled={!rows.length}
+                    onClick={() => void onPrint()}
+                    disabled={!rows.length || printing}
                   >
                     <IconPrinter className="h-3.5 w-3.5" />
                     {t("mess.print")}
@@ -899,6 +919,12 @@ export default function MessReportsClient() {
                 </tbody>
               </table>
             </div>
+            <MessReportsLetter
+              ref={printRef}
+              rows={rows}
+              from={rangeBounds.from}
+              to={rangeBounds.to}
+            />
             <ListPagination
               className="no-print"
               page={safePage}

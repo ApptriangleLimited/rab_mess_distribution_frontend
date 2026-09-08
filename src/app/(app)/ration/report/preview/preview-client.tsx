@@ -112,6 +112,7 @@ export default function RationReportPreviewClient() {
         el,
         name,
         frSheets.length > 0 ? "landscape" : "portrait",
+        { skipInlineStyles: true },
       );
     } finally {
       setPrinting(false);

@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { useI18n, useT } from "@/i18n/provider";
 import { roleLabel } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { NavCountBadge } from "@/components/layout/nav-count-badge";
 import {
   CHIP_CLASS,
   NAV_BY_ROLE,
@@ -13,6 +14,7 @@ import {
   isNavActive,
   type NavItem,
 } from "@/components/layout/role-nav";
+import { useRequestMenuBadge } from "@/hooks/use-pending-request-counts";
 import type { Role } from "@/lib/types";
 
 function NavLink({
@@ -27,6 +29,7 @@ function NavLink({
   const t = useT();
   const Icon = item.icon;
   const label = t(item.labelKey);
+  const badge = useRequestMenuBadge(item.href);
 
   return (
     <Link
@@ -48,15 +51,25 @@ function NavLink({
       ) : null}
       <span
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-105",
+          "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-105",
           active
             ? CHIP_CLASS[item.chip] ?? CHIP_CLASS.neutral
             : "bg-white/80 text-neutral-500 shadow-sm ring-1 ring-black/[0.04] dark:bg-white/5 dark:text-neutral-400 dark:ring-white/5",
         )}
       >
         <Icon className="h-4 w-4" />
+        {collapsed && badge > 0 ? (
+          <span className="absolute -right-1.5 -top-1.5">
+            <NavCountBadge count={badge} />
+          </span>
+        ) : null}
       </span>
-      {!collapsed ? <span className="truncate tracking-tight">{label}</span> : null}
+      {!collapsed ? (
+        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <span className="truncate tracking-tight">{label}</span>
+          <NavCountBadge count={badge} />
+        </span>
+      ) : null}
     </Link>
   );
 }

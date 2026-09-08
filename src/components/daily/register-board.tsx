@@ -43,8 +43,10 @@ import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import {
   canAssignOnDate,
+  canWriteMfrLockedTag,
   isMfrLocked,
   isUserInactiveOnDate,
+  FR_TAG,
   MFR_TAG,
 } from "@/lib/store/daily";
 import { setBoroKhana } from "@/lib/store/boro-khana";
@@ -57,6 +59,7 @@ import { tagDisplayClass } from "@/lib/trg-tone";
 import {
   isTrgTag,
   needsTrgSardaPrompt,
+  needsTrgTrainingPrompt,
   resolveTrgTone,
 } from "@/lib/trg-tone";
 import { ColoredTagGrid } from "@/components/daily/colored-tag-grid";
@@ -235,10 +238,12 @@ export function RegisterBoard({
   const [sardaPrompt, setSardaPrompt] = useState<{
     userId: string;
     userName: string;
+    force: string;
     fromDate: string;
     toDate: string;
   } | null>(null);
   const [sardaChecked, setSardaChecked] = useState(false);
+  const [trainingChecked, setTrainingChecked] = useState(false);
 
   const closeRangeMenu = useCallback(() => {
     setRangeMenu(null);
@@ -387,7 +392,6 @@ export function RegisterBoard({
     if (date < todayISO) return;
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
-    if (user && isMfrLocked(user)) return;
     if (pendingByUserDate.has(`${userId}|${date}`)) return;
     const stroke: DragStroke = {
       userId,
@@ -412,11 +416,12 @@ export function RegisterBoard({
     tag: DailyTag,
     fromDate: string,
     toDate: string,
-    sarda = false,
+    opts?: { sarda?: boolean; training?: boolean },
   ) {
     const queue = dutyTagQueue(tag);
     if (queue === "immediate") return false;
     const user = users.find((u) => u.id === userId);
+    const force = user?.force ?? "";
     const row = createDutyTagRequest({
       userId,
       toTag: tag,
@@ -424,9 +429,12 @@ export function RegisterBoard({
       toDate,
       queue,
       trg_tone: isTrgTag(tag)
-        ? resolveTrgTone(user?.force ?? "", sarda)
+        ? resolveTrgTone(force, Boolean(opts?.training))
         : undefined,
-      trg_sarda: isTrgTag(tag) ? sarda : undefined,
+      trg_sarda:
+        isTrgTag(tag) && needsTrgSardaPrompt(force)
+          ? Boolean(opts?.sarda)
+          : undefined,
     });
     if (row) {
       toast(
@@ -451,16 +459,20 @@ export function RegisterBoard({
         !pendingByUserDate.has(`${rangeMenu.userId}|${date}`),
     );
     if (dates.length === 0) return;
+    if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
+    if (user && isMfrLocked(user) && !tag) return;
     const fromDate = dates[0]!;
     const toDate = dates[dates.length - 1]!;
-    if (isTrgTag(tag) && user && needsTrgSardaPrompt(user.force)) {
+    if (isTrgTag(tag) && user && needsTrgTrainingPrompt(user.force)) {
       setSardaPrompt({
         userId: user.id,
         userName: user.name,
+        force: user.force,
         fromDate,
         toDate,
       });
       setSardaChecked(false);
+      setTrainingChecked(false);
       closeRangeMenu();
       return;
     }
@@ -481,6 +493,10 @@ export function RegisterBoard({
       ? `${formatDateDisplay(rangeMenu.fromDate)} → ${formatDateDisplay(rangeMenu.toDate)}`
       : formatDateDisplay(rangeMenu.fromDate)
     : "";
+  const rangeUser = rangeMenu
+    ? users.find((u) => u.id === rangeMenu.userId)
+    : undefined;
+  const rangeMfrLocked = Boolean(rangeUser && isMfrLocked(rangeUser));
 
   const resetKey = useMemo(
     () =>
@@ -902,7 +918,7 @@ export function RegisterBoard({
                       const preview =
                         inDragPreview(user.id, date) && !pending;
                       const locked =
-                        afterOut || date < todayISO || mfrLocked || pending;
+                        afterOut || date < todayISO || pending;
                       let tag = stored;
                       let isGhost = false;
                       if (pendingTag) {
@@ -1002,6 +1018,8 @@ export function RegisterBoard({
               ghost={Boolean(rangeMenu.ghostTag)}
               tag={rangeMenu.storedTag ?? rangeMenu.ghostTag}
               locale={locale}
+              allowedTags={rangeMfrLocked ? [FR_TAG] : undefined}
+              allowClear={!rangeMfrLocked}
               fromDate={rangeMenu.fromDate}
               toDate={rangeMenu.toDate}
               minDate={todayISO}
@@ -1037,11 +1055,17 @@ export function RegisterBoard({
       <TrgSardaDialog
         open={!!sardaPrompt}
         name={sardaPrompt?.userName ?? ""}
-        checked={sardaChecked}
-        onCheckedChange={setSardaChecked}
+        showSarda={Boolean(
+          sardaPrompt && needsTrgSardaPrompt(sardaPrompt.force),
+        )}
+        sardaChecked={sardaChecked}
+        trainingChecked={trainingChecked}
+        onSardaChange={setSardaChecked}
+        onTrainingChange={setTrainingChecked}
         onCancel={() => {
           setSardaPrompt(null);
           setSardaChecked(false);
+          setTrainingChecked(false);
         }}
         onConfirm={() => {
           if (!sardaPrompt) return;
@@ -1050,10 +1074,11 @@ export function RegisterBoard({
             "TRG",
             sardaPrompt.fromDate,
             sardaPrompt.toDate,
-            sardaChecked,
+            { sarda: sardaChecked, training: trainingChecked },
           );
           setSardaPrompt(null);
           setSardaChecked(false);
+          setTrainingChecked(false);
         }}
       />
     </div>
@@ -1533,6 +1558,8 @@ function TagPickerPanel({
   fromDate,
   toDate,
   minDate,
+  allowedTags,
+  allowClear = true,
   onFromDate,
   onToDate,
   onAcceptCarry,
@@ -1546,6 +1573,8 @@ function TagPickerPanel({
   fromDate: string;
   toDate: string;
   minDate: string;
+  allowedTags?: readonly DailyTag[];
+  allowClear?: boolean;
   onFromDate: (date: string) => void;
   onToDate: (date: string) => void;
   onAcceptCarry?: () => void;
@@ -1602,15 +1631,18 @@ function TagPickerPanel({
         value={!ghost ? tag : undefined}
         onPick={onPick}
         locale={locale}
+        allowedTags={allowedTags}
       />
-      <button
-        type="button"
-        onClick={onClear}
-        className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-neutral-200 px-2 py-1.5 text-[11px] text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-      >
-        <IconX className="h-3 w-3" />
-        {t("daily.noTag")}
-      </button>
+      {allowClear ? (
+        <button
+          type="button"
+          onClick={onClear}
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-neutral-200 px-2 py-1.5 text-[11px] text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >
+          <IconX className="h-3 w-3" />
+          {t("daily.noTag")}
+        </button>
+      ) : null}
     </>
   );
 }

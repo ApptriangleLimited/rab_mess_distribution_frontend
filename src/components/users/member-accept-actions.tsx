@@ -20,6 +20,7 @@ import {
 import {
   isTrgTag,
   needsTrgSardaPrompt,
+  needsTrgTrainingPrompt,
   resolveTrgTone,
 } from "@/lib/trg-tone";
 import { todayISO } from "@/lib/date";
@@ -47,11 +48,13 @@ export function MemberAcceptActions({
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [actionTag, setActionTag] = useState<DailyTag>("MS");
   const [sardaChecked, setSardaChecked] = useState(false);
-  const showSarda =
+  const [trainingChecked, setTrainingChecked] = useState(false);
+  const showTrgPrompt =
     pendingAction === "accept" &&
     withTag &&
     isTrgTag(actionTag) &&
-    needsTrgSardaPrompt(user.force);
+    needsTrgTrainingPrompt(user.force);
+  const showSarda = showTrgPrompt && needsTrgSardaPrompt(user.force);
 
   const pending = user.approval_status === "pending";
 
@@ -60,6 +63,7 @@ export function MemberAcceptActions({
       const existing = getAssignment(user.id, todayISO());
       setActionTag(existing?.tag ?? "MS");
       setSardaChecked(false);
+      setTrainingChecked(false);
     }
     setPendingAction(type);
   }
@@ -87,9 +91,12 @@ export function MemberAcceptActions({
             toDate: todayISO(),
             queue,
             trg_tone: isTrgTag(actionTag)
-              ? resolveTrgTone(user.force, sardaChecked)
+              ? resolveTrgTone(user.force, trainingChecked)
               : undefined,
-            trg_sarda: isTrgTag(actionTag) ? sardaChecked : undefined,
+            trg_sarda:
+              isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
+                ? sardaChecked
+                : undefined,
           });
           toast(
             queue === "ration"
@@ -192,6 +199,7 @@ export function MemberAcceptActions({
                   if (next) {
                     setActionTag(next);
                     setSardaChecked(false);
+                    setTrainingChecked(false);
                   }
                 }}
                 className="h-9 min-w-[12rem] rounded-lg"
@@ -209,8 +217,21 @@ export function MemberAcceptActions({
               <span className="font-medium text-neutral-800 dark:text-neutral-100">
                 {t("daily.sardaLabel")}
               </span>
+            </label>
+          ) : null}
+          {showTrgPrompt ? (
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-neutral-200/90 bg-neutral-50/80 px-3 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-900/70">
+              <input
+                type="checkbox"
+                checked={trainingChecked}
+                onChange={(e) => setTrainingChecked(e.target.checked)}
+                className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
+              />
+              <span className="font-medium text-neutral-800 dark:text-neutral-100">
+                {t("daily.trainingLabel")}
+              </span>
               <span className="ml-auto text-xs text-neutral-500">
-                {sardaChecked ? t("daily.sardaBlack") : t("daily.sardaRed")}
+                {trainingChecked ? t("daily.sardaBlack") : t("daily.sardaRed")}
               </span>
             </label>
           ) : null}

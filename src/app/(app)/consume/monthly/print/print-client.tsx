@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadTagBillPdf } from "@/lib/download-consume-pdfs";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildTagBill } from "@/lib/reports";
 import { isKnownTag } from "@/lib/store/rates";
 import type { DailyTag } from "@/lib/types";
@@ -29,6 +30,8 @@ export default function ConsumeTagBillPrintClient() {
   const { locale } = useI18n();
   const state = useStore();
   const searchParams = useSearchParams();
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
 
   const rawMonth = searchParams.get("month");
   const month = rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : monthKey();
@@ -97,6 +100,19 @@ export default function ConsumeTagBillPrintClient() {
     });
   }
 
+  async function onPrint() {
+    const el = printRef.current;
+    if (!el || !canAct || !tag) return;
+    setPrinting(true);
+    try {
+      await printLetterElement(el, `consume-bill-${month}-${tag}.pdf`, "portrait", {
+        skipInlineStyles: true,
+      });
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   return (
     <PagePane className="gap-4 print:border-0 print:p-0">
       <div className="no-print">
@@ -143,11 +159,11 @@ export default function ConsumeTagBillPrintClient() {
                 size="sm"
                 variant="cta"
                 className="rounded-lg"
-                disabled={!canAct}
-                onClick={() => window.print()}
+                disabled={!canAct || printing}
+                onClick={() => void onPrint()}
               >
                 <IconPrinter className="h-3.5 w-3.5" />
-                {t("consume.printBill")}
+                {printing ? t("common.loading") : t("consume.printBill")}
               </Button>
             </>
           }
@@ -160,6 +176,7 @@ export default function ConsumeTagBillPrintClient() {
         <EmptyState title={t("common.noResults")} />
       ) : (
         <TagBillPrint
+          ref={printRef}
           month={month}
           tag={tag}
           tagLabel={label}

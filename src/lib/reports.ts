@@ -11,6 +11,8 @@ import {
   findPriorTag,
   isCarrySuppressed,
 } from "@/lib/store/assignments";
+import { projectedCockpitTag } from "@/lib/store/pritibhoj-counts";
+import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
 import { getClFrMonthlyAmount, getFuelRatePerDay, listAllTags } from "@/lib/store/rates";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import { activeSenders } from "@/lib/store/senders";
@@ -576,28 +578,18 @@ export function buildDailyRegisterDates(
   rows: LedgerRow[];
 } {
   if (!dates.length) return { dates, rows: [] };
-  const lo = dates[0];
-  const hi = dates[dates.length - 1];
-  const assignments = getState().assignments.filter(
-    (a) => a.date >= lo && a.date <= hi,
-  );
-  const byUser = new Map<string, Map<string, DailyTag>>();
-  for (const a of assignments) {
-    let dayMap = byUser.get(a.user_id);
-    if (!dayMap) {
-      dayMap = new Map();
-      byUser.set(a.user_id, dayMap);
-    }
-    dayMap.set(a.date, a.tag);
-  }
-
+  const state = getState();
+  const ctx = {
+    users,
+    assignments: state.assignments,
+    suppressed_carries: state.suppressed_carries,
+  };
   const rows: LedgerRow[] = [...users]
     .sort(sortUsersForBill)
     .map((user) => {
-      const dayMap = byUser.get(user.id);
       const counts: Partial<Record<DailyTag, number>> = {};
       const days: LedgerDayCell[] = dates.map((date) => {
-        const tag = dayMap?.get(date) ?? "";
+        const tag = projectedCockpitTag(user, date, ctx);
         if (tag) counts[tag] = (counts[tag] ?? 0) + 1;
         return tag;
       });
@@ -643,7 +635,10 @@ export function buildDailyRegisterFromCells(
       const dayMap = byUser.get(user.id);
       const counts: Partial<Record<DailyTag, number>> = {};
       const days: LedgerDayCell[] = dates.map((date) => {
-        const tag = dayMap?.get(date) ?? "";
+        const tag =
+          isMfrLocked(user) && canAssignOnDate(user, date)
+            ? MFR_TAG
+            : (dayMap?.get(date) ?? "");
         if (tag) counts[tag] = (counts[tag] ?? 0) + 1;
         return tag;
       });

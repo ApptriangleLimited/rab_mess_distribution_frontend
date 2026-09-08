@@ -26,6 +26,7 @@ import { TrgSardaDialog } from "@/components/daily/trg-sarda-dialog";
 import {
   isTrgTag,
   needsTrgSardaPrompt,
+  needsTrgTrainingPrompt,
   resolveTrgTone,
 } from "@/lib/trg-tone";
 import { todayISO } from "@/lib/date";
@@ -41,10 +42,11 @@ export default function DailyNewUserPage() {
     null,
   );
   const [sardaChecked, setSardaChecked] = useState(false);
+  const [trainingChecked, setTrainingChecked] = useState(false);
 
   async function onSubmit(
     values: UserFormSubmitPayload,
-    sardaChoice?: boolean,
+    choice?: { sarda?: boolean; training?: boolean },
   ) {
     if (busy) return;
     if (!values.name.trim()) {
@@ -62,20 +64,25 @@ export default function DailyNewUserPage() {
 
     if (
       isTrgTag(values.today_tag) &&
-      needsTrgSardaPrompt(values.force) &&
-      sardaChoice === undefined
+      needsTrgTrainingPrompt(values.force) &&
+      choice === undefined
     ) {
       setSardaPending(values);
       setSardaChecked(false);
+      setTrainingChecked(false);
       return;
     }
 
     const { today_tag, ...input } = values;
     const queue = dutyTagQueue(today_tag);
     const defaultTag = queue === "immediate" ? today_tag : "";
+    const training =
+      isTrgTag(today_tag) && needsTrgTrainingPrompt(values.force)
+        ? Boolean(choice?.training)
+        : false;
     const sarda =
       isTrgTag(today_tag) && needsTrgSardaPrompt(values.force)
-        ? Boolean(sardaChoice)
+        ? Boolean(choice?.sarda)
         : false;
 
     function afterCreate(userId: string) {
@@ -91,9 +98,11 @@ export default function DailyNewUserPage() {
         toDate: todayISO(),
         queue,
         trg_tone: isTrgTag(today_tag)
-          ? resolveTrgTone(values.force, sarda)
+          ? resolveTrgTone(values.force, training)
           : undefined,
-        trg_sarda: isTrgTag(today_tag) ? sarda : undefined,
+        trg_sarda: isTrgTag(today_tag) && needsTrgSardaPrompt(values.force)
+          ? sarda
+          : undefined,
       });
       toast(
         queue === "ration"
@@ -183,17 +192,26 @@ export default function DailyNewUserPage() {
       <TrgSardaDialog
         open={!!sardaPending}
         name={sardaPending?.name ?? ""}
-        checked={sardaChecked}
-        onCheckedChange={setSardaChecked}
+        showSarda={Boolean(
+          sardaPending && needsTrgSardaPrompt(sardaPending.force),
+        )}
+        sardaChecked={sardaChecked}
+        trainingChecked={trainingChecked}
+        onSardaChange={setSardaChecked}
+        onTrainingChange={setTrainingChecked}
         onCancel={() => {
           setSardaPending(null);
           setSardaChecked(false);
+          setTrainingChecked(false);
         }}
         onConfirm={() => {
           const pending = sardaPending;
           if (!pending) return;
           setSardaPending(null);
-          void onSubmit(pending, sardaChecked);
+          void onSubmit(pending, {
+            sarda: sardaChecked,
+            training: trainingChecked,
+          });
         }}
       />
     </PagePane>

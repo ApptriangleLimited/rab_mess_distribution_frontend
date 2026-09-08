@@ -15,9 +15,20 @@ export type PritibhojCountCtx = {
 
 export type PritibhojWingCounts = {
   dad: number;
+  others: number;
   civilian: number;
   nonMuslim: number;
 };
+
+function isDadRank(user: User): boolean {
+  return user.rank.trim().toLowerCase() === "dad";
+}
+
+function isCivilMember(user: User): boolean {
+  if (user.member_type === "civilian") return true;
+  const rank = user.rank.trim().toLowerCase();
+  return rank === "civill" || rank === "civil" || rank === "civilian";
+}
 
 function assignmentOnDate(
   ctx: PritibhojCountCtx,
@@ -80,10 +91,11 @@ export function pritibhojWingCounts(
   ctx: PritibhojCountCtx,
 ): PritibhojWingCounts {
   const key = wing.trim();
-  if (!key) return { dad: 0, civilian: 0, nonMuslim: 0 };
+  if (!key) return { dad: 0, others: 0, civilian: 0, nonMuslim: 0 };
 
   const specialTag = pritibhojWingDef(key)?.tag;
   let dad = 0;
+  let others = 0;
   let civilian = 0;
   let nonMuslim = 0;
 
@@ -108,11 +120,13 @@ export function pritibhojWingCounts(
       dad += 1;
     }
 
+    if (!isDadRank(user) && !isCivilMember(user)) others += 1;
+
     const religion = user.religion?.trim() ?? "";
     if (religion && !isIslam(religion)) nonMuslim += 1;
   }
 
-  return { dad, civilian, nonMuslim };
+  return { dad, others, civilian, nonMuslim };
 }
 
 export function applyPritibhojLookups(
@@ -125,6 +139,7 @@ export function applyPritibhojLookups(
     return finalizePritibhojRow({
       ...row,
       dad: counts.dad,
+      others: counts.others,
       civilian: counts.civilian,
       nonMuslim: counts.nonMuslim,
     });

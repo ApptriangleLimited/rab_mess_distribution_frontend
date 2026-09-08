@@ -35,6 +35,7 @@ export type MemberApiRow = {
   member_type: string;
   dropdown_no: string;
   phone: string;
+  blood_group?: string;
   documents: User["documents"];
   status: string;
   approval_status: string;
@@ -92,6 +93,7 @@ export function memberToUser(row: MemberApiRow): User {
     member_type: asMemberType(row.member_type),
     dropdown_no: row.dropdown_no ?? "",
     phone: row.phone ?? "",
+    blood_group: row.blood_group ?? "",
     documents: row.documents ?? [],
     documents_verified: Boolean(
       (row as MemberApiRow & { documents_verified?: boolean }).documents_verified,
@@ -107,6 +109,7 @@ export function memberToUser(row: MemberApiRow): User {
     joining_date: row.joining_date ?? "",
     out_date: row.out_date ?? "",
     default_tag: ((row.default_tag || "MS").toUpperCase() || "MS") as DailyTag,
+    jl_end_date: "",
     inactive_spans:
       row.status !== "1"
         ? [{ from: row.joining_date || "2020-01-01", to: null }]

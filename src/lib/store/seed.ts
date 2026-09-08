@@ -75,6 +75,8 @@ function user(
     | "emergency_contacts"
     | "default_tag"
     | "inactive_spans"
+    | "blood_group"
+    | "jl_end_date"
   > & {
     documents?: User["documents"];
     documents_verified?: boolean;
@@ -85,6 +87,8 @@ function user(
     emergency_contacts?: User["emergency_contacts"];
     default_tag?: DailyTag;
     inactive_spans?: User["inactive_spans"];
+    blood_group?: string;
+    jl_end_date?: string;
   },
 ): User {
   const ts = nowISO();
@@ -98,6 +102,8 @@ function user(
     personal_id: partial.personal_id ?? "",
     emergency_contacts: partial.emergency_contacts ?? [],
     default_tag: partial.default_tag ?? "MS",
+    blood_group: partial.blood_group ?? "",
+    jl_end_date: partial.jl_end_date ?? "",
     inactive_spans:
       partial.inactive_spans ??
       (partial.status === "0"

@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef } from "react";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import type { DailyTag } from "@/lib/types";
 import type { WingSummaryRow } from "@/lib/reports";
@@ -19,17 +20,16 @@ type Props = {
   preview?: boolean;
 };
 
-export function WingSummaryPrint({
-  month,
-  tagCodes,
-  rows,
-  totals,
-  preview = false,
-}: Props) {
+export const WingSummaryPrint = forwardRef<HTMLDivElement, Props>(
+  function WingSummaryPrint(
+    { month, tagCodes, rows, totals, preview = false },
+    ref,
+  ) {
   const t = useT();
 
   return (
     <div
+      ref={ref}
       className={cn(
         "wing-summary-print text-black",
         preview
@@ -132,4 +132,5 @@ export function WingSummaryPrint({
       </footer>
     </div>
   );
-}
+  },
+);

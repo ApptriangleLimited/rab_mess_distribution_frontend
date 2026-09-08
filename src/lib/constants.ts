@@ -286,6 +286,18 @@ export const BRANCH_DISTRICTS = [
   "Thakurgaon",
 ] as const;
 
+/** Member blood group picklist (register form). */
+export const BLOOD_GROUPS = [
+  "A+",
+  "A-",
+  "B+",
+  "B-",
+  "O+",
+  "O-",
+  "AB+",
+  "AB-",
+] as const;
+
 /** Member religion picklist (register form). */
 export const RELIGIONS = [
   "Islam",

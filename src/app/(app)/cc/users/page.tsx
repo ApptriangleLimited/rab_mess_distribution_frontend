@@ -7,6 +7,7 @@ import {
   IconCircleCheck,
   IconClockHour4,
   IconPlus,
+  IconPrinter,
   IconUsers,
   IconUserCheck,
 } from "@tabler/icons-react";
@@ -22,7 +23,11 @@ import { ApiClientError } from "@/lib/api/client";
 import { isApiEnabled } from "@/lib/api/mode";
 import { listMembers, memberToUser } from "@/lib/api/members";
 import { PAGE_SIZE } from "@/lib/pagination";
-import { filterUsers, type UserFilters } from "@/lib/store/users";
+import {
+  filterUsers,
+  userFiltersToSearchParams,
+  type UserFilters,
+} from "@/lib/store/users";
 import type { User } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -122,6 +127,8 @@ export default function CcUsersPage() {
       }
     : demoStats;
   const subtitleCount = apiOn ? apiTotal : demoUsers.length;
+  const printHref = `/cc/users/print?${userFiltersToSearchParams(filters).toString()}`;
+  const canPrint = apiOn ? apiTotal > 0 : demoUsers.length > 0;
 
   function setFiltersAndResetPage(next: UserFilters) {
     setFilters(next);
@@ -209,17 +216,42 @@ export default function CcUsersPage() {
               }
               center={<CcTabs />}
               actions={
-                <Button
-                  asChild
-                  variant="cta"
-                  size="sm"
-                  className="rounded-xl shadow-sm shadow-primary/20"
-                >
-                  <Link href="/cc/users/new">
-                    <IconPlus className="h-3.5 w-3.5" />
-                    {t("cc.newUser")}
-                  </Link>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {canPrint ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                    >
+                      <Link href={printHref}>
+                        <IconPrinter className="h-3.5 w-3.5" />
+                        {t("mess.print")}
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                      disabled
+                    >
+                      <IconPrinter className="h-3.5 w-3.5" />
+                      {t("mess.print")}
+                    </Button>
+                  )}
+                  <Button
+                    asChild
+                    variant="cta"
+                    size="sm"
+                    className="rounded-xl shadow-sm shadow-primary/20"
+                  >
+                    <Link href="/cc/users/new">
+                      <IconPlus className="h-3.5 w-3.5" />
+                      {t("cc.newUser")}
+                    </Link>
+                  </Button>
+                </div>
               }
             />
           </div>

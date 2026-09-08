@@ -159,7 +159,9 @@ export default function MessLedgerPrintClient() {
     if (!el || !canAct) return;
     setPrinting(true);
     try {
-      await printLetterElement(el, `mess-ledger-${month}.pdf`, "landscape");
+      await printLetterElement(el, `mess-ledger-${month}.pdf`, "landscape", {
+        skipInlineStyles: true,
+      });
     } finally {
       setPrinting(false);
     }

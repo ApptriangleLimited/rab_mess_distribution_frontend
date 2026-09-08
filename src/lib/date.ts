@@ -34,6 +34,14 @@ export function formatMonthLong(month: string, locale = "en-US") {
   });
 }
 
+/** `2026-07` → `July-2026` (en) or locale long month + year. */
+export function formatMonthDash(month: string, locale = "en-US") {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return month;
+  const name = new Date(y, m - 1, 1).toLocaleString(locale, { month: "long" });
+  return `${name}-${y}`;
+}
+
 /** `2026-06` → `Jun-2026` */
 export function formatMonthBill(month: string) {
   const [y, m] = month.split("-").map(Number);

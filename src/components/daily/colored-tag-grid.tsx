@@ -14,14 +14,18 @@ export function ColoredTagGrid({
   onPick,
   locale,
   columns = 3,
+  allowedTags,
 }: {
   value?: DailyTag | "";
   onPick: (tag: DailyTag) => void;
   locale: Locale;
   columns?: 3 | 4;
+  allowedTags?: readonly DailyTag[];
 }) {
   const state = useStore();
-  const tags = listAllTags();
+  const tags = allowedTags?.length
+    ? listAllTags().filter((code) => allowedTags.includes(code))
+    : listAllTags();
   void state.rates;
 
   return (

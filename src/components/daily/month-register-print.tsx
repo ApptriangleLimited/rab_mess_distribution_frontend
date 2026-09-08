@@ -2,7 +2,7 @@
 
 import { forwardRef } from "react";
 import { CONSUME_REPORT_META } from "@/lib/constants";
-import { formatMonthLong } from "@/lib/date";
+import { formatMonthDash, formatMonthLong } from "@/lib/date";
 import {
   registerCellMark,
   registerDayRuns,
@@ -23,7 +23,7 @@ type Props = {
 
 const BN_DIGITS = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
 
-function toBnDigits(n: number) {
+function toBnDigits(n: number | string) {
   return String(n).replace(/\d/g, (d) => BN_DIGITS[Number(d)] ?? d);
 }
 
@@ -38,6 +38,12 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
     const monthBn = formatMonthLong(month, "bn-BD");
     const monthEn = formatMonthLong(month);
     const useBn = locale === "bn";
+    const coverMonth = useBn
+      ? toBnDigits(formatMonthDash(month, "bn-BD"))
+      : formatMonthDash(month);
+    const coverTitle = useBn
+      ? t("daily.registerCoverTitleBn")
+      : t("daily.registerCoverTitle");
 
     const dayLabel = (d: number) => (useBn ? toBnDigits(d) : String(d));
     const serLabel = (n: number) => (useBn ? toBnDigits(n) : String(n));
@@ -45,13 +51,26 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
     return (
       <div
         ref={ref}
+        data-print-stack="true"
         className={cn(
           "month-register-print text-black",
           preview
-            ? "block overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700"
+            ? "mx-auto block w-full max-w-[297mm] overflow-visible bg-white text-neutral-900 shadow-sm print:max-w-none print:shadow-none"
             : "hidden print:block",
         )}
       >
+        <section className="register-cover mb-4 flex min-h-[420px] items-center justify-center bg-[#f4e25a] p-8 print:mb-0">
+          <div className="register-cover-label border-[3px] border-double border-black bg-white px-16 py-12 text-center text-black">
+            <p className="register-cover-title text-3xl font-bold tracking-wide text-black">
+              {coverTitle}
+            </p>
+            <p className="register-cover-month mt-3 text-lg font-semibold text-black underline decoration-black underline-offset-4">
+              {coverMonth}
+            </p>
+          </div>
+        </section>
+
+        <section className="register-sheet bg-white p-4 print:p-0">
         <div className="letter-masthead mb-3 text-center">
           <p className="text-[11px] font-semibold">
             {CONSUME_REPORT_META.wingBn}
@@ -165,6 +184,7 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
             </div>
           ))}
         </div>
+        </section>
       </div>
     );
   },

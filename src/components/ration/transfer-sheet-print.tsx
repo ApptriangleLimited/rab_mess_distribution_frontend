@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef } from "react";
 import { RATION_REPORT_META } from "@/lib/constants";
 import { amountToWordsEn } from "@/lib/money-words";
 import { formatBdt, type RationTransferSheet } from "@/lib/reports";
@@ -8,8 +9,8 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   sheets: RationTransferSheet[];
-  /** When true, show this sheet on window.print */
-  active?: boolean;
+  /** On-screen letter preview (not print-only). */
+  preview?: boolean;
 };
 
 function amt(n: number) {
@@ -19,16 +20,20 @@ function amt(n: number) {
   });
 }
 
-export function TransferSheetPrint({ sheets, active = false }: Props) {
+export const TransferSheetPrint = forwardRef<HTMLDivElement, Props>(
+  function TransferSheetPrint({ sheets, preview = false }, ref) {
   const t = useT();
 
   if (!sheets.length) return null;
 
   return (
     <div
+      ref={ref}
       className={cn(
-        "transfer-sheet-print hidden text-black",
-        active && "print-this",
+        "transfer-sheet-print text-black",
+        !preview && "hidden",
+        preview &&
+          "block overflow-auto rounded-xl border border-neutral-200 bg-white p-5 print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none dark:border-neutral-700",
       )}
     >
       {sheets.map((sheet, sheetIndex) => {
@@ -216,4 +221,5 @@ export function TransferSheetPrint({ sheets, active = false }: Props) {
       })}
     </div>
   );
-}
+  },
+);

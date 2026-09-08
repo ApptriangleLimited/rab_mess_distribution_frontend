@@ -120,7 +120,7 @@ export default function ConsumeLedgerClient() {
         size="sm"
         className="h-10 shrink-0 rounded-xl px-3"
       >
-        <Link href={printHref} target="_blank" rel="noopener noreferrer">
+        <Link href={printHref}>
           <IconPrinter className="h-4 w-4" />
           {t("mess.print")}
         </Link>

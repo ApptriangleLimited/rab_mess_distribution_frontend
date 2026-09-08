@@ -1,7 +1,8 @@
-import { nowISO, previousISODate, todayISO } from "@/lib/date";
+import { nextISODate, nowISO, previousISODate, todayISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import type {
   ApprovalStatus,
+  DailyAssignment,
   DailyTag,
   InactiveSpan,
   User,
@@ -9,6 +10,8 @@ import type {
 } from "@/lib/types";
 
 export const MFR_TAG = "MFR" as const;
+export const FR_TAG = "FR" as const;
+export const JL_TAG = "JL" as const;
 
 /** After Daily assigns MFR, the member stays MFR while active. */
 export function isMfrLocked(user: Pick<User, "default_tag">): boolean {
@@ -19,12 +22,28 @@ export function isMfrTag(tag: DailyTag | "" | undefined): boolean {
   return (tag ?? "").toUpperCase() === MFR_TAG;
 }
 
+export function isFrTag(tag: DailyTag | "" | undefined): boolean {
+  return (tag ?? "").toUpperCase() === FR_TAG;
+}
+
+export function isJlTag(tag: DailyTag | "" | undefined): boolean {
+  return (tag ?? "").toUpperCase() === JL_TAG;
+}
+
+/** MFR can only move to FR; after that they paint like everyone else. */
+export function canWriteMfrLockedTag(tag: DailyTag | "" | undefined): boolean {
+  return isFrTag(tag);
+}
+
 /**
  * True for dates inside an inactive stretch (from deactivate until
  * the day before they are activated again).
  */
 export function isUserInactiveOnDate(
-  user: Pick<User, "status" | "inactive_spans"> & { joining_date?: string },
+  user: Pick<User, "status" | "inactive_spans"> & {
+    joining_date?: string;
+    jl_end_date?: string;
+  },
   date: string,
 ): boolean {
   const join = (user.joining_date ?? "").trim();
@@ -38,8 +57,12 @@ export function isUserInactiveOnDate(
     if (span.to && date > span.to) continue;
     return true;
   }
-  if (user.status !== "1") {
+  const jlEnd = (user.jl_end_date ?? "").trim();
+  if (jlEnd && date > jlEnd) {
     return true;
+  }
+  if (user.status !== "1") {
+    return spans.length === 0;
   }
   return false;
 }
@@ -114,6 +137,7 @@ function patchUser(
   const updated: User = {
     ...existing,
     ...patch,
+    jl_end_date: patch.status === "1" ? "" : existing.jl_end_date,
     inactive_spans,
     updated_at: nowISO(),
   };
@@ -157,4 +181,97 @@ export function setUserStatus(id: string, status: UserStatus) {
 
 export function setApprovalStatus(id: string, approval_status: ApprovalStatus) {
   return patchUser(id, { approval_status });
+}
+
+export function lastJlDateForUser(
+  assignments: DailyAssignment[],
+  userId: string,
+): string {
+  let last = "";
+  for (const row of assignments) {
+    if (row.user_id === userId && isJlTag(row.tag) && row.date > last) {
+      last = row.date;
+    }
+  }
+  return last;
+}
+
+function ensureOpenInactiveFrom(
+  spans: InactiveSpan[] | undefined,
+  from: string,
+): InactiveSpan[] {
+  const next = [...(spans ?? [])];
+  if (next.some((span) => !span.to)) return next;
+  return [...next, { from, to: null }];
+}
+
+export function syncUserAfterJl(
+  user: User,
+  lastJl: string,
+  asOfDate = todayISO(),
+): User {
+  if (!lastJl) {
+    if (!user.jl_end_date) return user;
+    return { ...user, jl_end_date: "" };
+  }
+  if (asOfDate > lastJl) {
+    if (user.status === "0" && !user.jl_end_date) return user;
+    const from = nextISODate(lastJl);
+    return {
+      ...user,
+      jl_end_date: "",
+      status: "0",
+      inactive_spans: ensureOpenInactiveFrom(user.inactive_spans, from),
+      updated_at: nowISO(),
+    };
+  }
+  if (user.jl_end_date === lastJl) return user;
+  return { ...user, jl_end_date: lastJl };
+}
+
+export function syncUsersAfterJl(
+  users: User[],
+  assignments: DailyAssignment[],
+  userIds: Iterable<string>,
+  asOfDate = todayISO(),
+): User[] {
+  const ids = new Set(userIds);
+  if (ids.size === 0) return users;
+  return users.map((user) => {
+    if (!ids.has(user.id)) return user;
+    return syncUserAfterJl(
+      user,
+      lastJlDateForUser(assignments, user.id),
+      asOfDate,
+    );
+  });
+}
+
+/** Flip members whose last JL day is already over. */
+export function applyDueJlInactivations(asOfDate = todayISO()) {
+  const prev = getState();
+  const touched = new Set<string>();
+  for (const user of prev.users) {
+    if (user.jl_end_date) touched.add(user.id);
+  }
+  for (const row of prev.assignments) {
+    if (isJlTag(row.tag)) touched.add(row.user_id);
+  }
+  if (touched.size === 0) return;
+  const users = syncUsersAfterJl(
+    prev.users,
+    prev.assignments,
+    touched,
+    asOfDate,
+  );
+  if (users.every((user, i) => user === prev.users[i])) return;
+  const byId = new Map(users.map((user) => [user.id, user]));
+  setState({
+    ...prev,
+    users,
+    assignments: prev.assignments.filter((row) => {
+      const user = byId.get(row.user_id);
+      return !user || !isUserInactiveOnDate(user, row.date);
+    }),
+  });
 }

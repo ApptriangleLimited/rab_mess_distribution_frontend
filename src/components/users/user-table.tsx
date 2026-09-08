@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { usePagination } from "@/hooks/use-pagination";
-import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
+import type { ApprovalStatus, MemberType, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { RequestTagButton } from "@/components/tag-requests/request-tag-dialog";
@@ -24,6 +24,46 @@ import { cn } from "@/lib/utils";
 
 function statusLabel(status: UserStatus, t: ReturnType<typeof useT>) {
   return status === "1" ? t("cc.statusActive") : t("cc.statusInactive");
+}
+
+const memberTypeClass: Record<MemberType, string> = {
+  permanent:
+    "border-emerald-200/90 bg-emerald-50 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200",
+  new: "border-sky-200/90 bg-sky-50 text-sky-900 dark:border-sky-800/50 dark:bg-sky-950/40 dark:text-sky-200",
+  attached:
+    "border-amber-200/90 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200",
+  guest:
+    "border-violet-200/90 bg-violet-50 text-violet-900 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-200",
+  civilian:
+    "border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200",
+};
+
+const memberTypeKeys = {
+  permanent: "cc.memberTypes.member",
+  new: "cc.memberTypes.new",
+  attached: "cc.memberTypes.attached",
+  guest: "cc.memberTypes.guest",
+  civilian: "cc.memberTypes.civilian",
+} as const;
+
+function memberTypeLabel(type: MemberType | undefined, t: ReturnType<typeof useT>) {
+  const kind = type || "permanent";
+  return t(memberTypeKeys[kind]);
+}
+
+function MemberTypeChip({ type }: { type?: MemberType }) {
+  const t = useT();
+  const kind = type || "permanent";
+  return (
+    <Badge
+      className={cn(
+        "rounded-full border text-[10px] font-semibold",
+        memberTypeClass[kind],
+      )}
+    >
+      {memberTypeLabel(kind, t)}
+    </Badge>
+  );
 }
 
 function approvalLabel(status: ApprovalStatus, t: ReturnType<typeof useT>) {
@@ -183,6 +223,7 @@ export function UserTable({
                     </div>
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <MemberTypeChip type={user.member_type} />
                     <Badge
                       className={cn(
                         "border text-[10px] font-semibold",
@@ -239,6 +280,9 @@ export function UserTable({
               </th>
               <th className="px-4 py-3.5 font-semibold">
                 {t("cc.fields.name")}
+              </th>
+              <th className="px-4 py-3.5 font-semibold">
+                {t("cc.fields.memberType")}
               </th>
               <th className="px-4 py-3.5 font-semibold">
                 {t("cc.fields.personalId")}
@@ -313,6 +357,9 @@ export function UserTable({
                         </a>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <MemberTypeChip type={user.member_type} />
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-400">
                     {user.personal_id || "—"}

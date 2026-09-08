@@ -14,6 +14,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
+import { useRequestMenuBadge } from "@/hooks/use-pending-request-counts";
 import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n";
 import type { Icon } from "@tabler/icons-react";
@@ -114,6 +115,7 @@ export function RationTabs({
   const pathname = usePathname();
   const t = useT();
   const { session } = useSession();
+  const requestBadge = useRequestMenuBadge("/ration/requests");
   const showDashboard = withDashboard ?? session?.role === "admin";
   const tabs = showDashboard
     ? [
@@ -136,6 +138,7 @@ export function RationTabs({
         label: t(tab.labelKey),
         icon: tab.icon,
         active: tab.match(pathname),
+        badge: tab.href === "/ration/requests" ? requestBadge : undefined,
       }))}
     />
   );

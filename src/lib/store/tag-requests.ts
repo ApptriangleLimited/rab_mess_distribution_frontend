@@ -8,6 +8,7 @@ import {
 } from "@/lib/store/assignments";
 import {
   canAssignOnDate,
+  canWriteMfrLockedTag,
   isMfrLocked,
   isUserInactiveOnDate,
   MFR_TAG,
@@ -72,7 +73,6 @@ export function getCockpitToneOnDate(user: User, date: string): TrgTone | undefi
 }
 
 export function canRequestTag(user: User, date = todayISO()): boolean {
-  if (isMfrLocked(user)) return false;
   return user.approval_status === "approved" && canAssignOnDate(user, date);
 }
 
@@ -92,6 +92,35 @@ export function getPendingTagRequest(
 
 export function listTagRequests(): TagRequest[] {
   return getState().tag_requests;
+}
+
+export type PendingRequestCounts = Record<TagRequestQueue, number>;
+
+/** Open tag-change requests waiting for action, by queue. */
+export function pendingRequestCounts(
+  requests: TagRequest[] = getState().tag_requests,
+): PendingRequestCounts {
+  const counts: PendingRequestCounts = { daily: 0, ration: 0, consume: 0 };
+  for (const row of requests) {
+    if (row.status !== "requested") continue;
+    const queue: TagRequestQueue =
+      row.queue === "ration" || row.queue === "consume" ? row.queue : "daily";
+    counts[queue] += 1;
+  }
+  return counts;
+}
+
+/** Menu href → pending count for that Requests item. */
+export function pendingRequestCountForHref(
+  href: string,
+  counts: PendingRequestCounts,
+): number {
+  if (href.startsWith("/daily/requests") || href.startsWith("/cc/requested")) {
+    return counts.daily;
+  }
+  if (href.startsWith("/ration/requests")) return counts.ration;
+  if (href.startsWith("/consume/requests")) return counts.consume;
+  return 0;
 }
 
 /** Pending Daily→Ration/Consume requests keyed `userId|YYYY-MM-DD`. */
@@ -161,6 +190,7 @@ export function createTagRequest(
   const fromDate = rawFrom <= rawTo ? rawFrom : rawTo;
   const toDate = rawFrom <= rawTo ? rawTo : rawFrom;
   if (!canRequestTag(user, fromDate)) return null;
+  if (isMfrLocked(user) && !canWriteMfrLockedTag(toTag)) return null;
   const assignable = eachISODate(fromDate, toDate).filter((d) =>
     canAssignOnDate(user, d),
   );
@@ -217,14 +247,14 @@ export function createDutyTagRequest(input: {
 }): TagRequest | null {
   const user = getState().users.find((u) => u.id === input.userId);
   if (!user || !input.toTag) return null;
-  if (isMfrLocked(user)) return null;
+  if (isMfrLocked(user) && !canWriteMfrLockedTag(input.toTag)) return null;
   const fromDate = input.fromDate || todayISO();
   const toDate = input.toDate || fromDate;
   const fromTag = getCockpitTagOnDate(user, fromDate);
   const ts = nowISO();
   const existing = getPendingTagRequest(input.userId, input.queue);
   const trg_tone = isTrgTag(input.toTag)
-    ? (input.trg_tone ?? resolveTrgTone(user.force, Boolean(input.trg_sarda)))
+    ? (input.trg_tone ?? resolveTrgTone(user.force, false))
     : undefined;
   const trg_sarda = isTrgTag(input.toTag) && needsTrgSardaPrompt(user.force)
     ? Boolean(input.trg_sarda)
@@ -292,7 +322,7 @@ export function applyTagRequest(
 
   const meta =
     isTrgTag(req.to_tag)
-      ? { trg_tone: req.trg_tone ?? resolveTrgTone(user.force, Boolean(req.trg_sarda)) }
+      ? { trg_tone: req.trg_tone ?? resolveTrgTone(user.force, false) }
       : undefined;
 
   if (dates.length === 1) {

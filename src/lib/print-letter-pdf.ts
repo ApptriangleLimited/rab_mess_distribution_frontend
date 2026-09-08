@@ -3,6 +3,8 @@
 export type PrintLetterOptions = {
   /** Keep table fills and grid lines (Pritibhoj and other colored sheets). */
   preserveColors?: boolean;
+  /** Skip computed-style copy (large registers hang Chrome before print). */
+  skipInlineStyles?: boolean;
 };
 
 const TABLE_TAGS = new Set([
@@ -89,8 +91,31 @@ function flattenPrintSurface(node: HTMLElement, wipeFill: boolean) {
   }
 }
 
-function expandForPrintPage(root: HTMLElement, preserveColors: boolean) {
-  flattenPrintSurface(root, true);
+function keepPrintFill(
+  node: HTMLElement,
+  preserveColors: boolean,
+  skipInlineStyles = false,
+) {
+  if (TABLE_TAGS.has(node.tagName) && (preserveColors || skipInlineStyles)) {
+    return true;
+  }
+  if (!preserveColors) return false;
+  return (
+    node.classList.contains("register-cover") ||
+    node.classList.contains("register-cover-label") ||
+    Boolean(node.closest(".register-cover"))
+  );
+}
+
+function expandForPrintPage(
+  root: HTMLElement,
+  preserveColors: boolean,
+  skipInlineStyles = false,
+) {
+  flattenPrintSurface(
+    root,
+    !root.querySelector(".register-cover") && !skipInlineStyles,
+  );
   root.style.width = "100%";
   root.style.minWidth = "0";
   root.style.height = "auto";
@@ -99,7 +124,7 @@ function expandForPrintPage(root: HTMLElement, preserveColors: boolean) {
   root.style.display = "block";
 
   root.querySelectorAll<HTMLElement>("*").forEach((node) => {
-    const keepFill = preserveColors && TABLE_TAGS.has(node.tagName);
+    const keepFill = keepPrintFill(node, preserveColors, skipInlineStyles);
     flattenPrintSurface(node, !keepFill);
     node.style.maxWidth = "none";
     if (keepFill) node.style.position = "static";
@@ -114,6 +139,51 @@ function pageCssSize(orientation: "portrait" | "landscape") {
   return orientation === "landscape"
     ? { w: "297mm", h: "210mm", page: "A4 landscape" }
     : { w: "210mm", h: "297mm", page: "A4 portrait" };
+}
+
+function letterSheetCss() {
+  return `
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  th, td {
+    border: 1px solid #111 !important;
+    padding: 3px 4px !important;
+    color: #111 !important;
+    vertical-align: middle;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  thead th, tfoot th, tfoot td {
+    font-weight: 600;
+    background: #f4f4f4 !important;
+  }
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .month-ledger-print table {
+    table-layout: fixed !important;
+  }
+  .month-ledger-print th,
+  .month-ledger-print td,
+  .transfer-sheet-print th,
+  .transfer-sheet-print td {
+    padding: 1px 2px !important;
+    font-size: 8px !important;
+  }
+  .tag-bill-print th,
+  .tag-bill-print td,
+  .staff-payout-print th,
+  .staff-payout-print td,
+  .mess-reports-letter th,
+  .mess-reports-letter td,
+  .wing-summary-print th,
+  .wing-summary-print td {
+    font-size: 10px !important;
+  }`;
 }
 
 function colorSheetCss() {
@@ -185,7 +255,55 @@ function colorSheetCss() {
   .pritibhoj-table th:nth-child(2),
   .pritibhoj-table td:nth-child(2) { width: 16%; }
   .pritibhoj-table th:nth-child(n+3),
-  .pritibhoj-table td:nth-child(n+3) { width: 7.27%; }`;
+  .pritibhoj-table td:nth-child(n+3) { width: 7.27%; }
+  .register-cover {
+    background: #f4e25a !important;
+    min-height: calc(210mm - 16mm);
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .register-cover-label {
+    background: #fff !important;
+    color: #000 !important;
+    border: 3px double #000 !important;
+    padding: 16mm 18mm !important;
+    text-align: center !important;
+  }
+  .register-cover-title,
+  .register-cover-month {
+    color: #000 !important;
+  }
+  .register-sheet {
+    page-break-before: always;
+    break-before: page;
+    background: #fff !important;
+  }
+  .month-register-print table,
+  .register-sheet table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  .month-register-print th,
+  .month-register-print td,
+  .register-sheet th,
+  .register-sheet td {
+    border: 1px solid #000 !important;
+    color: #000 !important;
+    background: #fff !important;
+    padding: 1px 2px !important;
+  }
+  .register-sheet tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }`;
 }
 
 function waitForPaint(win: Window) {
@@ -216,8 +334,10 @@ function printAndWait(win: Window) {
 function buildPrintHtml(
   orientation: "portrait" | "landscape",
   preserveColors: boolean,
+  skipInlineStyles: boolean,
 ) {
   const { w, h, page } = pageCssSize(orientation);
+  const allowFlow = preserveColors || skipInlineStyles;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <meta name="color-scheme" content="light"/>
 <title>Print</title>
@@ -243,6 +363,7 @@ function buildPrintHtml(
   }
   table { width: 100% !important; max-width: 100% !important; min-width: 0 !important; border-collapse: collapse; table-layout: fixed; }
   th, td { word-wrap: break-word; overflow-wrap: anywhere; }
+  ${letterSheetCss()}
   ${preserveColors ? colorSheetCss() : ""}
   .print-page {
     width: 100%;
@@ -257,7 +378,7 @@ function buildPrintHtml(
     border-radius: 0 !important;
     background: #fff;
     ${
-      preserveColors
+      allowFlow
         ? `page-break-after: auto;
     break-after: auto;
     page-break-inside: auto;
@@ -279,20 +400,28 @@ function prepareClone(
   el: HTMLElement,
   orientation: "portrait" | "landscape",
   preserveColors: boolean,
+  skipInlineStyles: boolean,
 ) {
   const { h } = pageCssSize(orientation);
   const clone = el.cloneNode(true) as HTMLElement;
-  inlineComputedStyles(el, clone, preserveColors);
+  if (!skipInlineStyles) {
+    inlineComputedStyles(el, clone, preserveColors);
+  }
   clone.querySelectorAll(".no-print").forEach((node) => node.remove());
-  expandForPrintPage(clone, preserveColors);
+  clone.classList.remove("hidden");
+  expandForPrintPage(clone, preserveColors, skipInlineStyles);
 
   if (clone.dataset.printStack === "true") {
     const pages = Array.from(clone.children);
     pages.forEach((kid, i) => {
       if (!(kid instanceof HTMLElement)) return;
-      kid.className = "print-page";
-      flattenPrintSurface(kid, true);
+      kid.classList.add("print-page");
+      const keepFill = keepPrintFill(kid, preserveColors);
+      flattenPrintSurface(kid, !keepFill);
       const last = i === pages.length - 1;
+      const allowFlow =
+        kid.classList.contains("register-sheet") ||
+        Boolean(kid.querySelector("table"));
       kid.style.width = "100%";
       kid.style.maxWidth = "100%";
       kid.style.minHeight = `calc(${h} - 16mm)`;
@@ -300,18 +429,19 @@ function prepareClone(
       kid.style.padding = "0";
       kid.style.pageBreakAfter = last ? "auto" : "always";
       kid.style.breakAfter = last ? "auto" : "page";
-      kid.style.pageBreakInside = "avoid";
-      kid.style.breakInside = "avoid";
+      kid.style.pageBreakInside = allowFlow ? "auto" : "avoid";
+      kid.style.breakInside = allowFlow ? "auto" : "avoid";
     });
     clone.style.width = "100%";
     clone.style.maxWidth = "100%";
     clone.style.display = "block";
     clone.style.gap = "0";
   } else {
-    clone.className = preserveColors
-      ? `${clone.className} print-page`.trim()
-      : "print-page";
-    flattenPrintSurface(clone, !preserveColors);
+    clone.className =
+      preserveColors || skipInlineStyles
+        ? `${clone.className} print-page`.trim()
+        : "print-page";
+    flattenPrintSurface(clone, !(preserveColors || skipInlineStyles));
     clone.style.width = "100%";
     clone.style.maxWidth = "100%";
     clone.style.minHeight = `calc(${h} - 16mm)`;
@@ -322,6 +452,26 @@ function prepareClone(
   return clone;
 }
 
+const LARGE_LETTER_SELECTOR = [
+  ".month-register-print",
+  ".register-cover",
+  ".month-ledger-print",
+  ".tag-bill-print",
+  ".wing-summary-print",
+  ".staff-payout-print",
+  ".transfer-sheet-print",
+  ".mess-reports-letter",
+  ".member-list-letter",
+].join(", ");
+
+function shouldSkipInlineStyles(el: HTMLElement, options: PrintLetterOptions) {
+  if (options.skipInlineStyles) return true;
+  return (
+    el.matches(LARGE_LETTER_SELECTOR) ||
+    Boolean(el.querySelector(LARGE_LETTER_SELECTOR))
+  );
+}
+
 export async function printLetterElement(
   el: HTMLElement,
   _filename = "letter.pdf",
@@ -329,14 +479,15 @@ export async function printLetterElement(
   options: PrintLetterOptions = {},
 ) {
   const preserveColors = Boolean(options.preserveColors);
+  const skipInlineStyles = shouldSkipInlineStyles(el, options);
   const prevMax = el.style.maxHeight;
   const prevOverflow = el.style.overflow;
   el.style.maxHeight = "none";
   el.style.overflow = "visible";
 
   const { w, h } = pageCssSize(orientation);
-  const html = buildPrintHtml(orientation, preserveColors);
-  const clone = prepareClone(el, orientation, preserveColors);
+  const html = buildPrintHtml(orientation, preserveColors, skipInlineStyles);
+  const clone = prepareClone(el, orientation, preserveColors, skipInlineStyles);
 
   // Do not use noopener — Chrome then returns null and leaves an empty about:blank.
   const printWin = window.open(

@@ -27,6 +27,7 @@ export function toMemberEntryBody(values: UserFormValues) {
     member_type: values.member_type,
     dropdown_no: values.dropdown_no.trim(),
     phone: normalizeBdPhone(values.phone),
+    blood_group: values.blood_group.trim(),
     bank_name: values.bank_name.trim(),
     account_name: values.account_name.trim(),
     account_number: values.account_number.trim(),

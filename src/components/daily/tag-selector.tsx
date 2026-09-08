@@ -19,17 +19,21 @@ export function TagSelector({
   allowEmpty = false,
   disabled = false,
   className,
+  allowedTags,
 }: {
   value: DailyTag | "" | null;
   onChange: (tag: DailyTag | "") => void;
   allowEmpty?: boolean;
   disabled?: boolean;
   className?: string;
+  allowedTags?: readonly DailyTag[];
 }) {
   const t = useT();
   const { locale } = useI18n();
   const state = useStore();
-  const tags = listAllTags();
+  const tags = allowedTags?.length
+    ? listAllTags().filter((code) => allowedTags.includes(code))
+    : listAllTags();
   const current = value ?? "";
   void state.rates;
 

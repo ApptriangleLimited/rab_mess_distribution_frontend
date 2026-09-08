@@ -15,9 +15,22 @@ export function isPoliceForce(force: string): boolean {
   return normForce(force) === "police";
 }
 
-/** Police TRG needs the Sarda checkbox before we know black vs red. */
+export function isAnsarForce(force: string): boolean {
+  return normForce(force) === "ansar";
+}
+
+export function isBgbForce(force: string): boolean {
+  return normForce(force) === "bgb";
+}
+
+/** Police still gets the Sarda checkbox on TRG. */
 export function needsTrgSardaPrompt(force: string): boolean {
   return isPoliceForce(force);
+}
+
+/** Police / Ansar / BGB pick Training — checked = black TRG, else red. */
+export function needsTrgTrainingPrompt(force: string): boolean {
+  return isPoliceForce(force) || isAnsarForce(force) || isBgbForce(force);
 }
 
 export function isTrgTag(tag?: DailyTag | "" | null): tag is "TRG" {
@@ -26,11 +39,12 @@ export function isTrgTag(tag?: DailyTag | "" | null): tag is "TRG" {
 
 /**
  * Force check at write time.
- * Police + Sarda checked → black; Police unchecked / other forces → red.
+ * Army / Navy / Air Force → black.
+ * Police / Ansar / BGB + Training checked → black; otherwise red.
  */
-export function resolveTrgTone(force: string, sardaChecked = false): TrgTone {
+export function resolveTrgTone(force: string, trainingChecked = false): TrgTone {
   if (isBlackTrgForce(force)) return "black";
-  if (isPoliceForce(force) && sardaChecked) return "black";
+  if (needsTrgTrainingPrompt(force) && trainingChecked) return "black";
   return "red";
 }
 

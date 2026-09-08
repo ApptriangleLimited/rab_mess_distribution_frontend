@@ -193,11 +193,7 @@ export default function ConsumeMonthlyClient() {
                         size="sm"
                         className="h-9 rounded-xl shadow-sm shadow-primary/20"
                       >
-                        <Link
-                          href={printHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
+                        <Link href={printHref}>
                           <IconPrinter className="h-3.5 w-3.5" />
                           {t("consume.printBill")}
                         </Link>

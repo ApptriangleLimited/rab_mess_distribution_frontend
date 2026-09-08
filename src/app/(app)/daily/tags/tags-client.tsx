@@ -54,7 +54,13 @@ import {
   setTagRange,
 } from "@/lib/store/assignments";
 import { listAllTags } from "@/lib/store/rates";
-import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
+import {
+  applyDueJlInactivations,
+  canAssignOnDate,
+  canWriteMfrLockedTag,
+  isMfrLocked,
+  MFR_TAG,
+} from "@/lib/store/daily";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -129,6 +135,7 @@ export default function TagsPageClient() {
   /** Demo only — API computes carry on read. Active members only. */
   useEffect(() => {
     if (apiOn) return;
+    applyDueJlInactivations(today);
     const ids = state.users
       .filter(
         (u) =>
@@ -304,6 +311,8 @@ export default function TagsPageClient() {
   function onTagChange(userId: string, date: string, tag: DailyTag | "") {
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
+    if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
+    if (user && isMfrLocked(user) && !tag) return;
     if (apiOn) void cockpit.onTagChange(userId, date, tag);
     else if (!tag) clearTag(userId, date);
     else setTag(userId, date, tag);
@@ -312,6 +321,8 @@ export default function TagsPageClient() {
   function onPaintRange(userId: string, dates: string[], tag: DailyTag | "") {
     const user = users.find((u) => u.id === userId);
     if (user && dates.every((d) => !canAssignOnDate(user, d))) return;
+    if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
+    if (user && isMfrLocked(user) && !tag) return;
     if (apiOn) void cockpit.onPaintRange(userId, dates, tag);
     else setTagRange(userId, dates, tag);
   }
@@ -328,7 +339,7 @@ export default function TagsPageClient() {
         size="sm"
         className="h-9 shrink-0 rounded-xl px-3"
       >
-        <Link href={printHref} target="_blank" rel="noopener noreferrer">
+        <Link href={printHref}>
           <IconPrinter className="h-4 w-4" />
           {t("mess.print")}
         </Link>

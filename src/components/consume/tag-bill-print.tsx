@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef } from "react";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatBdt, type TagBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
@@ -20,23 +21,28 @@ type Props = {
   preview?: boolean;
 };
 
-export function TagBillPrint({
-  month,
-  tag,
-  tagLabel,
-  rows,
-  totalDays,
-  totalAmount,
-  totalFuel,
-  grandTotal,
-  showFuel,
-  preview = false,
-}: Props) {
+export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
+  function TagBillPrint(
+    {
+      month,
+      tag,
+      tagLabel,
+      rows,
+      totalDays,
+      totalAmount,
+      totalFuel,
+      grandTotal,
+      showFuel,
+      preview = false,
+    },
+    ref,
+  ) {
   const t = useT();
   const [year, mon] = month.split("-");
 
   return (
     <div
+      ref={ref}
       className={cn(
         "tag-bill-print text-black",
         preview
@@ -175,4 +181,5 @@ export function TagBillPrint({
       </footer>
     </div>
   );
-}
+  },
+);

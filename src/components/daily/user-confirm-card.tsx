@@ -22,6 +22,11 @@ export function UserConfirmCard({ user }: { user: User }) {
       label: t("cc.fields.phone"),
       value: user.phone || "—",
     },
+    {
+      icon: IconId,
+      label: t("cc.fields.bloodGroup"),
+      value: user.blood_group || "—",
+    },
   ];
 
   return (

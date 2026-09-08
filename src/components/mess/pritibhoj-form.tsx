@@ -9,7 +9,7 @@ import type { PritibhojRow } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
-const INPUT_KEYS = ["officer", "azadHall", "others", "azadHallDist"] as const;
+const INPUT_KEYS = ["officer", "azadHall", "azadHallDist"] as const;
 
 type InputKey = (typeof INPUT_KEYS)[number];
 
@@ -159,10 +159,7 @@ function EditableTable({
                   value={live.distribution}
                   className="bg-sky-50 dark:bg-sky-950/30"
                 />
-                <NumberInput
-                  value={row.others}
-                  onChange={(next) => setNum(i, "others", next)}
-                />
+                <ReadCell value={live.others} />
                 <ReadCell value={live.civilian} />
                 <ReadCell value={live.nonMuslim} />
                 <ReadCell

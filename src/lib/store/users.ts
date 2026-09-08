@@ -2,7 +2,7 @@ import { nowISO, todayISO } from "@/lib/date";
 import { digitsOnly, isValidBdPhone, normalizeBdPhone } from "@/lib/utils";
 import { listRanks, listMemberBanks } from "@/lib/store/org-options";
 import { getState, setState } from "@/lib/store";
-import { applyStatusToSpans, isMfrLocked, isUserInactiveOnDate, MFR_TAG } from "@/lib/store/daily";
+import { applyStatusToSpans, isMfrLocked, isUserInactiveOnDate, FR_TAG, MFR_TAG } from "@/lib/store/daily";
 import type {
   ApprovalStatus,
   DailyTag,
@@ -34,6 +34,7 @@ export type UserInput = {
   member_type: MemberType;
   dropdown_no: string;
   phone: string;
+  blood_group: string;
   documents: DocumentMeta[];
   documents_verified: boolean;
   status: UserStatus;
@@ -213,12 +214,14 @@ export function createUser(
     routing: digitsOnly(input.routing),
     branch_location: input.branch_location.trim(),
     phone: normalizeBdPhone(input.phone),
+    blood_group: input.blood_group.trim(),
     emergency_contacts: cleanEmergencyContacts(input.emergency_contacts ?? []),
     documents_verified:
       input.member_type === "civilian" ? !!input.documents_verified : false,
     status: input.status,
     approval_status,
     default_tag: (input.default_tag || "MS") as DailyTag,
+    jl_end_date: "",
     inactive_spans:
       input.status === "0"
         ? [{ from: input.joining_date || "1970-01-01", to: null }]
@@ -254,14 +257,18 @@ export function updateUser(id: string, input: UserInput): User | null {
     routing: digitsOnly(input.routing),
     branch_location: input.branch_location.trim(),
     phone: normalizeBdPhone(input.phone),
+    blood_group: input.blood_group.trim(),
     emergency_contacts: cleanEmergencyContacts(input.emergency_contacts ?? []),
     documents_verified:
       (input.member_type || existing.member_type) === "civilian"
         ? !!input.documents_verified
         : false,
     default_tag: (isMfrLocked(existing)
-      ? MFR_TAG
+      ? input.default_tag === FR_TAG
+        ? FR_TAG
+        : MFR_TAG
       : input.default_tag || existing.default_tag || "MS") as DailyTag,
+    jl_end_date: input.status === "1" ? "" : existing.jl_end_date,
     inactive_spans,
     updated_at: nowISO(),
   };
@@ -380,4 +387,41 @@ export function filterUsers(users: User[], filters: UserFilters) {
       return hay.includes(q);
     })
     .sort(compareUsers);
+}
+
+export function userFiltersToSearchParams(filters: UserFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  const q = filters.q?.trim() ?? "";
+  if (q) params.set("q", q);
+  if (filters.status && filters.status !== "all") params.set("status", filters.status);
+  if (filters.approval && filters.approval !== "all") {
+    params.set("approval", filters.approval);
+  }
+  if (filters.wing && filters.wing !== "all") params.set("wing", filters.wing);
+  if (filters.rank && filters.rank !== "all") params.set("rank", filters.rank);
+  if (filters.date_from?.trim()) params.set("date_from", filters.date_from.trim());
+  if (filters.date_to?.trim()) params.set("date_to", filters.date_to.trim());
+  return params;
+}
+
+export function userFiltersFromSearchParams(
+  search: Pick<URLSearchParams, "get">,
+): UserFilters {
+  const status = search.get("status");
+  const approval = search.get("approval");
+  return {
+    q: search.get("q") ?? "",
+    status: status === "0" || status === "1" ? status : "all",
+    approval:
+      approval === "pending" ||
+      approval === "approved" ||
+      approval === "rejected" ||
+      approval === "ended"
+        ? approval
+        : "all",
+    wing: search.get("wing") || "all",
+    rank: search.get("rank") || "all",
+    date_from: search.get("date_from") ?? "",
+    date_to: search.get("date_to") ?? "",
+  };
 }

@@ -16,6 +16,7 @@ import {
   getCockpitTagOnDate,
   getPendingTagRequest,
 } from "@/lib/store/tag-requests";
+import { isMfrLocked, FR_TAG } from "@/lib/store/daily";
 import { todayISO } from "@/lib/date";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -149,6 +150,7 @@ export function RequestTagButton({
               onPick={(next) => setTag(next)}
               locale={locale}
               columns={4}
+              allowedTags={isMfrLocked(user) ? [FR_TAG] : undefined}
             />
           </div>
         </div>

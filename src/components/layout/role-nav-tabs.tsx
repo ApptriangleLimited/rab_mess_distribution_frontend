@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import type { Icon } from "@tabler/icons-react";
+import { NavCountBadge } from "@/components/layout/nav-count-badge";
 import { cn } from "@/lib/utils";
 
 export type RoleNavTab = {
@@ -11,6 +12,7 @@ export type RoleNavTab = {
   label: string;
   icon: Icon;
   active: boolean;
+  badge?: number;
 };
 
 type Props = {
@@ -103,6 +105,10 @@ export function RoleNavTabs({
                 <Icon className="h-3.5 w-3.5" stroke={2.25} />
               </span>
               <span className="whitespace-nowrap">{tab.label}</span>
+              <NavCountBadge
+                count={tab.badge ?? 0}
+                tone={tab.active ? "tabActive" : "tab"}
+              />
             </span>
           </Link>
         );

@@ -1170,6 +1170,8 @@ function normalizeState(state: AppState): AppState {
         personal_id: legacy.personal_id ?? "",
         force: legacy.force ?? "",
         religion: legacy.religion ?? "",
+        blood_group: legacy.blood_group ?? "",
+        jl_end_date: legacy.jl_end_date ?? "",
         branch_location: legacy.branch_location ?? "",
         bank_name,
         documents_verified: Boolean(

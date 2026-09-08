@@ -65,6 +65,8 @@ export interface User {
   member_type: MemberType;
   dropdown_no: string;
   phone: string;
+  /** ABO blood group, e.g. `A+`. Empty if not set. */
+  blood_group: string;
   documents: DocumentMeta[];
   /** Civilian: staff confirmed NID/birth-cert docs. */
   documents_verified: boolean;
@@ -90,6 +92,11 @@ export interface User {
    * Temp paints (e.g. CL) only affect stored days; after them, default resumes.
    */
   default_tag: DailyTag;
+  /**
+   * Last painted JL date. Days after this stay empty; on the next calendar
+   * day the member is set inactive. Cleared once inactivation is applied.
+   */
+  jl_end_date: string;
   emergency_contacts: EmergencyContact[];
   created_at: string;
   updated_at: string;

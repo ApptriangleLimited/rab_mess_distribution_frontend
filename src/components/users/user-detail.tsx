@@ -204,6 +204,11 @@ export function UserDetail({
           />
           <DetailField
             icon={IconId}
+            label={t("cc.fields.bloodGroup")}
+            value={user.blood_group}
+          />
+          <DetailField
+            icon={IconId}
             label={t("cc.fields.rfid")}
             value={user.rfid}
             mono
