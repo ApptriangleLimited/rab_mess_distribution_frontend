@@ -3,25 +3,14 @@
 import { forwardRef } from "react";
 import { CONSUME_REPORT_META, wingDisplayLabel } from "@/lib/constants";
 import { formatDateDisplay, todayISO } from "@/lib/date";
+import {
+  memberListFilterChips,
+  memberTypeMessageKey,
+} from "@/lib/member-list-report";
 import type { UserFilters } from "@/lib/store/users";
-import type { MemberType, User } from "@/lib/types";
+import type { User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
-
-const memberTypeKeys = {
-  permanent: "cc.memberTypes.member",
-  new: "cc.memberTypes.new",
-  attached: "cc.memberTypes.attached",
-  guest: "cc.memberTypes.guest",
-  civilian: "cc.memberTypes.civilian",
-} as const;
-
-function memberTypeLabel(
-  type: MemberType | undefined,
-  t: ReturnType<typeof useT>,
-) {
-  return t(memberTypeKeys[type || "permanent"]);
-}
 
 type Props = {
   users: User[];
@@ -38,45 +27,7 @@ export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
     const wingLabel = (wing: string) =>
       wing ? wingDisplayLabel(wing, wingLabels) : "—";
 
-    const chips: string[] = [];
-    if (filters.wing && filters.wing !== "all") {
-      chips.push(`${t("cc.fields.wing")}: ${wingLabel(filters.wing)}`);
-    }
-    if (filters.rank && filters.rank !== "all") {
-      chips.push(`${t("cc.fields.rank")}: ${filters.rank}`);
-    }
-    if (filters.status && filters.status !== "all") {
-      chips.push(
-        `${t("cc.fields.status")}: ${
-          filters.status === "1" ? t("cc.statusActive") : t("cc.statusInactive")
-        }`,
-      );
-    }
-    if (filters.approval && filters.approval !== "all") {
-      const approvalKey =
-        filters.approval === "pending"
-          ? "cc.approvalPending"
-          : filters.approval === "approved"
-            ? "cc.approvalApproved"
-            : filters.approval === "rejected"
-              ? "cc.approvalRejected"
-              : "cc.approvalEnded";
-      chips.push(`${t("cc.fields.approval")}: ${t(approvalKey)}`);
-    }
-    if (filters.q?.trim()) {
-      chips.push(`${t("common.search")}: ${filters.q.trim()}`);
-    }
-    const dateFrom = filters.date_from?.trim() ?? "";
-    const dateTo = filters.date_to?.trim() ?? "";
-    if (dateFrom || dateTo) {
-      chips.push(
-        `${t("cc.fields.memberDate")}: ${formatDateDisplay(dateFrom || dateTo)}${
-          dateFrom && dateTo && dateFrom !== dateTo
-            ? ` – ${formatDateDisplay(dateTo)}`
-            : ""
-        }`,
-      );
-    }
+    const chips = memberListFilterChips(filters, t, wingLabel);
 
     return (
       <div
@@ -152,7 +103,7 @@ export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
                   {user.name}
                 </td>
                 <td className="border border-neutral-800 px-1.5 py-1">
-                  {memberTypeLabel(user.member_type, t)}
+                  {t(memberTypeMessageKey(user.member_type))}
                 </td>
                 <td className="border border-neutral-800 px-1.5 py-1 font-mono">
                   {user.phone || "—"}

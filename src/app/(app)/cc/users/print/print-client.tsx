@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { IconArrowLeft, IconPrinter } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconDownload,
+  IconPrinter,
+  IconTableExport,
+} from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,6 +19,17 @@ import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
 import { isApiEnabled } from "@/lib/api/mode";
 import { listMembers, memberToUser } from "@/lib/api/members";
+import { CONSUME_REPORT_META, wingDisplayLabel } from "@/lib/constants";
+import { formatDateDisplay, todayISO } from "@/lib/date";
+import {
+  downloadMemberListExcel,
+  downloadMemberListPdf,
+} from "@/lib/download-member-list";
+import {
+  memberListFilterChips,
+  memberListTableHeaders,
+  memberListTableRows,
+} from "@/lib/member-list-report";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   filterUsers,
@@ -21,10 +37,11 @@ import {
   userFiltersToSearchParams,
 } from "@/lib/store/users";
 import type { User } from "@/lib/types";
-import { useT } from "@/i18n/provider";
+import { useI18n, useT } from "@/i18n/provider";
 
 export default function CcUsersPrintClient() {
   const t = useT();
+  const { locale } = useI18n();
   const { toast } = useToast();
   const apiOn = isApiEnabled();
   const state = useStore();
@@ -82,6 +99,39 @@ export default function CcUsersPrintClient() {
   const backHref = `/cc/users?${userFiltersToSearchParams(filters).toString()}`;
   const canAct = users.length > 0;
 
+  function reportPayload() {
+    const useBn = locale === "bn";
+    const wingLabel = (wing: string) =>
+      wing ? wingDisplayLabel(wing, state.wing_labels) : "—";
+    return {
+      org: useBn ? CONSUME_REPORT_META.orgNameBn : CONSUME_REPORT_META.orgName,
+      station: useBn
+        ? CONSUME_REPORT_META.stationBn
+        : CONSUME_REPORT_META.station,
+      title: t("cc.memberListReportTitle"),
+      countLabel: `${t("cc.memberListReportCount", { count: users.length })} · ${formatDateDisplay(todayISO())}`,
+      chips: memberListFilterChips(filters, t, wingLabel),
+      headers: memberListTableHeaders(t),
+      rows: memberListTableRows(users, t),
+    };
+  }
+
+  function onDownloadPdf() {
+    if (!canAct) return;
+    downloadMemberListPdf({
+      ...reportPayload(),
+      filename: "member-list.pdf",
+    });
+  }
+
+  function onDownloadExcel() {
+    if (!canAct) return;
+    downloadMemberListExcel({
+      ...reportPayload(),
+      filename: "member-list.xls",
+    });
+  }
+
   async function onPrint() {
     const el = printRef.current;
     if (!el || !canAct) return;
@@ -114,17 +164,41 @@ export default function CcUsersPrintClient() {
             </Button>
           }
           actions={
-            <Button
-              type="button"
-              variant="cta"
-              size="sm"
-              className="rounded-xl"
-              disabled={!canAct || printing || loading}
-              onClick={() => void onPrint()}
-            >
-              <IconPrinter className="h-4 w-4" />
-              {printing ? t("common.loading") : t("mess.print")}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                disabled={!canAct || loading}
+                onClick={onDownloadExcel}
+              >
+                <IconTableExport className="h-4 w-4" />
+                {t("cc.exportExcel")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                disabled={!canAct || loading}
+                onClick={onDownloadPdf}
+              >
+                <IconDownload className="h-4 w-4" />
+                {t("cc.exportPdf")}
+              </Button>
+              <Button
+                type="button"
+                variant="cta"
+                size="sm"
+                className="rounded-xl"
+                disabled={!canAct || printing || loading}
+                onClick={() => void onPrint()}
+              >
+                <IconPrinter className="h-4 w-4" />
+                {printing ? t("common.loading") : t("mess.print")}
+              </Button>
+            </div>
           }
         />
       </div>

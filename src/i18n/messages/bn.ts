@@ -314,7 +314,7 @@ export const bn = {
     },
     ccUsersPrint: {
       title: "সদস্য তালিকা প্রিভিউ",
-      subtitle: "{count} সদস্য — দেখে প্রিন্ট করুন",
+      subtitle: "{count} সদস্য — দেখে প্রিন্ট, PDF বা এক্সেল নিন",
       phase: "ফেজ ১",
     },
     messToday: {
@@ -724,6 +724,8 @@ export const bn = {
     newUser: "নতুন সদস্য",
     memberListReportTitle: "সদস্য তালিকা",
     memberListReportCount: "{count} সদস্য",
+    exportPdf: "পিডিএফ ডাউনলোড",
+    exportExcel: "এক্সেল ডাউনলোড",
     filters: "ফিল্টার",
     searchPlaceholder: "নাম, RAB ID, RFID, ফোন খুঁজুন…",
     filterStatus: "স্ট্যাটাস",

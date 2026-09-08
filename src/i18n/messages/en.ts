@@ -313,7 +313,7 @@ export const en = {
     },
     ccUsersPrint: {
       title: "Member list preview",
-      subtitle: "{count} members — review then print",
+      subtitle: "{count} members — review then print, PDF, or Excel",
       phase: "Phase 1",
     },
     messToday: {
@@ -722,6 +722,8 @@ export const en = {
     newUser: "New Member",
     memberListReportTitle: "Member List",
     memberListReportCount: "{count} members",
+    exportPdf: "Download PDF",
+    exportExcel: "Download Excel",
     filters: "Filters",
     searchPlaceholder: "Search name, RAB ID, RFID, phone…",
     filterStatus: "Status",
