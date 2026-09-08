@@ -1,0 +1,66 @@
+groups:
+  - name: mess
+    rules:
+      - alert: SLOErrorBudget
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[10m]))
+            /
+            clamp_min(sum(rate(http_requests_total[10m])), 0.001)
+          ) > 0.02
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: API 5xx ratio over 2% for 10m
+
+      - alert: AssignmentsP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket{handler=~"/api/v1/assignments.*"}[10m])) by (le)
+          ) > 1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Assignment HTTP p95 over 1s
+
+      - alert: RedisDown
+        expr: mess_redis_up == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Redis health probe failed
+
+      - alert: PostgresDown
+        expr: mess_db_up == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Postgres health probe failed
+
+      - alert: JobDeadLetter
+        expr: increase(mess_job_dead_total[1h]) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: A background job raised in the last hour
+
+      - alert: ZkDown
+        expr: mess_zk_up == 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: ZK device unreachable for 15m (ignore if ZK is off)
+
+      - alert: PendingRequestsStuck
+        expr: sum(mess_tag_requests_pending) > 0
+        for: 48h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Tag-request queue has been non-empty for 48h

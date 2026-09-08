@@ -1,0 +1,227 @@
+# P0 platform: api + postgres + redis + prometheus
+#   docker compose -f compose.platform.yml up --build
+# Root repo gitignores docker-compose.yml — keep this name.
+
+name: mess-backend
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mess
+      POSTGRES_PASSWORD: mess
+      POSTGRES_DB: mess
+    ports:
+      - "5432:5432"
+    volumes:
+      - mess_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mess -d mess"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - mess_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+  api-migrate:
+    build: .
+    restart: "no"
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+    environment:
+      TZ: Asia/Dhaka
+      DATABASE_URL: postgresql+psycopg://mess:mess@db:5432/mess
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: change-me-in-prod-use-32b-plus-secret
+      SEED_STAFF_PASSWORD: ChangeMe!
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  api:
+    build: .
+    restart: unless-stopped
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "2",
+      ]
+    environment:
+      TZ: Asia/Dhaka
+      DATABASE_URL: postgresql+psycopg://mess:mess@db:5432/mess
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: change-me-in-prod-use-32b-plus-secret
+      SEED_STAFF_PASSWORD: ChangeMe!
+      SEED_ON_START: "1"
+      CORS_ORIGINS: http://localhost:3000
+      PROM_ENABLE: "1"
+      ZK_DEMO: "1"
+      ZK_HOST: "192.168.1.50"
+      ZK_PORT: "4370"
+      DOCS_DIR: /data/docs
+      BACKUP_DIR: /data/backups
+    volumes:
+      - mess_docs:/data/docs
+      - mess_backups:/data/backups
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/v1/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+    networks:
+      - backend
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "app.jobs.worker"]
+    environment:
+      TZ: Asia/Dhaka
+      DATABASE_URL: postgresql+psycopg://mess:mess@db:5432/mess
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: change-me-in-prod-use-32b-plus-secret
+      DOCS_DIR: /data/docs
+      BACKUP_DIR: /data/backups
+      ZK_DEMO: "1"
+      ZK_HOST: "192.168.1.50"
+      ZK_PORT: "4370"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api-migrate:
+        condition: service_completed_successfully
+    volumes:
+      - mess_docs:/data/docs
+      - mess_backups:/data/backups
+    networks:
+      - backend
+
+  beat:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "app.jobs.beat"]
+    environment:
+      TZ: Asia/Dhaka
+      DATABASE_URL: postgresql+psycopg://mess:mess@db:5432/mess
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    networks:
+      - backend
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3001
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+    networks:
+      - backend
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Dhaka
+      PGPASSWORD: mess
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: mess
+      PGDATABASE: mess
+      BACKUP_DIR: /backups
+      BACKUP_KEEP_DAYS: "28"
+    command: ["sh", "/backup.sh", "--loop"]
+    volumes:
+      - ./scripts/pg_backup.sh:/backup.sh:ro
+      - ./scripts/pg_restore.sh:/restore.sh:ro
+      - mess_backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    profiles: ["metrics"]
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://mess:mess@db:5432/mess?sslmode=disable
+    ports:
+      - "9187:9187"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  mess_pg:
+  mess_redis:
+  mess_docs:
+  mess_backups:
+
+networks:
+  backend:

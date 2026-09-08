@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: mess
+    orgId: 1
+    folder: Mess
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
