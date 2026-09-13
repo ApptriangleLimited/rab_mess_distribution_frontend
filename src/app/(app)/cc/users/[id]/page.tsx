@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "motion/react";
@@ -14,15 +15,68 @@ import { MemberAcceptActions } from "@/components/users/member-accept-actions";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { RequestTagButton } from "@/components/tag-requests/request-tag-dialog";
 import { useStore } from "@/hooks/use-store";
+import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { onCcDataChange } from "@/lib/api/cc-events";
+import { getMember, memberToUser } from "@/lib/api/members";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { getCockpitTagOnDate } from "@/lib/store/tag-requests";
 import { todayISO } from "@/lib/date";
 import { useT } from "@/i18n/provider";
+import type { User } from "@/lib/types";
 
 export default function CcUserDetailPage() {
   const t = useT();
   const params = useParams<{ id: string }>();
+  const { toast } = useToast();
   const state = useStore();
-  const user = state.users.find((u) => u.id === params.id) ?? null;
+  const apiOn = isCcApiEnabled();
+  const [apiUser, setApiUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(apiOn);
+  const [reloadTick, setReloadTick] = useState(0);
+
+  useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getMember(params.id)
+      .then((row) => {
+        if (!cancelled) setApiUser(memberToUser(row));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiUser(null);
+        toast(
+          err instanceof ApiClientError ? err.detail : t("cc.notFound"),
+          "error",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, params.id, reloadTick, t, toast]);
+
+  const user = apiOn
+    ? apiUser
+    : (state.users.find((u) => u.id === params.id) ?? null);
+
+  if (loading) {
+    return (
+      <PagePane>
+        <p className="py-10 text-center text-sm text-neutral-500">
+          {t("common.loading")}
+        </p>
+      </PagePane>
+    );
+  }
 
   if (!user) {
     return (

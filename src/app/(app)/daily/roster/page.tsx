@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
@@ -33,6 +33,12 @@ import { RosterRow } from "@/components/daily/status-toggle";
 import { MemberDateFilter } from "@/components/users/user-filters";
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
+import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { onCcDataChange } from "@/lib/api/cc-events";
+import { listAssignments } from "@/lib/api/assignments";
+import { listMembers, memberToUser } from "@/lib/api/members";
+import { isDailyApiEnabled } from "@/lib/api/mode";
 import { getAssignment } from "@/lib/store/assignments";
 import {
   compareUsers,
@@ -53,10 +59,16 @@ export default function RosterPage() {
   const t = useT();
   const { locale } = useI18n();
   const router = useRouter();
+  const { toast } = useToast();
   const state = useStore();
+  const apiOn = isDailyApiEnabled();
   const { ranks, wings } = state;
   const tags = listAllTags();
   const reduceMotion = useReducedMotion();
+  const [apiUsers, setApiUsers] = useState<User[]>([]);
+  const [todayTags, setTodayTags] = useState<Map<string, string>>(new Map());
+  const [loading, setLoading] = useState(apiOn);
+  const [reloadTick, setReloadTick] = useState(0);
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
@@ -67,20 +79,63 @@ export default function RosterPage() {
   const [dateTo, setDateTo] = useState("");
   const today = todayISO();
 
+  useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      listMembers({ page: 1, page_size: 500 }),
+      listAssignments({ from: today, to: today }),
+    ])
+      .then(([members, assigns]) => {
+        if (cancelled) return;
+        setApiUsers(members.items.map(memberToUser));
+        const map = new Map<string, string>();
+        for (const cell of assigns.items) {
+          if (cell.source === "stored" && cell.tag) {
+            map.set(cell.member_id, cell.tag);
+          }
+        }
+        setTodayTags(map);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiUsers([]);
+        setTodayTags(new Map());
+        toast(
+          err instanceof ApiClientError ? err.detail : t("cc.createFail"),
+          "error",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, reloadTick, t, today, toast]);
+
+  const sourceUsers = apiOn ? apiUsers : state.users;
+
   const approved = useMemo(
     () =>
-      state.users.filter(
+      sourceUsers.filter(
         (u) => u.approval_status === "approved" && isCockpitMember(u),
       ),
-    [state.users],
+    [sourceUsers],
   );
 
   const pendingAll = useMemo(
     () =>
-      state.users.filter(
+      sourceUsers.filter(
         (u) => u.approval_status === "pending" && isCockpitMember(u),
       ),
-    [state.users],
+    [sourceUsers],
   );
 
   const activeCount = useMemo(
@@ -140,7 +195,9 @@ export default function RosterPage() {
         }
         if (!matchesMemberDateFilter(u, dateFrom, dateTo)) return false;
         if (tag !== "all") {
-          const todayTag = getAssignment(u.id, today)?.tag ?? null;
+          const todayTag = apiOn
+            ? (todayTags.get(u.id) ?? null)
+            : (getAssignment(u.id, today)?.tag ?? null);
           if (tag === "none") {
             if (todayTag) return false;
           } else if (todayTag !== tag) {
@@ -162,6 +219,8 @@ export default function RosterPage() {
     tag,
     effectiveStatus,
     today,
+    apiOn,
+    todayTags,
     state.assignments,
     dateFrom,
     dateTo,
@@ -235,7 +294,11 @@ export default function RosterPage() {
           <div className="relative">
             <PageHeader
               title={t("pages.roster.title")}
-              subtitle={t("pages.roster.subtitle", { count: showing })}
+              subtitle={
+                loading
+                  ? t("common.loading")
+                  : t("pages.roster.subtitle", { count: showing })
+              }
               center={<DailyTabs />}
               actions={
                 <Button
@@ -370,7 +433,11 @@ export default function RosterPage() {
           />
         </SearchFilterBar>
 
-        {boardEmpty ? (
+        {loading ? (
+          <p className="py-10 text-center text-sm text-neutral-500">
+            {t("common.loading")}
+          </p>
+        ) : boardEmpty ? (
           <EmptyState
             title={t("daily.emptyRoster")}
             description={t("daily.rosterEmptyHint")}

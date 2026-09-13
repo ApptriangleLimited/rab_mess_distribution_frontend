@@ -70,6 +70,8 @@ export const bn = {
     pageOf: "পাতা {page} / {total}",
     showingRange: "{from}–{to} দেখাচ্ছে, মোট {count}",
     perPage: "প্রতি পাতা",
+    saving: "সেভ হচ্ছে…",
+    sending: "পাঠানো হচ্ছে…",
   },
   confirm: {
     approveTitle: "এন্ট্রি গ্রহণ?",
@@ -852,6 +854,8 @@ export const bn = {
     createUser: "সদস্য তৈরি",
     currentTag: "বর্তমান ট্যাগ",
     requestTag: "রিকোয়েস্ট",
+    accepting: "গ্রহণ হচ্ছে…",
+    rejecting: "প্রত্যাখ্যান হচ্ছে…",
   },
   daily: {
     approve: "গ্রহণ",

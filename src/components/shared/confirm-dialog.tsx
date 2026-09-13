@@ -46,6 +46,7 @@ export function ConfirmDialog({
   confirmLabel,
   danger,
   tone,
+  busy,
   compact,
   children,
   panelClassName,
@@ -59,6 +60,7 @@ export function ConfirmDialog({
   confirmLabel?: string;
   danger?: boolean;
   tone?: Tone;
+  busy?: boolean;
   /** Tighter chrome so a full preview still fits one viewport. */
   compact?: boolean;
   children?: React.ReactNode;
@@ -181,6 +183,7 @@ export function ConfirmDialog({
                   type="button"
                   variant="outline"
                   className="rounded-xl"
+                  disabled={busy}
                   onClick={onCancel}
                 >
                   {t("common.cancel")}
@@ -189,6 +192,7 @@ export function ConfirmDialog({
                   type="button"
                   variant={resolvedTone === "danger" ? "danger" : "cta"}
                   className="rounded-xl"
+                  disabled={busy}
                   onClick={onConfirm}
                 >
                   {confirmLabel ?? t("common.confirm")}

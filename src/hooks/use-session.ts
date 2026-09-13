@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { logoutStaff } from "@/lib/api/auth";
-import { isApiEnabled } from "@/lib/api/mode";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import {
   clearSession,
+  getAccessToken,
   getSessionFromStorage,
   setAccessToken,
   setSession as persistSession,
@@ -17,7 +18,15 @@ export function useSession() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setSessionState(getSessionFromStorage());
+    const next = getSessionFromStorage();
+    // Cookie is host-wide on localhost. Docker :3000 often has the cookie
+    // from :3001 but no JWT in this origin's localStorage → blank redirect loop.
+    if (next && isCcApiEnabled() && !getAccessToken()) {
+      clearSession();
+      setSessionState(null);
+    } else {
+      setSessionState(next);
+    }
     setReady(true);
   }, []);
 
@@ -33,7 +42,7 @@ export function useSession() {
   );
 
   const logout = useCallback(() => {
-    if (isApiEnabled()) void logoutStaff();
+    if (getAccessToken()) void logoutStaff();
     clearSession();
     setSessionState(null);
   }, []);

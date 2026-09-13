@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
-import { isApiEnabled } from "@/lib/api/mode";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { listMembers, memberToUser } from "@/lib/api/members";
 import { CONSUME_REPORT_META, wingDisplayLabel } from "@/lib/constants";
 import { formatDateDisplay, todayISO } from "@/lib/date";
@@ -43,7 +43,7 @@ export default function CcUsersPrintClient() {
   const t = useT();
   const { locale } = useI18n();
   const { toast } = useToast();
-  const apiOn = isApiEnabled();
+  const apiOn = isCcApiEnabled();
   const state = useStore();
   const searchParams = useSearchParams();
   const printRef = useRef<HTMLDivElement>(null);

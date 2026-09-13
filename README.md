@@ -11,12 +11,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Docker (from repo root)
+### Docker (this folder)
 
 ```bash
 docker compose up --build
-# or hot-reload: docker compose --profile dev up --build web-dev
+# UI http://localhost:3000  API http://localhost:8000
+# login daily@mess.rab / ChangeMe!
+
+# hot reload
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
+
+Copy `env.docker.example` values to override ports or secrets. Host `:3000` / `:8000` must be free, or set `WEB_PORT` / `API_PORT`. Browser calls the published API (`NEXT_PUBLIC_API_URL=http://localhost:8000`).
 
 ## Demo
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "motion/react";
@@ -16,21 +16,83 @@ import { MemberAcceptActions } from "@/components/users/member-accept-actions";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
+import { ApiClientError } from "@/lib/api/client";
+import { notifyCcDataChange, onCcDataChange } from "@/lib/api/cc-events";
+import { getMember, memberToUser, updateMemberStatus } from "@/lib/api/members";
+import { isDailyApiEnabled } from "@/lib/api/mode";
 import { setUserStatus } from "@/lib/store/daily";
 import { useT } from "@/i18n/provider";
-import type { UserStatus } from "@/lib/types";
+import type { User, UserStatus } from "@/lib/types";
 
 export default function DailyUserDetailPage() {
   const t = useT();
   const params = useParams<{ id: string }>();
   const { toast } = useToast();
   const state = useStore();
-  const user = state.users.find((u) => u.id === params.id) ?? null;
-
+  const apiOn = isDailyApiEnabled();
+  const [apiUser, setApiUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(apiOn);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [statusNext, setStatusNext] = useState<UserStatus | null>(null);
 
-  function confirmStatus() {
-    if (!user || !statusNext) return;
+  useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getMember(params.id)
+      .then((row) => {
+        if (!cancelled) setApiUser(memberToUser(row));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiUser(null);
+        toast(
+          err instanceof ApiClientError ? err.detail : t("cc.notFound"),
+          "error",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, params.id, reloadTick, t, toast]);
+
+  const user = apiOn
+    ? apiUser
+    : (state.users.find((u) => u.id === params.id) ?? null);
+
+  async function confirmStatus() {
+    if (!user || !statusNext || busy) return;
+    if (apiOn) {
+      setBusy(true);
+      try {
+        await updateMemberStatus(user.id, statusNext);
+        notifyCcDataChange();
+        toast(
+          statusNext === "1"
+            ? t("daily.activatedToast")
+            : t("daily.deactivatedToast"),
+          "success",
+        );
+        setStatusNext(null);
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError ? err.detail : t("cc.createFail"),
+          "error",
+        );
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setUserStatus(user.id, statusNext);
     toast(
       statusNext === "1"
@@ -39,6 +101,16 @@ export default function DailyUserDetailPage() {
       "success",
     );
     setStatusNext(null);
+  }
+
+  if (loading) {
+    return (
+      <PagePane>
+        <p className="py-10 text-center text-sm text-neutral-500">
+          {t("common.loading")}
+        </p>
+      </PagePane>
+    );
   }
 
   if (!user) {
@@ -138,8 +210,13 @@ export default function DailyUserDetailPage() {
             : t("confirm.activateBodyShort")
         }
         confirmLabel={
-          statusNext === "0" ? t("daily.deactivate") : t("daily.activate")
+          busy
+            ? t("common.saving")
+            : statusNext === "0"
+              ? t("daily.deactivate")
+              : t("daily.activate")
         }
+        busy={busy}
         onCancel={() => setStatusNext(null)}
         onConfirm={confirmStatus}
       >

@@ -69,6 +69,8 @@ export const en = {
     pageOf: "Page {page} of {total}",
     showingRange: "Showing {from}–{to} of {count}",
     perPage: "Per page",
+    saving: "Saving…",
+    sending: "Sending…",
   },
   confirm: {
     approveTitle: "Accept entry?",
@@ -850,6 +852,8 @@ export const en = {
     createUser: "Create member",
     currentTag: "Current tag",
     requestTag: "Request",
+    accepting: "Accepting…",
+    rejecting: "Rejecting…",
   },
   daily: {
     approve: "Accept",

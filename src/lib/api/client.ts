@@ -1,5 +1,5 @@
 import { getAccessToken } from "@/lib/session";
-import { isApiEnabled } from "@/lib/api/mode";
+import { apiBaseUrl, isApiEnabled, isCcApiEnabled } from "@/lib/api/mode";
 
 export type FieldError = { field: string; code: string; message: string };
 
@@ -17,13 +17,20 @@ export class ApiClientError extends Error {
 
 type ProblemBody = {
   ok?: boolean;
+  success?: boolean;
   code?: string;
   detail?: string;
+  message?: string;
   errors?: FieldError[];
 };
 
+function apiUrl(path: string) {
+  const base = apiBaseUrl();
+  return base ? `${base}${path}` : path;
+}
+
 export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!isApiEnabled()) {
+  if (!isApiEnabled() && !isCcApiEnabled()) {
     throw new ApiClientError(503, "API_DISABLED", "API is off (demo mode).");
   }
   const headers = new Headers(init?.headers);
@@ -34,20 +41,26 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
   if (res.status === 204) return undefined as T;
 
   const body = (await res.json().catch(() => null)) as
-    | ({ ok: true; data: T } & Record<string, unknown>)
+    | ({ ok?: boolean; success?: boolean; data: T } & Record<string, unknown>)
     | ProblemBody
     | null;
 
-  if (!res.ok || !body || (body as ProblemBody).ok === false) {
+  const failed =
+    !res.ok ||
+    !body ||
+    (body as ProblemBody).ok === false ||
+    (body as ProblemBody).success === false;
+
+  if (failed) {
     const problem = (body ?? {}) as ProblemBody;
     throw new ApiClientError(
       res.status,
       problem.code ?? "INTERNAL_ERROR",
-      problem.detail ?? "Request failed",
+      problem.detail ?? problem.message ?? "Request failed",
       problem.errors ?? [],
     );
   }

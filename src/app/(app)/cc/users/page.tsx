@@ -20,7 +20,8 @@ import { UserTable } from "@/components/users/user-table";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
-import { isApiEnabled } from "@/lib/api/mode";
+import { onCcDataChange } from "@/lib/api/cc-events";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { listMembers, memberToUser } from "@/lib/api/members";
 import { PAGE_SIZE } from "@/lib/pagination";
 import {
@@ -46,13 +47,16 @@ export default function CcUsersPage() {
   const t = useT();
   const state = useStore();
   const { toast } = useToast();
-  const apiOn = isApiEnabled();
+  const apiOn = isCcApiEnabled();
   const [apiUsers, setApiUsers] = useState<User[]>([]);
   const [apiTotal, setApiTotal] = useState(0);
   const [loading, setLoading] = useState(apiOn);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [filters, setFilters] = useState<UserFilters>(emptyFilters);
+  const [reloadTick, setReloadTick] = useState(0);
+
+  useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
 
   // One list call — BE pages by page_size from FE (default 25).
   useEffect(() => {
@@ -94,7 +98,7 @@ export default function CcUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiOn, filters, page, pageSize, toast]);
+  }, [apiOn, filters, page, pageSize, reloadTick, toast]);
 
   const demoUsers = useMemo(
     () => filterUsers(state.users, filters),

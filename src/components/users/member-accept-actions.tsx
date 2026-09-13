@@ -9,6 +9,10 @@ import { UserDetail } from "@/components/users/user-detail";
 import { TagSelector } from "@/components/daily/tag-selector";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { notifyCcDataChange } from "@/lib/api/cc-events";
+import { acceptMember, rejectMember } from "@/lib/api/members";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { approveUser, rejectUser } from "@/lib/store/daily";
 import { getAssignment, setTag } from "@/lib/store/assignments";
 import { updateUser } from "@/lib/store/users";
@@ -45,7 +49,9 @@ export function MemberAcceptActions({
 }) {
   const t = useT();
   const { toast } = useToast();
+  const apiOn = isCcApiEnabled();
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [busy, setBusy] = useState(false);
   const [actionTag, setActionTag] = useState<DailyTag>("MS");
   const [sardaChecked, setSardaChecked] = useState(false);
   const [trainingChecked, setTrainingChecked] = useState(false);
@@ -68,14 +74,38 @@ export function MemberAcceptActions({
     setPendingAction(type);
   }
 
-  function confirm() {
-    if (!pendingAction) return;
+  async function confirm() {
+    if (!pendingAction || busy) return;
+    if (pendingAction === "accept" && withTag && !actionTag) {
+      toast(t("daily.tagRequired"), "error");
+      return;
+    }
+
+    if (apiOn) {
+      setBusy(true);
+      try {
+        if (pendingAction === "accept") {
+          await acceptMember(user.id, withTag ? actionTag : undefined);
+          toast(t("daily.approvedToast"), "success");
+        } else {
+          await rejectMember(user.id);
+          toast(t("daily.rejectedToast"), "success");
+        }
+        notifyCcDataChange();
+        setPendingAction(null);
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError ? err.detail : t("cc.createFail"),
+          "error",
+        );
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     if (pendingAction === "accept") {
       if (withTag) {
-        if (!actionTag) {
-          toast(t("daily.tagRequired"), "error");
-          return;
-        }
         const queue = dutyTagQueue(actionTag);
         if (queue === "immediate") {
           setTag(user.id, todayISO(), actionTag);
@@ -167,7 +197,14 @@ export function MemberAcceptActions({
         tone={copy.tone}
         title={copy.title}
         body={copy.body}
-        confirmLabel={copy.label}
+        confirmLabel={
+          busy
+            ? pendingAction === "accept"
+              ? t("cc.accepting")
+              : t("cc.rejecting")
+            : copy.label
+        }
+        busy={busy}
         compact={pendingAction === "accept"}
         panelClassName={
           pendingAction === "accept"

@@ -13,7 +13,8 @@ import { UserForm, type UserFormValues } from "@/components/users/user-form";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
 import { createMember } from "@/lib/api/members";
-import { isApiEnabled } from "@/lib/api/mode";
+import { notifyCcDataChange } from "@/lib/api/cc-events";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { createUser, findUserByRabId } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
 
@@ -21,7 +22,7 @@ export default function CcNewUserPage() {
   const t = useT();
   const router = useRouter();
   const { toast } = useToast();
-  const apiOn = isApiEnabled();
+  const apiOn = isCcApiEnabled();
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(values: UserFormValues) {
@@ -52,6 +53,7 @@ export default function CcNewUserPage() {
         status: values.status || "1",
         approval_status: "pending",
       });
+      notifyCcDataChange();
       toast(t("cc.created"), "success");
       router.push("/cc/users");
     } catch (err) {
@@ -113,6 +115,7 @@ export default function CcNewUserPage() {
         />
         <UserForm
           mode="create"
+          busy={busy}
           onSubmit={onSubmit}
           onCancel={() => router.push("/cc/users")}
         />

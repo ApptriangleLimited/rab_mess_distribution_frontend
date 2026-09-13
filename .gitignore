@@ -40,7 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Docker files managed on server
-docker-compose.yml
-compose.yml
-compose.yaml
+# python backend
+/backend/.venv
+/backend/venv
+/backend/__pycache__/
+*.pyc
+
+# docker-compose.yml is part of the repo now

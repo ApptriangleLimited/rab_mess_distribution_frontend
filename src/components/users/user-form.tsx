@@ -925,7 +925,9 @@ export function UserForm({
             {t("common.cancel")}
           </Button>
           <Button type="submit" variant="cta" size="sm" className="rounded-lg" disabled={busy}>
-            {mode === "create" ? (
+            {busy ? (
+              t("common.saving")
+            ) : mode === "create" ? (
               <>
                 <IconPlus className="h-3.5 w-3.5" />
                 {variant === "public"

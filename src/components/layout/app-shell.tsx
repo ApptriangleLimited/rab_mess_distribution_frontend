@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { HeaderBar } from "@/components/layout/header-bar";
 import { MobileDrawer, Sidebar } from "@/components/layout/sidebar";
 import { useSession } from "@/hooks/use-session";
+import { clearSession } from "@/lib/session";
 import { hydrateStore } from "@/lib/store";
 import { applyDueJlInactivations } from "@/lib/store/daily";
 import { useT } from "@/i18n/provider";
@@ -35,6 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     if (!session) {
+      clearSession();
       router.replace("/login");
     }
   }, [ready, session, router]);
@@ -60,7 +62,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+        {t("common.loadingShell")}
+      </div>
+    );
   }
 
   const hideSidebar =

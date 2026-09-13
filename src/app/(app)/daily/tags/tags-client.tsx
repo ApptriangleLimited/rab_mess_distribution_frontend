@@ -37,7 +37,7 @@ import {
 } from "@/components/daily/register-board";
 import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
 import { useStore } from "@/hooks/use-store";
-import { isApiEnabled } from "@/lib/api/mode";
+import { isDailyApiEnabled } from "@/lib/api/mode";
 import { DAILY_TAGS } from "@/lib/constants";
 import {
   daysInMonth,
@@ -84,7 +84,7 @@ function orderTags(tags: DailyTag[]) {
 export default function TagsPageClient() {
   const t = useT();
   const { locale } = useI18n();
-  const apiOn = isApiEnabled();
+  const apiOn = isDailyApiEnabled();
   const state = useStore();
   const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();

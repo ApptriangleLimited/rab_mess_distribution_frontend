@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
@@ -16,8 +17,13 @@ import {
 } from "@/components/users/user-form";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
+import { ApiClientError } from "@/lib/api/client";
+import { notifyCcDataChange } from "@/lib/api/cc-events";
+import { getMember, memberToUser, updateMember } from "@/lib/api/members";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { findUserByRabId, updateUser } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
+import type { User } from "@/lib/types";
 
 export default function CcEditUserPage() {
   const t = useT();
@@ -25,11 +31,45 @@ export default function CcEditUserPage() {
   const params = useParams<{ id: string }>();
   const { toast } = useToast();
   const state = useStore();
-  const user = state.users.find((u) => u.id === params.id) ?? null;
+  const apiOn = isCcApiEnabled();
+  const [apiUser, setApiUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(apiOn);
+  const [busy, setBusy] = useState(false);
   const detailHref = `/cc/users/${params.id}`;
 
-  function onSubmit(values: UserFormValues) {
-    if (!user) return;
+  useEffect(() => {
+    if (!apiOn) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getMember(params.id)
+      .then((row) => {
+        if (!cancelled) setApiUser(memberToUser(row));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiUser(null);
+        toast(
+          err instanceof ApiClientError ? err.detail : t("cc.notFound"),
+          "error",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, params.id, t, toast]);
+
+  const user = apiOn
+    ? apiUser
+    : (state.users.find((u) => u.id === params.id) ?? null);
+
+  async function onSubmit(values: UserFormValues) {
+    if (!user || busy) return;
     if (!values.name.trim()) {
       toast(t("cc.nameRequired"), "error");
       return;
@@ -38,13 +78,47 @@ export default function CcEditUserPage() {
       toast(t("cc.rabIdRequired"), "error");
       return;
     }
-    if (findUserByRabId(values.rab_id, user.id)) {
-      toast(t("cc.rabIdDuplicate"), "error");
+
+    if (!apiOn) {
+      if (findUserByRabId(values.rab_id, user.id)) {
+        toast(t("cc.rabIdDuplicate"), "error");
+        return;
+      }
+      updateUser(user.id, values);
+      toast(t("cc.updated"), "success");
+      router.push(detailHref);
       return;
     }
-    updateUser(user.id, values);
-    toast(t("cc.updated"), "success");
-    router.push(detailHref);
+
+    setBusy(true);
+    try {
+      await updateMember(user.id, values);
+      notifyCcDataChange();
+      toast(t("cc.updated"), "success");
+      router.push(detailHref);
+    } catch (err) {
+      if (err instanceof ApiClientError && err.code === "CONFLICT_RAB_ID") {
+        toast(t("cc.rabIdDuplicate"), "error");
+      } else if (err instanceof ApiClientError && err.errors[0]?.message) {
+        toast(err.errors[0].message, "error");
+      } else if (err instanceof ApiClientError) {
+        toast(err.detail, "error");
+      } else {
+        toast(t("cc.createFail"), "error");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <PagePane>
+        <p className="py-10 text-center text-sm text-neutral-500">
+          {t("common.loading")}
+        </p>
+      </PagePane>
+    );
   }
 
   if (!user) {
@@ -105,6 +179,7 @@ export default function CcEditUserPage() {
         <UserForm
           mode="edit"
           initial={userToFormValues(user)}
+          busy={busy}
           onSubmit={onSubmit}
           onCancel={() => router.push(detailHref)}
         />

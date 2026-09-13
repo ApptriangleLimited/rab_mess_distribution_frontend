@@ -15,7 +15,7 @@ import {
 import { approveDay, listLockedDates } from "@/lib/api/days";
 import { listBoroKhanaDates, setBoroKhanaDate } from "@/lib/api/boro-khana";
 import { listMembers, memberToUser } from "@/lib/api/members";
-import { isApiEnabled } from "@/lib/api/mode";
+import { isDailyApiEnabled } from "@/lib/api/mode";
 import { useToast } from "@/components/shared/toast-provider";
 import { compareUsers, filterCockpitMembers } from "@/lib/store/users";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
@@ -54,7 +54,7 @@ export function useDailyCockpit({
   wing,
   status = "1",
 }: Params) {
-  const apiOn = isApiEnabled();
+  const apiOn = isDailyApiEnabled();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);

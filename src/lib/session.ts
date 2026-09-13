@@ -33,11 +33,21 @@ export function parseSessionCookie(value: string | undefined | null): Session | 
   }
 }
 
+export function getSessionFromCookie(): Session | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${SESSION_COOKIE}=`;
+  const raw = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(prefix));
+  return parseSessionCookie(raw ? raw.slice(prefix.length) : null);
+}
+
 export function getSessionFromStorage(): Session | null {
   if (typeof window === "undefined") return null;
   return (
     readJsonSession(localStorage.getItem(SESSION_STORAGE_KEY)) ??
-    readJsonSession(sessionStorage.getItem(SESSION_STORAGE_KEY))
+    readJsonSession(sessionStorage.getItem(SESSION_STORAGE_KEY)) ??
+    getSessionFromCookie()
   );
 }
 

@@ -3,6 +3,9 @@ node_modules
 .next
 .git
 .gitignore
+backend
+.venv
+__pycache__
 
 *.md
 *.tsbuildinfo

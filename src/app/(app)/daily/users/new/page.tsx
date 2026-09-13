@@ -14,8 +14,11 @@ import {
 } from "@/components/users/user-form";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
+import { putAssignment } from "@/lib/api/assignments";
+import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { createMember, memberToUser } from "@/lib/api/members";
-import { isApiEnabled } from "@/lib/api/mode";
+import { isDailyApiEnabled } from "@/lib/api/mode";
+import { createTagRequestApi } from "@/lib/api/tag-requests";
 import { createUser, findUserByRabId } from "@/lib/store/users";
 import { setTag } from "@/lib/store/assignments";
 import {
@@ -36,7 +39,7 @@ export default function DailyNewUserPage() {
   const t = useT();
   const router = useRouter();
   const { toast } = useToast();
-  const apiOn = isApiEnabled();
+  const apiOn = isDailyApiEnabled();
   const [busy, setBusy] = useState(false);
   const [sardaPending, setSardaPending] = useState<UserFormSubmitPayload | null>(
     null,
@@ -85,25 +88,51 @@ export default function DailyNewUserPage() {
         ? Boolean(choice?.sarda)
         : false;
 
-    function afterCreate(userId: string) {
+    async function afterCreate(userId: string) {
       if (queue === "immediate") {
-        setTag(userId, todayISO(), today_tag);
+        if (apiOn) {
+          await putAssignment({
+            member_id: userId,
+            date: todayISO(),
+            tag: today_tag,
+          });
+        } else {
+          setTag(userId, todayISO(), today_tag);
+        }
         toast(t("cc.createdApproved"), "success");
         return;
       }
-      createDutyTagRequest({
-        userId,
-        toTag: today_tag,
-        fromDate: todayISO(),
-        toDate: todayISO(),
-        queue,
-        trg_tone: isTrgTag(today_tag)
-          ? resolveTrgTone(values.force, training)
-          : undefined,
-        trg_sarda: isTrgTag(today_tag) && needsTrgSardaPrompt(values.force)
-          ? sarda
-          : undefined,
-      });
+      if (apiOn) {
+        await createTagRequestApi({
+          userId,
+          toTag: today_tag,
+          from: todayISO(),
+          to: todayISO(),
+          queue,
+          trg_tone: isTrgTag(today_tag)
+            ? resolveTrgTone(values.force, training)
+            : undefined,
+          trg_sarda:
+            isTrgTag(today_tag) && needsTrgSardaPrompt(values.force)
+              ? sarda
+              : undefined,
+        });
+      } else {
+        createDutyTagRequest({
+          userId,
+          toTag: today_tag,
+          fromDate: todayISO(),
+          toDate: todayISO(),
+          queue,
+          trg_tone: isTrgTag(today_tag)
+            ? resolveTrgTone(values.force, training)
+            : undefined,
+          trg_sarda:
+            isTrgTag(today_tag) && needsTrgSardaPrompt(values.force)
+              ? sarda
+              : undefined,
+        });
+      }
       toast(
         queue === "ration"
           ? t("daily.queuedRation", { tag: today_tag })
@@ -136,7 +165,8 @@ export default function DailyNewUserPage() {
         },
       );
       const user = memberToUser(row);
-      afterCreate(user.id);
+      await afterCreate(user.id);
+      notifyCcDataChange();
       router.push("/daily/roster");
     } catch (err) {
       if (err instanceof ApiClientError && err.code === "CONFLICT_RAB_ID") {
@@ -185,6 +215,7 @@ export default function DailyNewUserPage() {
         <UserForm
           mode="create"
           variant="daily"
+          busy={busy}
           onSubmit={onSubmit}
           onCancel={() => router.push("/daily/roster")}
         />

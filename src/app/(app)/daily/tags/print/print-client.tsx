@@ -15,7 +15,7 @@ import { MonthRegisterPrint } from "@/components/daily/month-register-print";
 import { Button } from "@/components/ui/button";
 import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
 import { useStore } from "@/hooks/use-store";
-import { isApiEnabled } from "@/lib/api/mode";
+import { isDailyApiEnabled } from "@/lib/api/mode";
 import {
   dateInMonth,
   daysInMonth,
@@ -34,7 +34,7 @@ import { useT } from "@/i18n/provider";
 
 export default function DailyRegisterPrintClient() {
   const t = useT();
-  const apiOn = isApiEnabled();
+  const apiOn = isDailyApiEnabled();
   const state = useStore();
   const searchParams = useSearchParams();
   const printRef = useRef<HTMLDivElement>(null);

@@ -149,3 +149,44 @@ export function createMember(
     }),
   });
 }
+
+export function getMember(id: string) {
+  return apiJson<MemberApiRow>(`/api/v1/members/${id}`);
+}
+
+export function updateMember(id: string, values: UserFormValues) {
+  return apiJson<MemberApiRow>(`/api/v1/members/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      ...toMemberEntryBody(values),
+      status: values.status ?? "1",
+    }),
+  });
+}
+
+export function acceptMember(id: string, tag?: DailyTag) {
+  return apiJson<MemberApiRow>(`/api/v1/members/${id}/accept`, {
+    method: "PATCH",
+    body: JSON.stringify(tag ? { tag } : {}),
+  });
+}
+
+export function rejectMember(id: string) {
+  return apiJson<MemberApiRow>(`/api/v1/members/${id}/reject`, {
+    method: "PATCH",
+  });
+}
+
+export function updateMemberTag(id: string, tag: DailyTag) {
+  return apiJson<MemberApiRow>(`/api/v1/members/${id}/tag`, {
+    method: "PATCH",
+    body: JSON.stringify({ tag }),
+  });
+}
+
+export function updateMemberStatus(id: string, status: UserStatus) {
+  return apiJson<MemberApiRow>(`/api/v1/members/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}

@@ -32,7 +32,7 @@ import { useI18n, useT } from "@/i18n/provider";
 import { roleLabel } from "@/i18n";
 import { ApiClientError } from "@/lib/api/client";
 import { loginStaff } from "@/lib/api/auth";
-import { isApiEnabled } from "@/lib/api/mode";
+import { isApiEnabled, isCcApiEnabled } from "@/lib/api/mode";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 
@@ -80,7 +80,7 @@ export default function LoginPage() {
   const t = useT();
   const { locale } = useI18n();
   const reduceMotion = useReducedMotion();
-  const apiOn = isApiEnabled();
+  const apiOn = isApiEnabled() || isCcApiEnabled();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [demoRole, setDemoRole] = useState<Role>("cc");
@@ -167,15 +167,19 @@ export default function LoginPage() {
   }
 
   async function onQuickRole(role: Role) {
-    if (!apiOn) {
-      setDemoRole(role);
-      finishDemo(role, email.trim() || roleLabel(role, locale));
-      return;
+    if (apiOn) {
+      const nextEmail = SEED_STAFF_EMAIL(role);
+      setEmail(nextEmail);
+      setPassword(SEED_STAFF_PASSWORD);
+      try {
+        await signIn(nextEmail, SEED_STAFF_PASSWORD);
+        return;
+      } catch {
+        if (isApiEnabled()) return;
+      }
     }
-    const nextEmail = SEED_STAFF_EMAIL(role);
-    setEmail(nextEmail);
-    setPassword(SEED_STAFF_PASSWORD);
-    await signIn(nextEmail, SEED_STAFF_PASSWORD);
+    setDemoRole(role);
+    finishDemo(role, email.trim() || roleLabel(role, locale));
   }
 
   const selectedRole = apiOn

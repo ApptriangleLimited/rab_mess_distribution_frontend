@@ -10,6 +10,10 @@ import { TagChip } from "@/components/tag-requests/tag-chip";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
+import { ApiClientError } from "@/lib/api/client";
+import { notifyCcDataChange } from "@/lib/api/cc-events";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import { createTagRequestApi } from "@/lib/api/tag-requests";
 import {
   canRequestTag,
   createTagRequest,
@@ -37,8 +41,10 @@ export function RequestTagButton({
   const { locale } = useI18n();
   const { toast } = useToast();
   const state = useStore();
+  const apiOn = isCcApiEnabled();
   void state.tag_requests;
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const pending = getPendingTagRequest(user.id);
   const today = todayISO();
   const [tag, setTag] = useState<DailyTag | "">(pending?.to_tag ?? "");
@@ -59,7 +65,8 @@ export function RequestTagButton({
     setOpen(true);
   }
 
-  function confirm() {
+  async function confirm() {
+    if (busy) return;
     if (!from || !to) {
       toast(t("tagRequest.dateRangeRequired"), "error");
       return;
@@ -70,6 +77,28 @@ export function RequestTagButton({
     }
     if (tag === current) {
       toast(t("tagRequest.sameTag"), "error");
+      return;
+    }
+    if (apiOn) {
+      setBusy(true);
+      try {
+        await createTagRequestApi({
+          userId: user.id,
+          toTag: tag,
+          from,
+          to,
+        });
+        notifyCcDataChange();
+        toast(t("tagRequest.requestToast"), "success");
+        setOpen(false);
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
+          "error",
+        );
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     const row = createTagRequest(user.id, tag, "cc", { from, to });
@@ -112,7 +141,8 @@ export function RequestTagButton({
         tone="success"
         title={t("tagRequest.requestTitle")}
         body={t("tagRequest.requestBody", { name: user.name })}
-        confirmLabel={t("tagRequest.request")}
+        confirmLabel={busy ? t("common.sending") : t("tagRequest.request")}
+        busy={busy}
         panelClassName="max-w-lg"
         onCancel={() => setOpen(false)}
         onConfirm={confirm}

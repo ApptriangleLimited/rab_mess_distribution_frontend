@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconCircleCheck,
@@ -32,6 +32,17 @@ import {
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { notifyCcDataChange, onCcDataChange } from "@/lib/api/cc-events";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import {
+  acceptTagRequest,
+  listTagRequests,
+  rejectTagRequestApi,
+  requestMember,
+  requestToTagRequest,
+} from "@/lib/api/tag-requests";
+import { PAGE_SIZE } from "@/lib/pagination";
 import {
   applyTagRequest,
   getCockpitTagOnDate,
@@ -78,10 +89,25 @@ export function TagRequestBoard({
   const { locale } = useI18n();
   const { toast } = useToast();
   const state = useStore();
+  const apiOn = isCcApiEnabled();
   const { ranks, wings } = state;
   const tags = listAllTags();
   const reduceMotion = useReducedMotion();
   const today = todayISO();
+  const [apiRows, setApiRows] = useState<TagRequest[]>([]);
+  const [apiUsers, setApiUsers] = useState<User[]>([]);
+  const [apiTotal, setApiTotal] = useState(0);
+  const [apiCounts, setApiCounts] = useState({
+    requested: 0,
+    updated: 0,
+    rejected: 0,
+    all: 0,
+  });
+  const [loading, setLoading] = useState(apiOn);
+  const [busy, setBusy] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [apiPage, setApiPage] = useState(1);
+  const [apiPageSize, setApiPageSize] = useState(PAGE_SIZE);
 
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -99,12 +125,95 @@ export function TagRequestBoard({
   const [pendingUpdate, setPendingUpdate] = useState<TagRequest | null>(null);
   const [pendingReject, setPendingReject] = useState<TagRequest | null>(null);
 
+  useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    setApiPage(1);
+  }, [q, rank, wing, tag, status, view, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    listTagRequests({
+      queue,
+      status: mode === "daily" ? "requested" : view,
+      q: q || undefined,
+      rank,
+      wing,
+      tag,
+      member_status: status,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+      page: apiPage,
+      page_size: apiPageSize,
+    })
+      .then((data) => {
+        if (cancelled) return;
+        const users: User[] = [];
+        const seen = new Set<string>();
+        const rows = data.items.map((row) => {
+          const member = requestMember(row);
+          if (member && !seen.has(member.id)) {
+            seen.add(member.id);
+            users.push(member);
+          }
+          return requestToTagRequest(row);
+        });
+        setApiRows(rows);
+        setApiUsers(users);
+        setApiTotal(data.total);
+        setApiCounts({
+          requested: data.status_counts.requested,
+          updated: data.status_counts.updated,
+          rejected: data.status_counts.rejected,
+          all: data.status_counts.all,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiRows([]);
+        setApiUsers([]);
+        setApiTotal(0);
+        toast(
+          err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
+          "error",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    apiOn,
+    apiPage,
+    apiPageSize,
+    dateFrom,
+    dateTo,
+    mode,
+    q,
+    queue,
+    rank,
+    reloadTick,
+    status,
+    t,
+    tag,
+    toast,
+    view,
+    wing,
+  ]);
+
   const usersById = useMemo(
-    () => new Map(state.users.map((u) => [u.id, u])),
-    [state.users],
+    () => new Map((apiOn ? apiUsers : state.users).map((u) => [u.id, u])),
+    [apiOn, apiUsers, state.users],
   );
 
-  const rows = useMemo(() => {
+  const demoRows = useMemo(() => {
     const query = q.trim().toLowerCase();
     return state.tag_requests
       .filter((req) => {
@@ -156,19 +265,66 @@ export function TagRequestBoard({
     queue,
   ]);
 
+  const rows = apiOn ? apiRows : demoRows;
+
   const queued = state.tag_requests.filter(
     (r) => (r.queue ?? "daily") === queue,
   );
-  const requestedCount = queued.filter((r) => r.status === "requested").length;
-  const updatedCount = queued.filter((r) => r.status === "updated").length;
-  const rejectedCount = queued.filter((r) => r.status === "rejected").length;
+  const requestedCount = apiOn
+    ? apiCounts.requested
+    : queued.filter((r) => r.status === "requested").length;
+  const updatedCount = apiOn
+    ? apiCounts.updated
+    : queued.filter((r) => r.status === "updated").length;
+  const rejectedCount = apiOn
+    ? apiCounts.rejected
+    : queued.filter((r) => r.status === "rejected").length;
+  const allCount = apiOn ? apiCounts.all : queued.length;
 
   const resetKey = rows.map((r) => r.id).join("|");
-  const page = usePagination(rows, resetKey);
+  const clientPage = usePagination(rows, resetKey);
+  const page = apiOn
+    ? {
+        page: apiPage,
+        pageSize: apiPageSize,
+        total: apiTotal,
+        totalPages: Math.max(1, Math.ceil(apiTotal / apiPageSize) || 1),
+        pageItems: rows,
+        from: apiTotal === 0 ? 0 : (apiPage - 1) * apiPageSize + 1,
+        to: Math.min(apiPage * apiPageSize, apiTotal),
+        setPage: setApiPage,
+        setPageSize: (size: number) => {
+          setApiPageSize(size);
+          setApiPage(1);
+        },
+      }
+    : clientPage;
   const fieldClass = searchFilterCompactFieldClass;
 
-  function confirmUpdate() {
-    if (!pendingUpdate) return;
+  async function confirmUpdate() {
+    if (!pendingUpdate || busy) return;
+    if (apiOn) {
+      setBusy(true);
+      try {
+        await acceptTagRequest(pendingUpdate.id);
+        notifyCcDataChange();
+        toast(
+          canAct && mode !== "daily"
+            ? t("tagRequest.approveToast")
+            : t("tagRequest.updateToast"),
+          "success",
+        );
+        setPendingUpdate(null);
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
+          "error",
+        );
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const ok = applyTagRequest(pendingUpdate.id);
     if (!ok) {
       toast(t("tagRequest.cannotRequest"), "error");
@@ -184,8 +340,25 @@ export function TagRequestBoard({
     setPendingUpdate(null);
   }
 
-  function confirmReject() {
-    if (!pendingReject) return;
+  async function confirmReject() {
+    if (!pendingReject || busy) return;
+    if (apiOn) {
+      setBusy(true);
+      try {
+        await rejectTagRequestApi(pendingReject.id);
+        notifyCcDataChange();
+        toast(t("tagRequest.rejectToast"), "success");
+        setPendingReject(null);
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
+          "error",
+        );
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const ok = rejectTagRequest(pendingReject.id);
     if (!ok) {
       toast(t("tagRequest.cannotRequest"), "error");
@@ -218,7 +391,7 @@ export function TagRequestBoard({
           <div className="relative">
             <PageHeader
               title={title}
-              subtitle={subtitle(rows.length)}
+              subtitle={subtitle(apiOn ? apiTotal : rows.length)}
               center={tabs}
             />
           </div>
@@ -239,7 +412,7 @@ export function TagRequestBoard({
                 <StatChip
                   icon={<IconSend className="h-3 w-3" />}
                   label={t("tagRequest.statAll")}
-                  value={String(queued.length)}
+                  value={String(allCount)}
                   tone="teal"
                   selected={view === "all"}
                   onClick={() => setView("all")}
@@ -347,7 +520,11 @@ export function TagRequestBoard({
           />
         </SearchFilterBar>
 
-        {page.total === 0 ? (
+        {loading ? (
+          <p className="py-10 text-center text-sm text-neutral-500">
+            {t("common.loading")}
+          </p>
+        ) : page.total === 0 ? (
           <EmptyState
             title={
               mode === "ration"
@@ -432,8 +609,13 @@ export function TagRequestBoard({
           },
         )}
         confirmLabel={
-          mode === "daily" ? t("tagRequest.update") : t("tagRequest.approve")
+          busy
+            ? t("cc.accepting")
+            : mode === "daily"
+              ? t("tagRequest.update")
+              : t("tagRequest.approve")
         }
+        busy={busy}
         onCancel={() => setPendingUpdate(null)}
         onConfirm={confirmUpdate}
       >
@@ -476,7 +658,8 @@ export function TagRequestBoard({
           name: rejectUser?.name ?? "",
           tag: pendingReject?.to_tag ?? "",
         })}
-        confirmLabel={t("tagRequest.reject")}
+        confirmLabel={busy ? t("cc.rejecting") : t("tagRequest.reject")}
+        busy={busy}
         onCancel={() => setPendingReject(null)}
         onConfirm={confirmReject}
       >
