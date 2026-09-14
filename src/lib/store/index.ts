@@ -27,12 +27,22 @@ import {
   authorizedIdForLabel,
 } from "@/lib/constants";
 import { parseMoney } from "@/lib/money";
+import {
+  isLegacyDemoSenders,
+  officialSenderAccounts,
+} from "@/lib/official-senders";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { demoPritibhojEvents, lockPritibhojSheets } from "@/lib/pritibhoj-demo";
 import {
   ensureTagRequests,
   MIN_TAG_REQUESTS_PER_QUEUE,
+  storedTagRequests,
 } from "@/lib/tag-request-demo";
-import { createSeedState, SEED_VERSION } from "@/lib/store/seed";
+import {
+  createLiveCatalogState,
+  createSeedState,
+  SEED_VERSION,
+} from "@/lib/store/seed";
 import type {
   AllowanceRate,
   AppState,
@@ -43,9 +53,62 @@ import type {
 } from "@/lib/types";
 
 type Listener = () => void;
+type PersistHook = (state: AppState) => void;
 
 let memory: AppState | null = null;
 const listeners = new Set<Listener>();
+let persistHook: PersistHook | null = null;
+let persistPaused = false;
+let apiBacked = false;
+
+export function setPersistHook(hook: PersistHook | null) {
+  persistHook = hook;
+}
+
+export function applyApiSnapshot(partial: Partial<AppState>) {
+  persistPaused = true;
+  apiBacked = true;
+  const prev = getState();
+  const merged: AppState = { ...prev, version: SEED_VERSION };
+  for (const [key, value] of Object.entries(partial) as [keyof AppState, AppState[keyof AppState]][]) {
+    if (value == null) continue;
+    const current = merged[key];
+    if (Array.isArray(value) && value.length === 0 && Array.isArray(current) && current.length > 0) {
+      if (
+        key === "users" ||
+        key === "assignments" ||
+        key === "tag_requests" ||
+        key === "state_reports" ||
+        key === "meal_plans" ||
+        key === "meal_assigns" ||
+        key === "guest_meals" ||
+        key === "pritibhoj_events"
+      ) {
+        merged[key] = value as never;
+        continue;
+      }
+      continue;
+    }
+    if (
+      (key === "manpower_held" || key === "manpower_absent") &&
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.keys(value as object).length === 0 &&
+      current &&
+      typeof current === "object" &&
+      !Array.isArray(current) &&
+      Object.keys(current as object).length > 0
+    ) {
+      continue;
+    }
+    merged[key] = value as never;
+  }
+  memory = normalizeState(merged);
+  writeStorage(memory);
+  listeners.forEach((l) => l());
+  persistPaused = false;
+}
 
 type LegacyUser = User & {
   emergency_name?: string;
@@ -93,6 +156,30 @@ function ensureStringList(
 function asFiniteNumber(raw: unknown): number {
   const n = Number(raw);
   return Number.isFinite(n) ? n : 0;
+}
+
+function ensureDayWingCatMap(
+  raw: unknown,
+): Record<string, Record<string, Record<string, number>>> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, Record<string, Record<string, number>>> = {};
+  for (const [date, wings] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (!wings || typeof wings !== "object") continue;
+    const wingMap: Record<string, Record<string, number>> = {};
+    for (const [wing, cats] of Object.entries(wings as Record<string, unknown>)) {
+      if (!wing.trim() || !cats || typeof cats !== "object") continue;
+      const catMap: Record<string, number> = {};
+      for (const [catId, n] of Object.entries(cats as Record<string, unknown>)) {
+        const num = Number(n);
+        if (!catId.trim() || !Number.isFinite(num) || num < 0) continue;
+        catMap[catId] = Math.floor(num);
+      }
+      if (Object.keys(catMap).length) wingMap[wing] = catMap;
+    }
+    if (Object.keys(wingMap).length) out[date] = wingMap;
+  }
+  return out;
 }
 
 function sanitizePritibhojRow(raw: unknown): PritibhojRow | null {
@@ -145,12 +232,15 @@ function ensurePritibhojEvents(state: AppState): PritibhojEvent[] {
   const raw = Object.prototype.hasOwnProperty.call(state, "pritibhoj_events")
     ? state.pritibhoj_events
     : undefined;
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return demoPritibhojEvents();
-  }
-  return raw
-    .map(sanitizePritibhojEvent)
-    .filter((event): event is PritibhojEvent => event !== null);
+  const cleaned = Array.isArray(raw)
+    ? raw
+        .map(sanitizePritibhojEvent)
+        .filter((event): event is PritibhojEvent => event !== null)
+        .filter((event) => !event.id.startsWith("pb_demo_"))
+    : [];
+  if (apiBacked) return cleaned;
+  if (cleaned.length === 0) return demoPritibhojEvents();
+  return cleaned;
 }
 
 /** Swap battalion-era defaults → parent-force list once. */
@@ -1088,6 +1178,9 @@ function isCurrentSeed(state: AppState | null): boolean {
 }
 
 export function getState(): AppState {
+  if (typeof window !== "undefined" && isCcApiEnabled()) {
+    apiBacked = true;
+  }
   if (memory && isCurrentSeed(memory)) {
     const hasBanned = memory.wings.some((w) =>
       LEGACY_WINGS.some((b) => b.toLowerCase() === w.toLowerCase()),
@@ -1098,14 +1191,19 @@ export function getState(): AppState {
       const sum = sumAuthorizedWings(wings);
       return row.count !== sum;
     });
-    const shortRequestQueues = (
-      ["daily", "ration", "consume"] as const
-    ).some(
-      (queue) =>
-        memory!.tag_requests.filter((r) => (r.queue ?? "daily") === queue)
-          .length < MIN_TAG_REQUESTS_PER_QUEUE,
-    );
-    if (hasBanned || authStale || shortRequestQueues) {
+    const shortRequestQueues =
+      !apiBacked &&
+      (["daily", "ration", "consume"] as const).some(
+        (queue) =>
+          memory!.tag_requests.filter((r) => (r.queue ?? "daily") === queue)
+            .length < MIN_TAG_REQUESTS_PER_QUEUE,
+      );
+    if (
+      hasBanned ||
+      authStale ||
+      shortRequestQueues ||
+      (!apiBacked && isLegacyDemoSenders(memory.senders))
+    ) {
       memory = normalizeState(memory);
       writeStorage(memory);
     }
@@ -1114,13 +1212,23 @@ export function getState(): AppState {
 
   const fromDisk = readStorage();
   if (fromDisk && isCurrentSeed(fromDisk)) {
-    memory = normalizeState(fromDisk);
+    memory = normalizeState(
+      isCcApiEnabled()
+        ? {
+            ...fromDisk,
+            users: [],
+            assignments: [],
+            tag_requests: [],
+            pritibhoj_events: [],
+          }
+        : fromDisk,
+    );
     writeStorage(memory);
     return memory;
   }
 
-  // Stale / missing seed version → demo reseed, but keep real প্রাধিকৃত.
-  const seeded = createSeedState();
+  // Stale / missing seed version → live catalog when API is on, else demo reseed.
+  const seeded = isCcApiEnabled() ? createLiveCatalogState() : createSeedState();
   if (fromDisk && Array.isArray(fromDisk.authorized) && fromDisk.authorized.length) {
     seeded.authorized = ensureAuthorized(
       fromDisk.authorized,
@@ -1133,6 +1241,16 @@ export function getState(): AppState {
     typeof fromDisk.manpower_officer_absent === "object"
   ) {
     seeded.manpower_officer_absent = fromDisk.manpower_officer_absent;
+  }
+  if (fromDisk && fromDisk.manpower_held && typeof fromDisk.manpower_held === "object") {
+    seeded.manpower_held = fromDisk.manpower_held;
+  }
+  if (
+    fromDisk &&
+    fromDisk.manpower_absent &&
+    typeof fromDisk.manpower_absent === "object"
+  ) {
+    seeded.manpower_absent = fromDisk.manpower_absent;
   }
   memory = seeded;
   writeStorage(seeded);
@@ -1339,11 +1457,20 @@ function normalizeState(state: AppState): AppState {
       }
       return out;
     })(),
-    senders: (state.senders ?? []).map((s) => ({
-      ...s,
-      active: s.active !== false,
-      branch_location: s.branch_location ?? "",
-    })),
+    manpower_held: ensureDayWingCatMap(
+      (state as AppState & { manpower_held?: unknown }).manpower_held,
+    ),
+    manpower_absent: ensureDayWingCatMap(
+      (state as AppState & { manpower_absent?: unknown }).manpower_absent,
+    ),
+    senders: (() => {
+      const raw = (state.senders ?? []).map((s) => ({
+        ...s,
+        active: s.active !== false,
+        branch_location: s.branch_location ?? "",
+      }));
+      return isLegacyDemoSenders(raw) ? officialSenderAccounts() : raw;
+    })(),
     approved_dates: Array.isArray(state.approved_dates)
       ? state.approved_dates
       : [],
@@ -1361,7 +1488,9 @@ function normalizeState(state: AppState): AppState {
     meal_shifts: Array.isArray(state.meal_shifts) ? state.meal_shifts : [],
     guest_meals: Array.isArray(state.guest_meals) ? state.guest_meals : [],
     pritibhoj_events: ensurePritibhojEvents(state),
-    tag_requests: ensureTagRequests(state.tag_requests, state.users ?? []),
+    tag_requests: apiBacked
+      ? storedTagRequests(state.tag_requests)
+      : ensureTagRequests(state.tag_requests, state.users ?? []),
   };
 }
 
@@ -1371,6 +1500,7 @@ export function setState(next: AppState | ((prev: AppState) => AppState)) {
   memory = resolved;
   writeStorage(resolved);
   listeners.forEach((l) => l());
+  if (!persistPaused) persistHook?.(resolved);
 }
 
 export function resetToSeed() {
@@ -1408,6 +1538,8 @@ export function getServerSnapshot(): AppState {
     member_banks: [],
     authorized: [],
     manpower_officer_absent: {},
+    manpower_held: {},
+    manpower_absent: {},
     approved_dates: [],
     suppressed_carries: [],
     boro_khana_dates: [],
@@ -1424,4 +1556,8 @@ export function getServerSnapshot(): AppState {
 
 export function hydrateStore() {
   getState();
+  if (typeof window === "undefined") return;
+  void import("@/lib/api/app-sync").then((mod) => {
+    void mod.syncStoreFromApi();
+  });
 }

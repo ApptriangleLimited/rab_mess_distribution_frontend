@@ -50,6 +50,9 @@ import {
   type UserInput,
 } from "@/lib/store/users";
 import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { uploadFile } from "@/lib/api/files";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { listRanks, listWings } from "@/lib/store/org-options";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
@@ -183,6 +186,7 @@ export function UserForm({
   );
   const [todayTag, setTodayTag] = useState<DailyTag>(initialTag);
   const [dragOver, setDragOver] = useState(false);
+  const apiOn = isCcApiEnabled();
   const wingParts = resolveWingParts(values.wing, wing_parent);
   const parentWingOptions = rootWings(wings, wing_parent);
   const isCivilian = values.member_type === "civilian";
@@ -321,15 +325,41 @@ export function UserForm({
     }
   }
 
-  function onFiles(files: FileList | null) {
+  async function onFiles(files: FileList | null) {
     if (!files?.length) return;
-    const docs: DocumentMeta[] = Array.from(files).map((f) => ({
-      name: f.name,
-      size: f.size,
-    }));
+    const incoming = Array.from(files);
+    if (!apiOn || variant === "public") {
+      setValues((prev) => ({
+        ...prev,
+        documents: [
+          ...prev.documents,
+          ...incoming.map((f) => ({ name: f.name, size: f.size })),
+        ],
+      }));
+      return;
+    }
+    const uploaded: DocumentMeta[] = [];
+    for (const file of incoming) {
+      try {
+        const row = await uploadFile(file, { entity_type: "member" });
+        uploaded.push({
+          id: row.id,
+          name: row.original_name || file.name,
+          size: row.size || file.size,
+        });
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError
+            ? err.detail
+            : t("cc.documentOpenFail"),
+          "error",
+        );
+      }
+    }
+    if (!uploaded.length) return;
     setValues((prev) => ({
       ...prev,
-      documents: [...prev.documents, ...docs],
+      documents: [...prev.documents, ...uploaded],
     }));
   }
 

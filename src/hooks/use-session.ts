@@ -6,8 +6,11 @@ import { isCcApiEnabled } from "@/lib/api/mode";
 import {
   clearSession,
   getAccessToken,
+  getProfileAvatar,
   getSessionFromStorage,
+  sessionMsRemaining,
   setAccessToken,
+  setRefreshToken,
   setSession as persistSession,
 } from "@/lib/session";
 import type { Role, Session } from "@/lib/types";
@@ -30,11 +33,35 @@ export function useSession() {
     setReady(true);
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+    const remaining = sessionMsRemaining(session);
+    if (remaining <= 0) {
+      if (getAccessToken()) void logoutStaff();
+      clearSession();
+      setSessionState(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (getAccessToken()) void logoutStaff();
+      clearSession();
+      setSessionState(null);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [session]);
+
   const login = useCallback(
-    (role: Role, name: string, accessToken?: string, remember = true) => {
-      const next: Session = { role, name, loggedInAt: nowISO() };
+    (role: Role, name: string, accessToken?: string, remember = true, refreshToken?: string, username?: string) => {
+      const next: Session = {
+        role,
+        name,
+        username,
+        loggedInAt: nowISO(),
+        avatarUrl: getProfileAvatar(role, username) ?? undefined,
+      };
       persistSession(next, remember);
       if (accessToken) setAccessToken(accessToken, remember);
+      if (refreshToken) setRefreshToken(refreshToken, remember);
       setSessionState(next);
       return next;
     },
@@ -47,5 +74,22 @@ export function useSession() {
     setSessionState(null);
   }, []);
 
-  return { session, ready, login, logout };
+  const updateProfile = useCallback(
+    (name: string, avatarUrl: string | null, username?: string) => {
+      setSessionState((prev) => {
+        if (!prev) return prev;
+        const next = {
+          ...prev,
+          name,
+          username: username ?? prev.username,
+          avatarUrl: avatarUrl || undefined,
+        };
+        persistSession(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  return { session, ready, login, logout, updateProfile };
 }

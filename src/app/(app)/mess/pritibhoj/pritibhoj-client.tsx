@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -21,11 +21,18 @@ import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
+import { ApiClientError } from "@/lib/api/client";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import {
+  deletePritibhojEventApi,
+  listPritibhojEventsApi,
+} from "@/lib/api/pritibhoj";
 import { formatDateDisplay } from "@/lib/date";
 import {
   deletePritibhojEvent,
   eventManpower,
   listPritibhojEvents,
+  replaceLocalPritibhojEvents,
 } from "@/lib/store/pritibhoj";
 import type { PritibhojEvent } from "@/lib/types";
 import { useT } from "@/i18n/provider";
@@ -38,10 +45,41 @@ export default function MessPritibhojClient() {
   const [q, setQ] = useState("");
   const [deleting, setDeleting] = useState<PritibhojEvent | null>(null);
 
-  const events = useMemo(
-    () => listPritibhojEvents(),
+  const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
+  const [apiLoading, setApiLoading] = useState(isCcApiEnabled());
+
+  const storeEvents = useMemo(
+    () => listPritibhojEvents().filter((row) => !row.id.startsWith("pb_demo_")),
     [state.pritibhoj_events],
   );
+
+  useEffect(() => {
+    if (!isCcApiEnabled()) {
+      setApiEvents(null);
+      setApiLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setApiLoading(true);
+    listPritibhojEventsApi()
+      .then((rows) => {
+        if (cancelled) return;
+        const live = rows.filter((row) => !String(row.id).startsWith("pb_demo_"));
+        replaceLocalPritibhojEvents(live);
+        setApiEvents(live);
+      })
+      .catch(() => {
+        if (!cancelled) setApiEvents([]);
+      })
+      .finally(() => {
+        if (!cancelled) setApiLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const events = isCcApiEnabled() ? (apiEvents ?? []) : storeEvents;
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -98,7 +136,9 @@ export default function MessPritibhojClient() {
         >
         </SearchFilterBar>
 
-        {filtered.length === 0 ? (
+        {apiLoading ? (
+          <p className="p-4 text-sm text-neutral-500">{t("common.loading")}</p>
+        ) : filtered.length === 0 ? (
           <EmptyState
             title={t("mess.pritibhoj.listEmpty")}
             description={t("mess.pritibhoj.listEmptyHint")}
@@ -229,9 +269,23 @@ export default function MessPritibhojClient() {
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (!deleting) return;
-          deletePritibhojEvent(deleting.id);
-          toast(t("mess.pritibhoj.deleted"), "success");
-          setDeleting(null);
+          void (async () => {
+            try {
+              if (isCcApiEnabled()) {
+                await deletePritibhojEventApi(deleting.id);
+              }
+              deletePritibhojEvent(deleting.id);
+              toast(t("mess.pritibhoj.deleted"), "success");
+              setDeleting(null);
+            } catch (err) {
+              toast(
+                err instanceof ApiClientError
+                  ? err.detail
+                  : t("mess.pritibhoj.missing"),
+                "error",
+              );
+            }
+          })();
         }}
       />
     </PagePane>

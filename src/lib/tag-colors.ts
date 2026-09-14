@@ -20,6 +20,8 @@ const TAG_CELL: Record<string, string> = {
   WIT: "bg-fuchsia-100 text-fuchsia-950 dark:bg-fuchsia-900/55 dark:text-fuchsia-100",
   /** Medical — rose */
   MED: "bg-rose-100 text-rose-950 dark:bg-rose-900/55 dark:text-rose-100",
+  /** ML — maroon (distinct from MED rose) */
+  ML: "bg-red-200 text-red-950 dark:bg-red-900/50 dark:text-red-100",
   /** Training — cyan */
   TRG: "bg-cyan-100 text-cyan-950 dark:bg-cyan-900/55 dark:text-cyan-100",
   /** Fuel rate-only — yellow */

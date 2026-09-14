@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { IconTip } from "@/components/shared/icon-tip";
 import { CcTabs } from "@/components/layout/cc-tabs";
 import { Button } from "@/components/ui/button";
 import { UserFiltersBar } from "@/components/users/user-filters";
@@ -222,39 +223,46 @@ export default function CcUsersPage() {
               actions={
                 <div className="flex flex-wrap items-center gap-2">
                   {canPrint ? (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl"
-                    >
-                      <Link href={printHref}>
+                    <IconTip label={t("mess.print")}>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                      >
+                        <Link href={printHref} title={t("mess.print")}>
+                          <IconPrinter className="h-3.5 w-3.5" />
+                          {t("mess.print")}
+                        </Link>
+                      </Button>
+                    </IconTip>
+                  ) : (
+                    <IconTip label={t("mess.print")}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        disabled
+                        title={t("mess.print")}
+                      >
                         <IconPrinter className="h-3.5 w-3.5" />
                         {t("mess.print")}
+                      </Button>
+                    </IconTip>
+                  )}
+                  <IconTip label={t("cc.newUser")}>
+                    <Button
+                      asChild
+                      variant="cta"
+                      size="sm"
+                      className="rounded-xl shadow-sm shadow-primary/20"
+                    >
+                      <Link href="/cc/users/new" title={t("cc.newUser")}>
+                        <IconPlus className="h-3.5 w-3.5" />
+                        {t("cc.newUser")}
                       </Link>
                     </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl"
-                      disabled
-                    >
-                      <IconPrinter className="h-3.5 w-3.5" />
-                      {t("mess.print")}
-                    </Button>
-                  )}
-                  <Button
-                    asChild
-                    variant="cta"
-                    size="sm"
-                    className="rounded-xl shadow-sm shadow-primary/20"
-                  >
-                    <Link href="/cc/users/new">
-                      <IconPlus className="h-3.5 w-3.5" />
-                      {t("cc.newUser")}
-                    </Link>
-                  </Button>
+                  </IconTip>
                 </div>
               }
             />
@@ -273,6 +281,7 @@ export default function CcUsersPage() {
         ) : (
           <UserTable
             users={users}
+            onEmptyCreateHref="/cc/users/new"
             pagination={
               apiOn
                 ? {
@@ -323,6 +332,7 @@ function StatChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      title={label}
       className={cn(
         "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 shadow-sm transition",
         tones,

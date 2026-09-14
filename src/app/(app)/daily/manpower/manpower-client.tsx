@@ -15,15 +15,10 @@ import { DatePicker } from "@/components/shared/date-picker";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
-import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
+import { useManpowerDay } from "@/hooks/use-manpower-day";
 import { useStore } from "@/hooks/use-store";
-import { isApiEnabled } from "@/lib/api/mode";
 import { formatDateLong, todayISO } from "@/lib/date";
-import {
-  buildManpowerReport,
-  tagForFromCells,
-  type ManpowerSnapshot,
-} from "@/lib/manpower-report";
+import { buildManpowerReport } from "@/lib/manpower-report";
 import { buildStrengthReport } from "@/lib/strength-report";
 import { cn } from "@/lib/utils";
 import { useI18n, useT } from "@/i18n/provider";
@@ -40,7 +35,6 @@ export default function ManpowerClient() {
   const { locale } = useI18n();
   const reduceMotion = useReducedMotion();
   const state = useStore();
-  const apiOn = isApiEnabled();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -54,49 +48,34 @@ export default function ManpowerClient() {
 
   const form = parseForm(searchParams.get("form"));
 
-  const cockpit = useDailyCockpit({
-    dateFrom: date,
-    dateTo: date,
-    q: "",
-    rank: "all",
-    wing: "all",
-  });
-
-  const snapshot: ManpowerSnapshot | undefined = useMemo(() => {
-    if (!apiOn || cockpit.loading) return undefined;
-    return {
-      users: cockpit.users,
-      tagFor: tagForFromCells(cockpit.cells, date),
-      wingParent: state.wing_parent,
-    };
-  }, [
-    apiOn,
-    cockpit.loading,
-    cockpit.users,
-    cockpit.cells,
-    date,
-    state.wing_parent,
-  ]);
+  const { apiOn, loading, snapshot } = useManpowerDay(date);
+  const reportSnapshot = apiOn
+    ? snapshot ?? {
+        users: [],
+        tagFor: () => "" as const,
+        prefiltered: true,
+      }
+    : undefined;
 
   const form1 = useMemo(
-    () => buildManpowerReport(date, snapshot),
+    () => buildManpowerReport(date, reportSnapshot),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, snapshot],
+    [date, state, reportSnapshot],
   );
   const form2 = useMemo(
-    () => buildStrengthReport(date, "admin", snapshot),
+    () => buildStrengthReport(date, "admin", reportSnapshot),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, snapshot],
+    [date, state, reportSnapshot],
   );
   const form3 = useMemo(
-    () => buildStrengthReport(date, "hq", snapshot),
+    () => buildStrengthReport(date, "hq", reportSnapshot),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, snapshot],
+    [date, state, reportSnapshot],
   );
 
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   const printHref = `/daily/manpower/print?date=${encodeURIComponent(date)}&form=${form}`;
-  const loading = apiOn && cockpit.loading;
+  const showReport = !loading;
 
   const formTabs: {
     id: FormId;
@@ -235,9 +214,9 @@ export default function ManpowerClient() {
           {loading ? (
             <p className="p-4 text-sm text-neutral-500">{t("common.loading")}</p>
           ) : null}
-          {form === "1" && !loading ? <ManpowerWeb report={form1} /> : null}
-          {form === "2" && !loading ? <StrengthWeb report={form2} /> : null}
-          {form === "3" && !loading ? <StrengthWeb report={form3} /> : null}
+          {form === "1" && showReport ? <ManpowerWeb report={form1} /> : null}
+          {form === "2" && showReport ? <StrengthWeb report={form2} /> : null}
+          {form === "3" && showReport ? <StrengthWeb report={form3} /> : null}
         </div>
       </motion.div>
     </PagePane>

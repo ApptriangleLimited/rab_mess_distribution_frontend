@@ -65,10 +65,15 @@ import {
 import { ColoredTagGrid } from "@/components/daily/colored-tag-grid";
 import { TrgSardaDialog } from "@/components/daily/trg-sarda-dialog";
 import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { notifyCcDataChange } from "@/lib/api/cc-events";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import { createTagRequestApi, requestToTagRequest } from "@/lib/api/tag-requests";
 import {
   createDutyTagRequest,
   dutyTagQueue,
   pendingDutyByUserDate,
+  upsertLocalTagRequest,
 } from "@/lib/store/tag-requests";
 import { cn } from "@/lib/utils";
 
@@ -267,10 +272,7 @@ export function RegisterBoard({
           ? stroke.endDate
           : stroke.startDate;
       const dates = eachISODate(lo, hi).filter(
-        (date) =>
-          date >= todayISO &&
-          canAssignOnDate(user, date) &&
-          !pendingByUserDate.has(`${stroke.userId}|${date}`),
+        (date) => date >= todayISO && canAssignOnDate(user, date),
       );
       if (dates.length === 0) {
         setDrag(null);
@@ -325,7 +327,6 @@ export function RegisterBoard({
     [
       byUserDate,
       columnDates,
-      pendingByUserDate,
       priorByUser,
       suppressedSet,
       todayISO,
@@ -392,7 +393,6 @@ export function RegisterBoard({
     if (date < todayISO) return;
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
-    if (pendingByUserDate.has(`${userId}|${date}`)) return;
     const stroke: DragStroke = {
       userId,
       startDate: date,
@@ -411,7 +411,7 @@ export function RegisterBoard({
     return date >= lo && date <= hi;
   }
 
-  function queuePaint(
+  async function queuePaint(
     userId: string,
     tag: DailyTag,
     fromDate: string,
@@ -422,19 +422,48 @@ export function RegisterBoard({
     if (queue === "immediate") return false;
     const user = users.find((u) => u.id === userId);
     const force = user?.force ?? "";
+    const trg_tone = isTrgTag(tag)
+      ? resolveTrgTone(force, Boolean(opts?.training))
+      : undefined;
+    const trg_sarda =
+      isTrgTag(tag) && needsTrgSardaPrompt(force)
+        ? Boolean(opts?.sarda)
+        : undefined;
+    if (isCcApiEnabled()) {
+      try {
+        const created = await createTagRequestApi({
+          userId,
+          toTag: tag,
+          from: fromDate,
+          to: toDate,
+          queue,
+          trg_tone,
+          trg_sarda,
+        });
+        upsertLocalTagRequest(requestToTagRequest(created));
+        notifyCcDataChange();
+        toast(
+          queue === "ration"
+            ? t("daily.queuedRation", { tag })
+            : t("daily.queuedConsume", { tag }),
+          "success",
+        );
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
+          "error",
+        );
+      }
+      return true;
+    }
     const row = createDutyTagRequest({
       userId,
       toTag: tag,
       fromDate,
       toDate,
       queue,
-      trg_tone: isTrgTag(tag)
-        ? resolveTrgTone(force, Boolean(opts?.training))
-        : undefined,
-      trg_sarda:
-        isTrgTag(tag) && needsTrgSardaPrompt(force)
-          ? Boolean(opts?.sarda)
-          : undefined,
+      trg_tone,
+      trg_sarda,
     });
     if (row) {
       toast(
@@ -453,10 +482,7 @@ export function RegisterBoard({
     const from = rangeMenu.fromDate || rangeMenu.anchorDate;
     const to = rangeMenu.toDate || from;
     const dates = eachISODate(from, to).filter(
-      (date) =>
-        date >= todayISO &&
-        (!user || canAssignOnDate(user, date)) &&
-        !pendingByUserDate.has(`${rangeMenu.userId}|${date}`),
+      (date) => date >= todayISO && (!user || canAssignOnDate(user, date)),
     );
     if (dates.length === 0) return;
     if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
@@ -476,7 +502,8 @@ export function RegisterBoard({
       closeRangeMenu();
       return;
     }
-    if (tag && queuePaint(rangeMenu.userId, tag, fromDate, toDate)) {
+    if (tag && dutyTagQueue(tag) !== "immediate") {
+      void queuePaint(rangeMenu.userId, tag, fromDate, toDate);
       closeRangeMenu();
       return;
     }
@@ -765,36 +792,25 @@ export function RegisterBoard({
                     continue;
                   }
                   const key = `${user.id}|${date}`;
-                  const pending = pendingByUserDate.get(key);
-                  if (pending) {
-                    rowMeta.push({
-                      date,
-                      stored: undefined,
-                      ghost: undefined,
-                      pendingTag: pending.to_tag,
-                      trgTone: isTrgTag(pending.to_tag)
-                        ? (pending.trg_tone ?? resolveTrgTone(user.force))
-                        : undefined,
-                      afterOut: false,
-                      inactiveOnDate: false,
-                      mfrLocked: false,
-                    });
-                    continue;
-                  }
+                  const pendingReq = pendingByUserDate.get(key);
+                  const pendingTag = pendingReq?.to_tag;
                   const entry = byUserDate.get(key);
                   const stored = entry?.tag;
                   const suppressed = suppressedSet.has(key);
                   const ghost = stored || suppressed ? undefined : defaultGhost;
                   const trgTone = isTrgTag(stored)
                     ? (entry?.trg_tone ?? resolveTrgTone(user.force))
-                    : isTrgTag(ghost)
-                      ? resolveTrgTone(user.force)
-                      : undefined;
+                    : isTrgTag(pendingTag)
+                      ? (pendingReq?.trg_tone ?? resolveTrgTone(user.force))
+                      : isTrgTag(ghost)
+                        ? resolveTrgTone(user.force)
+                        : undefined;
                   rowMeta.push({
                     date,
                     stored,
                     // Empty cell → member default_tag only (not last paint).
                     ghost,
+                    pendingTag,
                     trgTone,
                     afterOut: false,
                     inactiveOnDate: false,
@@ -854,7 +870,7 @@ export function RegisterBoard({
                       const tagCounts: Partial<Record<DailyTag, number>> = {};
                       let totalDays = 0;
                       for (const cell of rowMeta) {
-                        if (cell.pendingTag) continue;
+                        if (cell.pendingTag && !cell.stored) continue;
                         const shown =
                           cell.stored ??
                           (!cell.afterOut && cell.ghost ? cell.ghost : undefined);
@@ -915,16 +931,17 @@ export function RegisterBoard({
                       } = cell;
                       const inactive = inactiveOnDate;
                       const pending = Boolean(pendingTag);
-                      const preview =
-                        inDragPreview(user.id, date) && !pending;
-                      const locked =
-                        afterOut || date < todayISO || pending;
+                      const preview = inDragPreview(user.id, date);
+                      const locked = afterOut || date < todayISO;
                       let tag = stored;
                       let isGhost = false;
-                      if (pendingTag) {
+                      if (stored) {
+                        tag = stored;
+                        isGhost = false;
+                      } else if (pendingTag) {
                         tag = pendingTag;
                         isGhost = true;
-                      } else if (!stored && ghost && !afterOut) {
+                      } else if (ghost && !afterOut) {
                         tag = ghost;
                         // Future only — past/today show solid (not preview fade)
                         isGhost = date > todayISO;
@@ -1069,7 +1086,7 @@ export function RegisterBoard({
         }}
         onConfirm={() => {
           if (!sardaPrompt) return;
-          queuePaint(
+          void queuePaint(
             sardaPrompt.userId,
             "TRG",
             sardaPrompt.fromDate,
@@ -1702,7 +1719,7 @@ function RegisterCell({
           contL ? "rounded-l-none" : "rounded-l-md",
           contR ? "rounded-r-none" : "rounded-r-md",
           // Carry ghost / pending request — faded so Daily can see it is not saved
-          (ghost || pending) && "opacity-40",
+          ghost && "opacity-40",
           pending &&
             "ring-1 ring-inset ring-dashed ring-amber-500/90 dark:ring-amber-300/80",
         )
@@ -1713,15 +1730,13 @@ function RegisterCell({
       "bg-primary/25 ring-2 ring-inset ring-primary/60 dark:bg-primary/40",
   );
 
-  const lockReason = pending
-    ? t("daily.pendingRequestLocked")
-    : inactive
-      ? t("daily.inactiveLocked")
-      : mfrLocked
-        ? t("daily.mfrLocked")
-        : afterOut
-          ? t("daily.afterOutLocked")
-          : t("daily.pastLocked");
+  const lockReason = inactive
+    ? t("daily.inactiveLocked")
+    : mfrLocked
+      ? t("daily.mfrLocked")
+      : afterOut
+        ? t("daily.afterOutLocked")
+        : t("daily.pastLocked");
   // Prior stored tags: normal title (not "disabled"). Empty locked: lock reason.
   const title = pending && tag
     ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)} · ${t("daily.pendingRequest")}`

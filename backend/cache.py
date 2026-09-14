@@ -2,36 +2,83 @@ import hashlib
 import json
 import os
 import time
+from urllib.parse import urlparse, urlunparse
 
 import redis
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6380/0")
+from config import settings
+
 CACHE_TTL = int(os.getenv("REDIS_CACHE_TTL", "120"))
 
 _client: redis.Redis | None = None
+_raw_client: redis.Redis | None = None
+
+
+def build_redis_url() -> str:
+    url = settings.redis_url
+    password = settings.redis_password
+    parsed = urlparse(url)
+    path = parsed.path or f"/{settings.redis_db}"
+    if password and not parsed.password:
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 6379
+        user = parsed.username or ""
+        auth = f"{user}:{password}" if user else f":{password}"
+        netloc = f"{auth}@{host}:{port}"
+        return urlunparse(parsed._replace(netloc=netloc, path=path))
+    return url
+
+
+def redis_log_target() -> str:
+    parsed = urlparse(build_redis_url())
+    host = parsed.hostname or "unknown"
+    port = parsed.port or 6379
+    db = (parsed.path or "/0").lstrip("/") or "0"
+    return f"{host}:{port}/{db}"
 
 
 def _reset() -> None:
-    global _client
+    global _client, _raw_client
     _client = None
+    _raw_client = None
+
+
+def _connect(decode: bool, *, blocking: bool = False) -> redis.Redis | None:
+    try:
+        client = redis.Redis.from_url(
+            build_redis_url(),
+            decode_responses=decode,
+            socket_connect_timeout=2.0,
+            socket_timeout=None if blocking else 1.5,
+            retry_on_timeout=True,
+            health_check_interval=30,
+        )
+        client.ping()
+        return client
+    except redis.RedisError:
+        return None
 
 
 def get_redis() -> redis.Redis | None:
     global _client
     if _client is not None:
         return _client
-    try:
-        client = redis.Redis.from_url(
-            REDIS_URL,
-            decode_responses=True,
-            socket_connect_timeout=0.4,
-            socket_timeout=0.4,
-        )
-        client.ping()
-        _client = client
-        return client
-    except redis.RedisError:
+    client = _connect(True)
+    if client is None:
         return None
+    _client = client
+    return client
+
+
+def get_redis_raw() -> redis.Redis | None:
+    global _raw_client
+    if _raw_client is not None:
+        return _raw_client
+    client = _connect(False, blocking=True)
+    if client is None:
+        return None
+    _raw_client = client
+    return client
 
 
 def redis_up() -> bool:
@@ -115,13 +162,38 @@ def deny_key(token: str, jti: str | None = None) -> str:
 
 
 def is_revoked(token: str, payload: dict) -> bool:
-    return cache_has(deny_key(token, payload.get("jti")))
+    if cache_has(deny_key(token, payload.get("jti"))):
+        return True
+    staff_id = payload.get("sub")
+    if staff_id and cache_has(f"rab:auth:staffdeny:{staff_id}"):
+        denied_after = cache_get(f"rab:auth:staffdeny:{staff_id}")
+        iat = int(payload.get("iat") or 0)
+        if isinstance(denied_after, dict):
+            return iat <= int(denied_after.get("at") or 0)
+        return True
+    return False
 
 
 def revoke_token(token: str, payload: dict) -> None:
     exp = int(payload.get("exp") or 0)
     ttl = max(1, exp - int(time.time()))
     cache_set_raw(deny_key(token, payload.get("jti")), "1", ttl)
+
+
+def revoke_staff_access(staff_id: str, ttl: int | None = None) -> None:
+    cache_set(
+        f"rab:auth:staffdeny:{staff_id}",
+        {"at": int(time.time())},
+        ttl or settings.jwt_expires_seconds,
+    )
+
+
+def worker_heartbeat(ttl: int = 90) -> None:
+    cache_set_raw("rab:worker:heartbeat", str(int(time.time())), ttl)
+
+
+def worker_up() -> bool:
+    return cache_has("rab:worker:heartbeat")
 
 
 def bust_members() -> None:

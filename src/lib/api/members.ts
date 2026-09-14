@@ -48,6 +48,8 @@ export type MemberApiRow = {
   joining_date: string | null;
   out_date: string | null;
   default_tag?: string;
+  jl_end_date?: string;
+  inactive_spans?: User["inactive_spans"];
   emergency_contacts: User["emergency_contacts"];
   created_at: string;
   updated_at: string;
@@ -109,9 +111,15 @@ export function memberToUser(row: MemberApiRow): User {
     joining_date: row.joining_date ?? "",
     out_date: row.out_date ?? "",
     default_tag: ((row.default_tag || "MS").toUpperCase() || "MS") as DailyTag,
-    jl_end_date: "",
-    inactive_spans:
-      row.status !== "1"
+    jl_end_date:
+      (row as MemberApiRow & { jl_end_date?: string }).jl_end_date ?? "",
+    inactive_spans: Array.isArray(
+      (row as MemberApiRow & { inactive_spans?: User["inactive_spans"] })
+        .inactive_spans,
+    )
+      ? (row as MemberApiRow & { inactive_spans: User["inactive_spans"] })
+          .inactive_spans
+      : row.status !== "1"
         ? [{ from: row.joining_date || "2020-01-01", to: null }]
         : [],
     emergency_contacts: row.emergency_contacts ?? [],

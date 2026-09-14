@@ -44,6 +44,7 @@ export function toMemberEntryBody(values: UserFormValues) {
       name: d.name,
       size: d.size,
       url: d.url ?? null,
+      id: d.id ?? null,
     })),
     emergency_contacts: (values.emergency_contacts ?? []).map((c) => ({
       name: c.name.trim(),

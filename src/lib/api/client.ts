@@ -1,4 +1,10 @@
-import { getAccessToken } from "@/lib/session";
+import {
+  getAccessToken,
+  getRefreshToken,
+  getSessionFromStorage,
+  setAccessToken,
+  setRefreshToken,
+} from "@/lib/session";
 import { apiBaseUrl, isApiEnabled, isCcApiEnabled } from "@/lib/api/mode";
 
 export type FieldError = { field: string; code: string; message: string };
@@ -24,18 +30,59 @@ type ProblemBody = {
   errors?: FieldError[];
 };
 
-function apiUrl(path: string) {
+type Envelope<T> = { ok?: boolean; success?: boolean; data: T } & Record<string, unknown>;
+
+export function apiUrl(path: string) {
   const base = apiBaseUrl();
   return base ? `${base}${path}` : path;
 }
 
-export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const refresh = getRefreshToken();
+    if (!refresh || !getSessionFromStorage()) return false;
+    try {
+      const res = await fetch(apiUrl("/api/v1/auth/refresh"), {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refresh }),
+      });
+      const body = (await res.json().catch(() => null)) as Envelope<{
+        access_token?: string;
+        refresh_token?: string;
+      }> | null;
+      if (!res.ok || !body?.data?.access_token) return false;
+      setAccessToken(body.data.access_token);
+      if (body.data.refresh_token) setRefreshToken(body.data.refresh_token);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+function shouldAttemptRefresh(path: string, status: number) {
+  return (
+    status === 401 &&
+    !path.includes("/api/v1/auth/login") &&
+    !path.includes("/api/v1/auth/refresh") &&
+    !path.includes("/api/v1/auth/forgot-password")
+  );
+}
+
+export async function apiJson<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   if (!isApiEnabled() && !isCcApiEnabled()) {
     throw new ApiClientError(503, "API_DISABLED", "API is off (demo mode).");
   }
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");
-  if (init?.body && !headers.has("Content-Type")) {
+  if (init?.body && !headers.has("Content-Type") && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   const token = getAccessToken();
@@ -44,16 +91,18 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), { ...init, headers });
   if (res.status === 204) return undefined as T;
 
-  const body = (await res.json().catch(() => null)) as
-    | ({ ok?: boolean; success?: boolean; data: T } & Record<string, unknown>)
-    | ProblemBody
-    | null;
+  const body = (await res.json().catch(() => null)) as Envelope<T> | ProblemBody | null;
 
   const failed =
     !res.ok ||
     !body ||
     (body as ProblemBody).ok === false ||
     (body as ProblemBody).success === false;
+
+  if (failed && !retried && shouldAttemptRefresh(path, res.status)) {
+    const refreshed = await tryRefreshAccessToken();
+    if (refreshed) return apiJson<T>(path, init, true);
+  }
 
   if (failed) {
     const problem = (body ?? {}) as ProblemBody;
@@ -65,5 +114,5 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
 
-  return (body as { data: T }).data;
+  return (body as Envelope<T>).data;
 }

@@ -20,7 +20,12 @@ import {
 } from "@/components/ui/select";
 import { usePagination } from "@/hooks/use-pagination";
 
-import { buildTagBill, formatBdt } from "@/lib/reports";
+import {
+  buildTagBill,
+  formatBdt,
+  withReportSource,
+  type ReportSource,
+} from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { useStore } from "@/hooks/use-store";
@@ -31,6 +36,7 @@ type Props = {
   tag: DailyTag;
   onMonthChange: (month: string) => void;
   tiles?: ReactNode;
+  source?: ReportSource;
 };
 
 /** Tag bill body — filters + member table (inline under by-tag tabs). */
@@ -39,6 +45,7 @@ export function TagBillPanel({
   tag,
   onMonthChange,
   tiles,
+  source,
 }: Props) {
   const t = useT();
   const state = useStore();
@@ -49,8 +56,8 @@ export function TagBillPanel({
   const [wing, setWing] = useState("all");
 
   const bill = useMemo(
-    () => buildTagBill(month, tag),
-    [state.assignments, state.users, state.rates, month, tag],
+    () => withReportSource(source, () => buildTagBill(month, tag)),
+    [state.assignments, state.users, state.rates, month, tag, source],
   );
 
   const members = useMemo(() => {

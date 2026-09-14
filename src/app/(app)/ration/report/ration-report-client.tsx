@@ -16,6 +16,7 @@ import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import {
   parseMonthInput,
@@ -28,6 +29,7 @@ import {
   buildRationStaffLines,
   buildRationTransferLines,
   formatBdt,
+  withReportSource,
 } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -58,19 +60,21 @@ export default function RationReportClient() {
     router.replace(`${pathname}?${params.toString()}`);
   }, [rawMonth, defaultMonth, pathname, router, searchParams]);
 
+  const { source } = useReportSource({ month });
+
   const report = useMemo(
-    () => buildRationReportClean(month),
-    [state.assignments, state.users, state.senders, state.rates, month],
+    () => withReportSource(source, () => buildRationReportClean(month)),
+    [state.assignments, state.users, state.senders, state.rates, month, source],
   );
 
   const staffSheets = useMemo(
-    () => buildRationStaffLines(month),
-    [state.assignments, state.users, state.senders, state.rates, month],
+    () => withReportSource(source, () => buildRationStaffLines(month)),
+    [state.assignments, state.users, state.senders, state.rates, month, source],
   );
 
   const transferSheets = useMemo(
-    () => buildRationTransferLines(month),
-    [state.assignments, state.users, state.senders, state.rates, month],
+    () => withReportSource(source, () => buildRationTransferLines(month)),
+    [state.assignments, state.users, state.senders, state.rates, month, source],
   );
 
   const staffLineCount = staffSheets.reduce((n, s) => n + s.lines.length, 0);

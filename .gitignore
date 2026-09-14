@@ -47,3 +47,6 @@ next-env.d.ts
 *.pyc
 
 # docker-compose.yml is part of the repo now
+
+# local database dumps from restore drills
+/backups/

@@ -11,7 +11,6 @@ import { SectionCard } from "@/components/shared/section-card";
 import { CcTabs } from "@/components/layout/cc-tabs";
 import { Button } from "@/components/ui/button";
 import { UserDetail } from "@/components/users/user-detail";
-import { MemberAcceptActions } from "@/components/users/member-accept-actions";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { RequestTagButton } from "@/components/tag-requests/request-tag-dialog";
 import { useStore } from "@/hooks/use-store";
@@ -116,22 +115,17 @@ export default function CcUserDetailPage() {
             </Button>
           }
           actions={
-            <MemberAcceptActions
-              user={user}
-              after={
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="rounded-lg"
-                >
-                  <Link href={`/cc/users/${user.id}/edit`}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                    {t("common.edit")}
-                  </Link>
-                </Button>
-              }
-            />
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+            >
+              <Link href={`/cc/users/${user.id}/edit`}>
+                <IconPencil className="h-3.5 w-3.5" />
+                {t("common.edit")}
+              </Link>
+            </Button>
           }
         />
         <SectionCard className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -143,7 +137,9 @@ export default function CcUserDetailPage() {
               <TagChip tag={getCockpitTagOnDate(user, todayISO())} />
             </div>
           </div>
-          <RequestTagButton user={user} />
+          {user.approval_status === "approved" ? (
+            <RequestTagButton user={user} />
+          ) : null}
         </SectionCard>
         <UserDetail user={user} />
       </motion.div>

@@ -35,7 +35,7 @@ const WING_LABEL_BN: Record<string, string> = {
   rfts: "আরএফটিএস",
   "training school": "ট্রেনিং স্কুল",
   "r & d cell": "আর এন্ড ডি সেল",
-  admin: "এ্যাডমিন",
+  admin: "এ্যাডমিন উইং",
   "admin (new)": "এ্যাডমিন (নতুন)",
   "admin (old)": "এ্যাডমিন (পুরাতন)",
   "dg office": "ডিজি দপ্তর",

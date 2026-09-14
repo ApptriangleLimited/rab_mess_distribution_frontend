@@ -12,14 +12,19 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { EmptyState } from "@/components/shared/empty-state";
 import { MonthNav } from "@/components/shared/month-nav";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { Button } from "@/components/ui/button";
-import { tagCellClass } from "@/lib/tag-colors";
+import { OfficialConsumeLetter } from "@/components/consume/official-consume-letter";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
+import {
+  buildOfficialConsumePack,
+  parseOfficialSheet,
+  type ConsumeOfficialSheet,
+} from "@/lib/consume-official-reports";
+import { withReportSource } from "@/lib/reports";
 import { monthKey } from "@/lib/date";
-import { buildWingSummary } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -45,20 +50,28 @@ export default function ConsumeSummaryClient() {
     router.replace(`${pathname}?${params.toString()}`);
   }, [rawMonth, defaultMonth, pathname, router, searchParams]);
 
-  const summary = useMemo(
-    () => buildWingSummary(month),
-    [state.assignments, state.users, state.rates, month],
+  const sheet = parseOfficialSheet(searchParams.get("sheet"));
+  const { source } = useReportSource({ month });
+  const pack = useMemo(
+    () =>
+      withReportSource(source, () => buildOfficialConsumePack(month, sheet)),
+    [state.assignments, state.users, state.rates, month, sheet, source],
   );
+  const report = pack.summary;
 
-  function setMonth(next: string) {
-    if (!MONTH_RE.test(next)) return;
+  function patchQuery(next: { month?: string; sheet?: ConsumeOfficialSheet }) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("month", next);
+    if (next.month) params.set("month", next.month);
+    if (next.sheet) params.set("sheet", next.sheet);
     router.replace(`${pathname}?${params.toString()}`);
   }
 
-  const printHref = `/consume/monthly/summary/print?month=${month}`;
-  const hasRows = summary.rows.length > 0;
+  function setMonth(next: string) {
+    if (!MONTH_RE.test(next)) return;
+    patchQuery({ month: next });
+  }
+
+  const printHref = `/consume/monthly/summary/print?month=${month}&sheet=${sheet}`;
 
   return (
     <PagePane className="gap-5">
@@ -83,29 +96,17 @@ export default function ConsumeSummaryClient() {
               center={<ConsumePanelTabs />}
               actions={
                 <div className="flex flex-wrap items-center gap-2 no-print">
-                  {hasRows ? (
-                    <Button
-                      asChild
-                      variant="cta"
-                      size="sm"
-                      className="h-9 rounded-xl shadow-sm shadow-primary/20"
-                    >
-                      <Link href={printHref}>
-                        <IconPrinter className="h-3.5 w-3.5" />
-                        {t("mess.print")}
-                      </Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="cta"
-                      size="sm"
-                      className="h-9 rounded-xl"
-                      disabled
-                    >
+                  <Button
+                    asChild
+                    variant="cta"
+                    size="sm"
+                    className="h-9 rounded-xl shadow-sm shadow-primary/20"
+                  >
+                    <Link href={printHref}>
                       <IconPrinter className="h-3.5 w-3.5" />
                       {t("mess.print")}
-                    </Button>
-                  )}
+                    </Link>
+                  </Button>
                 </div>
               }
             />
@@ -119,19 +120,19 @@ export default function ConsumeSummaryClient() {
               <StatChip
                 icon={<IconBuilding className="h-3.5 w-3.5" />}
                 label={t("consume.colWing")}
-                value={String(summary.rows.length)}
+                value={String(report.rows.length)}
                 tone="sky"
               />
               <StatChip
                 icon={<IconUsers className="h-3.5 w-3.5" />}
                 label={t("consume.colManpower")}
-                value={String(summary.totals.manpower)}
+                value={String(report.totals.manpower)}
                 tone="teal"
               />
               <StatChip
                 icon={<IconCalendarStats className="h-3.5 w-3.5" />}
                 label={t("consume.colTotalDays")}
-                value={String(summary.totals.totalDays)}
+                value={String(report.totals.totalDays)}
                 tone="primary"
                 accent
               />
@@ -139,105 +140,32 @@ export default function ConsumeSummaryClient() {
           </div>
         </div>
 
-        {!hasRows ? (
-          <EmptyState title={t("consume.wingSummaryEmpty")} />
-        ) : (
-          <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
-            <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-2.5 dark:border-neutral-800">
-              <IconBuilding className="h-3.5 w-3.5 text-neutral-400" />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-                {t("pages.consumeSummary.title")}
-              </span>
-              <span className="ml-auto text-[11px] tabular-nums text-neutral-400">
-                {summary.rows.length} · {month}
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
-                  <tr>
-                    <th className="px-4 py-3">{t("consume.colWing")}</th>
-                    <th className="px-4 py-3 text-right">
-                      {t("consume.colManpower")}
-                    </th>
-                    {summary.tagCodes.map((code) => (
-                      <th key={code} className="px-2 py-3 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold",
-                            tagCellClass(code),
-                          )}
-                        >
-                          {code}
-                        </span>
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 text-right">
-                      {t("consume.colTotalDays")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.rows.map((row) => (
-                    <tr
-                      key={row.wing}
-                      className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
-                    >
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-semibold text-neutral-900 dark:text-white">
-                          {row.wing}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
-                        {row.manpower}
-                      </td>
-                      {summary.tagCodes.map((code) => {
-                        const n = row.tagDays[code] ?? 0;
-                        return (
-                          <td
-                            key={code}
-                            className={cn(
-                              "px-2 py-3 text-center font-mono tabular-nums",
-                              n > 0
-                                ? "text-neutral-700 dark:text-neutral-300"
-                                : "text-neutral-300 dark:text-neutral-600",
-                            )}
-                          >
-                            {n}
-                          </td>
-                        );
-                      })}
-                      <td className="px-4 py-3 text-right font-mono text-sm font-semibold tabular-nums text-primary">
-                        {row.totalDays}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-primary/15 bg-gradient-to-r from-emerald-50/80 via-white to-sky-50/50 dark:border-primary/25 dark:from-primary/10 dark:via-neutral-950 dark:to-neutral-950">
-                    <td className="px-4 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-                      {t("consume.billTotal")}
-                    </td>
-                    <td className="px-4 py-3.5 text-right font-mono font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
-                      {summary.totals.manpower}
-                    </td>
-                    {summary.tagCodes.map((code) => (
-                      <td
-                        key={code}
-                        className="px-2 py-3.5 text-center font-mono font-semibold tabular-nums text-neutral-700 dark:text-neutral-200"
-                      >
-                        {summary.totals.tagDays[code] ?? 0}
-                      </td>
-                    ))}
-                    <td className="px-4 py-3.5 text-right font-mono text-lg font-bold tabular-nums text-primary">
-                      {summary.totals.totalDays}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </section>
-        )}
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["wings", "consume.officialWings"],
+              ["fr", "consume.officialFr"],
+              ["cd", "consume.officialCd"],
+              ["leave", "consume.officialLeave"],
+            ] as const
+          ).map(([id, key]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => patchQuery({ sheet: id })}
+              className={cn(
+                "h-8 rounded-lg px-3 text-xs font-semibold",
+                sheet === id
+                  ? "bg-primary text-white"
+                  : "border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200",
+              )}
+            >
+              {t(key)}
+            </button>
+          ))}
+        </div>
+
+        <OfficialConsumeLetter pack={pack} preview />
       </motion.div>
     </PagePane>
   );

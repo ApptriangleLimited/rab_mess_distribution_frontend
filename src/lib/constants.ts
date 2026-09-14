@@ -62,6 +62,7 @@ export const DAILY_TAGS: {
   { code: "CD", labelKey: "tags.CD", allowance: false, mess: false },
   { code: "WIT", labelKey: "tags.WIT", allowance: false, mess: false },
   { code: "MED", labelKey: "tags.MED", allowance: false, mess: false },
+  { code: "ML", labelKey: "tags.ML", allowance: false, mess: false },
   { code: "TRG", labelKey: "tags.TRG", allowance: false, mess: false },
   { code: "MS", labelKey: "tags.MS", allowance: true, mess: true },
   { code: "MOL", labelKey: "tags.MOL", allowance: true, mess: false },
@@ -877,6 +878,10 @@ export const MEMBER_TYPES: {
 export const SESSION_COOKIE = "mess_session";
 export const SESSION_STORAGE_KEY = "mess_session_v1";
 export const ACCESS_TOKEN_KEY = "mess_access_token";
+export const REFRESH_TOKEN_KEY = "mess_refresh_token";
+/** Hard session: 2 hours from login, then the user must sign in again. */
+export const SESSION_TTL_SECONDS = 2 * 60 * 60;
+export const PROFILE_AVATAR_KEY = "mess_profile_avatar_v1";
 export const REMEMBER_EMAIL_KEY = "mess_login_email";
 /** Demo seed staff. Matches backend `SEED_STAFF_PASSWORD` / `{role}@mess.rab`. */
 export const SEED_STAFF_PASSWORD = "ChangeMe!";

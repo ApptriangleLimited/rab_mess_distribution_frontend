@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IconSend, IconSend2 } from "@tabler/icons-react";
+import { IconTip } from "@/components/shared/icon-tip";
 import { rowActionClass } from "@/components/users/row-action-btn";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
@@ -13,12 +14,13 @@ import { useStore } from "@/hooks/use-store";
 import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { isCcApiEnabled } from "@/lib/api/mode";
-import { createTagRequestApi } from "@/lib/api/tag-requests";
+import { createTagRequestApi, requestToTagRequest } from "@/lib/api/tag-requests";
 import {
   canRequestTag,
   createTagRequest,
   getCockpitTagOnDate,
   getPendingTagRequest,
+  upsertLocalTagRequest,
 } from "@/lib/store/tag-requests";
 import { isMfrLocked, FR_TAG } from "@/lib/store/daily";
 import { todayISO } from "@/lib/date";
@@ -82,12 +84,13 @@ export function RequestTagButton({
     if (apiOn) {
       setBusy(true);
       try {
-        await createTagRequestApi({
+        const created = await createTagRequestApi({
           userId: user.id,
           toTag: tag,
           from,
           to,
         });
+        upsertLocalTagRequest(requestToTagRequest(created));
         notifyCcDataChange();
         toast(t("tagRequest.requestToast"), "success");
         setOpen(false);
@@ -112,8 +115,8 @@ export function RequestTagButton({
 
   if (!allowed && !iconOnly) return null;
 
-  return (
-    <>
+  const requestLabel = pending ? t("tagRequest.requested") : t("tagRequest.request");
+  const requestButton = (
       <Button
         type="button"
         variant={iconOnly ? "ghost" : pending ? "outline" : "cta"}
@@ -125,7 +128,8 @@ export function RequestTagButton({
             : cn("rounded-lg", size === "xs" && "h-7 px-2 text-[11px]"),
           className,
         )}
-        aria-label={pending ? t("tagRequest.requested") : t("tagRequest.request")}
+        title={requestLabel}
+        aria-label={requestLabel}
         onClick={openDialog}
       >
         {iconOnly ? (
@@ -133,8 +137,13 @@ export function RequestTagButton({
         ) : (
           <IconSend className="h-3.5 w-3.5" />
         )}
-        {iconOnly ? null : pending ? t("tagRequest.requested") : t("tagRequest.request")}
+        {iconOnly ? null : requestLabel}
       </Button>
+  );
+
+  return (
+    <>
+      {iconOnly ? <IconTip label={requestLabel}>{requestButton}</IconTip> : requestButton}
       <ConfirmDialog
         open={open}
         compact

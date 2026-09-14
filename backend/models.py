@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,6 +16,10 @@ class Staff(Base):
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mfa_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mfa_recovery: Mapped[str | None] = mapped_column(Text, nullable=True)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -161,3 +165,252 @@ class BoroKhanaDay(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class Rate(Base):
+    __tablename__ = "rates"
+
+    tag: Mapped[str] = mapped_column(String(32), primary_key=True)
+    amount_per_day: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_protected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class Sender(Base):
+    __tablename__ = "senders"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    label: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    bank_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    account_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    account_number: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    routing: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    branch: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    branch_location: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    mapped_tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class CatalogState(Base):
+    """Org catalogs (ranks, wings, forces, banks) as one durable row."""
+
+    __tablename__ = "catalog_state"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default="default")
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class AuthorizedStrength(Base):
+    __tablename__ = "authorized_strength"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    label: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    wings: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    held_wings: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class ManpowerAbsent(Base):
+    __tablename__ = "manpower_officer_absent"
+
+    date: Mapped[date] = mapped_column(Date, primary_key=True)
+    wing: Mapped[str] = mapped_column(String(128), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class StateReport(Base):
+    __tablename__ = "state_reports"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    submitted_by: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    boro_khana: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    members: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    totals: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class MealShift(Base):
+    __tablename__ = "meal_shifts"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    start_time: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    end_time: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    description: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class MealPlan(Base):
+    __tablename__ = "meal_plans"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    date: Mapped[date] = mapped_column(Date, unique=True, nullable=False)
+    meals: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class MealAssign(Base):
+    __tablename__ = "meal_assigns"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    member_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    shift_id: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    status: Mapped[int] = mapped_column(nullable=False, default=1)
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    check_in_time: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class GuestMeal(Base):
+    __tablename__ = "guest_meals"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    shift_id: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    check_in_time: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    guest_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    guest_info: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    ref_info: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    actor_id: Mapped[str] = mapped_column(String(40), nullable=False, default="", index=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    entity: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    ip: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    user_agent: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class PritibhojEvent(Base):
+    __tablename__ = "pritibhoj_events"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    occasion: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    org: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    main_rows: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    admin_rows: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RefreshSession(Base):
+    __tablename__ = "refresh_sessions"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    staff_id: Mapped[str] = mapped_column(
+        String(40), ForeignKey("staff.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    family_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    replaced_by: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    user_agent: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    ip: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+
+
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    staff_id: Mapped[str] = mapped_column(
+        String(40), ForeignKey("staff.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    description: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    role: Mapped[str] = mapped_column(String(32), primary_key=True)
+    permission_code: Mapped[str] = mapped_column(
+        String(64), ForeignKey("permissions.code", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class FileObject(Base):
+    __tablename__ = "file_objects"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    original_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    storage_key: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False, default="", index=True)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    uploaded_by: Mapped[str] = mapped_column(String(40), nullable=False, default="", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    recipient_user_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    type: Mapped[str] = mapped_column(String(64), nullable=False, default="info")
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

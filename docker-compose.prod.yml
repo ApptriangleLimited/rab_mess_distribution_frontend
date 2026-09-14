@@ -1,0 +1,69 @@
+# Production / staging overlay. Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Do not publish Postgres or Redis. Terminate TLS on nginx after real certs exist:
+#   NGINX_CONFIG=nginx.tls.conf TLS_CERT_DIR=/etc/letsencrypt/live/<host>
+#
+# Redis --requirepass is mandatory in this overlay. Empty REDIS_PASSWORD fails startup.
+
+services:
+  postgres:
+    ports: []
+    restart: always
+
+  redis:
+    ports: []
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ -z "$$REDIS_PASSWORD" ]; then
+          echo "REDIS_PASSWORD is required in the production overlay" >&2
+          exit 1
+        fi
+        exec redis-server --appendonly yes --maxmemory-policy allkeys-lru --requirepass "$$REDIS_PASSWORD"
+    restart: always
+
+  api:
+    ports: []
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      SEED_STAFF: ${SEED_STAFF:-false}
+      ENABLE_HSTS: ${ENABLE_HSTS:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://ms.apptriangle.com}
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    restart: always
+
+  worker:
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+    restart: always
+
+  web:
+    ports: []
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_USE_API: "true"
+        NEXT_PUBLIC_ZK_DEMO: "false"
+        NEXT_PUBLIC_API_URL: ""
+        NEXT_PUBLIC_API_BASE_URL: ""
+        API_PROXY_URL: http://api:8000
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: rab-mess-proxy
+    restart: always
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./deploy/nginx/${NGINX_CONFIG:-nginx.conf}:/etc/nginx/nginx.conf:ro
+      - ${TLS_CERT_DIR:-./deploy/certs}:/etc/nginx/certs:ro

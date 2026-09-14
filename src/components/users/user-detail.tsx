@@ -5,17 +5,27 @@ import {
   IconBuilding,
   IconBuildingBank,
   IconCalendar,
+  IconEye,
+  IconFile,
   IconId,
   IconPhone,
   IconPhoneCall,
   IconShield,
+  IconTags,
   IconUsers,
   type Icon,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/shared/section-card";
 import { UserAvatar } from "@/components/shared/user-avatar";
-import type { ApprovalStatus, User, UserStatus } from "@/lib/types";
+import { TagChip } from "@/components/tag-requests/tag-chip";
+import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { downloadFileBlob } from "@/lib/api/files";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import { MEMBER_TYPES } from "@/lib/constants";
+import type { ApprovalStatus, DocumentMeta, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -45,6 +55,17 @@ const approvalClass: Record<ApprovalStatus, string> = {
     "bg-neutral-100 text-neutral-600 ring-1 ring-inset ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700",
 };
 
+function formatDocSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function memberTypeLabel(type: User["member_type"], t: ReturnType<typeof useT>) {
+  const row = MEMBER_TYPES.find((m) => m.value === type);
+  return row ? t(row.labelKey) : type;
+}
+
 function DetailField({
   icon: Icon,
   label,
@@ -53,10 +74,11 @@ function DetailField({
 }: {
   icon: Icon;
   label: string;
-  value: string;
+  value: ReactNode;
   mono?: boolean;
 }) {
-  const empty = !value?.trim();
+  const text = typeof value === "string" ? value : "";
+  const empty = typeof value === "string" ? !value.trim() : value == null;
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-md border border-neutral-200/80 bg-neutral-50/60 px-2 py-1.5 dark:border-neutral-700/80 dark:bg-neutral-900/40">
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -75,7 +97,7 @@ function DetailField({
             mono && !empty && "font-mono text-[12px] tabular-nums tracking-tight",
           )}
         >
-          {empty ? "—" : value}
+          {empty ? "—" : typeof value === "string" ? text : value}
         </dd>
       </div>
     </div>
@@ -115,7 +137,31 @@ export function UserDetail({
   className?: string;
 }) {
   const t = useT();
+  const { toast } = useToast();
+  const apiOn = isCcApiEnabled();
   const meta = [user.rank, user.wing, user.phone].filter(Boolean).join(" · ");
+
+  async function openDocument(doc: DocumentMeta) {
+    if (doc.url) {
+      window.open(doc.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (!doc.id || !apiOn) {
+      toast(t("cc.documentUnavailable"), "error");
+      return;
+    }
+    try {
+      const blob = await downloadFileBlob(doc.id);
+      const href = URL.createObjectURL(blob);
+      window.open(href, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("cc.documentOpenFail"),
+        "error",
+      );
+    }
+  }
 
   return (
     <SectionCard className={cn("overflow-hidden p-0", className)}>
@@ -172,9 +218,25 @@ export function UserDetail({
       <div className="flex flex-col gap-3 p-3 sm:p-4">
         <dl className="grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-5">
           <DetailField
+            icon={IconUsers}
+            label={t("cc.fields.memberType")}
+            value={memberTypeLabel(user.member_type, t)}
+          />
+          <DetailField
+            icon={IconUsers}
+            label={t("cc.fields.name")}
+            value={user.name}
+          />
+          <DetailField
             icon={IconId}
             label={t("cc.fields.personalNo")}
             value={user.personal_id}
+            mono
+          />
+          <DetailField
+            icon={IconId}
+            label={t("cc.fields.rabId")}
+            value={user.rab_id}
             mono
           />
           <DetailField
@@ -188,6 +250,16 @@ export function UserDetail({
             value={user.wing}
           />
           <DetailField
+            icon={IconPhone}
+            label={t("cc.fields.phone")}
+            value={user.phone}
+          />
+          <DetailField
+            icon={IconId}
+            label={t("cc.fields.bloodGroup")}
+            value={user.blood_group}
+          />
+          <DetailField
             icon={IconShield}
             label={t("cc.fields.force")}
             value={user.force}
@@ -198,14 +270,14 @@ export function UserDetail({
             value={user.religion}
           />
           <DetailField
-            icon={IconPhone}
-            label={t("cc.fields.phone")}
-            value={user.phone}
+            icon={IconCalendar}
+            label={t("cc.fields.joiningDate")}
+            value={formatDateDisplay(user.joining_date)}
           />
           <DetailField
-            icon={IconId}
-            label={t("cc.fields.bloodGroup")}
-            value={user.blood_group}
+            icon={IconCalendar}
+            label={t("cc.fields.outDate")}
+            value={formatDateDisplay(user.out_date)}
           />
           <DetailField
             icon={IconId}
@@ -219,14 +291,9 @@ export function UserDetail({
             value={user.dropdown_no}
           />
           <DetailField
-            icon={IconCalendar}
-            label={t("cc.fields.joiningDate")}
-            value={formatDateDisplay(user.joining_date)}
-          />
-          <DetailField
-            icon={IconCalendar}
-            label={t("cc.fields.outDate")}
-            value={formatDateDisplay(user.out_date)}
+            icon={IconTags}
+            label={t("daily.defaultTag")}
+            value={<TagChip tag={user.default_tag} />}
           />
         </dl>
 
@@ -303,6 +370,44 @@ export function UserDetail({
             </dl>
           </DetailBlock>
         </div>
+
+        <DetailBlock icon={IconFile} title={t("cc.sectionDocs")}>
+          {user.member_type === "civilian" && user.documents_verified ? (
+            <p className="mb-1.5 text-xs font-medium text-primary">
+              {t("cc.verifyDocuments")}
+            </p>
+          ) : null}
+          {user.documents.length === 0 ? (
+            <p className="text-xs text-neutral-500">{t("cc.docsEmpty")}</p>
+          ) : (
+            <ul className="grid gap-1.5 sm:grid-cols-2">
+              {user.documents.map((doc, i) => (
+                <li
+                  key={`${doc.id ?? doc.name}-${i}`}
+                  className="flex items-center gap-2 rounded-md border border-neutral-200/80 bg-neutral-50/60 px-2 py-1.5 dark:border-neutral-700/80 dark:bg-neutral-900/40"
+                >
+                  <IconFile className="h-4 w-4 shrink-0 text-neutral-400" stroke={1.75} />
+                  <p className="min-w-0 flex-1 truncate text-sm text-neutral-800 dark:text-neutral-100">
+                    {doc.name}
+                    <span className="ml-1.5 text-[11px] text-neutral-400">
+                      {formatDocSize(doc.size)}
+                    </span>
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 shrink-0 rounded-md px-2 text-xs"
+                    onClick={() => void openDocument(doc)}
+                  >
+                    <IconEye className="h-3.5 w-3.5" />
+                    {t("cc.viewDocument")}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DetailBlock>
       </div>
     </SectionCard>
   );

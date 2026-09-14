@@ -166,20 +166,20 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
             })}
           </tbody>
         </table>
-        <p className="mt-4 text-right text-[8px] text-neutral-500">
-          {t("daily.registerFooter", { month: useBn ? monthBn : monthEn })}
-        </p>
 
-        <div className="mt-10 grid grid-cols-3 gap-4 text-center text-[9px]">
+        <div className="mt-8 grid grid-cols-6 gap-1.5 text-center text-[7px] leading-tight">
           {(
             [
               "daily.signDailySi",
-              "daily.signAdmin",
+              "daily.signConsumeSi",
+              "daily.signMessCq",
+              "daily.signSeniorDad",
+              "daily.signMessPresident",
               "daily.signCommandant",
             ] as const
           ).map((key) => (
-            <div key={key} className="pt-8">
-              <div className="mx-auto mb-2 h-px w-28 bg-black" />
+            <div key={key} className="min-w-0 pt-7">
+              <div className="mx-auto mb-1.5 h-px w-full max-w-[7.5rem] bg-black" />
               <p>{t(key)}</p>
             </div>
           ))}

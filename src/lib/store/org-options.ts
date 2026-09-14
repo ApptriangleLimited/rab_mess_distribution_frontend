@@ -16,13 +16,24 @@ export function listWings(): string[] {
 }
 
 /** Direct children of `parent` (null = root wings). Order follows catalog. */
-export function listWingChildren(parent: string | null): string[] {
-  const { wings, wing_parent } = getState();
+export function listWingChildrenFrom(
+  wings: string[],
+  wingParent: Record<string, string>,
+  parent: string | string[] | null,
+): string[] {
   const live = wings.filter((w) => !BANNED_WINGS.has(w.toLowerCase()));
   if (parent === null) {
-    return live.filter((w) => !wing_parent[w]);
+    return live.filter((w) => !wingParent[w]);
   }
-  return live.filter((w) => wing_parent[w] === parent);
+  const parents = (Array.isArray(parent) ? parent : [parent]).map((p) =>
+    p.trim().toLowerCase(),
+  );
+  return live.filter((w) => parents.includes((wingParent[w] ?? "").trim().toLowerCase()));
+}
+
+export function listWingChildren(parent: string | null): string[] {
+  const { wings, wing_parent } = getState();
+  return listWingChildrenFrom(wings, wing_parent, parent);
 }
 
 /** Admin family roots collapsed to one key (Authorized tab only). */
@@ -57,9 +68,11 @@ const AUTHORIZED_ROOT_WINGS = [
  * Root wings for Settings → Authorized wing প্রাধিকৃত.
  * Short fixed list (not full Wings catalog). Other tabs unchanged.
  */
-export function listAuthorizedRootWings(): string[] {
+export function listAuthorizedRootWingsFrom(wings: string[]): string[] {
   const live = new Set(
-    listWings().map((w) => w.toLowerCase()),
+    wings
+      .filter((w) => !BANNED_WINGS.has(w.toLowerCase()))
+      .map((w) => w.toLowerCase()),
   );
   // Admin always offered when any Admin* root exists or Admin in catalog.
   const hasAdmin = [...live].some((k) => ADMIN_AUTH_ROOTS.has(k));
@@ -72,6 +85,10 @@ export function listAuthorizedRootWings(): string[] {
     if (live.has(w.toLowerCase())) out.push(w);
   }
   return out;
+}
+
+export function listAuthorizedRootWings(): string[] {
+  return listAuthorizedRootWingsFrom(listWings());
 }
 
 /** Count for Authorized UI row (Admin = sum of Admin family keys). */
@@ -570,6 +587,19 @@ export function renameWing(
       }
       manpower_officer_absent[date] = map;
     }
+    const renameDayWingCat = (
+      prevMap: Record<string, Record<string, Record<string, number>>>,
+    ) => {
+      const out: Record<string, Record<string, Record<string, number>>> = {};
+      for (const [date, wings] of Object.entries(prevMap ?? {})) {
+        const map: Record<string, Record<string, number>> = {};
+        for (const [w, cats] of Object.entries(wings)) {
+          map[w === from ? next : w] = cats;
+        }
+        out[date] = map;
+      }
+      return out;
+    };
     return {
       ...prev,
       wings: prev.wings.map((w) => (w === from ? next : w)),
@@ -578,6 +608,8 @@ export function renameWing(
       rank_force_wings,
       authorized,
       manpower_officer_absent,
+      manpower_held: renameDayWingCat(prev.manpower_held ?? {}),
+      manpower_absent: renameDayWingCat(prev.manpower_absent ?? {}),
       users: prev.users.map((u) =>
         u.wing === from ? { ...u, wing: next } : u,
       ),
@@ -1092,6 +1124,102 @@ export function setAuthorizedHeldWingCount(
       return { ...r, held_wings };
     }),
   }));
+  return true;
+}
+
+function setDayWingCat(
+  prev: Record<string, Record<string, Record<string, number>>>,
+  date: string,
+  wingLabel: string,
+  categoryId: string,
+  count: number,
+): Record<string, Record<string, Record<string, number>>> {
+  const day = { ...(prev[date] ?? {}) };
+  const collapseAdmin = isAdminAuthorizedRoot(wingLabel);
+  const wingKey = collapseAdmin ? "Admin" : wingLabel;
+  if (collapseAdmin) {
+    for (const k of Object.keys(day)) {
+      if (isAdminAuthorizedRoot(k) && k !== "Admin") delete day[k];
+    }
+  }
+  const wing = { ...(day[wingKey] ?? {}) };
+  const safe =
+    Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
+  wing[categoryId] = safe;
+  day[wingKey] = wing;
+  return { ...prev, [date]: day };
+}
+
+/** Form 1 — প্রাপ্ত for one wing + rank on a date. */
+export function setManpowerHeld(
+  date: string,
+  wing: string,
+  categoryId: string,
+  count: number,
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !categoryId.trim()) return false;
+  const wingLabel = normalizeLabel(wing);
+  if (!wingLabel || BANNED_WINGS.has(wingLabel.toLowerCase())) return false;
+  setState((prev) => ({
+    ...prev,
+    manpower_held: setDayWingCat(
+      prev.manpower_held ?? {},
+      date,
+      wingLabel,
+      categoryId,
+      count,
+    ),
+  }));
+  return true;
+}
+
+/** Form 1 — অনুপস্থিত for one wing + rank on a date. */
+export function setManpowerAbsentCount(
+  date: string,
+  wing: string,
+  categoryId: string,
+  count: number,
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !categoryId.trim()) return false;
+  const wingLabel = normalizeLabel(wing);
+  if (!wingLabel || BANNED_WINGS.has(wingLabel.toLowerCase())) return false;
+  setState((prev) => {
+    const manpower_absent = setDayWingCat(
+      prev.manpower_absent ?? {},
+      date,
+      wingLabel,
+      categoryId,
+      count,
+    );
+    const officer = prev.authorized.find((c) => {
+      const key = c.label.trim().toLowerCase();
+      return (
+        c.id === categoryId &&
+        (key === "officer" || key.startsWith("officer"))
+      );
+    });
+    if (!officer) return { ...prev, manpower_absent };
+
+    const safe =
+      Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
+    const collapseAdmin = isAdminAuthorizedRoot(wingLabel);
+    const day = { ...(prev.manpower_officer_absent?.[date] ?? {}) };
+    if (collapseAdmin) {
+      for (const k of Object.keys(day)) {
+        if (isAdminAuthorizedRoot(k)) delete day[k];
+      }
+      if (safe > 0) day.Admin = safe;
+      else delete day.Admin;
+    } else if (safe === 0) {
+      delete day[wingLabel];
+    } else {
+      day[wingLabel] = safe;
+    }
+    const manpower_officer_absent = { ...prev.manpower_officer_absent };
+    if (Object.keys(day).length === 0) delete manpower_officer_absent[date];
+    else manpower_officer_absent[date] = day;
+    return { ...prev, manpower_absent, manpower_officer_absent };
+  });
   return true;
 }
 

@@ -35,6 +35,7 @@ import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange, onCcDataChange } from "@/lib/api/cc-events";
 import { isCcApiEnabled } from "@/lib/api/mode";
+import { syncStoreFromApi } from "@/lib/api/app-sync";
 import {
   acceptTagRequest,
   listTagRequests,
@@ -48,6 +49,7 @@ import {
   getCockpitTagOnDate,
   getCockpitToneOnDate,
   rejectTagRequest,
+  upsertLocalTagRequest,
 } from "@/lib/store/tag-requests";
 import { listAllTags } from "@/lib/store/rates";
 import { formatDateDisplay, todayISO } from "@/lib/date";
@@ -306,7 +308,9 @@ export function TagRequestBoard({
     if (apiOn) {
       setBusy(true);
       try {
-        await acceptTagRequest(pendingUpdate.id);
+        const updated = await acceptTagRequest(pendingUpdate.id);
+        upsertLocalTagRequest(requestToTagRequest(updated));
+        await syncStoreFromApi();
         notifyCcDataChange();
         toast(
           canAct && mode !== "daily"
@@ -345,7 +349,8 @@ export function TagRequestBoard({
     if (apiOn) {
       setBusy(true);
       try {
-        await rejectTagRequestApi(pendingReject.id);
+        const updated = await rejectTagRequestApi(pendingReject.id);
+        upsertLocalTagRequest(requestToTagRequest(updated));
         notifyCcDataChange();
         toast(t("tagRequest.rejectToast"), "success");
         setPendingReject(null);

@@ -16,8 +16,11 @@ import { approveDay, listLockedDates } from "@/lib/api/days";
 import { listBoroKhanaDates, setBoroKhanaDate } from "@/lib/api/boro-khana";
 import { listMembers, memberToUser } from "@/lib/api/members";
 import { isDailyApiEnabled } from "@/lib/api/mode";
+import { onCcDataChange } from "@/lib/api/cc-events";
+import { listTagRequests, requestToTagRequest } from "@/lib/api/tag-requests";
 import { useToast } from "@/components/shared/toast-provider";
-import { compareUsers, filterCockpitMembers } from "@/lib/store/users";
+import { replaceQueueRequests } from "@/lib/store/tag-requests";
+import { compareUsers } from "@/lib/store/users";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 
 /**
@@ -42,7 +45,7 @@ type Params = {
   q: string;
   rank: string;
   wing: string;
-  /** Member duty status: `1` active, `0` inactive, `all`. Default active. */
+  /** Member duty status: `1` active, `0` inactive, `all`. Default all. */
   status?: "all" | "0" | "1";
 };
 
@@ -52,7 +55,7 @@ export function useDailyCockpit({
   q,
   rank,
   wing,
-  status = "1",
+  status = "all",
 }: Params) {
   const apiOn = isDailyApiEnabled();
   const { toast } = useToast();
@@ -70,7 +73,7 @@ export function useDailyCockpit({
     }
     setLoading(true);
     try {
-      const [memberRes, assignRes, summaryRes, bkRes, locksRes] =
+      const [memberRes, assignRes, summaryRes, bkRes, locksRes, requestRes] =
         await Promise.all([
         listMembers({
           approval: "approved",
@@ -97,16 +100,24 @@ export function useDailyCockpit({
         }),
         listBoroKhanaDates(dateFrom, dateTo),
         listLockedDates(dateFrom, dateTo),
+        listTagRequests({
+          queue: "daily",
+          status: "requested",
+          page: 1,
+          page_size: 500,
+        }).catch(() => null),
       ]);
-      setUsers(
-        filterCockpitMembers(memberRes.items.map(memberToUser)).sort(
-          compareUsers,
-        ),
-      );
+      setUsers(memberRes.items.map(memberToUser).sort(compareUsers));
       setCells(assignRes.items);
       setTagCounts(summaryRes.by_tag);
       setBoroKhanaDates(bkRes.dates);
       setApprovedDates(locksRes.dates);
+      if (requestRes) {
+        replaceQueueRequests(
+          "daily",
+          requestRes.items.map(requestToTagRequest),
+        );
+      }
     } catch (err) {
       setUsers([]);
       setCells([]);
@@ -126,6 +137,8 @@ export function useDailyCockpit({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => onCcDataChange(() => { void load(); }), [load]);
 
   const assignments = useMemo(
     () => cellsToAssignments(cells),

@@ -21,11 +21,25 @@ services:
     image: redis:7-alpine
     container_name: rab-mess-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+        else
+          exec redis-server --appendonly yes
+        fi
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD-SHELL",
+          'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" ping; else redis-cli ping; fi',
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -39,11 +53,17 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://mess:${POSTGRES_PASSWORD:-mess}@postgres:5432/rab_mess
       REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-120}
       JWT_SECRET: ${JWT_SECRET:-local-dev-cc-jwt-secret-change-me}
-      JWT_EXPIRES_SECONDS: ${JWT_EXPIRES_SECONDS:-604800}
+      APP_SECRET: ${APP_SECRET:-${JWT_SECRET:-local-dev-cc-jwt-secret-change-me}}
+      JWT_EXPIRES_SECONDS: ${JWT_EXPIRES_SECONDS:-7200}
+      JWT_REFRESH_EXPIRES_SECONDS: ${JWT_REFRESH_EXPIRES_SECONDS:-7200}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001}
       SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-ChangeMe!}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_PATH: /var/lib/rab-mess/files
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -63,16 +83,44 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    volumes:
+      - files_data:/var/lib/rab-mess/files
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rab-mess-worker
+    restart: unless-stopped
+    command: ["python", "worker.py"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://mess:${POSTGRES_PASSWORD:-mess}@postgres:5432/rab_mess
+      REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-cc-jwt-secret-change-me}
+      APP_SECRET: ${APP_SECRET:-${JWT_SECRET:-local-dev-cc-jwt-secret-change-me}}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - files_data:/var/lib/rab-mess/files
 
   web:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-        NEXT_PUBLIC_USE_API: ${NEXT_PUBLIC_USE_API:-false}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        NEXT_PUBLIC_USE_API: ${NEXT_PUBLIC_USE_API:-true}
         NEXT_PUBLIC_ZK_DEMO: ${NEXT_PUBLIC_ZK_DEMO:-false}
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
         API_PROXY_URL: http://api:8000
     container_name: rab-mess-web
     restart: unless-stopped
@@ -99,3 +147,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  files_data:

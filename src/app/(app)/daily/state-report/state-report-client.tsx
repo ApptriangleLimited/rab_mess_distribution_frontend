@@ -26,7 +26,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormattedDateInput } from "@/components/shared/date-picker";
 import { useToast } from "@/components/shared/toast-provider";
+import {
+  apiSubmitStateReport,
+  useStateReportDraft,
+  useStateReportsApi,
+} from "@/hooks/use-state-reports";
 import { useStore } from "@/hooks/use-store";
+import { isApiEnabled } from "@/lib/api/mode";
 import { formatDateLong, nextISODate, previousISODate, todayISO } from "@/lib/date";
 import { downloadStateReportPdf } from "@/lib/download-state-report-pdf";
 import { tagCellClass } from "@/lib/tag-colors";
@@ -76,28 +82,44 @@ export default function StateReportClient() {
   );
   const [panel, setPanel] = useState<"preview" | "history">("preview");
 
-  const draft = useMemo(
+  const apiOn = isApiEnabled();
+  const { rows: apiRows, reload } = useStateReportsApi();
+  const { draft: apiDraft } = useStateReportDraft(date);
+
+  const storeDraft = useMemo(
     () => buildDailyStateReportDraft(date),
     // Recompute when live store mutates (tags / BK / roster).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [date, state],
   );
+  const draft = apiOn
+    ? (apiDraft ?? {
+        date,
+        boro_khana: false,
+        members: [],
+        totals: { active: 0, by_tag: {}, mess_eaters: 0 },
+      })
+    : storeDraft;
 
   const pending = useMemo(
-    () => getPendingStateReportForDate(date),
+    () =>
+      apiOn
+        ? apiRows.find((r) => r.date === date && r.status === "pending") ?? null
+        : getPendingStateReportForDate(date),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state.state_reports],
+    [date, state.state_reports, apiOn, apiRows],
   );
 
   const submittedForDate = useMemo(() => {
     if (pending) return pending;
-    return listStateReports().find((r) => r.date === date) ?? null;
-  }, [pending, date, state.state_reports]);
+    const rows = apiOn ? apiRows : listStateReports();
+    return rows.find((r) => r.date === date) ?? null;
+  }, [pending, date, state.state_reports, apiOn, apiRows]);
 
   const history = useMemo(
-    () => listStateReports(),
+    () => (apiOn ? apiRows : listStateReports()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.state_reports],
+    [state.state_reports, apiOn, apiRows],
   );
 
   const tagEntries = useMemo(
@@ -121,9 +143,12 @@ export default function StateReportClient() {
     router.replace(`${pathname}?${params.toString()}`);
   }
 
-  function onSubmit() {
+  async function onSubmit() {
     try {
-      const report = submitStateReport(date);
+      const report = apiOn
+        ? await apiSubmitStateReport(date)
+        : submitStateReport(date);
+      if (apiOn) await reload();
       toast(t("stateReport.submittedToast", { date: report.date }), "success");
     } catch (err) {
       toast(

@@ -14,11 +14,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/shared/toast-provider";
 import { usePritibhojCountCtx } from "@/hooks/use-pritibhoj-counts";
 import { todayISO } from "@/lib/date";
+import { ApiClientError } from "@/lib/api/client";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import {
+  createPritibhojEventApi,
+  updatePritibhojEventApi,
+} from "@/lib/api/pritibhoj";
 import {
   createPritibhojEvent,
   defaultPritibhojAdminRows,
   defaultPritibhojMainRows,
   updatePritibhojEvent,
+  upsertLocalPritibhojEvent,
   type PritibhojInput,
 } from "@/lib/store/pritibhoj";
 import { lockPritibhojSheets } from "@/lib/pritibhoj-demo";
@@ -94,7 +101,7 @@ export default function MessPritibhojEditorClient({
     return null;
   }
 
-  function onSave() {
+  async function onSave() {
     if (!value) return;
     const error = validate();
     if (error) {
@@ -103,15 +110,28 @@ export default function MessPritibhojEditorClient({
     }
     setSaving(true);
     try {
-      const saved = event
-        ? updatePritibhojEvent(event.id, value)
-        : createPritibhojEvent(value);
+      let saved;
+      if (isCcApiEnabled()) {
+        saved = event
+          ? await updatePritibhojEventApi(event.id, value)
+          : await createPritibhojEventApi(value);
+        upsertLocalPritibhojEvent(saved);
+      } else {
+        saved = event
+          ? updatePritibhojEvent(event.id, value)
+          : createPritibhojEvent(value);
+      }
       if (!saved) {
         toast(t("mess.pritibhoj.missing"), "error");
         return;
       }
       toast(t("mess.pritibhoj.saved"), "success");
       router.push(`/mess/pritibhoj/${saved.id}`);
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("mess.pritibhoj.missing"),
+        "error",
+      );
     } finally {
       setSaving(false);
     }
@@ -157,7 +177,7 @@ export default function MessPritibhojEditorClient({
                   size="sm"
                   className="h-10 rounded-xl shadow-sm shadow-primary/20"
                   disabled={saving || !value}
-                  onClick={onSave}
+                  onClick={() => void onSave()}
                 >
                   {saving ? t("common.loading") : t("mess.pritibhoj.savePreview")}
                 </Button>

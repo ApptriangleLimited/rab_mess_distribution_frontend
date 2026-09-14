@@ -86,6 +86,26 @@ export function deletePritibhojEvent(id: string): void {
   }));
 }
 
+export function upsertLocalPritibhojEvent(event: PritibhojEvent) {
+  setState((prev) => {
+    const current = prev.pritibhoj_events ?? [];
+    const exists = current.some((row) => row.id === event.id);
+    return {
+      ...prev,
+      pritibhoj_events: exists
+        ? current.map((row) => (row.id === event.id ? event : row))
+        : [event, ...current],
+    };
+  });
+}
+
+export function replaceLocalPritibhojEvents(events: PritibhojEvent[]) {
+  setState((prev) => ({
+    ...prev,
+    pritibhoj_events: events,
+  }));
+}
+
 export function eventManpower(event: PritibhojEvent): number {
   return event.main_rows.reduce((sum, row) => sum + row.total, 0);
 }

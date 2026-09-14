@@ -131,20 +131,27 @@ export function downloadDailyRegisterPdf({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const after = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
-  doc.setFontSize(7);
-  doc.setTextColor(100);
-  doc.text(`ATTENDANCE REGISTER (${monthLabel.toUpperCase()})`, pageW - 8, after, {
-    align: "right",
-  });
   doc.setTextColor(20);
 
-  const signs = ["Daily SI", "Admin Officer", "Commandant"];
-  const signY = after + 14;
-  const gap = pageW / signs.length;
+  const signs = [
+    "Daily SI",
+    "Consume SI",
+    "Mess CQ",
+    "Senior DAD (Admin)",
+    "President, Mess Committee",
+    "Commandant",
+  ];
+  const signY = after + 12;
+  const inset = 6;
+  const usable = pageW - inset * 2;
+  const gap = usable / signs.length;
+  const half = Math.min(18, gap / 2 - 1.5);
+  doc.setFontSize(6);
   signs.forEach((label, i) => {
-    const x = gap * i + gap / 2;
-    doc.line(x - 18, signY, x + 18, signY);
-    doc.text(label, x, signY + 4, { align: "center" });
+    const x = inset + gap * i + gap / 2;
+    doc.line(x - half, signY, x + half, signY);
+    const lines = doc.splitTextToSize(label, gap - 2);
+    doc.text(lines, x, signY + 3.2, { align: "center" });
   });
 
   doc.save(filename ?? `attendance-register-${month}.pdf`);

@@ -9,6 +9,7 @@ import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StateReportLetter } from "@/components/state-report/state-report-letter";
 import { Button } from "@/components/ui/button";
+import { useStateReportById } from "@/hooks/use-state-reports";
 import { useStore } from "@/hooks/use-store";
 import { formatDateLong } from "@/lib/date";
 import { downloadStateReportPdf } from "@/lib/download-state-report-pdf";
@@ -30,11 +31,13 @@ export function StateReportPrintClient({
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
 
-  const report = useMemo(
+  const { apiOn, report: apiReport } = useStateReportById(id);
+  const storeReport = useMemo(
     () => (id ? getStateReport(id) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [id, state.state_reports],
   );
+  const report = apiOn ? apiReport : storeReport;
 
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
 

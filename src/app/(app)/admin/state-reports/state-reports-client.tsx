@@ -24,6 +24,11 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { useToast } from "@/components/shared/toast-provider";
+import {
+  apiReviewStateReport,
+  useStateReportsApi,
+} from "@/hooks/use-state-reports";
+import { isApiEnabled } from "@/lib/api/mode";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import {
   SearchFilterBar,
@@ -92,16 +97,22 @@ export default function AdminStateReportsClient() {
   const [rejectNote, setRejectNote] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
 
+  const apiOn = isApiEnabled();
+  const { rows: apiRows, reload } = useStateReportsApi();
+
   const pending = useMemo(
-    () => listPendingStateReports(),
+    () =>
+      apiOn
+        ? apiRows.filter((r) => r.status === "pending")
+        : listPendingStateReports(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.state_reports],
+    [state.state_reports, apiOn, apiRows],
   );
 
   const all = useMemo(
-    () => listStateReports(),
+    () => (apiOn ? apiRows : listStateReports()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.state_reports],
+    [state.state_reports, apiOn, apiRows],
   );
 
   const searched = useMemo(() => {
@@ -129,7 +140,11 @@ export default function AdminStateReportsClient() {
       ? idParam
       : (list[0]?.id ?? null);
 
-  const selected = selectedId ? getStateReport(selectedId) : null;
+  const selected = selectedId
+    ? apiOn
+      ? (apiRows.find((r) => r.id === selectedId) ?? null)
+      : getStateReport(selectedId)
+    : null;
 
   function setQuery(next: { id?: string | null; filter?: Filter }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -143,34 +158,53 @@ export default function AdminStateReportsClient() {
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  function onApprove() {
+  async function onApprove() {
     if (!selected) return;
-    const updated = approveStateReport(selected.id);
-    setApproveOpen(false);
-    if (!updated) {
+    try {
+      const updated = apiOn
+        ? await apiReviewStateReport(selected.id, "approved")
+        : approveStateReport(selected.id);
+      setApproveOpen(false);
+      if (!updated) {
+        toast(t("stateReport.adminActionFail"), "error");
+        return;
+      }
+      if (apiOn) await reload();
+      toast(t("stateReport.approvedToast", { date: updated.date }), "success");
+      const still = apiOn
+        ? apiRows.filter((r) => r.status === "pending" && r.id !== updated.id)
+        : listPendingStateReports();
+      setQuery({ id: still[0]?.id ?? updated.id, filter: "pending" });
+    } catch {
       toast(t("stateReport.adminActionFail"), "error");
-      return;
     }
-    toast(t("stateReport.approvedToast", { date: updated.date }), "success");
-    const still = listPendingStateReports();
-    setQuery({ id: still[0]?.id ?? updated.id, filter: "pending" });
   }
 
-  function onReject() {
+  async function onReject() {
     if (!selected) return;
-    const updated = rejectStateReport(
-      selected.id,
-      rejectNote.trim() || undefined,
-    );
-    setRejectOpen(false);
-    setRejectNote("");
-    if (!updated) {
+    try {
+      const updated = apiOn
+        ? await apiReviewStateReport(
+            selected.id,
+            "rejected",
+            rejectNote.trim(),
+          )
+        : rejectStateReport(selected.id, rejectNote.trim() || undefined);
+      setRejectOpen(false);
+      setRejectNote("");
+      if (!updated) {
+        toast(t("stateReport.adminActionFail"), "error");
+        return;
+      }
+      if (apiOn) await reload();
+      toast(t("stateReport.rejectedToast", { date: updated.date }), "success");
+      const still = apiOn
+        ? apiRows.filter((r) => r.status === "pending" && r.id !== updated.id)
+        : listPendingStateReports();
+      setQuery({ id: still[0]?.id ?? updated.id, filter: "pending" });
+    } catch {
       toast(t("stateReport.adminActionFail"), "error");
-      return;
     }
-    toast(t("stateReport.rejectedToast", { date: updated.date }), "success");
-    const still = listPendingStateReports();
-    setQuery({ id: still[0]?.id ?? updated.id, filter: "pending" });
   }
 
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";

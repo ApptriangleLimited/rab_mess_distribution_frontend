@@ -35,6 +35,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import {
   formatDateDisplay,
@@ -44,7 +45,7 @@ import {
   recentMonthDates,
   todayISO,
 } from "@/lib/date";
-import { buildMonthLedger } from "@/lib/reports";
+import { buildMonthLedger, withReportSource } from "@/lib/reports";
 import { listGuestMeals } from "@/lib/store/guest-meals";
 import { listMealAssigns } from "@/lib/store/meal-assigns";
 import { listMealShifts, mealShiftLabel } from "@/lib/store/meal-shifts";
@@ -147,6 +148,7 @@ export default function AdminDashboardClient() {
   const state = useStore();
   const reduceMotion = useReducedMotion();
   const month = monthKey();
+  const { source } = useReportSource({ month });
   const today = todayISO();
   const tomorrow = nextISODate(today);
 
@@ -216,7 +218,7 @@ export default function AdminDashboardClient() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
 
-    const ledger = buildMonthLedger(month);
+    const ledger = withReportSource(source, () => buildMonthLedger(month));
     const tagTotals = new Map<string, number>();
     for (const row of ledger.rows) {
       for (const [code, n] of Object.entries(row.tagCounts)) {
@@ -352,6 +354,7 @@ export default function AdminDashboardClient() {
     tomorrow,
     t,
     locale,
+    source,
   ]);
 
   const kpis = [
@@ -975,12 +978,20 @@ export default function AdminDashboardClient() {
               maps: stats.bankMaps,
             })}
             action={
-              <Link
-                href="/settings"
-                className="text-[11px] font-semibold text-teal-700 hover:underline dark:text-teal-300"
-              >
-                {t("nav.settings")}
-              </Link>
+              <span className="flex items-center gap-3">
+                <Link
+                  href="/settings?tab=staff"
+                  className="text-[11px] font-semibold text-teal-700 hover:underline dark:text-teal-300"
+                >
+                  {t("settings.tabStaff")}
+                </Link>
+                <Link
+                  href="/settings"
+                  className="text-[11px] font-semibold text-teal-700 hover:underline dark:text-teal-300"
+                >
+                  {t("nav.settings")}
+                </Link>
+              </span>
             }
           >
             {stats.liveRates.length === 0 ? (

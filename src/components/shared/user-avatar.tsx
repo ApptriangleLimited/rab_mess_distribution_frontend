@@ -26,16 +26,33 @@ function toneFromName(name: string) {
 
 export function UserAvatar({
   name,
+  src,
   size = "md",
   muted,
   className,
 }: {
   name: string;
+  src?: string | null;
   size?: keyof typeof sizeClass;
   /** Inactive / muted look */
   muted?: boolean;
   className?: string;
 }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        className={cn(
+          "inline-block shrink-0 rounded-full object-cover ring-1 ring-white/25",
+          sizeClass[size],
+          muted && "opacity-60 grayscale",
+          className,
+        )}
+      />
+    );
+  }
   return (
     <span
       className={cn(

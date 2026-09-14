@@ -12,21 +12,24 @@ jobs:
     steps:
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          HEALTH_BASE_URL: ${{ secrets.STAGE_URL }}
         with:
           host: ${{ secrets.STAGE_HOST }}
           username: ${{ secrets.STAGE_USER }}
           key: ${{ secrets.STAGE_KEY }}
+          envs: HEALTH_BASE_URL
           script: |
-            set -e
+            set -euo pipefail
 
-            FRONTEND_DIR=/var/www/mess/frontend
-            PROJECT_DIR=/var/www/mess
+            REPO_DIR=/var/www/mess/frontend
+            COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 
             echo "========================================"
-            echo "Starting frontend deployment"
+            echo "Starting staging deployment"
             echo "========================================"
 
-            cd "$FRONTEND_DIR"
+            cd "$REPO_DIR"
 
             echo "Fetching latest develop branch..."
             git fetch origin develop
@@ -44,22 +47,43 @@ jobs:
             test -f package.json
             test -f package-lock.json
             test -f Dockerfile
+            test -f docker-compose.yml
+            test -f docker-compose.prod.yml
 
-            echo "Required frontend files found."
-
-            cd "$PROJECT_DIR"
+            echo "Required deployment files found."
 
             echo "Validating Docker Compose..."
-            docker compose config
+            $COMPOSE config >/dev/null
 
-            echo "Building Docker image..."
-            docker compose build
+            echo "Building Docker images..."
+            $COMPOSE build
 
             echo "Starting containers..."
-            docker compose up -d
+            $COMPOSE up -d
 
             echo "Checking container status..."
-            docker compose ps
+            $COMPOSE ps
+
+            echo "Applying database migrations..."
+            $COMPOSE run --rm api alembic upgrade head
+
+            echo "Deployment health gate (in-network)..."
+            live_ok=0
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              if $COMPOSE exec -T api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"; then
+                live_ok=1
+                break
+              fi
+              sleep 3
+            done
+            test "$live_ok" = 1
+            $COMPOSE exec -T api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"
+
+            if [ -n "${HEALTH_BASE_URL:-}" ]; then
+              echo "Deployment health gate (public hostname)..."
+              curl -fsS "$HEALTH_BASE_URL/health/live" >/dev/null
+              curl -fsS "$HEALTH_BASE_URL/health/ready" >/dev/null
+            fi
 
             echo "========================================"
             echo "Deployment completed successfully."

@@ -63,6 +63,17 @@ export function formatDateLong(iso: string, locale = "en-GB") {
   });
 }
 
+const BN_DIGIT = "০১২৩৪৫৬৭৮৯";
+
+/** `2026-09-18` → `18-09-2026` or `১৮-০৯-২০২৬`. */
+export function formatDateDmy(iso: string, locale = "en-GB") {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (!m) return iso;
+  const raw = `${m[3]}-${m[2]}-${m[1]}`;
+  if (!locale.toLowerCase().startsWith("bn")) return raw;
+  return raw.replace(/\d/g, (d) => BN_DIGIT[Number(d)] ?? d);
+}
+
 /** `2026-09-26` → `26 Sep 2026`. Empty → `""`. */
 export function formatDateDisplay(iso: string) {
   if (!iso.trim()) return "";
@@ -73,6 +84,37 @@ export function formatDateDisplay(iso: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+/** Compact from–to label that fits a narrow filter field. */
+export function formatDateRangeCompact(from: string, to: string) {
+  const start = from.trim();
+  const end = to.trim();
+  if (!start && !end) return "";
+  if (start && !end) return `${formatDateDisplay(start)} – …`;
+  if (!start && end) return `… – ${formatDateDisplay(end)}`;
+  if (start === end) return formatDateDisplay(start);
+
+  const a = new Date(`${start}T12:00:00`);
+  const b = new Date(`${end}T12:00:00`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) {
+    return `${start} – ${end}`;
+  }
+
+  const dayA = a.getDate();
+  const dayB = b.getDate();
+  const monA = a.toLocaleDateString("en-GB", { month: "short" });
+  const monB = b.toLocaleDateString("en-GB", { month: "short" });
+  const yearA = a.getFullYear();
+  const yearB = b.getFullYear();
+
+  if (yearA === yearB && a.getMonth() === b.getMonth()) {
+    return `${dayA}–${dayB} ${monA} ${yearA}`;
+  }
+  if (yearA === yearB) {
+    return `${dayA} ${monA}–${dayB} ${monB} ${yearA}`;
+  }
+  return `${dayA} ${monA} ${String(yearA).slice(-2)}–${dayB} ${monB} ${String(yearB).slice(-2)}`;
 }
 
 /** Calendar month before `date`, as `YYYY-MM`. */

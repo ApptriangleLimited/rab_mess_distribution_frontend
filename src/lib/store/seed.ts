@@ -7,6 +7,7 @@ import {
   RATE_ONLY_TAGS,
   RANKS,
   RELIGIONS,
+  BLOOD_GROUPS,
   WINGS,
   ADMIN_SUB_WINGS,
   HQ_SUB_WINGS,
@@ -24,6 +25,7 @@ import {
   shiftMonthKey,
   todayISO,
 } from "@/lib/date";
+import { officialSenderAccounts } from "@/lib/official-senders";
 import { demoPritibhojEvents } from "@/lib/pritibhoj-demo";
 import { demoTagRequests } from "@/lib/tag-request-demo";
 import type {
@@ -114,108 +116,10 @@ function user(
   };
 }
 
-const FIRST_NAMES = [
-  "Karim",
-  "Nusrat",
-  "Rafiq",
-  "Sabbir",
-  "Imran",
-  "Farhana",
-  "Jamal",
-  "Tania",
-  "Hasan",
-  "Shila",
-  "Mehedi",
-  "Rina",
-  "Omar",
-  "Lamia",
-  "Sajjad",
-  "Ayesha",
-  "Babul",
-  "Nazmul",
-  "Sumaiya",
-  "Arif",
-  "Farzana",
-  "Kamal",
-  "Nadia",
-  "Rubel",
-  "Popy",
-  "Jahid",
-  "Mitu",
-  "Sohel",
-  "Jannat",
-  "Rakib",
-  "Salma",
-  "Tanvir",
-  "Mousumi",
-  "Ashraf",
-  "Faria",
-  "Belal",
-  "Ruma",
-  "Shuvo",
-  "Nasrin",
-  "Habib",
-  "Shahnaz",
-  "Masud",
-  "Laboni",
-  "Yousuf",
-  "Sharmin",
-  "Anwar",
-  "Keya",
-  "Faisal",
-  "Runa",
-  "Nayeem",
-];
-
-const LAST_NAMES = [
-  "Hossain",
-  "Jahan",
-  "Ahmed",
-  "Khan",
-  "Ali",
-  "Akter",
-  "Uddin",
-  "Rahman",
-  "Mahmud",
-  "Begum",
-  "Hasan",
-  "Faruk",
-  "Chowdhury",
-  "Sultana",
-  "Mia",
-  "Islam",
-  "Karim",
-  "Siddique",
-  "Alam",
-  "Parveen",
-];
-
-/** Branches for Settings member-bank catalog (MEMBER_BANKS). */
 const BANK_BRANCHES = ["Mirpur", "Uttara", "Motijheel"] as const;
 
-const BANKS = MEMBER_BANKS.map((bank, i) => ({
-  bank,
-  branch: BANK_BRANCHES[i % BANK_BRANCHES.length]!,
-}));
-
-/** Base duty tags for roster members (pending/ended skip assignments). */
-const BASE_TAGS: DailyTag[] = [
-  "MS",
-  "MS",
-  "MS",
-  "MS",
-  "MS",
-  "FR",
-  "FR",
-  "FR",
-  "TRG",
-  "WR",
-  "CD",
-  "MED",
-  "CL",
-  "PL",
-  "WIT",
-];
+/** Cycle every daily tag so the cockpit counts light up. */
+const BASE_TAGS: DailyTag[] = DAILY_TAGS.map((tag) => tag.code);
 
 const OVERLAY_TAGS: DailyTag[] = [
   "CL",
@@ -226,6 +130,16 @@ const OVERLAY_TAGS: DailyTag[] = [
   "CD",
   "MS",
   "WR",
+  "MOL",
+  "CMH",
+  "RBH",
+  "BGH",
+  "AWL",
+  "OSL",
+  "RL",
+  "PE",
+  "LNK",
+  "ML",
 ];
 
 type MemberPlan = {
@@ -234,218 +148,136 @@ type MemberPlan = {
   spans?: { tag: DailyTag; from: number; to: number }[];
 };
 
-const SEED_WINGS = [
-  "Admin",
-  "Ops Wg",
-  "Int Wg",
-  "Comm & MIS Wg",
-  "Trg Wg",
-  "L & M Wg",
-  "Inv Wg",
-  "Air Wg",
-  "R & D Cell",
-  "Training School",
-] as const;
-
-/** Ranks that fill Manpower columns (Officer + Settings RANKS). */
-const SEED_MANPOWER_RANKS = ["Officer", ...RANKS] as const;
-
-/** How many approved members per wing for each rank — demo-sized Form 1. */
-const SEED_RANK_PER_WING: Record<(typeof SEED_MANPOWER_RANKS)[number], number> =
-  {
-    Officer: 2,
-    DAD: 2,
-    RT: 1,
-    ASI: 3,
-    AASI: 3,
-    Naik: 4,
-    Constable: 7,
-    Cook: 1,
-    ANCE: 1,
-    Civill: 1,
-    Attached: 1,
-  };
-
 /** Full tag history only for first N roster members (mess/consume demos). */
 const SEED_FULL_HISTORY_ROSTER = 25;
 
-/** Total demo members (edge cases + grid + pending civilian). */
-const SEED_DEMO_MEMBER_TOTAL = 25;
-
-function seedDocuments(n: number): DocumentMeta[] {
+function seedDocuments(n: number, kind: "posting" | "nid" | "guest"): DocumentMeta[] {
+  if (kind === "guest") {
+    return [{ name: "guest-note.pdf", size: 42_000 + n * 800 }];
+  }
   return [
     {
-      name: n % 3 === 0 ? "posting-order.pdf" : "joining-order.pdf",
+      name: kind === "nid" ? "nid-copy.pdf" : n % 2 === 0 ? "posting-order.pdf" : "joining-order.pdf",
       size: 180_000 + n * 4_200,
+    },
+    {
+      name: kind === "nid" ? "birth-certificate.pdf" : "id-photo.jpg",
+      size: 96_000 + n * 1_100,
     },
   ];
 }
 
-type SeedMemberProfile = {
+type SeedRow = {
+  id: string;
+  name: string;
   member_type: MemberType;
+  wing: string;
+  rank: string;
+  force: string;
   approval_status: User["approval_status"];
   status: User["status"];
-  idPrefix: string;
-  rabBase: number;
+  default_tag: DailyTag;
+  contact: string;
   out_date?: string;
 };
 
-function buildDemoUsers(): User[] {
-  const users: User[] = [];
-  let n = 0;
+/** One complete member per catalog wing, plus extras so every member type is present. */
+const SEED_MEMBERS: SeedRow[] = [
+  { id: "u_seed_01", name: "Karim Hossain", member_type: "permanent", wing: "Ops Wg", rank: "Constable", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
+  { id: "u_seed_02", name: "Nusrat Jahan", member_type: "new", wing: "Int Wg", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
+  { id: "u_seed_03", name: "Rafiq Ahmed", member_type: "attached", wing: "L & M Wg", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "MS", contact: "Brother" },
+  { id: "u_seed_04", name: "Farhana Akter", member_type: "civilian", wing: "Air Wg", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "MS", contact: "Mother" },
+  { id: "u_seed_05", name: "Jamal Uddin", member_type: "guest", wing: "Comm & MIS Wg", rank: "DAD", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Host" },
+  { id: "u_seed_06", name: "Tania Rahman", member_type: "permanent", wing: "Inv Wg", rank: "DAD", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
+  { id: "u_seed_07", name: "Hasan Mahmud", member_type: "new", wing: "Trg Wg", rank: "Naik", force: "Ansar", approval_status: "pending", status: "1", default_tag: "TRG", contact: "Father" },
+  { id: "u_seed_08", name: "Shila Begum", member_type: "attached", wing: "RFTS", rank: "RT", force: "Navy", approval_status: "approved", status: "1", default_tag: "ML", contact: "Sister" },
+  { id: "u_seed_09", name: "Mehedi Hasan", member_type: "civilian", wing: "Training School", rank: "Civill", force: "Civilian", approval_status: "pending", status: "1", default_tag: "MS", contact: "Uncle" },
+  { id: "u_seed_10", name: "Rina Chowdhury", member_type: "permanent", wing: "R & D Cell", rank: "AASI", force: "Air Force", approval_status: "approved", status: "1", default_tag: "CD", contact: "Spouse" },
+  { id: "u_seed_11", name: "Omar Faruk", member_type: "permanent", wing: "Admin", rank: "DAD", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
+  { id: "u_seed_12", name: "Lamia Sultana", member_type: "permanent", wing: "Admin (New)", rank: "Cook", force: "Army", approval_status: "approved", status: "1", default_tag: "ML", contact: "Mother" },
+  { id: "u_seed_13", name: "Sajjad Mia", member_type: "permanent", wing: "Admin (Old)", rank: "ASI", force: "Police", approval_status: "ended", status: "0", default_tag: "MS", contact: "Brother", out_date: `${shiftMonthKey(monthKey(), -1)}-15` },
+  { id: "u_seed_14", name: "Ayesha Islam", member_type: "new", wing: "Fin Br", rank: "ANCE", force: "Ansar", approval_status: "approved", status: "1", default_tag: "WR", contact: "Spouse" },
+  { id: "u_seed_15", name: "Babul Karim", member_type: "civilian", wing: "Forces Mess", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
+  { id: "u_seed_16", name: "Nazmul Alam", member_type: "attached", wing: "HQ Br", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "CL", contact: "Cousin" },
+  { id: "u_seed_17", name: "Imran Kabir", member_type: "permanent", wing: "Per Br", rank: "Constable", force: "Army", approval_status: "approved", status: "1", default_tag: "FR", contact: "Father" },
+  { id: "u_seed_18", name: "Sadia Noor", member_type: "new", wing: "Gen Br", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "CL", contact: "Spouse" },
+  { id: "u_seed_19", name: "Kamal Sheikh", member_type: "attached", wing: "Sup Br", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "PL", contact: "Brother" },
+  { id: "u_seed_20", name: "Rehana Parvin", member_type: "civilian", wing: "Med Br", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "WR", contact: "Mother" },
+  { id: "u_seed_21", name: "Anwar Hossain", member_type: "permanent", wing: "Rec Br", rank: "Naik", force: "Army", approval_status: "approved", status: "1", default_tag: "CD", contact: "Father" },
+  { id: "u_seed_22", name: "Mitu Akter", member_type: "new", wing: "Proc Br", rank: "AASI", force: "Air Force", approval_status: "approved", status: "1", default_tag: "WIT", contact: "Sister" },
+  { id: "u_seed_23", name: "Sohel Rana", member_type: "attached", wing: "Budget Br", rank: "Attached", force: "Navy", approval_status: "approved", status: "1", default_tag: "ML", contact: "Uncle" },
+  { id: "u_seed_24", name: "Nasrin Sultana", member_type: "civilian", wing: "Dev Br", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "TRG", contact: "Spouse" },
+  { id: "u_seed_25", name: "Jahangir Alam", member_type: "permanent", wing: "Wksp Br", rank: "DAD", force: "Police", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
+  { id: "u_seed_26", name: "Popy Das", member_type: "new", wing: "MT Br", rank: "ANCE", force: "Ansar", approval_status: "approved", status: "1", default_tag: "MOL", contact: "Mother" },
+  { id: "u_seed_27", name: "Liton Miah", member_type: "attached", wing: "Rat Br", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "CMH", contact: "Brother" },
+  { id: "u_seed_28", name: "Sharmin Nahar", member_type: "civilian", wing: "Proj Br", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "RBH", contact: "Sister" },
+  { id: "u_seed_29", name: "Faisal Ahmed", member_type: "permanent", wing: "Security Branch - IEC Cell", rank: "RT", force: "Navy", approval_status: "approved", status: "1", default_tag: "BGH", contact: "Spouse" },
+  { id: "u_seed_30", name: "Rubina Yasmin", member_type: "new", wing: "Headquarters Branch", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "AWL", contact: "Father" },
+  { id: "u_seed_31", name: "Shahidul Islam", member_type: "attached", wing: "Headquarters Office", rank: "Attached", force: "Army", approval_status: "approved", status: "1", default_tag: "OSL", contact: "Cousin" },
+  { id: "u_seed_32", name: "Jannatul Ferdous", member_type: "civilian", wing: "Security Branch", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "RL", contact: "Mother" },
+  { id: "u_seed_33", name: "Mamun Reza", member_type: "permanent", wing: "Record Branch", rank: "Cook", force: "Army", approval_status: "approved", status: "1", default_tag: "PE", contact: "Brother" },
+  { id: "u_seed_34", name: "Sumaiya Khan", member_type: "new", wing: "Field Mess", rank: "Constable", force: "Ansar", approval_status: "approved", status: "1", default_tag: "LNK", contact: "Spouse" },
+  { id: "u_seed_35", name: "Arif Chowdhury", member_type: "attached", wing: "MT Branch", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "MFR", contact: "Uncle" },
+  { id: "u_seed_36", name: "Dilara Begum", member_type: "civilian", wing: "New / Temporary Attached", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "JL", contact: "Sister" },
+  { id: "u_seed_37", name: "Rashid Khan", member_type: "new", wing: "DG Office", rank: "Naik", force: "Army", approval_status: "pending", status: "1", default_tag: "TRG", contact: "Father" },
+  { id: "u_seed_38", name: "Mini Roy", member_type: "civilian", wing: "ADG (Ops) Office", rank: "Civill", force: "Civilian", approval_status: "pending", status: "1", default_tag: "MS", contact: "Mother" },
+  { id: "u_seed_39", name: "Tanvir Hasan", member_type: "guest", wing: "ADG (Admin) Office", rank: "DAD", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Host" },
+  { id: "u_seed_40", name: "Khaled Mostafa", member_type: "permanent", wing: "Ops Wg", rank: "ASI", force: "Police", approval_status: "ended", status: "0", default_tag: "MS", contact: "Brother", out_date: `${shiftMonthKey(monthKey(), -1)}-20` },
+];
 
-  function pushMember(opts: {
-    profile: SeedMemberProfile;
-    rank: string;
-    wing: string;
-    force?: string;
-  }) {
-    n += 1;
-    const i = n - 1;
-    const first = FIRST_NAMES[i % FIRST_NAMES.length]!;
-    const last = LAST_NAMES[(i * 3) % LAST_NAMES.length]!;
-    const name = `${first} ${last}`;
-    const bank = BANKS[i % BANKS.length]!;
-    const profile = opts.profile;
-    const isCivilian =
-      profile.member_type === "civilian" || opts.rank === "Civill";
-    const force =
-      opts.force ??
-      (isCivilian ? "Civilian" : FORCES[i % (FORCES.length - 1)]!);
-    const religion = RELIGIONS[i % RELIGIONS.length]!;
-    const personalNo = isCivilian
-      ? `${1980 + (n % 20)}${String(1000000 + n * 137).slice(0, 8)}`
-      : `PN-${String(10000 + n).padStart(5, "0")}`;
+function buildDemoUsers(): User[] {
+  return SEED_MEMBERS.map((row, i) => {
+    const n = i + 1;
+    const isCivilian = row.member_type === "civilian";
+    const isGuest = row.member_type === "guest";
+    const bank = MEMBER_BANKS[i % MEMBER_BANKS.length]!;
     const cardNo = isCivilian ? `CARD-${String(n).padStart(4, "0")}` : "";
     const rab_id = isCivilian
       ? `CIV-${cardNo.replace(/^CARD-/, "")}`
-      : `RAB-${profile.rabBase}`;
-
-    users.push(
-      user({
-        id: `${profile.idPrefix}_${n}`,
-        name,
-        personal_id: personalNo,
-        rab_id,
-        rfid: isCivilian ? "" : `RFID-${profile.rabBase}`,
-        rank: isCivilian ? "Civill" : opts.rank,
-        wing: opts.wing,
-        force,
-        religion,
-        member_type: profile.member_type,
-        dropdown_no: cardNo,
-        phone: `01711${String(n).padStart(6, "0")}`,
-        status: profile.status,
-        approval_status: profile.approval_status,
-        bank_name: bank.bank,
-        account_name: name,
-        account_number: `${profile.approval_status === "pending" ? "11" : "22"}02${String(profile.rabBase).padStart(6, "0")}`,
-        routing: `20027${String(n).padStart(4, "0")}`,
-        branch: bank.branch,
-        branch_location: BRANCH_DISTRICTS[i % BRANCH_DISTRICTS.length]!,
-        documents: seedDocuments(n),
-        out_date: profile.out_date ?? "",
-        joining_date:
-          n % 7 === 0
-            ? dateInMonth(shiftMonthKey(monthKey(), -2), 1 + (n % 20))
-            : todayISO(),
-        emergency_contacts:
-          n % 5 === 0
-            ? [
-                {
-                  name: `${last} Contact`,
-                  relation: n % 2 === 0 ? "Spouse" : "Father",
-                  phone: `01811${String(n).padStart(6, "0")}`,
-                },
-              ]
-            : [],
-      }),
-    );
-  }
-
-  // Edge-case rows for CC/Daily workflows (not on Manpower held).
-  pushMember({
-    profile: {
-      member_type: "new",
-      approval_status: "pending",
-      status: "1",
-      idPrefix: "u_pending",
-      rabBase: 1001,
-    },
-    rank: "Constable",
-    wing: "Ops Wg",
-  });
-  pushMember({
-    profile: {
-      member_type: "permanent",
-      approval_status: "ended",
-      status: "0",
-      idPrefix: "u_ended",
-      rabBase: 2002,
-      out_date: shiftMonthKey(monthKey(), -1) + "-15",
-    },
-    rank: "ASI",
-    wing: "Int Wg",
-  });
-  pushMember({
-    profile: {
-      member_type: "permanent",
-      approval_status: "approved",
-      status: "0",
-      idPrefix: "u_off",
-      rabBase: 2003,
-    },
-    rank: "DAD",
-    wing: "Admin",
-  });
-
-  // Main Manpower grid: round-robin wings so SEED_DEMO_MEMBER_TOTAL
-  // does not dump everyone on Admin (first wing).
-  const gridSlots: { wing: string; rank: (typeof SEED_MANPOWER_RANKS)[number] }[] =
-    [];
-  for (const rank of SEED_MANPOWER_RANKS) {
-    const copies = SEED_RANK_PER_WING[rank] ?? 1;
-    for (let c = 0; c < copies; c++) {
-      for (const wing of SEED_WINGS) {
-        gridSlots.push({ wing, rank });
-      }
-    }
-  }
-  for (const slot of gridSlots) {
-    if (users.length >= SEED_DEMO_MEMBER_TOTAL - 1) break;
-    const isCiv = slot.rank === "Civill";
-    const isAtt = slot.rank === "Attached";
-    pushMember({
-      profile: {
-        member_type: isCiv
-          ? "civilian"
-          : isAtt
-            ? "attached"
-            : "permanent",
-        approval_status: "approved",
-        status: "1",
-        idPrefix: isCiv ? "u_civ" : isAtt ? "u_att" : "u",
-        rabBase: 3000 + n + 1,
-      },
-      rank: slot.rank,
-      wing: slot.wing,
+      : isGuest
+        ? `GST-${String(5000 + n)}`
+        : `RAB-${String(3100 + n)}`;
+    const personal_id = isCivilian
+      ? `${1984 + (n % 12)}${String(1000000 + n * 137).slice(0, 8)}`
+      : isGuest
+        ? `GST-PN-${String(n).padStart(4, "0")}`
+        : `PN-${String(11000 + n)}`;
+    return user({
+      id: row.id,
+      name: row.name,
+      personal_id,
+      rab_id,
+      rfid: isCivilian ? `CIV-RF-${String(n).padStart(4, "0")}` : `RFID-${3100 + n}`,
+      rank: isCivilian ? "Civill" : row.rank,
+      wing: row.wing,
+      force: row.force,
+      religion: RELIGIONS[i % RELIGIONS.length]!,
+      member_type: row.member_type,
+      dropdown_no: cardNo,
+      phone: `01711${String(200000 + n).slice(-6)}`,
+      blood_group: BLOOD_GROUPS[i % BLOOD_GROUPS.length]!,
+      status: row.status,
+      approval_status: row.approval_status,
+      bank_name: bank,
+      account_name: row.name,
+      account_number: `${row.approval_status === "pending" ? "11" : "22"}02${String(3100 + n).padStart(6, "0")}`,
+      routing: `20027${String(n).padStart(4, "0")}`,
+      branch: BANK_BRANCHES[i % BANK_BRANCHES.length]!,
+      branch_location: BRANCH_DISTRICTS[i % BRANCH_DISTRICTS.length]!,
+      documents: seedDocuments(n, isCivilian ? "nid" : isGuest ? "guest" : "posting"),
+      documents_verified: isCivilian && row.approval_status === "approved",
+      joining_date: dateInMonth(shiftMonthKey(monthKey(), -((n % 4) + 1)), 2 + (n % 20)),
+      out_date: row.out_date ?? "",
+      default_tag: row.default_tag,
+      emergency_contacts: [
+        {
+          name: `${row.name.split(" ").at(-1) ?? "Family"} ${row.contact}`,
+          relation: row.contact,
+          phone: `01811${String(300000 + n).slice(-6)}`,
+        },
+      ],
     });
-  }
-
-  // One pending civilian for CC queue demo.
-  pushMember({
-    profile: {
-      member_type: "civilian",
-      approval_status: "pending",
-      status: "1",
-      idPrefix: "u_civ_pending",
-      rabBase: 9001,
-    },
-    rank: "Civill",
-    wing: "Admin",
   });
-
-  return users;
 }
 
 function buildMemberPlans(users: User[]): MemberPlan[] {
@@ -665,7 +497,23 @@ function seedGuestMeals(users: User[]): GuestMeal[] {
 }
 
 /** Bump → auto wipe localStorage + reseed on next load. */
-export const SEED_VERSION = 30;
+export const SEED_VERSION = 32;
+
+/** Catalog/rates only — no demo members, assignments, requests, or Pritibhoj. */
+export function createLiveCatalogState(): AppState {
+  const seeded = createSeedState();
+  return {
+    ...seeded,
+    users: [],
+    assignments: [],
+    tag_requests: [],
+    pritibhoj_events: [],
+    meal_plans: [],
+    meal_assigns: [],
+    guest_meals: [],
+    state_reports: [],
+  };
+}
 
 export function createSeedState(): AppState {
   const today = todayISO();
@@ -676,8 +524,11 @@ export function createSeedState(): AppState {
   const defaultByUser = new Map(
     memberPlans.map((plan) => [plan.user_id, plan.base] as const),
   );
+  const mlMemberIds = new Set(["u_seed_08", "u_seed_12", "u_seed_23"]);
   for (const u of users) {
-    u.default_tag = defaultByUser.get(u.id) ?? "MS";
+    u.default_tag = mlMemberIds.has(u.id)
+      ? "ML"
+      : (defaultByUser.get(u.id) ?? "MS");
   }
 
   function resolveDayBound(bound: number, lastDay: number) {
@@ -712,75 +563,16 @@ export function createSeedState(): AppState {
         id: id("a"),
         user_id: plan.user_id,
         date,
-        tag: tagForPlan(plan, day, lastDay),
+        tag: mlMemberIds.has(plan.user_id)
+          ? "ML"
+          : tagForPlan(plan, day, lastDay),
         updated_by: "daily",
         updated_at: nowISO(),
       });
     }
   }
 
-  const senders: SenderAccount[] = [
-    {
-      id: "s_fr",
-      label: "FR Pool",
-      bank_name: MEMBER_BANKS[0]!,
-      account_name: "RAB FR Allowance",
-      account_number: "9001001001",
-      routing: "000000001",
-      branch: "Head Office",
-      branch_location: "Dhaka",
-      mapped_tags: ["FR"],
-      active: true,
-    },
-    {
-      id: "s_ms",
-      label: "Mess Fund",
-      bank_name: MEMBER_BANKS[1]!,
-      account_name: "RAB Mess Fund",
-      account_number: "9001001002",
-      routing: "000000002",
-      branch: "HQ Branch",
-      branch_location: "Dhaka",
-      mapped_tags: ["MS"],
-      active: true,
-    },
-    {
-      id: "s_ops",
-      label: "Ops Contingency",
-      bank_name: MEMBER_BANKS[2]!,
-      account_name: "RAB Ops Pool",
-      account_number: "9001001003",
-      routing: "000000003",
-      branch: "Central",
-      branch_location: "Dhaka",
-      mapped_tags: ["CD", "TRG"],
-      active: true,
-    },
-    {
-      id: "s_med",
-      label: "Medical Pool",
-      bank_name: MEMBER_BANKS[0]!,
-      account_name: "RAB Medical Fund",
-      account_number: "9001001004",
-      routing: "000000004",
-      branch: "HQ Branch",
-      branch_location: "Dhaka",
-      mapped_tags: ["MED", "WIT"],
-      active: true,
-    },
-    {
-      id: "s_leave",
-      label: "Leave / Admin",
-      bank_name: MEMBER_BANKS[1]!,
-      account_name: "RAB Admin Pool",
-      account_number: "9001001005",
-      routing: "000000005",
-      branch: "Banani",
-      branch_location: "Dhaka",
-      mapped_tags: ["CL", "PL", "WR"],
-      active: true,
-    },
-  ];
+  const senders: SenderAccount[] = officialSenderAccounts();
 
   const rates: AllowanceRate[] = [
     ...DAILY_TAGS.map((tag) => ({
@@ -834,6 +626,8 @@ export function createSeedState(): AppState {
       wings: { ...(row.wings ?? {}) },
     })),
     manpower_officer_absent: {},
+    manpower_held: {},
+    manpower_absent: {},
     approved_dates: [],
     suppressed_carries: [],
     boro_khana_dates: [],

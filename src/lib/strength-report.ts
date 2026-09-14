@@ -1,5 +1,8 @@
-import { ADMIN_SUB_WINGS, HQ_SUB_WINGS } from "@/lib/constants";
-import type { ManpowerSnapshot } from "@/lib/manpower-report";
+import { ADMIN_SUB_WINGS, DEFAULT_WING_PARENT, HQ_SUB_WINGS } from "@/lib/constants";
+import {
+  manpowerWingFamily,
+  type ManpowerSnapshot,
+} from "@/lib/manpower-report";
 import { getState } from "@/lib/store";
 import {
   findPriorTag,
@@ -11,6 +14,7 @@ import {
   authorizedWingDisplayCount,
   isBannedWing,
   listWingChildren,
+  listWingChildrenFrom,
 } from "@/lib/store/org-options";
 import { isCockpitMember } from "@/lib/store/users";
 import type { DailyTag, User } from "@/lib/types";
@@ -106,21 +110,18 @@ export type StrengthReport = {
 const ABSENT_TAGS = new Set<string>([
   "CL",
   "PL",
-  "WR",
-  "WIT",
-  "MED",
+  "RL",
+  "ML",
+  "MOL",
   "TRG",
+  "WIT",
+  "PE",
+  "LNK",
   "CMH",
   "RBH",
   "BGH",
   "AWL",
   "OSL",
-  "MOL",
-  "CD",
-  "RL",
-  "JL",
-  "PE",
-  "LNK",
 ]);
 
 function emptyCounts(): StrengthCounts {
@@ -275,59 +276,6 @@ function isSadarWing(name: string): boolean {
   return key === "সদর" || key === "sadar" || key === "hq";
 }
 
-function isAdminFamilyRoot(name: string): boolean {
-  const key = normalize(name);
-  return key === "admin" || key === "admin (new)" || key === "admin (old)";
-}
-
-function isHqBrRoot(name: string): boolean {
-  const key = normalize(name);
-  return key === "hq br" || key === "headquarters branch";
-}
-
-function walkWingRoot(
-  wing: string,
-  wingParent: Record<string, string>,
-): string {
-  let cur = wing.trim();
-  if (!cur) return cur;
-  const seen = new Set<string>([cur.toLowerCase()]);
-  while (wingParent[cur]) {
-    const p = wingParent[cur];
-    if (seen.has(p.toLowerCase())) break;
-    seen.add(p.toLowerCase());
-    cur = p;
-  }
-  return cur;
-}
-
-function pathIncludesHqBr(
-  wing: string,
-  wingParent: Record<string, string>,
-): boolean {
-  let cur = wing.trim();
-  const seen = new Set<string>();
-  while (cur) {
-    if (isHqBrRoot(cur)) return true;
-    if (seen.has(cur.toLowerCase())) break;
-    seen.add(cur.toLowerCase());
-    cur = wingParent[cur] ?? "";
-  }
-  return false;
-}
-
-/** Stable sub-wing pick when member sits on parent root (not a listed child). */
-function pickSubWing(userId: string, branches: string[]): string | null {
-  const real = branches.filter((b) => !isSadarWing(b));
-  if (real.length === 0) return null;
-  let h = 0;
-  for (let i = 0; i < userId.length; i++) {
-    h = (h * 31 + userId.charCodeAt(i)) >>> 0;
-  }
-  return real[h % real.length]!;
-}
-
-
 function bumpAbsence(
   row: Omit<StrengthAbsenceRow, "wing" | "total">,
   tag: DailyTag | "",
@@ -339,11 +287,10 @@ function bumpAbsence(
     case "PL":
       row.pl += 1;
       break;
-    case "WR":
     case "RL":
       row.rl += 1;
       break;
-    case "MED":
+    case "ML":
       row.ml += 1;
       break;
     case "MOL":
@@ -352,9 +299,11 @@ function bumpAbsence(
     case "TRG":
       row.training += 1;
       break;
-    case "CD":
     case "PE":
       row.exam += 1;
+      break;
+    case "LNK":
+      row.other += 1;
       break;
     case "CMH":
     case "RBH":
@@ -365,7 +314,6 @@ function bumpAbsence(
       row.remaining += 1;
       break;
     default:
-      if (tag) row.other += 1;
       break;
   }
 }
@@ -394,68 +342,79 @@ type Bucket = {
   absence: Omit<StrengthAbsenceRow, "wing" | "total">;
 };
 
-function resolveBranch(
-  wing: string,
-  wingParent: Record<string, string>,
-  branchSet: Set<string>,
-  rootNames: string[],
-): string | null {
-  if (!wing.trim()) return null;
-  let cur = wing.trim();
-  const seen = new Set<string>([cur.toLowerCase()]);
-  if (branchSet.has(cur)) return cur;
-  while (wingParent[cur]) {
-    const parent = wingParent[cur];
-    if (branchSet.has(cur) && rootNames.some((r) => normalize(r) === normalize(parent))) {
-      return cur;
-    }
-    if (branchSet.has(parent)) return parent;
-    if (seen.has(parent.toLowerCase())) break;
-    seen.add(parent.toLowerCase());
-    cur = parent;
+function mergeScopeBranches(
+  base: string[],
+  extra: string[] | undefined,
+  family: "admin" | "hq",
+  parents: Record<string, string>,
+): string[] {
+  const out = [...base];
+  const seen = new Set(base.map((w) => w.toLowerCase()));
+  for (const wing of extra ?? []) {
+    const name = wing.trim();
+    if (!name || isBannedWing(name) || seen.has(name.toLowerCase())) continue;
+    if (isSadarWing(name)) continue;
+    if (manpowerWingFamily(name, parents) !== family) continue;
+    seen.add(name.toLowerCase());
+    out.push(name);
   }
-  if (rootNames.some((r) => normalize(r) === normalize(wing.trim()) || normalize(r) === normalize(cur))) {
-    for (const b of branchSet) {
-      if (isSadarWing(b)) return b;
-    }
-  }
-  return null;
+  return out;
 }
 
-function branchesForScope(scope: StrengthScope): {
+function branchesForScope(
+  scope: StrengthScope,
+  catalogWings?: string[],
+  catalogParent?: Record<string, string>,
+  extraWings?: string[],
+): {
   branches: string[];
   roots: string[];
   skipSadarFill: boolean;
   formNo: 2 | 3;
   wingLabel: string;
 } {
+  const liveWings = catalogWings?.length ? catalogWings : undefined;
+  const liveParent = catalogParent;
+
+  const parents = { ...DEFAULT_WING_PARENT, ...(liveParent ?? {}) };
+
   if (scope === "hq") {
-    let branches = listWingChildren("HQ Br");
-    if (branches.length === 0) {
-      branches = [...HQ_SUB_WINGS];
-    }
-    branches = branches.filter((w) => !isBannedWing(w));
+    const roots = ["HQ Br"];
+    const listed = ["HQ Br", ...HQ_SUB_WINGS];
+    const fromTree = liveWings
+      ? listWingChildrenFrom(liveWings, parents, ["HQ Br", "Headquarters Branch"])
+      : listWingChildren("HQ Br");
+    let branches = [
+      ...listed,
+      ...fromTree.filter((w) => !listed.some((l) => l.toLowerCase() === w.toLowerCase())),
+    ].filter((w) => !isBannedWing(w));
+    branches = mergeScopeBranches(branches, extraWings, "hq", parents);
     return {
       branches,
-      roots: ["HQ Br", "Headquarters Branch"],
+      roots,
       skipSadarFill: false,
       formNo: 3,
-      wingLabel: "এ্যাডমিন উইং · সদর দপ্তর শাখা",
+      wingLabel: "সদর দপ্তর শাখা",
     };
   }
 
-  let branches = listWingChildren("Admin");
-  if (branches.length === 0) branches = listWingChildren("Admin (New)");
-  if (branches.length === 0) branches = [...ADMIN_SUB_WINGS];
-  branches = branches.filter((w) => !isBannedWing(w));
-  const branchSet = new Set(branches);
-  if (![...branchSet].some(isSadarWing)) {
-    branches = ["সদর", ...branches];
-  }
+  const roots = ["Admin", "Admin (New)", "Admin (Old)"];
+  const listed = [
+    ...roots,
+    ...ADMIN_SUB_WINGS.filter((w) => w.trim().toLowerCase() !== "hq br"),
+  ];
+  const fromTree = liveWings
+    ? listWingChildrenFrom(liveWings, parents, roots)
+    : listWingChildren("Admin");
+  let branches = [
+    ...listed,
+    ...fromTree.filter((w) => !listed.some((l) => l.toLowerCase() === w.toLowerCase())),
+  ].filter((w) => !isBannedWing(w) && w.trim().toLowerCase() !== "hq br");
+  branches = mergeScopeBranches(branches, extraWings, "admin", parents);
   return {
     branches,
-    roots: ["Admin", "Admin (New)", "Admin (Old)"],
-    skipSadarFill: true,
+    roots,
+    skipSadarFill: false,
     formNo: 2,
     wingLabel: "এ্যাডমিন উইং",
   };
@@ -468,13 +427,24 @@ export function buildStrengthReport(
   snapshot?: ManpowerSnapshot,
 ): StrengthReport {
   const state = getState();
-  const cfg = branchesForScope(scope);
+  const cfg = branchesForScope(
+    scope,
+    snapshot?.wings,
+    snapshot?.wingParent,
+    snapshot?.extraWings,
+  );
   let { branches } = cfg;
   const branchSet = new Set(branches);
-  const wingParent = snapshot?.wingParent ?? state.wing_parent;
+  const wingParent = {
+    ...DEFAULT_WING_PARENT,
+    ...(snapshot?.wingParent ?? state.wing_parent),
+  };
   const tagFor =
     snapshot?.tagFor ?? ((userId: string) => projectedTag(userId, date));
   const sourceUsers = snapshot?.users ?? state.users;
+  const authorizedRows = snapshot?.authorized?.length
+    ? snapshot.authorized
+    : state.authorized;
 
   const map = new Map<string, Bucket>();
   for (const b of branches) {
@@ -486,45 +456,38 @@ export function buildStrengthReport(
     });
   }
 
-  const active: User[] = sourceUsers.filter(
-    (u) =>
-      u.approval_status === "approved" &&
-      u.status === "1" &&
-      isCockpitMember(u) &&
-      canAssignOnDate(u, date),
-  );
+  const active: User[] = snapshot?.prefiltered
+    ? sourceUsers
+    : sourceUsers.filter(
+        (u) =>
+          u.approval_status === "approved" &&
+          u.status === "1" &&
+          isCockpitMember(u) &&
+          canAssignOnDate(u, date),
+      );
 
   for (const user of active) {
     const cat = strengthCategoryForRank(user.rank);
     if (!cat) continue;
 
-    let branch = resolveBranch(
-      user.wing,
-      wingParent,
-      branchSet,
-      cfg.roots,
+    const rawWing = user.wing.trim();
+    const family = manpowerWingFamily(rawWing, wingParent);
+    if (scope === "admin" && family !== "admin") continue;
+    if (scope === "hq" && family !== "hq") continue;
+
+    const exact = [...branchSet].find(
+      (b) => b.toLowerCase() === rawWing.toLowerCase(),
     );
-    // Parent-root members (Admin / HQ Br) → spread onto real sub-wings so forms fill.
-    if (scope === "admin") {
-      if (
-        (branch && cfg.skipSadarFill && isSadarWing(branch)) ||
-        (!branch && isAdminFamilyRoot(user.wing.trim()))
-      ) {
-        const root = walkWingRoot(user.wing, wingParent);
-        if (isAdminFamilyRoot(root) || isAdminFamilyRoot(user.wing.trim())) {
-          branch = pickSubWing(user.id, branches);
-        }
-      }
-    } else if (scope === "hq" && !branch) {
-      const root = walkWingRoot(user.wing, wingParent);
-      const onHq =
-        isHqBrRoot(user.wing.trim()) ||
-        pathIncludesHqBr(user.wing, wingParent) ||
-        isAdminFamilyRoot(user.wing.trim()) ||
-        isAdminFamilyRoot(root);
-      if (onHq) {
-        branch = pickSubWing(user.id, branches);
-      }
+    const branch = exact ?? rawWing;
+    if (!map.has(branch)) {
+      map.set(branch, {
+        held: emptyCounts(),
+        present: emptyCounts(),
+        absent: emptyCounts(),
+        absence: emptyAbsence(),
+      });
+      branches.push(branch);
+      branchSet.add(branch);
     }
     if (!branch) continue;
     if (cfg.skipSadarFill && isSadarWing(branch)) continue;
@@ -532,7 +495,10 @@ export function buildStrengthReport(
     const bucket = map.get(branch);
     if (!bucket) continue;
 
-    const tag = tagFor(user.id);
+    const resolved = tagFor(user.id);
+    const tag = (
+      snapshot ? resolved : resolved || user.default_tag || ""
+    ) as DailyTag | "";
 
     bucket.held[cat] += 1;
     if (isAbsentTag(tag)) {
@@ -546,12 +512,13 @@ export function buildStrengthReport(
   }
 
   // Officer প্রাপ্ত = Settings held_wings; অনুপস্থিত = date overrides; উপস্থিত = প্রাপ্ত − অনুপস্থিত.
-  const officerRow = state.authorized.find((r) => {
+  const officerRow = authorizedRows.find((r) => {
     const key = r.label.trim().toLowerCase();
     return key === "officer" || key.startsWith("officer");
   });
   const officerAuthorizedId = officerRow?.id ?? null;
-  const officerAbsentDay = state.manpower_officer_absent?.[date] ?? {};
+  const officerAbsentDay =
+    snapshot?.officerAbsent ?? state.manpower_officer_absent?.[date] ?? {};
   if (officerRow) {
     for (const wing of branches) {
       if (cfg.skipSadarFill && isSadarWing(wing)) continue;

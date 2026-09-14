@@ -1,9 +1,8 @@
 "use client";
 
 import { forwardRef } from "react";
-import { CONSUME_REPORT_META } from "@/lib/constants";
-import { formatDateLong } from "@/lib/date";
 import { RankColumnHeader } from "@/components/manpower/rank-column-header";
+import { StrengthReportTitle } from "@/components/manpower/strength-title";
 import { WingName } from "@/components/manpower/wing-name";
 import {
   STRENGTH_CATEGORIES,
@@ -96,28 +95,18 @@ function BranchBlock({ block }: { block: StrengthBranchBlock }) {
 /** Form 2 letter — Admin Wing daily strength. Officer blank on branch rows. */
 export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
   function StrengthLetter({ report, locale = "bn-BD" }, ref) {
-    const dateLabel = formatDateLong(report.date, locale);
-
     return (
       <div
         ref={ref}
         className="mx-auto w-full max-w-[297mm] bg-white p-3 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
       >
-        <header className="border-b border-neutral-800 pb-2 text-center">
-          <p className="text-[11px] font-semibold">
-            {CONSUME_REPORT_META.orgNameBn}
-          </p>
-          <h1 className="mt-0.5 text-base font-bold tracking-wide">
-            {report.titleBn}
-          </h1>
-          <p className="text-[10px] font-medium text-neutral-700">
-            {report.wingLabel}
-          </p>
-          <p className="text-[10px] text-neutral-600">
-            Daily Manpower Report · {CONSUME_REPORT_META.stationBn}
-          </p>
-          <p className="mt-1 text-xs font-medium">তারিখ / Date: {dateLabel}</p>
-        </header>
+        <StrengthReportTitle
+          titleBn={report.titleBn}
+          wingLabel={report.wingLabel}
+          date={report.date}
+          locale={locale}
+          compact
+        />
 
         {/* Top summary */}
         <table className="mt-3 w-full border-collapse text-[8px] leading-tight">

@@ -29,7 +29,7 @@ import {
   listSenders,
   updateSenderApi,
 } from "@/lib/api/settings";
-import { DAILY_TAGS } from "@/lib/constants";
+import { DAILY_TAGS, FUEL_RATE_TAG } from "@/lib/constants";
 import {
   createSender,
   isSenderActive,
@@ -95,11 +95,16 @@ export function SenderAccountsSection({
   const [deleteTarget, setDeleteTarget] = useState<SenderAccount | null>(null);
 
   const senders = apiOn && apiSenders ? apiSenders : state.senders;
-  const tagOptions =
+  const rawTagOptions =
     rateTags ??
     (state.rates.length > 0
       ? state.rates.map((r) => r.tag)
       : DAILY_TAGS.map((row) => row.code));
+  const tagOptions = rawTagOptions.some(
+    (code) => code.toLowerCase() === FUEL_RATE_TAG.toLowerCase(),
+  )
+    ? rawTagOptions
+    : [...rawTagOptions, FUEL_RATE_TAG];
 
   useEffect(() => {
     if (!apiOn) return;

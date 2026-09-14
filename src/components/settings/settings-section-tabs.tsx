@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 export type SettingsTabId =
   | "rates"
+  | "staff"
   | "rank"
   | "wing"
   | "force"
@@ -32,10 +33,12 @@ type TabDef = {
   labelKey: MessageKey;
   icon: Icon;
   rationOnly?: boolean;
+  staffOnly?: boolean;
 };
 
 const TABS: TabDef[] = [
   { id: "rates", labelKey: "settings.tabRates", icon: IconCoin },
+  { id: "staff", labelKey: "settings.tabStaff", icon: IconUsers, staffOnly: true },
   { id: "rank", labelKey: "settings.tabRank", icon: IconMilitaryRank },
   { id: "wing", labelKey: "settings.tabWing", icon: IconTopologyStar3 },
   { id: "force", labelKey: "settings.tabForce", icon: IconShield },
@@ -59,15 +62,22 @@ const TABS: TabDef[] = [
   { id: "qr", labelKey: "settings.tabQr", icon: IconQrcode },
 ];
 
-export function settingsTabsForRole(isRation: boolean): TabDef[] {
-  return TABS.filter((tab) => !tab.rationOnly || isRation);
+export function settingsTabsForRole(
+  isRation: boolean,
+  canManageStaff = false,
+): TabDef[] {
+  return TABS.filter(
+    (tab) =>
+      (!tab.rationOnly || isRation) && (!tab.staffOnly || canManageStaff),
+  );
 }
 
 export function parseSettingsTab(
   raw: string | null,
   isRation: boolean,
+  canManageStaff = false,
 ): SettingsTabId {
-  const allowed = settingsTabsForRole(isRation).map((t) => t.id);
+  const allowed = settingsTabsForRole(isRation, canManageStaff).map((t) => t.id);
   if (raw && (allowed as string[]).includes(raw)) {
     return raw as SettingsTabId;
   }
@@ -79,6 +89,7 @@ export function SettingsSectionTabs({
   value,
   onChange,
   isRation,
+  canManageStaff = false,
   className,
   /** Sit inside RoleNavTabs `after` — no own border chrome. */
   embedded = false,
@@ -86,12 +97,13 @@ export function SettingsSectionTabs({
   value: SettingsTabId;
   onChange: (id: SettingsTabId) => void;
   isRation: boolean;
+  canManageStaff?: boolean;
   className?: string;
   embedded?: boolean;
 }) {
   const t = useT();
   const reduceMotion = useReducedMotion();
-  const tabs = settingsTabsForRole(isRation);
+  const tabs = settingsTabsForRole(isRation, canManageStaff);
   const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {

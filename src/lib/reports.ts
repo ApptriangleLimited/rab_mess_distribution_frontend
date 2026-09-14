@@ -1,23 +1,28 @@
 import type { AssignmentCell } from "@/lib/api/assignments";
 import { getState } from "@/lib/store";
-import { RATION_REPORT_META } from "@/lib/constants";
+import {
+  CL_FR_MONTHLY_TAG,
+  DAILY_TAGS,
+  FR_FUEL_RATE_PER_DAY,
+  FUEL_RATE_TAG,
+  isRateOnlyTag,
+  RATE_ONLY_TAGS,
+  RATION_REPORT_META,
+} from "@/lib/constants";
+import { isFrFuelTag, sameBankName } from "@/lib/official-senders";
 import {
   dateInMonth,
   daysInMonth,
   eachISODate,
   todayISO,
 } from "@/lib/date";
-import {
-  findPriorTag,
-  isCarrySuppressed,
-} from "@/lib/store/assignments";
 import { projectedCockpitTag } from "@/lib/store/pritibhoj-counts";
 import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
-import { getClFrMonthlyAmount, getFuelRatePerDay, listAllTags } from "@/lib/store/rates";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import { activeSenders } from "@/lib/store/senders";
-import { roundPaisa } from "@/lib/money";
+import { parseMoney, roundPaisa } from "@/lib/money";
 import type {
+  AllowanceRate,
   DailyAssignment,
   DailyTag,
   SenderAccount,
@@ -25,6 +30,91 @@ import type {
 } from "@/lib/types";
 
 export { formatBdt } from "@/lib/money";
+
+/** Live DB snapshot for consume / ration / ledger builders. */
+export type ReportSource = {
+  users: User[];
+  assignments: DailyAssignment[];
+  rates?: AllowanceRate[];
+  senders?: SenderAccount[];
+  suppressed_carries?: string[];
+};
+
+let currentSource: ReportSource | undefined;
+
+export function withReportSource<T>(
+  source: ReportSource | undefined,
+  fn: () => T,
+): T {
+  const prev = currentSource;
+  currentSource = source;
+  try {
+    return fn();
+  } finally {
+    currentSource = prev;
+  }
+}
+
+function reportState() {
+  const state = getState();
+  if (!currentSource) return state;
+  return {
+    ...state,
+    users: currentSource.users,
+    assignments: currentSource.assignments,
+    rates: currentSource.rates ?? state.rates,
+    senders: currentSource.senders ?? state.senders,
+    suppressed_carries:
+      currentSource.suppressed_carries ?? state.suppressed_carries,
+  };
+}
+
+function listAllTags(): DailyTag[] {
+  const rates = reportState().rates;
+  const seen = new Set<string>();
+  const out: DailyTag[] = [];
+  for (const builtIn of DAILY_TAGS) {
+    const fromRate = rates.find(
+      (r) => r.tag.toLowerCase() === builtIn.code.toLowerCase(),
+    );
+    const code = (fromRate?.tag ?? builtIn.code) as DailyTag;
+    seen.add(code.toLowerCase());
+    out.push(code);
+  }
+  for (const rate of rates) {
+    const key = rate.tag.toLowerCase();
+    if (seen.has(key) || isRateOnlyTag(rate.tag)) continue;
+    seen.add(key);
+    out.push(rate.tag);
+  }
+  return out;
+}
+
+function getFuelRatePerDay(): number {
+  const rate = reportState().rates.find(
+    (r) => r.tag.toLowerCase() === FUEL_RATE_TAG.toLowerCase(),
+  );
+  if (rate) return Math.max(0, roundPaisa(rate.amount_per_day));
+  return FR_FUEL_RATE_PER_DAY;
+}
+
+function getClFrMonthlyAmount(): number {
+  const rate = reportState().rates.find(
+    (r) => r.tag.toLowerCase() === CL_FR_MONTHLY_TAG.toLowerCase(),
+  );
+  if (rate) return parseMoney(rate.amount_per_day);
+  const fallback = RATE_ONLY_TAGS.find((t) => t.code === CL_FR_MONTHLY_TAG);
+  return fallback ? parseMoney(fallback.defaultAmount) : 0;
+}
+
+function findPriorTag(userId: string): DailyTag | null {
+  const user = reportState().users.find((row) => row.id === userId);
+  return user?.default_tag ?? null;
+}
+
+function isCarrySuppressed(userId: string, date: string) {
+  return (reportState().suppressed_carries ?? []).includes(`${userId}|${date}`);
+}
 
 function moneyDays(days: number, rate: number) {
   return roundPaisa(days * rate);
@@ -59,7 +149,7 @@ function isClFrEligible(tagDays: Map<DailyTag, number> | undefined): boolean {
 function buildClFrRationLines(month: string): RationLine[] {
   const monthly = getClFrMonthlyAmount();
   if (monthly <= 0) return [];
-  const { users } = getState();
+  const { users } = reportState();
   const byUser = tagDaysByUserInMonth(month);
   const lines: RationLine[] = [];
   for (const user of users) {
@@ -136,12 +226,12 @@ export type SenderReportGroup = {
 };
 
 function assignmentsInMonth(month: string): DailyAssignment[] {
-  return getState().assignments.filter((a) => a.date.startsWith(month));
+  return reportState().assignments.filter((a) => a.date.startsWith(month));
 }
 
 function rateMap() {
   const map = new Map<DailyTag, number>();
-  for (const r of getState().rates) map.set(r.tag, r.amount_per_day);
+  for (const r of reportState().rates) map.set(r.tag, r.amount_per_day);
   return map;
 }
 
@@ -161,7 +251,7 @@ function sortUsersBankWise(a: User, b: User) {
 
 export function buildConsumeMonth(month: string) {
   const assignments = assignmentsInMonth(month);
-  const users = getState().users;
+  const users = reportState().users;
   const rates = rateMap();
 
   const byUser = new Map<string, Partial<Record<DailyTag, number>>>();
@@ -351,7 +441,7 @@ export function buildMonthLedger(
 } {
   const dayCount = daysInMonth(month);
   const assignments = assignmentsInMonth(month);
-  const users = getState().users;
+  const users = reportState().users;
   const tagFilter = tags?.length ? new Set<DailyTag>(tags) : null;
   const tagCodes = tagFilter
     ? tags!.filter((t, i, arr) => arr.indexOf(t) === i)
@@ -397,7 +487,7 @@ export function buildMonthLedger(
         const date = dateInMonth(month, d);
         if (date > today && !previewFuture) continue;
         if (isCarrySuppressed(user.id, date)) continue;
-        const prior = findPriorTag(user.id, date);
+        const prior = findPriorTag(user.id);
         if (!prior) continue;
         if (tagFilter && !tagFilter.has(prior)) continue;
         dayMap.set(d, prior);
@@ -444,10 +534,10 @@ export function buildRangeLedger(
   rows: LedgerRow[];
 } {
   const dates = eachISODate(from, to);
-  const assignments = getState().assignments.filter(
+  const assignments = reportState().assignments.filter(
     (a) => a.date >= (from <= to ? from : to) && a.date <= (from <= to ? to : from),
   );
-  const users = getState().users;
+  const users = reportState().users;
   const tagFilter = tags?.length ? new Set<DailyTag>(tags) : null;
   const tagCodes = tagFilter
     ? tags!.filter((t, i, arr) => arr.indexOf(t) === i)
@@ -490,7 +580,7 @@ export function buildRangeLedger(
         if (dayMap.has(date)) continue;
         if (date > today && !previewFuture) continue;
         if (isCarrySuppressed(user.id, date)) continue;
-        const prior = findPriorTag(user.id, date);
+        const prior = findPriorTag(user.id);
         if (!prior) continue;
         if (tagFilter && !tagFilter.has(prior)) continue;
         dayMap.set(date, prior);
@@ -578,7 +668,7 @@ export function buildDailyRegisterDates(
   rows: LedgerRow[];
 } {
   if (!dates.length) return { dates, rows: [] };
-  const state = getState();
+  const state = reportState();
   const ctx = {
     users,
     assignments: state.assignments,
@@ -739,7 +829,7 @@ export function buildRationReport(month: string): {
   unmapped: RationLine[];
   total: number;
 } {
-  const { users, senders, rates } = getState();
+  const { users, senders, rates } = reportState();
   const payoutSenders = activeSenders(senders);
   const rateByTag = new Map(rates.map((r) => [r.tag, r.amount_per_day]));
   const assignments = assignmentsInMonth(month);
@@ -764,9 +854,32 @@ export function buildRationReport(month: string): {
   // MS + CL (no FR that month) → fixed monthly Fresh Ration via CL lines.
   lines.push(...buildClFrRationLines(month));
 
+  const fuelRate = getFuelRatePerDay();
+  if (fuelRate > 0) {
+    const frDays = new Map<string, number>();
+    for (const a of assignments) {
+      if (a.tag !== "FR") continue;
+      frDays.set(a.user_id, (frDays.get(a.user_id) ?? 0) + 1);
+    }
+    for (const [userId, days] of frDays) {
+      const user = users.find((u) => u.id === userId);
+      if (!user) continue;
+      lines.push({
+        user,
+        tag: FUEL_RATE_TAG,
+        days,
+        rate: fuelRate,
+        amount: moneyDays(days, fuelRate),
+      });
+    }
+  }
+
   const groups: SenderReportGroup[] = payoutSenders.map((sender) => {
-    const senderLines = lines.filter((l) =>
-      sender.mapped_tags.includes(l.tag),
+    const senderLines = lines.filter(
+      (l) =>
+        sender.mapped_tags.some(
+          (t) => t.toLowerCase() === l.tag.toLowerCase(),
+        ) && sameBankName(l.user.bank_name ?? "", sender.bank_name),
     );
     return {
       sender,
@@ -921,13 +1034,18 @@ export function buildRationStaffLines(
 ): RationStaffSheet[] {
   // Tag + bank letter: count days for tag even when rate is 0 / tag not on mapped_tags.
   if (tag && senderId) {
-    const { users, senders, rates } = getState();
+    const { users, senders, rates } = reportState();
     const sender = activeSenders(senders).find((s) => s.id === senderId);
     if (!sender) return [];
 
+    const bankOk = (user: User) =>
+      sameBankName(user.bank_name ?? "", sender.bank_name);
+
     // CL ration letter: MS members get fixed monthly Fresh Ration (CLFR), not FR/day.
     if (tag === "CL") {
-      const clFr = buildClFrRationLines(month);
+      const clFr = buildClFrRationLines(month).filter((row) =>
+        bankOk(row.user),
+      );
       if (!clFr.length) return [];
       const lines: RationStaffLine[] = clFr.map((row, i) => ({
         ser: i + 1,
@@ -948,19 +1066,20 @@ export function buildRationStaffLines(
       ]);
     }
 
-    const rate =
-      rates.find((r) => r.tag === tag)?.amount_per_day ?? 0;
-    const fuelPerDay = tag === "FR" ? getFuelRatePerDay() : 0;
-    const dayRate = rate + fuelPerDay;
+    const fuelLetter = isFrFuelTag(tag);
+    const countTag: DailyTag = fuelLetter ? "FR" : tag;
+    const dayRate = fuelLetter
+      ? getFuelRatePerDay()
+      : (rates.find((r) => r.tag === tag)?.amount_per_day ?? 0);
     const daysMap = new Map<string, number>();
     for (const a of assignmentsInMonth(month)) {
-      if (a.tag !== tag) continue;
+      if (a.tag !== countTag) continue;
       daysMap.set(a.user_id, (daysMap.get(a.user_id) ?? 0) + 1);
     }
     const rolled = [...daysMap.entries()]
       .map(([userId, days]) => {
         const user = users.find((u) => u.id === userId);
-        if (!user) return null;
+        if (!user || !bankOk(user)) return null;
         return {
           user,
           days,
@@ -989,7 +1108,7 @@ export function buildRationStaffLines(
       tags: row.tags,
       days: row.days,
       missingBank: missingBank(row.user),
-      remarks: "",
+      remarks: fuelLetter ? "FR days × fuel" : "",
     }));
 
     return flattenStaffByMemberBank([

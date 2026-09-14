@@ -39,7 +39,11 @@ import {
 import type { User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 
-export default function CcUsersPrintClient() {
+export default function CcUsersPrintClient({
+  listHref = "/cc/users",
+}: {
+  listHref?: string;
+}) {
   const t = useT();
   const { locale } = useI18n();
   const { toast } = useToast();
@@ -96,7 +100,7 @@ export default function CcUsersPrintClient() {
   }, [apiOn, filters, toast]);
 
   const users = apiOn ? apiUsers : filterUsers(state.users, filters);
-  const backHref = `/cc/users?${userFiltersToSearchParams(filters).toString()}`;
+  const backHref = `${listHref}?${userFiltersToSearchParams(filters).toString()}`;
   const canAct = users.length > 0;
 
   function reportPayload() {

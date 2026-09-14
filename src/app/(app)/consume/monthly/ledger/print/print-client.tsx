@@ -13,11 +13,16 @@ import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { Button } from "@/components/ui/button";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { buildMonthLedger, buildRangeLedger } from "@/lib/reports";
+import {
+  buildMonthLedger,
+  buildRangeLedger,
+  withReportSource,
+} from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -51,30 +56,39 @@ export default function ConsumeLedgerPrintClient() {
     return null;
   }, [dateFrom, dateTo]);
 
+  const { source } = useReportSource(
+    rangeBounds
+      ? { from: rangeBounds.from, to: rangeBounds.to }
+      : { month },
+  );
+
   const ledger = useMemo(() => {
-    if (rangeBounds) {
-      const range = buildRangeLedger(
-        rangeBounds.from,
-        rangeBounds.to,
-        undefined,
-        { carry: true },
-      );
-      return {
-        month,
-        dayCount: range.dates.length,
-        tagCodes: range.tagCodes,
-        rows: range.rows,
-        columnDates: range.dates,
-      };
-    }
-    const monthLedger = buildMonthLedger(month, undefined, { carry: true });
-    return { ...monthLedger, columnDates: undefined as string[] | undefined };
+    return withReportSource(source, () => {
+      if (rangeBounds) {
+        const range = buildRangeLedger(
+          rangeBounds.from,
+          rangeBounds.to,
+          undefined,
+          { carry: true },
+        );
+        return {
+          month,
+          dayCount: range.dates.length,
+          tagCodes: range.tagCodes,
+          rows: range.rows,
+          columnDates: range.dates,
+        };
+      }
+      const monthLedger = buildMonthLedger(month, undefined, { carry: true });
+      return { ...monthLedger, columnDates: undefined as string[] | undefined };
+    });
   }, [
     state.assignments,
     state.users,
     state.suppressed_carries,
     month,
     rangeBounds,
+    source,
   ]);
 
   const rows = useMemo(() => {

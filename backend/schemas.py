@@ -30,6 +30,7 @@ DUTY_TAGS = {
     "PE",
     "LNK",
     "MFR",
+    "ML",
 }
 
 
@@ -48,6 +49,7 @@ class DocumentIn(BaseModel):
     name: str = ""
     size: int = 0
     url: str | None = None
+    id: str | None = None
 
 
 class EmergencyContactIn(BaseModel):
@@ -59,6 +61,9 @@ class EmergencyContactIn(BaseModel):
 class LoginIn(BaseModel):
     email: str
     password: str
+    otp: str = ""
+    recovery_code: str = ""
+    refresh_token: str = ""
 
 
 class StaffPublic(BaseModel):

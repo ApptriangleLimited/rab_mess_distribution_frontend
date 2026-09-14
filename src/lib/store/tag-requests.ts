@@ -94,6 +94,17 @@ export function listTagRequests(): TagRequest[] {
   return getState().tag_requests;
 }
 
+export function upsertLocalTagRequest(row: TagRequest) {
+  const next = normalizeTagRequest(row);
+  setState((prev) => ({
+    ...prev,
+    tag_requests: [
+      next,
+      ...prev.tag_requests.filter((r) => r.id !== next.id),
+    ],
+  }));
+}
+
 export type PendingRequestCounts = Record<TagRequestQueue, number>;
 
 /** Open tag-change requests waiting for action, by queue. */
@@ -123,14 +134,33 @@ export function pendingRequestCountForHref(
   return 0;
 }
 
-/** Pending Daily→Ration/Consume requests keyed `userId|YYYY-MM-DD`. */
+export function replaceQueueRequests(
+  queue: TagRequestQueue,
+  rows: TagRequest[],
+) {
+  const incoming = rows.map(normalizeTagRequest);
+  const incomingIds = new Set(incoming.map((r) => r.id));
+  setState((prev) => ({
+    ...prev,
+    tag_requests: [
+      ...incoming,
+      ...prev.tag_requests.filter((r) => {
+        if (incomingIds.has(r.id)) return false;
+        return (r.queue ?? "daily") !== queue;
+      }),
+    ],
+  }));
+}
+
+/** Pending CC→Daily and Daily→Ration/Consume requests keyed `userId|YYYY-MM-DD`. */
 export function pendingDutyByUserDate(
   requests: TagRequest[] = getState().tag_requests,
 ): Map<string, TagRequest> {
   const map = new Map<string, TagRequest>();
   for (const r of requests) {
     if (r.status !== "requested") continue;
-    if (r.queue !== "ration" && r.queue !== "consume") continue;
+    const queue = r.queue ?? "daily";
+    if (queue !== "daily" && queue !== "ration" && queue !== "consume") continue;
     const from = r.from_date || r.date;
     const to = r.to_date || r.date || from;
     for (const d of eachISODate(from, to)) {

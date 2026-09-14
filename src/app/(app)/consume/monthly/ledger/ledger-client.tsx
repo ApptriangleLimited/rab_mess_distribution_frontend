@@ -22,10 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 
 import { monthDateBounds } from "@/lib/date";
-import { buildRangeLedger } from "@/lib/reports";
+import { buildRangeLedger, withReportSource } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -65,12 +66,16 @@ export default function ConsumeLedgerClient() {
       : { from: dateTo, to: dateFrom };
   }, [dateFrom, dateTo]);
 
+  const { source } = useReportSource({
+    from: rangeBounds.from,
+    to: rangeBounds.to,
+  });
+
   const ledger = useMemo(() => {
-    const range = buildRangeLedger(
-      rangeBounds.from,
-      rangeBounds.to,
-      undefined,
-      { carry: true },
+    const range = withReportSource(source, () =>
+      buildRangeLedger(rangeBounds.from, rangeBounds.to, undefined, {
+        carry: true,
+      }),
     );
     return {
       month,
@@ -85,6 +90,7 @@ export default function ConsumeLedgerClient() {
     state.suppressed_carries,
     month,
     rangeBounds,
+    source,
   ]);
 
   const rows = useMemo(() => {

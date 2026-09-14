@@ -10,11 +10,18 @@ const ZK_DEMO_ON = (() => {
   return raw === "true" || raw === "1" || raw === "yes" || raw === "on";
 })();
 
-/** Proxy /api/v1 → FastAPI when full API mode or ZK demo-only. */
-const PROXY_API = API_ON || ZK_DEMO_ON;
+const HAS_API_URL = Boolean(
+  process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+    process.env.API_PROXY_URL?.trim(),
+);
+
+/** Proxy /api/v1 → Docker FastAPI (never a remote host unless env says so). */
+const PROXY_API = API_ON || ZK_DEMO_ON || HAS_API_URL;
 
 const API_BASE = (
   process.env.API_PROXY_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   "http://127.0.0.1:8000"
 ).replace(/\/$/, "");

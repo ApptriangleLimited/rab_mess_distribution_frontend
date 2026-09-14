@@ -15,6 +15,7 @@ import type { ApprovalStatus, MemberType, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { RequestTagButton } from "@/components/tag-requests/request-tag-dialog";
+import { IconTip } from "@/components/shared/icon-tip";
 import { MemberAcceptActions } from "@/components/users/member-accept-actions";
 import { useStore } from "@/hooks/use-store";
 import { getCockpitTagOnDate } from "@/lib/store/tag-requests";
@@ -99,30 +100,39 @@ function MemberListActions({
   user,
   detailHref,
   editHref,
+  showRequestAction,
+  showAcceptActions,
 }: {
   user: User;
   detailHref: string;
   editHref: string;
+  showRequestAction: boolean;
+  showAcceptActions: boolean;
 }) {
   const t = useT();
+  const canRequest = showRequestAction && user.approval_status === "approved";
   return (
     <div
       className="flex flex-nowrap items-center gap-1.5"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <Button asChild variant="ghost" size="icon" className={rowActionClass("view")}>
-        <Link href={detailHref} aria-label={t("common.view")}>
-          <IconEyeFilled className="h-4 w-4" />
-        </Link>
-      </Button>
-      <Button asChild variant="ghost" size="icon" className={rowActionClass("edit")}>
-        <Link href={editHref} aria-label={t("common.edit")}>
-          <IconEdit className="h-4 w-4" />
-        </Link>
-      </Button>
-      <MemberAcceptActions user={user} iconOnly />
-      <RequestTagButton user={user} iconOnly />
+      <IconTip label={t("common.view")}>
+        <Button asChild variant="ghost" size="icon" className={rowActionClass("view")}>
+          <Link href={detailHref} title={t("common.view")} aria-label={t("common.view")}>
+            <IconEyeFilled className="h-4 w-4" />
+          </Link>
+        </Button>
+      </IconTip>
+      <IconTip label={t("common.edit")}>
+        <Button asChild variant="ghost" size="icon" className={rowActionClass("edit")}>
+          <Link href={editHref} title={t("common.edit")} aria-label={t("common.edit")}>
+            <IconEdit className="h-4 w-4" />
+          </Link>
+        </Button>
+      </IconTip>
+      {showAcceptActions ? <MemberAcceptActions user={user} iconOnly /> : null}
+      {canRequest ? <RequestTagButton user={user} iconOnly /> : null}
     </div>
   );
 }
@@ -132,7 +142,9 @@ export function UserTable({
   pagination,
   detailHref = (id: string) => `/cc/users/${id}`,
   editHref = (id: string) => `/cc/users/${id}/edit`,
-  onEmptyCreateHref = "/cc/users/new",
+  onEmptyCreateHref,
+  showRequestAction = true,
+  showAcceptActions = false,
 }: {
   users: User[];
   /** When set, `users` is already one page — no client slice. */
@@ -140,6 +152,10 @@ export function UserTable({
   detailHref?: (id: string) => string;
   editHref?: (id: string) => string;
   onEmptyCreateHref?: string;
+  /** CC list shows request-tag after Daily accepts. Daily members list hides it. */
+  showRequestAction?: boolean;
+  /** Daily accepts/rejects new members. CC only views status. */
+  showAcceptActions?: boolean;
 }) {
   const t = useT();
   const router = useRouter();
@@ -177,9 +193,11 @@ export function UserTable({
       <EmptyState
         title={t("cc.empty")}
         action={
-          <Button asChild variant="cta">
-            <Link href={onEmptyCreateHref}>{t("cc.emptyAction")}</Link>
-          </Button>
+          onEmptyCreateHref ? (
+            <Button asChild variant="cta">
+              <Link href={onEmptyCreateHref}>{t("cc.emptyAction")}</Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -260,6 +278,8 @@ export function UserTable({
                   user={user}
                   detailHref={href}
                   editHref={editHref(user.id)}
+                  showRequestAction={showRequestAction}
+                  showAcceptActions={showAcceptActions}
                 />
               </div>
             </li>
@@ -412,6 +432,8 @@ export function UserTable({
                       user={user}
                       detailHref={href}
                       editHref={editHref(user.id)}
+                      showRequestAction={showRequestAction}
+                      showAcceptActions={showAcceptActions}
                     />
                   </td>
                 </tr>

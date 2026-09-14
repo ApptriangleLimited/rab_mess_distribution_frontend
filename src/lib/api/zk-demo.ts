@@ -1,6 +1,6 @@
 import { getAccessToken } from "@/lib/session";
 import { isApiEnabled } from "@/lib/api/mode";
-import { ApiClientError, type FieldError } from "@/lib/api/client";
+import { ApiClientError, apiUrl, type FieldError } from "@/lib/api/client";
 
 /** ZK demo UI/API. On if explicit flag or general API mode. */
 export function isZkDemoEnabled(): boolean {
@@ -31,7 +31,7 @@ export async function zkApiJson<T>(
   const token = getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
   const body = (await res.json().catch(() => null)) as
     | ({ ok: true; data: T } & Record<string, unknown>)
     | ProblemBody

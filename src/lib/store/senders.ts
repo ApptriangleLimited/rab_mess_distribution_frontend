@@ -1,6 +1,21 @@
 import { getState, setState } from "@/lib/store";
+import {
+  isFrFuelSender,
+  isFrFuelTag,
+} from "@/lib/official-senders";
 import { digitsOnly } from "@/lib/utils";
 import type { DailyTag, SenderAccount } from "@/lib/types";
+
+export {
+  FRESH_MONEY_TAGS,
+  REPORT_PAYOUT_TAGS,
+  isFrFuelSender,
+  isFrFuelTag,
+  isFreshMoneyTag,
+  isLegacyDemoSenders,
+  officialSenderAccounts,
+  sameBankName,
+} from "@/lib/official-senders";
 
 export type SenderInput = {
   label: string;
@@ -20,6 +35,20 @@ export function isSenderActive(sender: Pick<SenderAccount, "active">) {
 
 export function activeSenders(senders: SenderAccount[] = listSenders()) {
   return senders.filter(isSenderActive);
+}
+
+export function sendersForReportTag(
+  senders: SenderAccount[],
+  tag: DailyTag | "",
+) {
+  const active = activeSenders(senders);
+  if (!tag) return active;
+  if (isFrFuelTag(tag)) return active.filter(isFrFuelSender);
+  return active.filter(
+    (s) =>
+      !isFrFuelSender(s) &&
+      s.mapped_tags.some((t) => t.toLowerCase() === tag.toLowerCase()),
+  );
 }
 
 function newId() {

@@ -32,7 +32,8 @@ export type BuiltInDailyTag =
   | "JL"
   | "PE"
   | "LNK"
-  | "MFR";
+  | "MFR"
+  | "ML";
 
 /** Built-in duty tags + custom allowance codes (ration). */
 export type DailyTag = BuiltInDailyTag | (string & {});
@@ -41,6 +42,8 @@ export interface DocumentMeta {
   name: string;
   size: number;
   url?: string;
+  /** Stored file id from `POST /api/v1/files`. */
+  id?: string;
 }
 
 export interface EmergencyContact {
@@ -165,7 +168,10 @@ export interface AllowanceRate {
 export interface Session {
   role: Role;
   name: string;
+  username?: string;
   loggedInAt: string;
+  /** Not stored in the session cookie — see PROFILE_AVATAR_KEY. */
+  avatarUrl?: string;
 }
 
 export type StateReportStatus = "pending" | "approved" | "rejected";
@@ -342,6 +348,16 @@ export interface AppState {
    * উপস্থিত = প্রাপ্ত − this.
    */
   manpower_officer_absent: Record<string, Record<string, number>>;
+  /**
+   * Form 1 প্রাপ্ত overrides (`YYYY-MM-DD` → wing → category id → count).
+   * Missing key = use computed roster / Settings held.
+   */
+  manpower_held: Record<string, Record<string, Record<string, number>>>;
+  /**
+   * Form 1 অনুপস্থিত overrides (`YYYY-MM-DD` → wing → category id → count).
+   * Missing key = use cockpit absent tags (Officer falls back to manpower_officer_absent).
+   */
+  manpower_absent: Record<string, Record<string, Record<string, number>>>;
   /** ISO dates Daily has confirmed (carry + edits locked as approved). */
   approved_dates: string[];
   /** `${userId}|${date}` — hide carry ghost until Approve restores or new tag set. */

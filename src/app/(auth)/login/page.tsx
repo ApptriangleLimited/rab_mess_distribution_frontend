@@ -100,8 +100,15 @@ export default function LoginPage() {
     }
   }, []);
 
-  function finishDemo(role: Role, name: string) {
-    login(role, name, undefined, rememberMe);
+  function finishDemo(role: Role, name: string, username?: string) {
+    login(
+      role,
+      name,
+      undefined,
+      rememberMe,
+      undefined,
+      username || SEED_STAFF_EMAIL(role),
+    );
     toast(t("login.loggedInAs", { role: roleLabel(role, locale) }), "success");
     router.replace(ROLE_HOMES[role]);
   }
@@ -115,7 +122,16 @@ export default function LoginPage() {
         toast(t("login.fail"), "error");
         return;
       }
-      login(data.staff.role, data.staff.display_name, data.access_token, rememberMe);
+      login(
+        data.staff.role,
+        data.staff.display_name,
+        data.access_token,
+        rememberMe,
+        data.refresh_token,
+        data.staff.email,
+      );
+      const { syncStoreFromApi } = await import("@/lib/api/app-sync");
+      await syncStoreFromApi();
       try {
         if (rememberMe) {
           localStorage.setItem(REMEMBER_EMAIL_KEY, nextEmail);
@@ -149,7 +165,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (apiOn) {
       if (!email.trim()) {
-        toast(t("login.emailRequired"), "error");
+        toast(t("login.usernameRequired"), "error");
         return;
       }
       if (!password.trim()) {
@@ -159,11 +175,21 @@ export default function LoginPage() {
       await signIn(email.trim().toLowerCase(), password);
       return;
     }
+    if (!email.trim()) {
+      toast(t("login.usernameRequired"), "error");
+      return;
+    }
     if (!password.trim()) {
       toast(t("login.passwordRequired"), "error");
       return;
     }
-    finishDemo(demoRole, email.trim() || t("login.demoUser"));
+    const nextUser = email.trim().toLowerCase();
+    const matched = VISIBLE_ROLE_KEYS.find((r) => nextUser === SEED_STAFF_EMAIL(r));
+    finishDemo(
+      matched ?? demoRole,
+      matched ? roleLabel(matched, locale) : email.trim(),
+      nextUser,
+    );
   }
 
   async function onQuickRole(role: Role) {
@@ -179,7 +205,9 @@ export default function LoginPage() {
       }
     }
     setDemoRole(role);
-    finishDemo(role, email.trim() || roleLabel(role, locale));
+    setEmail(SEED_STAFF_EMAIL(role));
+    setPassword(SEED_STAFF_PASSWORD);
+    finishDemo(role, roleLabel(role, locale), SEED_STAFF_EMAIL(role));
   }
 
   const selectedRole = apiOn
@@ -281,16 +309,16 @@ export default function LoginPage() {
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="identity" className="text-neutral-700 dark:text-neutral-300">
-                {t(apiOn ? "login.email" : "login.displayName")}
+                {t("login.username")}
               </Label>
               <Input
                 id="identity"
-                type={apiOn ? "email" : "text"}
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t(apiOn ? "login.emailPlaceholder" : "login.namePlaceholder")}
+                placeholder={t("login.usernamePlaceholder")}
                 className="h-11 rounded-xl border-neutral-200 bg-neutral-50 px-3.5 text-base shadow-none focus-visible:ring-primary dark:border-neutral-700 dark:bg-neutral-900"
-                autoComplete={apiOn ? "email" : "username"}
+                autoComplete="username"
                 disabled={busy}
               />
             </div>
@@ -378,6 +406,10 @@ export default function LoginPage() {
                       </span>
                       <span className="relative text-xs font-semibold leading-snug text-neutral-800 dark:text-neutral-100">
                         {roleLabel(r, locale)}
+                      </span>
+                      <span className="relative space-y-0.5 font-mono text-[10px] leading-tight text-neutral-500 dark:text-neutral-400">
+                        <span className="block truncate">{SEED_STAFF_EMAIL(r)}</span>
+                        <span className="block truncate">{SEED_STAFF_PASSWORD}</span>
                       </span>
                     </motion.button>
                   );

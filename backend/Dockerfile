@@ -8,8 +8,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py auth.py cache.py daily.py database.py models.py schemas.py schema.sql ./
+COPY *.py schema.sql alembic.ini entrypoint.sh ./
+COPY alembic ./alembic
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh \
+    && mkdir -p /var/lib/rab-mess/files
 
 EXPOSE 8000
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

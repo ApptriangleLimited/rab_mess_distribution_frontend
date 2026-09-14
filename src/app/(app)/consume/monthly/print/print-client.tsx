@@ -13,11 +13,12 @@ import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TagBillPrint } from "@/components/consume/tag-bill-print";
 import { Button } from "@/components/ui/button";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadTagBillPdf } from "@/lib/download-consume-pdfs";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { buildTagBill } from "@/lib/reports";
+import { buildTagBill, withReportSource } from "@/lib/reports";
 import { isKnownTag } from "@/lib/store/rates";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -41,9 +42,11 @@ export default function ConsumeTagBillPrintClient() {
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
 
+  const { source, loading } = useReportSource({ month });
   const bill = useMemo(
-    () => (tag ? buildTagBill(month, tag) : null),
-    [state.assignments, state.users, state.rates, month, tag],
+    () =>
+      tag ? withReportSource(source, () => buildTagBill(month, tag)) : null,
+    [state.assignments, state.users, state.rates, month, tag, source],
   );
 
   const rows = useMemo(() => {

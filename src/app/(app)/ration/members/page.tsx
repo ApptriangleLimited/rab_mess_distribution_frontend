@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconEye,
@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/select";
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import { listMembers, memberToUser } from "@/lib/api/members";
 import { compareUsers } from "@/lib/store/users";
 
 import { useT } from "@/i18n/provider";
@@ -53,9 +55,32 @@ export default function RationMembersPage() {
   const [status, setStatus] = useState("all");
   const [viewUser, setViewUser] = useState<User | null>(null);
 
+  const [apiUsers, setApiUsers] = useState<User[] | null>(null);
+
+  useEffect(() => {
+    if (!isCcApiEnabled()) {
+      setApiUsers(null);
+      return;
+    }
+    let cancelled = false;
+    listMembers({ approval: "approved", page: 1, page_size: 500 })
+      .then((res) => {
+        if (!cancelled) setApiUsers(res.items.map(memberToUser));
+      })
+      .catch(() => {
+        if (!cancelled) setApiUsers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const approved = useMemo(
-    () => state.users.filter((u) => u.approval_status === "approved"),
-    [state.users],
+    () =>
+      (isCcApiEnabled() ? (apiUsers ?? []) : state.users).filter(
+        (u) => u.approval_status === "approved",
+      ),
+    [apiUsers, state.users],
   );
 
   const activeCount = useMemo(

@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { IconCircleCheckFilled, IconCircleXFilled } from "@tabler/icons-react";
+import { IconTip } from "@/components/shared/icon-tip";
 import { rowActionClass } from "@/components/users/row-action-btn";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { UserConfirmCard } from "@/components/daily/user-confirm-card";
@@ -13,6 +14,7 @@ import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { acceptMember, rejectMember } from "@/lib/api/members";
 import { isCcApiEnabled } from "@/lib/api/mode";
+import { createTagRequestApi, requestToTagRequest } from "@/lib/api/tag-requests";
 import { approveUser, rejectUser } from "@/lib/store/daily";
 import { getAssignment, setTag } from "@/lib/store/assignments";
 import { updateUser } from "@/lib/store/users";
@@ -20,6 +22,7 @@ import { userToFormValues } from "@/components/users/user-form";
 import {
   createDutyTagRequest,
   dutyTagQueue,
+  upsertLocalTagRequest,
 } from "@/lib/store/tag-requests";
 import {
   isTrgTag,
@@ -85,7 +88,34 @@ export function MemberAcceptActions({
       setBusy(true);
       try {
         if (pendingAction === "accept") {
-          await acceptMember(user.id, withTag ? actionTag : undefined);
+          const queue = withTag ? dutyTagQueue(actionTag) : "immediate";
+          await acceptMember(
+            user.id,
+            withTag && queue === "immediate" ? actionTag : undefined,
+          );
+          if (withTag && queue !== "immediate") {
+            const created = await createTagRequestApi({
+              userId: user.id,
+              toTag: actionTag,
+              from: todayISO(),
+              to: todayISO(),
+              queue,
+              trg_tone: isTrgTag(actionTag)
+                ? resolveTrgTone(user.force, trainingChecked)
+                : undefined,
+              trg_sarda:
+                isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
+                  ? sardaChecked
+                  : undefined,
+            });
+            upsertLocalTagRequest(requestToTagRequest(created));
+            toast(
+              queue === "ration"
+                ? t("daily.queuedRation", { tag: actionTag })
+                : t("daily.queuedConsume", { tag: actionTag }),
+              "success",
+            );
+          }
           toast(t("daily.approvedToast"), "success");
         } else {
           await rejectMember(user.id);
@@ -164,30 +194,62 @@ export function MemberAcceptActions({
     <>
       {iconOnly || pending ? (
         <>
-          <Button
-            type="button"
-            variant={iconOnly ? "ghost" : "cta"}
-            size={iconOnly ? "icon" : "sm"}
-            disabled={iconOnly && !pending}
-            className={iconOnly ? rowActionClass("approve") : "rounded-lg"}
-            aria-label={t("daily.approve")}
-            onClick={() => open("accept")}
-          >
-            <IconCircleCheckFilled className="h-4 w-4" />
-            {iconOnly ? null : t("daily.approve")}
-          </Button>
-          <Button
-            type="button"
-            variant={iconOnly ? "ghost" : "outline"}
-            size={iconOnly ? "icon" : "sm"}
-            disabled={iconOnly && !pending}
-            className={iconOnly ? rowActionClass("reject") : "rounded-lg"}
-            aria-label={t("daily.reject")}
-            onClick={() => open("reject")}
-          >
-            <IconCircleXFilled className="h-4 w-4" />
-            {iconOnly ? null : t("daily.reject")}
-          </Button>
+          {iconOnly ? (
+            <IconTip label={t("daily.approve")}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={!pending}
+                className={rowActionClass("approve")}
+                title={t("daily.approve")}
+                aria-label={t("daily.approve")}
+                onClick={() => open("accept")}
+              >
+                <IconCircleCheckFilled className="h-4 w-4" />
+              </Button>
+            </IconTip>
+          ) : (
+            <Button
+              type="button"
+              variant="cta"
+              size="sm"
+              className="rounded-lg"
+              aria-label={t("daily.approve")}
+              onClick={() => open("accept")}
+            >
+              <IconCircleCheckFilled className="h-4 w-4" />
+              {t("daily.approve")}
+            </Button>
+          )}
+          {iconOnly ? (
+            <IconTip label={t("daily.reject")}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={!pending}
+                className={rowActionClass("reject")}
+                title={t("daily.reject")}
+                aria-label={t("daily.reject")}
+                onClick={() => open("reject")}
+              >
+                <IconCircleXFilled className="h-4 w-4" />
+              </Button>
+            </IconTip>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              aria-label={t("daily.reject")}
+              onClick={() => open("reject")}
+            >
+              <IconCircleXFilled className="h-4 w-4" />
+              {t("daily.reject")}
+            </Button>
+          )}
         </>
       ) : null}
       {after}

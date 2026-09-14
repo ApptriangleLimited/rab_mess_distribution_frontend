@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 
 import {
@@ -49,6 +50,7 @@ import {
   buildRationStaffLines,
   buildRationTransferLines,
   formatBdt,
+  withReportSource,
 } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -93,9 +95,14 @@ export default function RationSenderReportClient() {
     router.replace(`${pathname}?${next.toString()}`);
   }, [senderId, rawMonth, defaultMonth, pathname, router, searchParams]);
 
+  const { source } = useReportSource({ month });
+
   const staffSheet = useMemo(() => {
     if (!senderId) return null;
-    return buildRationStaffLines(month, senderId)[0] ?? null;
+    return (
+      withReportSource(source, () => buildRationStaffLines(month, senderId))[0] ??
+      null
+    );
   }, [
     state.assignments,
     state.users,
@@ -103,11 +110,17 @@ export default function RationSenderReportClient() {
     state.rates,
     month,
     senderId,
+    source,
   ]);
 
   const transferSheet = useMemo(() => {
     if (!senderId) return null;
-    return buildRationTransferLines(month, senderId)[0] ?? null;
+    return (
+      withReportSource(
+        source,
+        () => buildRationTransferLines(month, senderId),
+      )[0] ?? null
+    );
   }, [
     state.assignments,
     state.users,
@@ -115,6 +128,7 @@ export default function RationSenderReportClient() {
     state.rates,
     month,
     senderId,
+    source,
   ]);
 
   const members = useMemo(() => {

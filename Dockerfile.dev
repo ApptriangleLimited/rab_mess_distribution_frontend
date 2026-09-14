@@ -7,6 +7,6 @@ RUN npm install --no-audit --no-fund
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 \
     NEXT_PUBLIC_API_URL=http://localhost:8000 \
-    NEXT_PUBLIC_USE_API=false
+    NEXT_PUBLIC_USE_API=true
 EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3000"]

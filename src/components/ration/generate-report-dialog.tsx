@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,8 @@ import {
 } from "@/components/ui/select";
 import { useStore } from "@/hooks/use-store";
 import { parseMonthInput } from "@/lib/date";
-import { listAllTags } from "@/lib/store/rates";
-import { activeSenders } from "@/lib/store/senders";
+import { REPORT_PAYOUT_TAGS } from "@/lib/official-senders";
+import { sendersForReportTag } from "@/lib/store/senders";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -32,8 +33,8 @@ export function GenerateReportDialog({
 }: Props) {
   const t = useT();
   const { locale } = useI18n();
+  const router = useRouter();
   const state = useStore();
-  const tags = listAllTags();
   const [month, setMonth] = useState(defaultMonth);
   const [tag, setTag] = useState<DailyTag | "">("");
   const [senderId, setSenderId] = useState("");
@@ -45,21 +46,13 @@ export function GenerateReportDialog({
     setSenderId("");
   }, [open, defaultMonth]);
 
-  const senders = activeSenders(state.senders);
+  const senders = sendersForReportTag(state.senders, tag);
   const canGenerate = Boolean(tag && senderId);
-
-  function senderForTag(nextTag: DailyTag) {
-    return (
-      senders.find((s) => s.mapped_tags.includes(nextTag)) ??
-      senders[0] ??
-      null
-    );
-  }
 
   function onTagChange(nextTag: DailyTag) {
     setTag(nextTag);
-    const match = senderForTag(nextTag);
-    if (match) setSenderId(match.id);
+    const match = sendersForReportTag(state.senders, nextTag)[0] ?? null;
+    setSenderId(match?.id ?? "");
   }
 
   function onGenerate() {
@@ -70,8 +63,8 @@ export function GenerateReportDialog({
       tag,
       sender: senderId,
     });
-    window.open(`/ration/report/preview?${qs.toString()}`, "_blank");
     onClose();
+    router.push(`/ration/report/preview?${qs.toString()}`);
   }
 
   if (!open) return null;
@@ -108,7 +101,7 @@ export function GenerateReportDialog({
               <SelectValue placeholder={t("ration.selectTag")} />
             </SelectTrigger>
             <SelectContent>
-              {tags.map((code) => (
+              {REPORT_PAYOUT_TAGS.map((code) => (
                 <SelectItem key={code} value={code}>
                   {code} — {tagLabel(code, locale)}
                 </SelectItem>
@@ -121,6 +114,7 @@ export function GenerateReportDialog({
           <Select
             value={senderId || undefined}
             onValueChange={setSenderId}
+            disabled={!tag}
           >
             <SelectTrigger className="h-10 rounded-lg">
               <SelectValue placeholder={t("ration.selectBank")} />
@@ -129,7 +123,6 @@ export function GenerateReportDialog({
               {senders.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.label}
-                  {s.bank_name ? ` · ${s.bank_name}` : ""}
                 </SelectItem>
               ))}
             </SelectContent>

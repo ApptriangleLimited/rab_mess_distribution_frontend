@@ -29,7 +29,7 @@ import {
   buildDailyRegisterDates,
   buildDailyRegisterFromCells,
 } from "@/lib/reports";
-import { compareUsers, isCockpitMember } from "@/lib/store/users";
+import { compareUsers } from "@/lib/store/users";
 import { useT } from "@/i18n/provider";
 
 export default function DailyRegisterPrintClient() {
@@ -50,7 +50,7 @@ export default function DailyRegisterPrintClient() {
   const memberStatus: "all" | "0" | "1" =
     statusParam === "0" || statusParam === "1" || statusParam === "all"
       ? statusParam
-      : "1";
+      : "all";
   const dayCount = daysInMonth(month);
   const loadFrom = dateFrom.trim() || dateInMonth(month, 1);
   const loadTo = dateTo.trim() || dateInMonth(month, dayCount);
@@ -69,7 +69,6 @@ export default function DailyRegisterPrintClient() {
     const query = q.trim().toLowerCase();
     return state.users
       .filter((u) => {
-        if (!isCockpitMember(u)) return false;
         if (u.approval_status !== "approved") return false;
         if (memberStatus !== "all" && u.status !== memberStatus) return false;
         if (rank !== "all" && u.rank !== rank) return false;

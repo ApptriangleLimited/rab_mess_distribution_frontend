@@ -180,6 +180,8 @@ function letterSheetCss() {
   .staff-payout-print td,
   .mess-reports-letter th,
   .mess-reports-letter td,
+  .official-consume-letter th,
+  .official-consume-letter td,
   .wing-summary-print th,
   .wing-summary-print td {
     font-size: 10px !important;
@@ -462,6 +464,7 @@ const LARGE_LETTER_SELECTOR = [
   ".transfer-sheet-print",
   ".mess-reports-letter",
   ".member-list-letter",
+  ".official-consume-letter",
 ].join(", ");
 
 function shouldSkipInlineStyles(el: HTMLElement, options: PrintLetterOptions) {

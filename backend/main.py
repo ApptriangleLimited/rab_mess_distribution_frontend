@@ -1,13 +1,14 @@
+import logging
 import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -18,21 +19,41 @@ from auth import (
     current_staff,
     decode_token,
     hash_password,
+    issue_refresh_session,
     require_roles,
+    revoke_staff_sessions,
     verify_password,
 )
 from cache import (
+    bust_daily,
     bust_members,
     bust_tag_requests,
     cache_get,
     cache_key,
     cache_set,
+    redis_log_target,
     redis_up,
+    revoke_staff_access,
     revoke_token,
+    worker_up,
 )
-from daily import router as daily_router
+from daily import can_assign, each_date, router as daily_router, upsert_assignment
+from extra import router as extra_router, seed_catalog
+from persist import router as persist_router, seed_persist
+from account import router as account_router
+from headers import SecurityHeadersMiddleware
+from permissions import seed_permissions
+from security import verify_login_mfa
+from audit import write_audit
+from config import settings
 from database import Base, SessionLocal, engine, get_db
-from models import Member, Staff, TagRequest
+from models import Assignment, Member, Staff, TagRequest
+from observability import RequestContextMiddleware, configure_logging, log_event
+from rate_limit import (
+    client_ip,
+    clear_login_limits,
+    enforce_login_limits,
+)
 from schemas import (
     AcceptMemberIn,
     LoginIn,
@@ -46,23 +67,31 @@ from schemas import (
 
 ROLES = ("cc", "daily", "mess", "consume", "ration", "admin")
 MEMBER_ROLES = ("cc", "daily", "admin")
+MEMBER_CREATE_ROLES = ("cc", "admin")
 QUEUE_ROLES = {
     "daily": ("daily", "admin"),
     "ration": ("ration", "admin"),
     "consume": ("consume", "admin"),
 }
 
-app = FastAPI(title="RAB Mess CC API", version="0.1.0")
-app.include_router(daily_router)
+configure_logging()
+settings.assert_secure()
 
-_origins = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001",
-    ).split(",")
-    if origin.strip()
-]
+app = FastAPI(
+    title="RAB Mess CC API",
+    version="0.2.0",
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
+)
+app.add_middleware(RequestContextMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.include_router(daily_router)
+app.include_router(extra_router)
+app.include_router(persist_router)
+app.include_router(account_router)
+
+_origins = settings.cors_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
@@ -92,7 +121,27 @@ def envelope(data, message: str = "", status: int = 200):
     )
 
 
-def fail(status: int, message: str, code: str, errors: list | None = None):
+def cors_headers_for(request: Request | None) -> dict[str, str]:
+    if request is None:
+        return {}
+    origin = request.headers.get("origin")
+    if origin and origin in _origins:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
+
+
+def fail(
+    status: int,
+    message: str,
+    code: str,
+    errors: list | None = None,
+    *,
+    request: Request | None = None,
+):
     return JSONResponse(
         {
             "ok": False,
@@ -103,11 +152,12 @@ def fail(status: int, message: str, code: str, errors: list | None = None):
             "errors": errors or [],
         },
         status_code=status,
+        headers=cors_headers_for(request),
     )
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(_request, exc: HTTPException):
+async def http_exception_handler(request: Request, exc: HTTPException):
     detail = str(exc.detail)
     code = {
         401: "UNAUTHORIZED",
@@ -121,11 +171,11 @@ async def http_exception_handler(_request, exc: HTTPException):
         code = "AUTH_INVALID_CREDENTIALS"
     if exc.status_code == 409 and "RAB" in detail:
         code = "CONFLICT_RAB_ID"
-    return fail(exc.status_code, str(exc.detail), code)
+    return fail(exc.status_code, str(exc.detail), code, request=request)
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(_request, exc: RequestValidationError):
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
     errors = []
     for err in exc.errors():
         loc = err.get("loc", ())
@@ -138,12 +188,23 @@ async def validation_exception_handler(_request, exc: RequestValidationError):
             }
         )
     message = errors[0]["message"] if errors else "Validation failed"
-    return fail(422, message, "VALIDATION_ERROR", errors)
+    return fail(422, message, "VALIDATION_ERROR", errors, request=request)
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(_request, _exc: Exception):
-    return fail(500, "Unexpected server error", "INTERNAL_ERROR")
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    import logging
+
+    log_event(
+        logging.ERROR,
+        service="api",
+        request_id=getattr(request.state, "request_id", ""),
+        method=request.method,
+        path=str(request.url.path),
+        event="unhandled_exception",
+        error_type=type(exc).__name__,
+    )
+    return fail(500, "Unexpected server error", "INTERNAL_ERROR", request=request)
 
 
 def iso_date(value: date | None) -> str | None:
@@ -178,6 +239,8 @@ def member_out(row: Member) -> dict:
         "joining_date": iso_date(row.joining_date),
         "out_date": iso_date(row.out_date),
         "default_tag": (row.default_tag or "MS").upper(),
+        "jl_end_date": row.jl_end_date or "",
+        "inactive_spans": row.inactive_spans or [],
         "emergency_contacts": row.emergency_contacts or [],
         "created_at": row.created_at.isoformat() if row.created_at else utcnow().isoformat(),
         "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
@@ -270,7 +333,9 @@ def queue_counts(db: Session) -> dict[str, int]:
 
 
 def seed_staff() -> None:
-    password = os.getenv("SEED_STAFF_PASSWORD", "ChangeMe!")
+    if not settings.seed_staff:
+        return
+    password = settings.seed_staff_password
     db = SessionLocal()
     try:
         existing = {row.email for row in db.query(Staff.email).all()}
@@ -296,10 +361,38 @@ def seed_staff() -> None:
         db.close()
 
 
+def run_migrations() -> None:
+    from alembic import command
+    from alembic.config import Config
+
+    command.upgrade(Config("alembic.ini"), "head")
+
+
 @app.on_event("startup")
 def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
+    run_migrations()
+    if settings.allow_create_all:
+        Base.metadata.create_all(bind=engine)
     seed_staff()
+    seed_permissions()
+    seed_catalog()
+    seed_persist()
+    log_event(
+        logging.INFO,
+        service="api",
+        event="startup",
+        redis=redis_log_target(),
+        env=settings.app_env,
+    )
+
+
+def postgres_up() -> bool:
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
 
 
 @app.get("/health")
@@ -307,18 +400,73 @@ def health():
     return envelope({"status": "ok", "redis": "up" if redis_up() else "down"})
 
 
+@app.get("/health/live")
+def health_live():
+    return envelope({"status": "ok"})
+
+
+@app.get("/health/ready")
+def health_ready():
+    db_ok = postgres_up()
+    redis_ok = redis_up()
+    payload = {
+        "status": "ok" if db_ok and redis_ok else "degraded",
+        "database": "up" if db_ok else "down",
+        "redis": "up" if redis_ok else "down",
+    }
+    if not db_ok:
+        return fail(503, "Database unavailable", "NOT_READY")
+    if settings.is_production and not redis_ok:
+        return fail(503, "Redis unavailable", "NOT_READY")
+    payload["worker"] = "up" if worker_up() else "down"
+    return envelope(payload)
+
+
 @app.post("/api/v1/auth/login")
-def login(body: LoginIn, db: Session = Depends(get_db)):
+def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     email = body.email.strip().lower()
+    enforce_login_limits(request, email)
     staff = db.query(Staff).filter(func.lower(Staff.email) == email).first()
     if staff is None or not verify_password(body.password, staff.password_hash):
+        write_audit(
+            db,
+            actor_id="",
+            action="LOGIN_FAIL",
+            entity="staff",
+            entity_id=email,
+            ip=client_ip(request),
+            user_agent=request.headers.get("user-agent", ""),
+        )
+        db.commit()
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not staff.active:
         return fail(401, "Account is inactive", "AUTH_INACTIVE")
+    mfa_error = verify_login_mfa(staff, body.otp, body.recovery_code)
+    if mfa_error:
+        code, message = mfa_error
+        return fail(401, message, code)
+    clear_login_limits(request, email)
+    write_audit(
+        db,
+        actor_id=staff.id,
+        action="LOGIN",
+        entity="staff",
+        entity_id=staff.id,
+        ip=client_ip(request),
+        user_agent=request.headers.get("user-agent", ""),
+    )
+    raw_refresh, _session = issue_refresh_session(
+        db,
+        staff,
+        ip=client_ip(request),
+        user_agent=request.headers.get("user-agent", ""),
+    )
+    db.commit()
     token = create_access_token(staff)
     return envelope(
         {
             "access_token": token,
+            "refresh_token": raw_refresh,
             "token_type": "bearer",
             "expires_in": JWT_EXPIRES_SECONDS,
             "staff": {
@@ -326,6 +474,7 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
                 "email": staff.email,
                 "display_name": staff.display_name,
                 "role": staff.role,
+                "mfa_enabled": bool(staff.mfa_enabled),
             },
         },
         "Logged in",
@@ -334,11 +483,24 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 
 @app.post("/api/v1/auth/logout")
 def logout(
+    request: Request,
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
-    _staff: Staff = Depends(current_staff),
+    staff: Staff = Depends(current_staff),
+    db: Session = Depends(get_db),
 ):
     if creds is not None:
         revoke_token(creds.credentials, decode_token(creds.credentials))
+    revoke_staff_sessions(db, staff.id)
+    write_audit(
+        db,
+        actor_id=staff.id,
+        action="LOGOUT",
+        entity="staff",
+        entity_id=staff.id,
+        ip=client_ip(request),
+        user_agent=request.headers.get("user-agent", ""),
+    )
+    db.commit()
     return envelope(None, "Logged out")
 
 
@@ -421,7 +583,7 @@ def list_members(
 @app.post("/api/v1/members")
 def create_member(
     body: MemberIn,
-    staff: Staff = Depends(require_roles(*MEMBER_ROLES)),
+    staff: Staff = Depends(require_roles(*MEMBER_CREATE_ROLES)),
     db: Session = Depends(get_db),
 ):
     if not body.name.strip():
@@ -737,14 +899,18 @@ def create_tag_request(
         to_tag = normalize_tag(body.to_tag)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    current = (member.default_tag or "").upper()
-    if current == to_tag:
-        raise HTTPException(status_code=400, detail="Requested tag is the same as the current tag")
-
     start = body.from_date or date.today()
     end = body.to_date or start
     if end < start:
         start, end = end, start
+    stored = (
+        db.query(Assignment)
+        .filter(Assignment.user_id == member.id, Assignment.date == start)
+        .first()
+    )
+    current = ((stored.tag if stored else member.default_tag) or "").upper()
+    if current == to_tag:
+        raise HTTPException(status_code=400, detail="Requested tag is the same as the current tag")
     pending = (
         db.query(TagRequest)
         .filter(
@@ -848,12 +1014,29 @@ def accept_tag_request(
     row.status = "updated"
     row.updated_by = staff.id
     row.updated_at = utcnow()
-    row.member.default_tag = row.to_tag
-    row.member.updated_at = utcnow()
+    start = row.from_date or row.date
+    end = row.to_date or start
+    if end < start:
+        start, end = end, start
+    today = date.today()
+    if start < today:
+        start = today
+    wrote = 0
+    for day in each_date(start, end):
+        if day < today:
+            continue
+        if not can_assign(row.member, day):
+            continue
+        assigned = upsert_assignment(db, row.member, day, row.to_tag, staff)
+        assigned.trg_tone = row.trg_tone
+        wrote += 1
+    if wrote == 0:
+        raise HTTPException(status_code=409, detail="No assignable days in this request")
     db.commit()
     db.refresh(row)
     bust_tag_requests()
     bust_members()
+    bust_daily()
     return envelope(request_out(row), "Member request accepted.")
 
 

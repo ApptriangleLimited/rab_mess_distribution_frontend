@@ -9,15 +9,10 @@ import { StrengthLetter } from "@/components/manpower/strength-letter";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
-import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
+import { useManpowerDay } from "@/hooks/use-manpower-day";
 import { useStore } from "@/hooks/use-store";
-import { isApiEnabled } from "@/lib/api/mode";
 import { formatDateLong, todayISO } from "@/lib/date";
-import {
-  buildManpowerReport,
-  tagForFromCells,
-  type ManpowerSnapshot,
-} from "@/lib/manpower-report";
+import { buildManpowerReport } from "@/lib/manpower-report";
 import { buildStrengthReport } from "@/lib/strength-report";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { useI18n, useT } from "@/i18n/provider";
@@ -33,7 +28,6 @@ export function ManpowerPrintClient() {
   const t = useT();
   const { locale } = useI18n();
   const state = useStore();
-  const apiOn = isApiEnabled();
   const searchParams = useSearchParams();
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
@@ -45,41 +39,32 @@ export function ManpowerPrintClient() {
       : todayISO();
   const form = parseForm(searchParams.get("form"));
 
-  const cockpit = useDailyCockpit({
-    dateFrom: date,
-    dateTo: date,
-    q: "",
-    rank: "all",
-    wing: "all",
-  });
-
-  const snapshot: ManpowerSnapshot | undefined = useMemo(() => {
-    if (!apiOn || cockpit.loading) return undefined;
-    return {
-      users: cockpit.users,
-      tagFor: tagForFromCells(cockpit.cells, date),
-      wingParent: state.wing_parent,
-    };
-  }, [apiOn, cockpit.loading, cockpit.users, cockpit.cells, date, state.wing_parent]);
+  const { apiOn, loading, snapshot } = useManpowerDay(date);
+  const reportSnapshot = apiOn
+    ? snapshot ?? {
+        users: [],
+        tagFor: () => "" as const,
+        prefiltered: true,
+      }
+    : undefined;
 
   const form1 = useMemo(
-    () => buildManpowerReport(date, snapshot),
+    () => buildManpowerReport(date, reportSnapshot),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, snapshot],
+    [date, state, reportSnapshot],
   );
   const form2 = useMemo(
-    () => buildStrengthReport(date, "admin", snapshot),
+    () => buildStrengthReport(date, "admin", reportSnapshot),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, snapshot],
+    [date, state, reportSnapshot],
   );
   const form3 = useMemo(
-    () => buildStrengthReport(date, "hq", snapshot),
+    () => buildStrengthReport(date, "hq", reportSnapshot),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, snapshot],
+    [date, state, reportSnapshot],
   );
 
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
-  const loading = apiOn && cockpit.loading;
 
   const titleKey =
     form === "1"

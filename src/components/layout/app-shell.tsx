@@ -13,7 +13,7 @@ import { useT } from "@/i18n/provider";
 const SIDEBAR_KEY = "mess_sidebar_collapsed_v1";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { session, ready, logout } = useSession();
+  const { session, ready, logout, updateProfile } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -101,6 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               logout();
               router.replace("/login");
             }}
+            onProfileSaved={updateProfile}
           />
         </div>
         <main className="min-h-0 flex-1 overflow-y-auto custom-scrollbar" key={pathname}>

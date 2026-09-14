@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import current_staff, require_roles
@@ -143,8 +144,6 @@ def member_matches(
     rank: str | None,
     wing: str | None,
 ) -> bool:
-    if member.member_type == "guest":
-        return False
     if member.approval_status != "approved":
         return False
     if rank and rank != "all" and member.rank != rank:
@@ -284,6 +283,62 @@ def set_suppressed(db: Session, user_id: str, day: date, on: bool) -> None:
         db.delete(existing)
 
 
+def session_member_dates(db: Session, model, member_id: str) -> set[date]:
+    """Dates already staged in this session (unflushed inserts/updates)."""
+    dates: set[date] = set()
+    for obj in list(db.new) + list(db.dirty):
+        if isinstance(obj, model) and getattr(obj, "user_id", None) == member_id:
+            day = getattr(obj, "date", None)
+            if day is not None:
+                dates.add(day)
+    return dates
+
+
+def freeze_prior_tags(db: Session, member: Member, before: date, staff: Staff) -> None:
+    """Lock empty days before `before` as stored default tags so later paints cannot rewrite them."""
+    default = (member.default_tag or "").upper()
+    if not default or before <= date.min:
+        return
+    window_start = before - timedelta(days=90)
+    if member.joining_date and member.joining_date > window_start:
+        window_start = member.joining_date
+    if window_start >= before:
+        return
+    last = before - timedelta(days=1)
+    existing = {
+        row.date
+        for row in db.query(Assignment.date).filter(
+            Assignment.user_id == member.id,
+            Assignment.date >= window_start,
+            Assignment.date <= last,
+        )
+    } | session_member_dates(db, Assignment, member.id)
+    suppressed = {
+        row.date
+        for row in db.query(SuppressedCarry.date).filter(
+            SuppressedCarry.user_id == member.id,
+            SuppressedCarry.date >= window_start,
+            SuppressedCarry.date <= last,
+        )
+    } | session_member_dates(db, SuppressedCarry, member.id)
+    now = utcnow()
+    for day in each_date(window_start, last):
+        if day in existing or day in suppressed:
+            continue
+        if not can_assign(member, day):
+            continue
+        db.add(
+            Assignment(
+                id=new_id("a"),
+                user_id=member.id,
+                date=day,
+                tag=default,
+                updated_by=staff.id,
+                updated_at=now,
+            )
+        )
+
+
 def upsert_assignment(
     db: Session,
     member: Member,
@@ -291,6 +346,7 @@ def upsert_assignment(
     tag: str,
     staff: Staff,
 ) -> Assignment:
+    freeze_prior_tags(db, member, day, staff)
     row = (
         db.query(Assignment)
         .filter(Assignment.user_id == member.id, Assignment.date == day)
@@ -436,6 +492,8 @@ def put_assignment(
         tag = normalize_tag(body.tag)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if day < date.today():
+        raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if not can_write_tag(member, day, tag):
         raise HTTPException(status_code=409, detail="Cannot assign tag on this date")
     row = upsert_assignment(db, member, day, tag, staff)
@@ -470,10 +528,13 @@ def delete_assignment(
     if member is None:
         raise HTTPException(status_code=404, detail="User not found")
     target = parse_day(day)
+    if target < date.today():
+        raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if is_mfr_locked(member):
         raise HTTPException(status_code=409, detail="Cannot clear an MFR-locked member")
     if not can_assign(member, target):
         raise HTTPException(status_code=409, detail="Cannot clear tag on this date")
+    freeze_prior_tags(db, member, target, staff)
     db.query(Assignment).filter(
         Assignment.user_id == member_id, Assignment.date == target
     ).delete()
@@ -514,8 +575,14 @@ def put_assignment_range(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     items = []
     updated = 0
+    today = date.today()
+    write_days = []
     for raw in body.dates:
         day = parse_day(raw)
+        if day < today:
+            continue
+        write_days.append(day)
+    for day in write_days:
         if tag:
             if not can_write_tag(member, day, tag):
                 continue
@@ -549,7 +616,14 @@ def put_assignment_range(
             )
             updated += 1
     member.updated_at = utcnow()
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Could not save this tag range",
+        ) from exc
     bust_daily()
     return envelope({"updated": updated, "items": items}, "Range updated")
 

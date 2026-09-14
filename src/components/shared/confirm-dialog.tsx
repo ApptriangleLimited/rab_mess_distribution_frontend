@@ -44,6 +44,7 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  cancelLabel,
   danger,
   tone,
   busy,
@@ -58,6 +59,7 @@ export function ConfirmDialog({
   title: string;
   body: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   danger?: boolean;
   tone?: Tone;
   busy?: boolean;
@@ -186,7 +188,7 @@ export function ConfirmDialog({
                   disabled={busy}
                   onClick={onCancel}
                 >
-                  {t("common.cancel")}
+                  {cancelLabel ?? t("common.cancel")}
                 </Button>
                 <Button
                   type="button"

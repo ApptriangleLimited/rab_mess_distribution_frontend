@@ -13,7 +13,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { formatDateDisplay, monthKey, shiftMonthKey } from "@/lib/date";
+import {
+  formatDateDisplay,
+  formatDateRangeCompact,
+  monthKey,
+  shiftMonthKey,
+} from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -195,6 +200,10 @@ export function DateRangePicker({
   const previewTo = draftTo || hover || "";
   const hasValue = Boolean(from || to);
   const display = useMemo(() => {
+    if (from || to) return formatDateRangeCompact(from, to);
+    return t("common.selectDates");
+  }, [from, to, t]);
+  const fullDisplay = useMemo(() => {
     if (from && to) return `${formatShort(from)} – ${formatShort(to)}`;
     if (from) return `${formatShort(from)} – …`;
     if (to) return `… – ${formatShort(to)}`;
@@ -224,9 +233,10 @@ export function DateRangePicker({
               triggerClassName,
             )}
             aria-label={label ?? t("common.dateRange")}
+            title={fullDisplay}
           >
             <IconCalendar className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-medium tabular-nums">
+            <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-medium tracking-tight tabular-nums">
               {display}
             </span>
             {hasValue ? (

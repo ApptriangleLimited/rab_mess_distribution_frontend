@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { FrTransferLetterPrint } from "@/components/ration/fr-transfer-letter-print";
 import { StaffPayoutPrint } from "@/components/ration/staff-payout-print";
 import { Button } from "@/components/ui/button";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import {
   downloadFrTransferPdf,
@@ -19,26 +20,27 @@ import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   buildFrTransferSheetsByMemberBank,
   buildRationStaffLines,
+  withReportSource,
 } from "@/lib/reports";
+import { REPORT_PAYOUT_TAGS } from "@/lib/official-senders";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 
 const TAGS = new Set<string>([
-  "FR",
-  "CL",
+  ...REPORT_PAYOUT_TAGS,
   "PL",
   "WR",
-  "CD",
   "WIT",
-  "MED",
-  "TRG",
   "MS",
 ]);
 
 function parseTag(raw: string | null): DailyTag | null {
-  if (!raw || !TAGS.has(raw)) return null;
-  return raw as DailyTag;
+  if (!raw) return null;
+  const match = [...TAGS].find(
+    (code) => code.toLowerCase() === raw.toLowerCase(),
+  );
+  return match ? (match as DailyTag) : null;
 }
 
 export default function RationReportPreviewClient() {
@@ -54,9 +56,13 @@ export default function RationReportPreviewClient() {
   const senderId = searchParams.get("sender") ?? "";
   const isFr = tag === "FR";
 
+  const { source } = useReportSource({ month });
+
   const staffSheets = useMemo(() => {
     if (!tag || !senderId || isFr) return [];
-    return buildRationStaffLines(month, senderId, tag);
+    return withReportSource(source, () =>
+      buildRationStaffLines(month, senderId, tag),
+    );
   }, [
     state.assignments,
     state.users,
@@ -66,11 +72,14 @@ export default function RationReportPreviewClient() {
     tag,
     senderId,
     isFr,
+    source,
   ]);
 
   const frSheets = useMemo(() => {
     if (!isFr || !senderId) return [];
-    return buildFrTransferSheetsByMemberBank(month, senderId, todayISO());
+    return withReportSource(source, () =>
+      buildFrTransferSheetsByMemberBank(month, senderId, todayISO()),
+    );
   }, [
     state.assignments,
     state.users,
@@ -79,6 +88,7 @@ export default function RationReportPreviewClient() {
     month,
     senderId,
     isFr,
+    source,
   ]);
 
   const sender = state.senders.find((s) => s.id === senderId);

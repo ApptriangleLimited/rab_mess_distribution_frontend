@@ -9,10 +9,9 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
-import { useStore } from "@/hooks/use-store";
+import { usePritibhojEvent } from "@/hooks/use-pritibhoj-event";
 import { formatDateLong } from "@/lib/date";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import { getPritibhojEvent } from "@/lib/store/pritibhoj";
 import { useI18n, useT } from "@/i18n/provider";
 
 export default function MessPritibhojPrintPage() {
@@ -21,10 +20,13 @@ export default function MessPritibhojPrintPage() {
   const params = useParams<{ id: string }>();
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
-  useStore();
-  const event = getPritibhojEvent(params.id);
+  const { event, loading } = usePritibhojEvent(params.id);
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   const pdfName = event ? `pritibhoj-${event.date}.pdf` : "pritibhoj.pdf";
+
+  if (loading && !event) {
+    return <PagePane className="gap-4" />;
+  }
 
   if (!event) {
     return (

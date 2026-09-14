@@ -26,8 +26,8 @@ import {
   rolesForPicker,
 } from "@/lib/constants";
 import { useSession } from "@/hooks/use-session";
-import { homeForRole, setSession } from "@/lib/session";
-import { nowISO } from "@/lib/date";
+import { switchToSeedRole } from "@/lib/api/switch-role";
+import { homeForRole } from "@/lib/session";
 import type { AllowanceRate, DailyTag, Role } from "@/lib/types";
 import {
   Select,
@@ -49,6 +49,7 @@ import { SenderAccountsSection } from "@/components/ration/sender-accounts-secti
 import { AuthorizedSection } from "@/components/settings/authorized-section";
 import { MemberBanksSection } from "@/components/settings/member-banks-section";
 import { RegisterQrSection } from "@/components/settings/register-qr-section";
+import { StaffAccountsSection } from "@/components/settings/staff-accounts-section";
 import { OrgListSection } from "@/components/settings/org-list-section";
 import {
   parseSettingsTab,
@@ -84,17 +85,18 @@ function SettingsPageInner() {
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
   const isRation = isRationFamily(session?.role);
+  const canManageStaff = session?.role === "admin" || session?.role === "mess";
 
-  const tab = parseSettingsTab(searchParams.get("tab"), isRation);
+  const tab = parseSettingsTab(searchParams.get("tab"), isRation, canManageStaff);
 
   useEffect(() => {
     const raw = searchParams.get("tab");
-    const next = parseSettingsTab(raw, isRation);
+    const next = parseSettingsTab(raw, isRation, canManageStaff);
     if (raw === next) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
     router.replace(`${pathname}?${params.toString()}`);
-  }, [searchParams, isRation, pathname, router]);
+  }, [searchParams, isRation, canManageStaff, pathname, router]);
 
   function setTab(id: SettingsTabId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -172,12 +174,18 @@ function SettingsPageInner() {
     window.location.reload();
   }
 
-  function onSwitchRole(role: Role) {
+  async function onSwitchRole(role: Role) {
     if (!session) return;
-    const next = { ...session, role, loggedInAt: nowISO() };
-    setSession(next);
-    toast(t("settings.switchedTo", { role: roleLabel(role, locale) }), "success");
-    window.location.href = homeForRole(role);
+    try {
+      await switchToSeedRole(role, session);
+      toast(t("settings.switchedTo", { role: roleLabel(role, locale) }), "success");
+      window.location.href = homeForRole(role);
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("settings.switchFailed"),
+        "error",
+      );
+    }
   }
 
   async function onSaveRates() {
@@ -447,8 +455,12 @@ function SettingsPageInner() {
           value={tab}
           onChange={setTab}
           isRation={isRation}
+          canManageStaff={canManageStaff}
         />
 
+        {tab === "staff" && canManageStaff ? (
+          <StaffAccountsSection static />
+        ) : null}
         {tab === "rates" ? ratesPanel : null}
         {tab === "rank" ? (
           <OrgListSection kind="rank" icon={IconMilitaryRank} />

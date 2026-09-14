@@ -1,39 +1,64 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import type { User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
-import { IconPlayerPlay, IconPlayerPause } from "@tabler/icons-react";
 
 export function StatusToggle({
   user,
   onToggle,
+  disabled = false,
 }: {
   user: User;
   onToggle: (next: UserStatus) => void;
+  disabled?: boolean;
 }) {
   const t = useT();
   const active = user.status === "1";
 
   return (
-    <Button
-      size="sm"
-      variant={active ? "outline" : "cta"}
-      className="rounded-lg"
+    <button
+      type="button"
+      role="switch"
+      aria-checked={active}
+      disabled={disabled}
       onClick={() => onToggle(active ? "0" : "1")}
+      className="inline-flex h-8 shrink-0 items-center gap-2 rounded-full border border-neutral-200 bg-white px-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-900"
     >
-      {active ? (
-        <IconPlayerPause className="h-3.5 w-3.5" />
-      ) : (
-        <IconPlayerPlay className="h-3.5 w-3.5" />
-      )}
-      {active ? t("daily.deactivate") : t("daily.activate")}
-    </Button>
+      <span
+        className={cn(
+          "text-[11px] font-semibold",
+          active ? "text-neutral-400" : "text-neutral-700 dark:text-neutral-200",
+        )}
+      >
+        {t("cc.statusInactive")}
+      </span>
+      <span
+        className={cn(
+          "relative h-5 w-9 rounded-full transition-colors",
+          active ? "bg-primary" : "bg-neutral-300 dark:bg-neutral-600",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left]",
+            active ? "left-4" : "left-0.5",
+          )}
+        />
+      </span>
+      <span
+        className={cn(
+          "text-[11px] font-semibold",
+          active ? "text-primary" : "text-neutral-400",
+        )}
+      >
+        {t("cc.statusActive")}
+      </span>
+    </button>
   );
 }
 

@@ -36,8 +36,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/shared/toast-provider";
+import { isApiEnabled } from "@/lib/api/mode";
+import {
+  fetchMessCheckins,
+  messCheckinMembers,
+  type MessCheckinsData,
+} from "@/lib/api/mess-checkins";
 
 import { downloadCsv } from "@/lib/csv";
 import { eachISODate, formatDateLong, monthDateBounds } from "@/lib/date";
@@ -222,6 +229,7 @@ export default function MessReportsClient() {
   const [zkUsers, setZkUsers] = useState<ZkUserRow[]>([]);
   const [zkLoading, setZkLoading] = useState(() => isZkDemoEnabled());
   const [zkTick, setZkTick] = useState(0);
+  const [checkins, setCheckins] = useState<MessCheckinsData | null>(null);
   const [printing, setPrinting] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -270,11 +278,48 @@ export default function MessReportsClient() {
       : { from: dateTo, to: dateFrom };
   }, [dateFrom, dateTo]);
 
+  const apiOn = isApiEnabled();
+  const { source } = useReportSource({
+    from: rangeBounds.from,
+    to: rangeBounds.to,
+  });
+
+  useEffect(() => {
+    if (!apiOn) {
+      setCheckins(null);
+      return;
+    }
+    let cancelled = false;
+    fetchMessCheckins(rangeBounds.from, rangeBounds.to)
+      .then((data) => {
+        if (!cancelled) setCheckins(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCheckins(null);
+        toast(
+          err instanceof ApiClientError
+            ? err.detail
+            : "Could not load mess check-ins from API.",
+          "error",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, rangeBounds.from, rangeBounds.to, toast]);
+
   const usersById = useMemo(() => {
     const map = new Map<string, User>();
-    for (const u of state.users) map.set(u.id, u);
+    const live =
+      apiOn && checkins
+        ? messCheckinMembers(checkins)
+        : apiOn && source
+          ? source.users
+          : state.users;
+    for (const u of live) map.set(u.id, u);
     return map;
-  }, [state.users]);
+  }, [apiOn, checkins, source, state.users]);
 
   const shifts = useMemo(
     () => listMealShifts(),
@@ -339,10 +384,30 @@ export default function MessReportsClient() {
           if (shift !== "all" && r.shift_id !== shift) continue;
           ate.add(r.member_id);
         }
+      } else if (apiOn && checkins) {
+        ate = new Set();
+        for (const row of checkins.assigns) {
+          if (row.date !== date || row.status !== 1) continue;
+          if (shift !== "all" && row.shift_id !== shift) continue;
+          ate.add(row.member_id);
+        }
       } else {
         ate = listConsumedMemberIds(date, shift);
       }
-      for (const u of getMessEaters(date)) {
+      const eaters =
+        apiOn && source
+          ? source.users.filter((u) => {
+              if (u.approval_status !== "approved" || u.status !== "1") {
+                return false;
+              }
+              const boro = (checkins?.boro_khana_dates ?? []).includes(date);
+              if (boro) return true;
+              return source.assignments.some(
+                (a) => a.user_id === u.id && a.date === date && a.tag === "MS",
+              );
+            })
+          : getMessEaters(date);
+      for (const u of eaters) {
         if (ate.has(u.id)) continue;
         if (wing !== "all" && u.wing !== wing) continue;
         if (
@@ -387,6 +452,9 @@ export default function MessReportsClient() {
     state.users,
     state.assignments,
     state.boro_khana_dates,
+    apiOn,
+    checkins,
+    source,
   ]);
 
   const checkinBase = useMemo(() => {
@@ -423,7 +491,9 @@ export default function MessReportsClient() {
           });
         }
       } else {
-        for (const row of listMealAssigns()) {
+        const assigns =
+          apiOn && checkins ? checkins.assigns : listMealAssigns();
+        for (const row of assigns) {
           if (row.date < rangeBounds.from || row.date > rangeBounds.to) continue;
           if (shift !== "all" && row.shift_id !== shift) continue;
           const member = usersById.get(row.member_id);
@@ -456,7 +526,9 @@ export default function MessReportsClient() {
     }
 
     if (!zkOn && audience !== "member") {
-      for (const row of listGuestMeals()) {
+      const guests =
+        apiOn && checkins ? checkins.guests : listGuestMeals();
+      for (const row of guests) {
         if (row.date < rangeBounds.from || row.date > rangeBounds.to) continue;
         if (shift !== "all" && row.shift_id !== shift) continue;
         if (wing !== "all") continue;
@@ -502,6 +574,8 @@ export default function MessReportsClient() {
     usersById,
     zkOn,
     zkClassified,
+    apiOn,
+    checkins,
   ]);
 
   const checkinRows = useMemo(() => {

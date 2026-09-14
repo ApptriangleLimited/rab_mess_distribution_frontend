@@ -189,6 +189,7 @@ export default function DailyUserDetailPage() {
               </div>
               <StatusToggle
                 user={user}
+                disabled={busy}
                 onToggle={(next) => setStatusNext(next)}
               />
             </div>

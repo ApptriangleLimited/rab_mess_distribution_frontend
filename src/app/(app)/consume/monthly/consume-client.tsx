@@ -21,10 +21,16 @@ import {
   type ConsumeTagTab,
 } from "@/components/layout/consume-tag-tabs";
 import { Button } from "@/components/ui/button";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import { isAllowanceTag, isKnownTag } from "@/lib/store/rates";
 import { monthKey } from "@/lib/date";
-import { buildConsumeMonth, buildTagBill, formatBdt } from "@/lib/reports";
+import {
+  buildConsumeMonth,
+  buildTagBill,
+  formatBdt,
+  withReportSource,
+} from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -50,9 +56,11 @@ export default function ConsumeMonthlyClient() {
   const month =
     rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : defaultMonth;
 
+  const { source, loading } = useReportSource({ month });
+
   const report = useMemo(
-    () => buildConsumeMonth(month),
-    [state.assignments, state.users, state.rates, month],
+    () => withReportSource(source, () => buildConsumeMonth(month)),
+    [state.assignments, state.users, state.rates, month, source],
   );
 
   const tagStats = useMemo(() => [...report.byTag], [report.byTag]);
@@ -99,8 +107,11 @@ export default function ConsumeMonthlyClient() {
   }, [tag, report, allowanceDays]);
 
   const tagBill = useMemo(
-    () => (tag === "all" ? null : buildTagBill(month, tag)),
-    [state.assignments, state.users, state.rates, month, tag],
+    () =>
+      tag === "all"
+        ? null
+        : withReportSource(source, () => buildTagBill(month, tag)),
+    [state.assignments, state.users, state.rates, month, tag, source],
   );
 
   const amountValue =
@@ -229,6 +240,9 @@ export default function ConsumeMonthlyClient() {
           </div>
 
           <div className="p-4 sm:p-5">
+            {loading ? (
+              <p className="mb-3 text-sm text-neutral-500">{t("common.loading")}</p>
+            ) : null}
             {tag === "all" ? (
               <AllConsumePanel
                 key={`${month}-all`}
@@ -244,6 +258,7 @@ export default function ConsumeMonthlyClient() {
                 tag={tag}
                 onMonthChange={setMonth}
                 tiles={statsTiles}
+                source={source}
               />
             )}
           </div>

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { IconChevronDown } from "@tabler/icons-react";
+import { StrengthReportTitle } from "@/components/manpower/strength-title";
 import { WingName } from "@/components/manpower/wing-name";
+import { useI18n } from "@/i18n/provider";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
 import {
@@ -345,16 +347,19 @@ function BranchCard({
 
 /** Screen / tab panel view of Form 2/3 (not print letter). */
 export function StrengthWeb({ report }: Props) {
+  const { locale } = useI18n();
   const editableOfficer = true;
   const [branchesOpen, setBranchesOpen] = useState(true);
+  const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   return (
     <div className="flex flex-col gap-4 p-1 sm:p-2">
-      <p className="px-1 text-xs text-neutral-500">{report.wingLabel}</p>
-
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
-        <div className="bg-neutral-100 px-3 py-2.5 text-sm font-bold dark:bg-neutral-800">
-          সর্বমোট
-        </div>
+        <StrengthReportTitle
+          titleBn={report.titleBn}
+          wingLabel={report.wingLabel}
+          date={report.date}
+          locale={dateLocale}
+        />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse">
             <thead>

@@ -61,7 +61,7 @@ import {
   isMfrLocked,
   MFR_TAG,
 } from "@/lib/store/daily";
-import { compareUsers, isCockpitMember } from "@/lib/store/users";
+import { compareUsers } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -96,8 +96,8 @@ export default function TagsPageClient() {
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
-  /** Default: active members only. */
-  const [memberStatus, setMemberStatus] = useState<"all" | "0" | "1">("1");
+  /** Default: every approved member (active, inactive, guest). */
+  const [memberStatus, setMemberStatus] = useState<"all" | "0" | "1">("all");
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
 
@@ -137,12 +137,7 @@ export default function TagsPageClient() {
     if (apiOn) return;
     applyDueJlInactivations(today);
     const ids = state.users
-      .filter(
-        (u) =>
-          u.approval_status === "approved" &&
-          u.status === "1" &&
-          isCockpitMember(u),
-      )
+      .filter((u) => u.approval_status === "approved" && u.status === "1")
       .map((u) => u.id);
     if (!ids.length) return;
     autoApplyCarryForward(ids, today);
@@ -153,7 +148,6 @@ export default function TagsPageClient() {
     const query = q.trim().toLowerCase();
     return state.users
       .filter((u) => {
-        if (!isCockpitMember(u)) return false;
         if (u.approval_status !== "approved") return false;
         if (memberStatus !== "all" && u.status !== memberStatus) return false;
         if (rank !== "all" && u.rank !== rank) return false;
@@ -214,8 +208,7 @@ export default function TagsPageClient() {
       if (
         !allowed.has(user.id) ||
         user.approval_status !== "approved" ||
-        user.status !== "1" ||
-        !isCockpitMember(user)
+        user.status !== "1"
       ) {
         continue;
       }

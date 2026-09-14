@@ -28,9 +28,11 @@ const DAILY_SPECS: DemoSpec[] = [
   { queue: "daily", to_tag: "MED", from_tag: "MS", status: "requested", dayOffset: 1, requestedBy: "cc" },
   { queue: "daily", to_tag: "WIT", from_tag: "TRG", status: "requested", dayOffset: 1, requestedBy: "cc" },
   { queue: "daily", to_tag: "CD", from_tag: "MS", status: "requested", dayOffset: 2, requestedBy: "cc" },
-  { queue: "daily", to_tag: "PL", from_tag: "MS", status: "updated", dayOffset: 2, requestedBy: "cc" },
-  { queue: "daily", to_tag: "WR", from_tag: "FR", status: "updated", dayOffset: 3, requestedBy: "cc" },
-  { queue: "daily", to_tag: "MOL", from_tag: "MS", status: "rejected", dayOffset: 3, requestedBy: "cc" },
+  { queue: "daily", to_tag: "PL", from_tag: "MS", status: "requested", dayOffset: 2, requestedBy: "cc" },
+  { queue: "daily", to_tag: "WR", from_tag: "FR", status: "requested", dayOffset: 3, requestedBy: "cc" },
+  { queue: "daily", to_tag: "MOL", from_tag: "MS", status: "updated", dayOffset: 3, requestedBy: "cc" },
+  { queue: "daily", to_tag: "CMH", from_tag: "MED", status: "updated", dayOffset: 4, requestedBy: "cc" },
+  { queue: "daily", to_tag: "AWL", from_tag: "MS", status: "rejected", dayOffset: 4, requestedBy: "cc" },
 ];
 
 const RATION_SPECS: DemoSpec[] = [
@@ -133,6 +135,14 @@ export function demoTagRequests(users: User[]): TagRequest[] {
     ...buildRows(rationUsers.length ? rationUsers : roster, RATION_SPECS, "ration"),
     ...buildRows(consumeUsers, CONSUME_SPECS, "consume"),
   ];
+}
+
+export function storedTagRequests(existing: unknown): TagRequest[] {
+  if (!Array.isArray(existing)) return [];
+  return existing
+    .filter((row): row is TagRequest => Boolean(row && typeof row === "object"))
+    .map((row) => normalizeRequest(row))
+    .filter((row) => !String(row.id ?? "").startsWith("tr_demo_"));
 }
 
 export function ensureTagRequests(
