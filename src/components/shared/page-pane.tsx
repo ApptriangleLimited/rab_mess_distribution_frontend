@@ -5,7 +5,7 @@ export function PagePane({
   children,
 }: {
   className?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return <div className={cn("page-pane", className)}>{children}</div>;
 }

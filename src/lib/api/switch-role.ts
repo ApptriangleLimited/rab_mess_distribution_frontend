@@ -35,7 +35,8 @@ export async function switchToSeedRole(
     return next;
   }
   const seedUser =
-    current?.username?.toLowerCase() === SEED_STAFF_EMAIL(current.role)
+    current?.role &&
+    current.username?.toLowerCase() === SEED_STAFF_EMAIL(current.role)
       ? SEED_STAFF_EMAIL(role)
       : (current?.username ?? SEED_STAFF_EMAIL(role));
   const next: Session = {

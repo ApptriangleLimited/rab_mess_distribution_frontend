@@ -48,6 +48,7 @@ function MetricRow({
   categories,
   emphasize,
   signed,
+  wingCell,
 }: {
   label: ReactNode;
   counts: ManpowerCounts;

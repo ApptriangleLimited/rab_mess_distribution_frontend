@@ -127,11 +127,7 @@ export type ManpowerWingGroup = {
 export const MANPOWER_WING_GROUPS: {
   id: ManpowerWingGroupId;
   titleBn: string;
-}[] = [
-  { id: "main", titleBn: "উইং" },
-  { id: "admin", titleBn: "এ্যাডমিন উইং" },
-  { id: "hq", titleBn: "সদর দপ্তর শাখা" },
-];
+}[] = [{ id: "main", titleBn: "উইং" }];
 
 const ABSENT_TAGS = new Set<string>([
   "CL",
@@ -296,34 +292,24 @@ function pushUnique(
   seen.add(spelled.toLowerCase());
 }
 
-function listForm1GroupNames(
+/** Form 1 tab — main Daily Cockpit wings only. Admin → Form 2, HQ Br → Form 3. */
+function listForm1WingNames(
   catalog: string[],
   memberWings: string[],
   parents: Record<string, string>,
-): Record<ManpowerWingGroupId, string[]> {
+): string[] {
   const roots = catalog.length
     ? listAuthorizedRootWingsFrom(catalog)
     : listAuthorizedRootWings();
   const mainFixed = [
-    ...roots.filter((w) => !isAdminFamilyName(w)),
+    ...roots.filter((w) => !isAdminFamilyName(w) && !isHqBrName(w)),
     "RFTS",
   ];
-  const adminFixed = [
-    "Admin",
-    "Admin (New)",
-    "Admin (Old)",
-    ...ADMIN_SUB_WINGS.filter((w) => !isHqBrName(w)),
-  ];
-  const hqFixed = ["HQ Br", ...HQ_SUB_WINGS];
 
   const main: string[] = [];
-  const admin: string[] = [];
-  const hq: string[] = [];
   const seen = new Set<string>();
 
   for (const w of mainFixed) pushUnique(main, seen, w, catalog);
-  for (const w of adminFixed) pushUnique(admin, seen, w, catalog);
-  for (const w of hqFixed) pushUnique(hq, seen, w, catalog);
 
   const extras = [...catalog, ...memberWings].filter((w) => {
     const name = w.trim();
@@ -335,13 +321,11 @@ function listForm1GroupNames(
     return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
   });
   for (const w of extras) {
-    const family = manpowerWingFamily(w, parents);
-    if (family === "admin") pushUnique(admin, seen, w, catalog);
-    else if (family === "hq") pushUnique(hq, seen, w, catalog);
-    else pushUnique(main, seen, w, catalog);
+    if (manpowerWingFamily(w, parents) !== "main") continue;
+    pushUnique(main, seen, w, catalog);
   }
 
-  return { main, admin, hq };
+  return main;
 }
 
 function projectedTag(userId: string, date: string): DailyTag | "" {
@@ -451,16 +435,13 @@ export function buildManpowerReport(
     ? snapshot.extraWings
     : sourceUsers.map((u) => u.wing);
   const parents = mergeParentMap(snapshot?.wingParent ?? state.wing_parent);
-  const groupedNames = listForm1GroupNames(catalogWings, memberWings, parents);
-  const authWings = [
-    ...groupedNames.main,
-    ...groupedNames.admin,
-    ...groupedNames.hq,
-  ];
+  const form1Wings = listForm1WingNames(catalogWings, memberWings, parents);
+  const authWings = [...form1Wings];
 
   function toCockpitWing(userWing: string): string | null {
     const raw = userWing.trim();
     if (!raw || raw === "—" || isBannedWing(raw)) return null;
+    if (manpowerWingFamily(raw, parents) !== "main") return null;
     return exactWing(authWings, raw) ?? raw;
   }
 
@@ -593,15 +574,14 @@ export function buildManpowerReport(
     (w) => !authWings.some((a) => a.toLowerCase() === w.toLowerCase()),
   );
   for (const extra of extraWingsInMap) {
-    const family = manpowerWingFamily(extra, parents);
-    groupedNames[family].push(extra);
+    if (manpowerWingFamily(extra, parents) !== "main") {
+      wingMap.delete(extra);
+      continue;
+    }
+    form1Wings.push(extra);
     authWings.push(extra);
   }
-  const wingOrder = [
-    ...groupedNames.main,
-    ...groupedNames.admin,
-    ...groupedNames.hq,
-  ];
+  const wingOrder = [...form1Wings];
 
   function toWingBlock(wing: string): ManpowerWingBlock {
     const block = wingMap.get(wing) ?? makeBucket();
@@ -666,11 +646,14 @@ export function buildManpowerReport(
   }
 
   const absence: ManpowerAbsenceRow[] = wingOrder.map(toAbsenceRow);
-  const groups: ManpowerWingGroup[] = MANPOWER_WING_GROUPS.map((meta) => ({
-    ...meta,
-    wings: groupedNames[meta.id].map(toWingBlock),
-    absence: groupedNames[meta.id].map(toAbsenceRow),
-  }));
+  const groups: ManpowerWingGroup[] = [
+    {
+      id: "main",
+      titleBn: "উইং",
+      wings,
+      absence,
+    },
+  ];
 
   return {
     date,

@@ -14,11 +14,11 @@ There must be **space** between these blocks. **সর্বমোট** strength
 
 | # | Section title (what you see) | What it is |
 |---|---|---|
-| 1 | **দৈনিক জনবলের প্রতিবেদন** (org name + date on top) | Overall totals (HQ roll-up) |
+| 1 | **দৈনিক জনবলের প্রতিবেদন** (org name + date on top) | Overall totals (sum of Form 1 wings) |
 | 2 | **উইং** | Main Daily Cockpit wings (Ops, Int, Air, RFTS, …) — not Admin/HQ children |
-| 3 | **এ্যাডমিন উইং** | Admin, Admin (New), Admin (Old) + Admin branches (Fin Br, Per Br, …). Not HQ Br children |
-| 4 | **সদর দপ্তর শাখা** | HQ Br + HQ Br sub-wings (Forces Mess, Field Mess, …) |
-| 5 | **অনুপস্থিতির বিবরণ** (one table per group above) | Absence reason tables — same wing set / same cockpit tags |
+| 3 | **অনুপস্থিতির বিবরণ** | Absence reason table — same main-wing set / same cockpit tags |
+
+Admin branches belong on **Form 2 (এ্যাডমিন উইং)**. HQ Br / Forces Mess / Field Mess belong on **Form 3 (সদর দপ্তর শাখা)**. Do not fail Form 1 if those rows are missing here.
 
 Section 1 header must include:
 
@@ -131,7 +131,7 @@ Sample members that may already have `ML`: Omar Faruk (Admin), Lamia Sultana (Ad
 
 1. Daily Cockpit → pick date **D**. Filter by a **wing** (e.g. `Fin Br`, `Admin (New)`, `Air Wg`) and note tags (`CL`, `PL`, `ML`, `TRG`, …).
 2. Open **Manpower Form 1** for date **D**.
-3. That wing sits in the matching group (**উইং** / **এ্যাডমিন উইং** / **সদর দপ্তর শাখা**). **প্রাপ্ত** default = cockpit headcount for that exact wing, split by rank.
+3. Main wings sit on **Form 1**. Admin / HQ children sit on **Form 2 / Form 3**. **প্রাপ্ত** default = cockpit headcount for that exact wing, split by rank.
 4. Section 2: that wing’s **অনুপস্থিত** default ≈ cockpit members on **mapped absent tags** only, split by rank.
 5. **বৃদ্ধি/হ্রাস** = প্রাধিকৃত − প্রাপ্ত (can be negative; show the minus).
 6. Section 3: each tag column matches cockpit counts for that wing.
@@ -168,7 +168,8 @@ Print Form 1 must show:
 - অন্যান্য counts anything except `LNK`
 - `ML` is missing from Daily Cockpit paint chips
 - A cockpit wing (e.g. `Fin Br`, `Admin (New)`) is missing or rolled into **Admin**
-- `Fin Br` / Admin branches appear under **উইং** instead of **এ্যাডমিন উইং**
-- `Forces Mess` / HQ Br children appear under Admin instead of **সদর দপ্তর শাখা**
+- `Fin Br` / Admin branches appear on Form 1 instead of **Form 2**
+- `Forces Mess` / HQ Br children appear on Form 1 instead of **Form 3**
+- Form 1 shows **এ্যাডমিন উইং** or **সদর দপ্তর শাখা** as extra blocks
 - Section 1 / 2 / 3 are stuck together with no gap
 - Rank columns do not line up across rows
