@@ -7,7 +7,7 @@ PostgreSQL 16. Production schema is created only by `alembic upgrade head`. `000
 | Table | Kind | Purpose |
 | ----- | ---- | ------- |
 | `staff` | master | Desk logins (cc, daily, mess, consume, ration, admin) |
-| `members` | master | Mess members (RAB ID unique when non-empty) |
+| `members` | master | Mess members (SRB ID unique when non-empty) |
 | `assignments` | transaction | One tag per member per date |
 | `tag_requests` | workflow | Pending/updated/rejected tag changes by queue |
 | `suppressed_carries` | transaction | Stop default-tag carry on a day |

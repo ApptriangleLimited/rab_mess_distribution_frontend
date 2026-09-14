@@ -10,22 +10,23 @@ Pick a date that has Daily Cockpit tags, then open Form 1 for that same date.
 
 ## 1. Page layout (spaced sections)
 
-There must be **space** between these blocks. **সর্বমোট** strength block is **hidden** (do not fail the build if it is missing).
+There must be **space** between these blocks. **সর্বমোট** is the last strength block after Training School, above অনুপস্থিতির বিবরণ.
 
 | # | Section title (what you see) | What it is |
 |---|---|---|
 | 1 | **দৈনিক জনবলের প্রতিবেদন** (org name + date on top) | Overall totals (sum of Form 1 wings) |
-| 2 | **উইং** | Main Daily Cockpit wings (Ops, Int, Air, RFTS, …) — not Admin/HQ children |
+| 2 | **উইং** | Official Form 1 wings in paper order: Admin, Ops, Int, Comm & MIS, Trg, L & M, Inv, Air, R & D Cell, Training School |
 | 3 | **অনুপস্থিতির বিবরণ** | Absence reason table — same main-wing set / same cockpit tags |
 
 Admin branches belong on **Form 2 (এ্যাডমিন উইং)**. HQ Br / Forces Mess / Field Mess belong on **Form 3 (সদর দপ্তর শাখা)**. Do not fail Form 1 if those rows are missing here.
 
 Section 1 header must include:
 
-- র‍্যাব ফোর্সেস সদর দপ্তর
 - দৈনিক জনবলের প্রতিবেদন
-- Daily Manpower Report · কুর্মিটোলা, ঢাকা
-- তারিখ / Date: *(selected date)*
+- এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর
+- তারিখ *(DD-MM-YYYY)* on the **right**
+
+Do **not** show `Daily Manpower Report · কুর্মিটোলা, ঢাকা`.
 
 There must **not** be a **হেডকোয়ার্টার** banner row.
 
@@ -66,7 +67,7 @@ Section 1 (overall) uses the same four titles but **no inputs** — it is the **
 
 **উপস্থিত** is calculated as **প্রাপ্ত − অনুপস্থিত** in the engine (never negative). It is **not** a visible row on Form 1.
 
-**সর্বমোট** strength card is **not shown**.
+**সর্বমোট** is the last wing block in section 2 (sum of the Form 1 wings). It is read-only.
 
 ---
 

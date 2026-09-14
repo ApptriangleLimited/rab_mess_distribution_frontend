@@ -87,7 +87,7 @@ export function missingUserFormRequired(
   return null;
 }
 
-/** Hidden RAB ID for civilians — derived from card no. or NID. */
+/** Hidden SRB ID for civilians — derived from card no. or NID. */
 export function deriveCivilianRabId(
   input: Pick<UserInput, "dropdown_no" | "personal_id">,
 ): string {
@@ -161,7 +161,7 @@ export function filterCockpitMembers<T extends Pick<User, "member_type">>(
   return users.filter(isCockpitMember);
 }
 
-/** Member table order: RAB ID → Rank → Name. */
+/** Member table order: SRB ID → Rank → Name. */
 export function compareUsers(a: User, b: User) {
   const id = a.rab_id.localeCompare(b.rab_id, undefined, {
     numeric: true,

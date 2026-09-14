@@ -236,7 +236,7 @@ function buildDemoUsers(): User[] {
       ? `CIV-${cardNo.replace(/^CARD-/, "")}`
       : isGuest
         ? `GST-${String(5000 + n)}`
-        : `RAB-${String(3100 + n)}`;
+        : `SRB-${String(3100 + n)}`;
     const personal_id = isCivilian
       ? `${1984 + (n % 12)}${String(1000000 + n * 137).slice(0, 8)}`
       : isGuest

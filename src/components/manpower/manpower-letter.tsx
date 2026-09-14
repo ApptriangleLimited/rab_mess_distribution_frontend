@@ -2,18 +2,19 @@
 
 import { forwardRef, type ReactNode } from "react";
 import { CONSUME_REPORT_META } from "@/lib/constants";
-import { formatDateLong } from "@/lib/date";
 import { RankColumnHeader } from "@/components/manpower/rank-column-header";
+import { StrengthReportTitle } from "@/components/manpower/strength-title";
 import { WingName } from "@/components/manpower/wing-name";
+import { toBnDigits } from "@/lib/consume-official-reports";
 import {
   formatManpowerCell,
-  manpowerRowTotal,
+  manpowerRowTotalFor,
   type ManpowerAbsenceRow,
   type ManpowerCounts,
   type ManpowerReport,
   type ManpowerWingGroup,
 } from "@/lib/manpower-report";
-import { authorizedLabelBn } from "@/lib/rank-labels";
+import { form1RankLabelBn, isForm1RankColumn } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -37,7 +38,7 @@ function Cell({
         className,
       )}
     >
-      {formatManpowerCell(value, { signed })}
+      {toBnDigits(formatManpowerCell(value, { signed }))}
     </td>
   );
 }
@@ -71,7 +72,7 @@ function MetricRow({
         />
       ))}
       <Cell
-        value={manpowerRowTotal(counts)}
+        value={manpowerRowTotalFor(counts, categories)}
         signed={signed}
         className="font-semibold"
       />
@@ -82,26 +83,23 @@ function MetricRow({
 /** Printable Daily Manpower Report (landscape). */
 export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
   function ManpowerLetter({ report, locale = "bn-BD" }, ref) {
-    const dateLabel = formatDateLong(report.date, locale);
-    const { categories, hq, wings, absence } = report;
+    const { hq, wings, absence, grandTotal } = report;
+    const categories = report.categories.filter((c) =>
+      isForm1RankColumn(c.label),
+    );
 
     return (
       <div
         ref={ref}
         className="mx-auto w-full max-w-[297mm] bg-white p-4 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
       >
-        <header className="border-b border-neutral-800 pb-2 text-center">
-          <p className="text-[11px] font-semibold">
-            {CONSUME_REPORT_META.orgNameBn}
-          </p>
-          <h1 className="mt-0.5 text-base font-bold tracking-wide">
-            দৈনিক জনবলের প্রতিবেদন
-          </h1>
-          <p className="text-[10px] text-neutral-600">
-            Daily Manpower Report · {CONSUME_REPORT_META.stationBn}
-          </p>
-          <p className="mt-1 text-xs font-medium">তারিখ / Date: {dateLabel}</p>
-        </header>
+        <StrengthReportTitle
+          titleBn="দৈনিক জনবলের প্রতিবেদন"
+          wingLabel={CONSUME_REPORT_META.orgNameBn}
+          date={report.date}
+          locale="bn-BD"
+          compact
+        />
 
         <StrengthTable categories={categories} className="mt-3">
           <MetricRow
@@ -146,6 +144,15 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
                   categories={categories}
                 />
               ))}
+              <WingGroup
+                wing={grandTotal.wing}
+                authorized={grandTotal.authorized}
+                held={grandTotal.held}
+                shortfall={grandTotal.shortfall}
+                absent={grandTotal.absent}
+                categories={categories}
+                emphasize
+              />
             </StrengthTable>
             <p className="mt-4 text-[10px] font-semibold">
               * অনুপস্থিতির বিবরণ · {group.titleBn}
@@ -309,7 +316,7 @@ function StrengthTable({
           {categories.map((cat) => (
             <RankColumnHeader
               key={cat.id}
-              labelBn={authorizedLabelBn(cat.label)}
+              labelBn={form1RankLabelBn(cat.label)}
             />
           ))}
           <th className="border border-neutral-800 px-0.5 py-1 font-semibold">

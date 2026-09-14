@@ -261,7 +261,7 @@ def payload(row: dict, i: int) -> dict:
         rfid = f"RFID-{3100 + n}"
         docs = [{"name": "guest-note.pdf", "size": 42000 + n * 800}]
     else:
-        rab_id = f"RAB-{3100 + n}"
+        rab_id = f"SRB-{3100 + n}"
         personal_id = f"PN-{11000 + n}"
         rfid = f"RFID-{3100 + n}"
         docs = [

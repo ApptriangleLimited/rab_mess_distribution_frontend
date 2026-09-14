@@ -1,4 +1,4 @@
-import { ADMIN_SUB_WINGS, DEFAULT_WING_PARENT, HQ_SUB_WINGS } from "@/lib/constants";
+import { DEFAULT_WING_PARENT, HQ_SUB_WINGS } from "@/lib/constants";
 import {
   manpowerWingFamily,
   type ManpowerSnapshot,
@@ -13,19 +13,16 @@ import { canAssignOnDate } from "@/lib/store/daily";
 import {
   authorizedWingDisplayCount,
   isBannedWing,
-  listWingChildren,
-  listWingChildrenFrom,
 } from "@/lib/store/org-options";
 import { isCockpitMember } from "@/lib/store/users";
 import type { DailyTag, User } from "@/lib/types";
 
 /**
  * Form 2/3 — Admin Wing daily strength.
- * Form 2 = Admin children. Form 3 = HQ Br children.
- * Ranks: Officer, DAD, RT, SI, ASI, Naik, Con, Cook, NC(E), Civil.
+ * Form 2 = official এ্যাডমিন উইং sheet (HQ Br / mess / MT).
+ * Form 3 = HQ Br office children. Do not mix the two lists.
  * প্রাপ্ত = members; অনুপস্থিত = cockpit absent tags; উপস্থিত = প্রাপ্ত − অনুপস্থিত.
  * Officer: প্রাপ্ত = Settings held_wings; অনুপস্থিত = date overrides; উপস্থিত = প্রাপ্ত − অনুপস্থিত.
- * Form 2: সদর without record.
  */
 
 export type StrengthScope = "admin" | "hq";
@@ -83,8 +80,52 @@ export type StrengthAbsenceRow = {
   exam: number;
   other: number;
   hospital: number;
+  /** AWL + OSL — গড় হাজির / গড় উপস্থিত. */
+  avgPresent: number;
   total: number;
 };
+
+export function emptyAbsenceRow(wing: string): StrengthAbsenceRow {
+  return {
+    wing,
+    cl: 0,
+    pl: 0,
+    rl: 0,
+    ml: 0,
+    maternity: 0,
+    training: 0,
+    remaining: 0,
+    exam: 0,
+    other: 0,
+    hospital: 0,
+    avgPresent: 0,
+    total: 0,
+  };
+}
+
+export function sumAbsenceRows(
+  rows: StrengthAbsenceRow[],
+  wing = "সর্বমোট",
+): StrengthAbsenceRow {
+  return rows.reduce(
+    (acc, row) => ({
+      wing,
+      cl: acc.cl + row.cl,
+      pl: acc.pl + row.pl,
+      rl: acc.rl + row.rl,
+      ml: acc.ml + row.ml,
+      maternity: acc.maternity + row.maternity,
+      training: acc.training + row.training,
+      remaining: acc.remaining + row.remaining,
+      exam: acc.exam + row.exam,
+      other: acc.other + row.other,
+      hospital: acc.hospital + row.hospital,
+      avgPresent: acc.avgPresent + row.avgPresent,
+      total: acc.total + row.total,
+    }),
+    emptyAbsenceRow(wing),
+  );
+}
 
 export type StrengthReport = {
   date: string;
@@ -151,6 +192,7 @@ function emptyAbsence(): Omit<StrengthAbsenceRow, "wing" | "total"> {
     exam: 0,
     other: 0,
     hospital: 0,
+    avgPresent: 0,
   };
 }
 
@@ -313,6 +355,10 @@ function bumpAbsence(
     case "WIT":
       row.remaining += 1;
       break;
+    case "AWL":
+    case "OSL":
+      row.avgPresent += 1;
+      break;
     default:
       break;
   }
@@ -331,7 +377,8 @@ function absenceTotal(
     row.remaining +
     row.exam +
     row.other +
-    row.hospital
+    row.hospital +
+    row.avgPresent
   );
 }
 
@@ -342,30 +389,35 @@ type Bucket = {
   absence: Omit<StrengthAbsenceRow, "wing" | "total">;
 };
 
-function mergeScopeBranches(
-  base: string[],
-  extra: string[] | undefined,
-  family: "admin" | "hq",
-  parents: Record<string, string>,
-): string[] {
-  const out = [...base];
-  const seen = new Set(base.map((w) => w.toLowerCase()));
-  for (const wing of extra ?? []) {
-    const name = wing.trim();
-    if (!name || isBannedWing(name) || seen.has(name.toLowerCase())) continue;
-    if (isSadarWing(name)) continue;
-    if (manpowerWingFamily(name, parents) !== family) continue;
-    seen.add(name.toLowerCase());
-    out.push(name);
-  }
-  return out;
+/** Official Form 2 এ্যাডমিন উইং rows — Record Branch is crossed off the paper. */
+const FORM2_ADMIN_BRANCHES = [
+  "HQ Br",
+  "Headquarters Office",
+  "Security Branch",
+  "Forces Mess",
+  "Field Mess",
+  "MT Br",
+  "New / Temporary Attached",
+] as const;
+
+const FORM2_WING_ALIASES: Record<string, string> = {
+  "hq br": "HQ Br",
+  "headquarters branch": "HQ Br",
+  "headquarters office": "Headquarters Office",
+  "security branch": "Security Branch",
+  "forces mess": "Forces Mess",
+  "field mess": "Field Mess",
+  "mt br": "MT Br",
+  "mt branch": "MT Br",
+  "new / temporary attached": "New / Temporary Attached",
+};
+
+function resolveForm2Branch(wing: string): string | null {
+  return FORM2_WING_ALIASES[normalize(wing)] ?? null;
 }
 
 function branchesForScope(
   scope: StrengthScope,
-  catalogWings?: string[],
-  catalogParent?: Record<string, string>,
-  extraWings?: string[],
 ): {
   branches: string[];
   roots: string[];
@@ -373,47 +425,22 @@ function branchesForScope(
   formNo: 2 | 3;
   wingLabel: string;
 } {
-  const liveWings = catalogWings?.length ? catalogWings : undefined;
-  const liveParent = catalogParent;
-
-  const parents = { ...DEFAULT_WING_PARENT, ...(liveParent ?? {}) };
-
   if (scope === "hq") {
     const roots = ["HQ Br"];
-    const listed = ["HQ Br", ...HQ_SUB_WINGS];
-    const fromTree = liveWings
-      ? listWingChildrenFrom(liveWings, parents, ["HQ Br", "Headquarters Branch"])
-      : listWingChildren("HQ Br");
-    let branches = [
-      ...listed,
-      ...fromTree.filter((w) => !listed.some((l) => l.toLowerCase() === w.toLowerCase())),
-    ].filter((w) => !isBannedWing(w));
-    branches = mergeScopeBranches(branches, extraWings, "hq", parents);
+    const listed = [...HQ_SUB_WINGS];
+    let branches = listed.filter((w) => !isBannedWing(w));
     return {
       branches,
       roots,
       skipSadarFill: false,
       formNo: 3,
-      wingLabel: "সদর দপ্তর শাখা",
+      wingLabel: "এ্যাডমিন উইং",
     };
   }
 
-  const roots = ["Admin", "Admin (New)", "Admin (Old)"];
-  const listed = [
-    ...roots,
-    ...ADMIN_SUB_WINGS.filter((w) => w.trim().toLowerCase() !== "hq br"),
-  ];
-  const fromTree = liveWings
-    ? listWingChildrenFrom(liveWings, parents, roots)
-    : listWingChildren("Admin");
-  let branches = [
-    ...listed,
-    ...fromTree.filter((w) => !listed.some((l) => l.toLowerCase() === w.toLowerCase())),
-  ].filter((w) => !isBannedWing(w) && w.trim().toLowerCase() !== "hq br");
-  branches = mergeScopeBranches(branches, extraWings, "admin", parents);
   return {
-    branches,
-    roots,
+    branches: [...FORM2_ADMIN_BRANCHES],
+    roots: ["Admin", "Admin (New)", "Admin (Old)"],
     skipSadarFill: false,
     formNo: 2,
     wingLabel: "এ্যাডমিন উইং",
@@ -427,12 +454,7 @@ export function buildStrengthReport(
   snapshot?: ManpowerSnapshot,
 ): StrengthReport {
   const state = getState();
-  const cfg = branchesForScope(
-    scope,
-    snapshot?.wings,
-    snapshot?.wingParent,
-    snapshot?.extraWings,
-  );
+  const cfg = branchesForScope(scope);
   let { branches } = cfg;
   const branchSet = new Set(branches);
   const wingParent = {
@@ -472,14 +494,16 @@ export function buildStrengthReport(
 
     const rawWing = user.wing.trim();
     const family = manpowerWingFamily(rawWing, wingParent);
-    if (scope === "admin" && family !== "admin") continue;
     if (scope === "hq" && family !== "hq") continue;
 
+    const form2 = scope === "admin" ? resolveForm2Branch(rawWing) : null;
+    if (scope === "admin" && !form2) continue;
+
     const exact = [...branchSet].find(
-      (b) => b.toLowerCase() === rawWing.toLowerCase(),
+      (b) => b.toLowerCase() === (form2 ?? rawWing).toLowerCase(),
     );
-    const branch = exact ?? rawWing;
-    if (!map.has(branch)) {
+    const branch = form2 ?? exact ?? rawWing;
+    if (scope !== "admin" && !map.has(branch)) {
       map.set(branch, {
         held: emptyCounts(),
         present: emptyCounts(),

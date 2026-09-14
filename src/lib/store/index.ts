@@ -15,6 +15,8 @@ import {
   LEGACY_WINGS,
   ADMIN_SUB_WINGS,
   HQ_SUB_WINGS,
+  LEGACY_FORM1_WINGS,
+  LEGACY_HQ_SUB_WINGS,
   DEFAULT_WING_PARENT,
   LEGACY_MEMBER_BANKS,
   DEFAULT_AUTHORIZED,
@@ -303,10 +305,12 @@ function isLegacyWings(raw: unknown): boolean {
   return seen.size === LEGACY_WINGS.length;
 }
 
-/** Core RAB wings + Admin sub-branches + user-added. Drop Alpha…Support forever. */
+/** Core SRB wings + Admin sub-branches + user-added. Drop Alpha…Support forever. */
 function ensureWings(raw: unknown): string[] {
   const banned = new Set(
-    LEGACY_WINGS.map((w) => w.toLowerCase()),
+    [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS, ...LEGACY_HQ_SUB_WINGS].map((w) =>
+      w.toLowerCase(),
+    ),
   );
   if (isLegacyWings(raw)) return [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS];
   const base: string[] = [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS];
@@ -556,7 +560,7 @@ function isUniformLegacyForceRanks(
   return true;
 }
 
-/** Old dump put RAB catalog under every Force — migrate to service ladders. */
+/** Old dump put SRB catalog under every Force — migrate to service ladders. */
 function forcesHoldStaleRabRanks(
   raw: unknown,
   forces: string[],
@@ -746,7 +750,6 @@ function ensureWingParent(
   }
   for (const [child, parent] of Object.entries(DEFAULT_WING_PARENT)) {
     if (!wingSet.has(child) || !wingSet.has(parent)) continue;
-    if (out[child]) continue;
     out[child] = parent;
   }
   return out;
@@ -758,7 +761,7 @@ function ensureForces(raw: unknown): string[] {
 }
 
 function ensureRanks(raw: unknown): string[] {
-  // Always keep core RAB catalog; append user-added ranks after.
+  // Always keep core SRB catalog; append user-added ranks after.
   if (isLegacyRanks(raw)) return [...RANKS];
   const base: string[] = [...RANKS];
   const seen = new Set<string>(base.map((r) => r.toLowerCase()));
@@ -1006,7 +1009,7 @@ function ensureRankForces(
   return out;
 }
 
-/** Keep RAB rank → force → service-rank equivalents in sync. */
+/** Keep SRB rank → force → service-rank equivalents in sync. */
 function ensureRankEquivalents(
   raw: unknown,
   ranks: string[],
@@ -1183,8 +1186,14 @@ export function getState(): AppState {
   }
   if (memory && isCurrentSeed(memory)) {
     const hasBanned = memory.wings.some((w) =>
-      LEGACY_WINGS.some((b) => b.toLowerCase() === w.toLowerCase()),
+      [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS].some(
+        (b) => b.toLowerCase() === w.toLowerCase(),
+      ),
     );
+    const form1OrderStale = WINGS.some((wing, i) => {
+      const roots = memory!.wings.filter((w) => !memory!.wing_parent[w]);
+      return (roots[i] ?? "").toLowerCase() !== wing.toLowerCase();
+    });
     const authStale = memory.authorized.some((row) => {
       const wings = row.wings ?? {};
       if (Object.keys(wings).length === 0) return false;
@@ -1200,6 +1209,7 @@ export function getState(): AppState {
       );
     if (
       hasBanned ||
+      form1OrderStale ||
       authStale ||
       shortRequestQueues ||
       (!apiBacked && isLegacyDemoSenders(memory.senders))

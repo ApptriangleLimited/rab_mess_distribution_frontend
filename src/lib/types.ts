@@ -326,12 +326,12 @@ export interface AppState {
   force_rank_removed: Record<string, string[]>;
   /** Elaborate names for force service ranks (`force` → short → full). */
   force_rank_labels: Record<string, Record<string, string>>;
-  /** Elaborate names for RAB ranks (`short` → full), overrides defaults. */
+  /** Elaborate names for SRB ranks (`short` → full), overrides defaults. */
   rank_labels: Record<string, string>;
-  /** Forces linked under each RAB rank (`rab rank` → force labels). */
+  /** Forces linked under each SRB rank (`rab rank` → force labels). */
   rank_forces: Record<string, string[]>;
   /**
-   * RAB rank ↔ force service-rank equivalents
+   * SRB rank ↔ force service-rank equivalents
    * (`rab rank` → `force` → service ranks).
    * e.g. DAD → Army → [OR, L/CPL]; DAD → Police → [Insp].
    */

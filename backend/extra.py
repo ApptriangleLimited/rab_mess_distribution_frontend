@@ -559,9 +559,9 @@ def public_register(body: MemberIn, request: Request, db: Session = Depends(get_
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
     if body.member_type != "guest" and not body.rab_id.strip():
-        raise HTTPException(status_code=400, detail="RAB ID is required")
+        raise HTTPException(status_code=400, detail="SRB ID is required")
     if find_member_by_rab(db, body.rab_id):
-        raise HTTPException(status_code=409, detail="A member with this RAB ID already exists")
+        raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     row = Member(id=new_id("u"), created_by=None)
     apply_member_fields(row, body)
     row.status = "1"
@@ -571,7 +571,7 @@ def public_register(body: MemberIn, request: Request, db: Session = Depends(get_
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="A member with this RAB ID already exists") from exc
+        raise HTTPException(status_code=409, detail="A member with this SRB ID already exists") from exc
     db.refresh(row)
     return envelope(
         {

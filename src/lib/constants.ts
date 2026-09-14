@@ -110,23 +110,27 @@ export function isProtectedRateTag(tag: string) {
 }
 
 /**
- * Main RAB wings / branches (short form = stored value).
+ * Main SRB wings / branches (short form = stored value).
  * Admin rows have no short — store full name.
  */
 export const WINGS = [
+  "Admin",
   "Ops Wg",
   "Int Wg",
-  "L & M Wg",
-  "Air Wg",
   "Comm & MIS Wg",
-  "Inv Wg",
   "Trg Wg",
-  "RFTS",
-  "Training School",
+  "L & M Wg",
+  "Inv Wg",
+  "Air Wg",
   "R & D Cell",
-  "Admin",
+  "Training School",
+] as const;
+
+/** Old Form 1 roots — dropped so the sheet matches the official list. */
+export const LEGACY_FORM1_WINGS = [
   "Admin (New)",
   "Admin (Old)",
+  "RFTS",
 ] as const;
 
 /** Admin sub-branches (short = stored value; parent = Admin only). */
@@ -134,25 +138,49 @@ export const ADMIN_SUB_WINGS = [
   "DG Office",
   "ADG (Ops) Office",
   "ADG (Admin) Office",
-  "Fin Br",
+  "Director (Admin) Office",
+  "Sup Br",
   "Per Br",
   "Gen Br",
-  "Sup Br",
-  "HQ Br",
   "Med Br",
   "Rec Br",
+  "Fin Br",
   "Proc Br",
   "Budget Br",
   "Dev Br",
+  "Proj Br",
   "Wksp Br",
   "MT Br",
-  "Rat Br",
-  "Proj Br",
-  "Security Branch - IEC Cell",
+  "HQ Br",
+  "New / Temporary Attached",
 ] as const;
 
-/** HQ Br hub-wings (parent = HQ Br only). */
+/**
+ * HQ Br children — same office/branch names and order as the official
+ * এ্যাডমিন উইং / HQ daily strength sheet.
+ */
 export const HQ_SUB_WINGS = [
+  "DG Office",
+  "ADG (Ops) Office",
+  "ADG (Admin) Office",
+  "Director (Admin) Office",
+  "Sup Br",
+  "Per Br",
+  "Gen Br",
+  "Med Br",
+  "Rec Br",
+  "Fin Br",
+  "Proc Br",
+  "Budget Br",
+  "Dev Br",
+  "Proj Br",
+  "Wksp Br",
+  "MT Br",
+  "New / Temporary Attached",
+] as const;
+
+/** Old HQ catalog names — keep parented under HQ Br if still in store. */
+export const LEGACY_HQ_SUB_WINGS = [
   "Headquarters Branch",
   "Headquarters Office",
   "Security Branch",
@@ -160,13 +188,13 @@ export const HQ_SUB_WINGS = [
   "Forces Mess",
   "Field Mess",
   "MT Branch",
-  "New / Temporary Attached",
 ] as const;
 
 /** Default child → parent links for catalog sub-wings. */
 export const DEFAULT_WING_PARENT: Record<string, string> = {
   ...Object.fromEntries(ADMIN_SUB_WINGS.map((wing) => [wing, "Admin"])),
   ...Object.fromEntries(HQ_SUB_WINGS.map((wing) => [wing, "HQ Br"])),
+  ...Object.fromEntries(LEGACY_HQ_SUB_WINGS.map((wing) => [wing, "HQ Br"])),
 };
 
 /** Full wing / branch names for short forms. */
@@ -178,12 +206,17 @@ export const WING_LABELS: Record<string, string> = {
   "Comm & MIS Wg": "Communication & MIS Wing",
   "Inv Wg": "Investigation & Forensic Wing",
   "Trg Wg": "Training & Orientation Wing",
-  RFTS: "RAB Forces Training School",
+  RFTS: "SRB Forces Training School",
   "Training School": "Training School",
   "R & D Cell": "Research & Development Cell",
   Admin: "Admin",
   "Admin (New)": "Admin (New)",
   "Admin (Old)": "Admin (Old)",
+  "DG Office": "Director General Office",
+  "ADG (Ops) Office": "Additional Director General (Operations) Office",
+  "ADG (Admin) Office": "Additional Director General (Admin) Office",
+  "Director (Admin) Office": "Director (Admin) Office",
+  "New / Temporary Attached": "New / Temporary Attached",
   "Fin Br": "Finance Branch",
   "Per Br": "Personnel Branch",
   "Gen Br": "General Branch",
@@ -308,7 +341,7 @@ export const RELIGIONS = [
   "Other",
 ] as const;
 
-/** Pre–RAB-catalog wing seed (stripped on load; not in live catalog). */
+/** Pre–SRB-catalog wing seed (stripped on load; not in live catalog). */
 export const LEGACY_WINGS = [
   "Alpha",
   "Bravo",
@@ -331,9 +364,9 @@ export function wingDisplayLabel(
 }
 
 /**
- * Parent forces that contribute members to RAB mess.
+ * Parent forces that contribute members to SRB mess.
  * Force expand → that force’s own service ladder (FORCE_DEFAULT_RANKS).
- * Rank tab → RAB mess ranks only (RANKS).
+ * Rank tab → SRB mess ranks only (RANKS).
  */
 export const FORCES = [
   "Army",
@@ -345,7 +378,7 @@ export const FORCES = [
   "Civilian",
 ] as const;
 
-/** RAB mess ranks only (Settings → Rank). Order = seniority. Short codes. */
+/** SRB mess ranks only (Settings → Rank). Order = seniority. Short codes. */
 export const RANKS = [
   "DAD",
   "RT",
@@ -465,7 +498,7 @@ export const DEFAULT_AUTHORIZED: AuthorizedStrength[] = [
   authRow("auth_attached", "Attached", {}),
 ];
 
-/** Full names for RAB short ranks. */
+/** Full names for SRB short ranks. */
 export const RANK_LABELS: Record<string, string> = {
   DAD: "Deputy Assistant Director",
   RT: "Recruit Training",
@@ -479,7 +512,7 @@ export const RANK_LABELS: Record<string, string> = {
   Attached: "Attached",
 };
 
-/** Own rank ladder per parent force (Force expand). Not RAB ranks. */
+/** Own rank ladder per parent force (Force expand). Not SRB ranks. */
 export const FORCE_DEFAULT_RANKS: Record<
   (typeof FORCES)[number],
   readonly string[]
@@ -828,11 +861,11 @@ export function defaultForceRanks(
 
 /** Org header for Consume print bills (prototype defaults). */
 export const CONSUME_REPORT_META = {
-  orgName: "RAB Forces Headquarters",
-  orgNameBn: "র‍্যাব ফোর্সেস সদর দপ্তর",
+  orgName: "SRB-Special Response Battalion Headquarters",
+  orgNameBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর",
   station: "Kurmitola, Dhaka",
   stationBn: "কুর্মিটোলা, ঢাকা",
-  campBn: "র‍্যাব ফোর্সেস সদর দপ্তর ক্যাম্প, কুর্মিটোলা ঢাকা",
+  campBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর ক্যাম্প, কুর্মিটোলা ঢাকা",
   wing: "Administration & Finance Wing",
   wingBn: "প্রশাসন ও অর্থ উইং",
   formNo: "Bangladesh Form No-5211",
@@ -844,19 +877,19 @@ export const FR_FUEL_RATE_PER_DAY =
 
 /** Org / letter defaults for Ration Accounts print & transfer export. */
 export const RATION_REPORT_META = {
-  orgName: "RAB Forces Headquarters",
-  orgNameBn: "র‍্যাব ফোর্সেস সদর দপ্তর",
+  orgName: "SRB-Special Response Battalion Headquarters",
+  orgNameBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর",
   govLine: "Government of the People's Republic of Bangladesh",
   policeLine: "Bangladesh Police",
   station: "Kurmitola, Dhaka",
   stationBn: "কুর্মিটোলা, ঢাকা",
-  institute: "RAB HQ",
+  institute: "SRB HQ",
   currency: "BDT",
   transferType: "C",
   entryDescription: "Fresh Money Bill",
   paymentInfo: "Fresh Money",
-  refPrefix: "RAB HQ/Finance/S33/Pay",
-  refPrefixPayAllce: "RAB HQ/Finance/S33/Pay & Allce",
+  refPrefix: "SRB HQ/Finance/S33/Pay",
+  refPrefixPayAllce: "SRB HQ/Finance/S33/Pay & Allce",
   subjectFreshMoney: "Disbursement of Fresh Money Bill {month}",
   subjectTagBill:
     "Disbursement of Payment Fresh Money Bill-{monthLabel} Transfer BEFTN to {bank}.",

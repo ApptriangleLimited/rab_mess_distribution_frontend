@@ -35,6 +35,7 @@ import { listMembers, memberToUser } from "@/lib/api/members";
 import { compareUsers } from "@/lib/store/users";
 
 import { useT } from "@/i18n/provider";
+import { wingSettingsLabel } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
 import type { User } from "@/lib/types";
 
@@ -227,7 +228,7 @@ export default function RationMembersPage() {
                 <SelectItem value="all">{t("common.allWing")}</SelectItem>
                 {wings.map((w) => (
                   <SelectItem key={w} value={w}>
-                    {w}
+                    {wingSettingsLabel(w)}
                   </SelectItem>
                 ))}
               </SelectContent>

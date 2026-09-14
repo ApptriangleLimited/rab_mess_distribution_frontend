@@ -1,7 +1,16 @@
-import { FORCE_DEFAULT_RANKS, FORCES, LEGACY_WINGS, authorizedIdForLabel } from "@/lib/constants";
+import {
+  FORCE_DEFAULT_RANKS,
+  FORCES,
+  LEGACY_FORM1_WINGS,
+  LEGACY_WINGS,
+  WINGS,
+  authorizedIdForLabel,
+} from "@/lib/constants";
 import { getState, setState } from "@/lib/store";
 
-const BANNED_WINGS = new Set(LEGACY_WINGS.map((w) => w.toLowerCase()));
+const BANNED_WINGS = new Set(
+  [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS].map((w) => w.toLowerCase()),
+);
 
 function normalizeLabel(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -49,20 +58,9 @@ export function isAdminAuthorizedRoot(wing: string): boolean {
 
 /**
  * Fixed short wing ladder for Settings → Authorized only.
- * Order fixed; Admin stands for Admin / Admin (New) / Admin (Old).
+ * Same order as Form 1 / official daily sheet; Admin stands for Admin family.
  */
-const AUTHORIZED_ROOT_WINGS = [
-  "Admin",
-  "Ops Wg",
-  "Int Wg",
-  "Comm & MIS Wg",
-  "Trg Wg",
-  "L & M Wg",
-  "Inv Wg",
-  "Air Wg",
-  "R & D Cell",
-  "Training School",
-] as const;
+const AUTHORIZED_ROOT_WINGS = WINGS;
 
 /**
  * Root wings for Settings → Authorized wing প্রাধিকৃত.
@@ -824,7 +822,7 @@ export function toggleForceRank(force: string, rank: string) {
   });
 }
 
-/** Toggle service-rank equivalent under a RAB rank + force. */
+/** Toggle service-rank equivalent under an SRB rank + force. */
 export function toggleRankEquivalent(
   rabRank: string,
   force: string,

@@ -1,4 +1,4 @@
-# Production Gap Analysis — RAB Mess Distribution
+# Production Gap Analysis — SRB-Special Response Battalion Mess Distribution
 
 **Date:** 2026-09-13  
 **Frontend:** treated as the approved functional specification. UI/UX is locked.  

@@ -243,7 +243,7 @@ export default function LoginPage() {
               <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-page-dark bg-emerald-400" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/50">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">
                 {t("common.rab")} · {t("common.prototype")}
               </p>
               <p className="text-xs text-white/40">{t("login.panelTag")}</p>

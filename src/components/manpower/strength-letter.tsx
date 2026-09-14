@@ -1,12 +1,15 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, type ReactNode } from "react";
 import { RankColumnHeader } from "@/components/manpower/rank-column-header";
 import { StrengthReportTitle } from "@/components/manpower/strength-title";
 import { WingName } from "@/components/manpower/wing-name";
+import { toBnDigits } from "@/lib/consume-official-reports";
 import {
   STRENGTH_CATEGORIES,
   strengthMetricTotal,
+  sumAbsenceRows,
+  type StrengthAbsenceRow,
   type StrengthBranchBlock,
   type StrengthCounts,
   type StrengthReport,
@@ -18,18 +21,33 @@ type Props = {
   locale?: string;
 };
 
+function formatCount(value: number, bn?: boolean) {
+  const n = Math.abs(value);
+  return bn ? toBnDigits(n) : String(n);
+}
+
 function CountCell({
   value,
   blank,
+  bn,
 }: {
   value: number;
   blank?: boolean;
+  bn?: boolean;
 }) {
   return (
     <td className="border border-neutral-800 px-0.5 py-0.5 text-center tabular-nums">
-      {blank ? "" : Math.abs(value)}
+      {blank ? "" : formatCount(value, bn)}
     </td>
   );
+}
+
+function AdminWingName({ wing }: { wing: string }) {
+  const key = wing.trim().toLowerCase();
+  if (wing === "সর্বমোট") return <>সর্বমোট</>;
+  if (key === "mt br" || key === "mt branch") return <>এমটি</>;
+  if (key === "new / temporary attached") return <>নতুন / অস্থায়ী সংযুক্ত</>;
+  return <WingName wing={wing} />;
 }
 
 function MetricRow({
@@ -37,14 +55,19 @@ function MetricRow({
   counts,
   blankOfficer,
   emphasize,
+  bn,
+  wingCell,
 }: {
   label: string;
   counts: StrengthCounts;
   blankOfficer?: boolean;
   emphasize?: boolean;
+  bn?: boolean;
+  wingCell?: ReactNode;
 }) {
   return (
     <tr className={cn(emphasize && "bg-neutral-50 font-semibold")}>
+      {wingCell}
       <td className="border border-neutral-800 px-1 py-0.5 text-left font-medium">
         {label}
       </td>
@@ -53,16 +76,62 @@ function MetricRow({
           key={cat.id}
           value={counts[cat.id] ?? 0}
           blank={blankOfficer && cat.id === "officer"}
+          bn={bn}
         />
       ))}
       <td className="border border-neutral-800 px-0.5 py-0.5 text-center font-semibold tabular-nums">
-        {strengthMetricTotal(counts, !!blankOfficer)}
+        {formatCount(strengthMetricTotal(counts, !!blankOfficer), bn)}
       </td>
     </tr>
   );
 }
 
-function BranchBlock({ block }: { block: StrengthBranchBlock }) {
+function Form2BranchBlock({
+  block,
+  bn,
+}: {
+  block: StrengthBranchBlock;
+  bn?: boolean;
+}) {
+  return (
+    <>
+      <MetricRow
+        label="প্রাপ্ত"
+        counts={block.held}
+        emphasize={block.wing === "সর্বমোট"}
+        bn={bn}
+        wingCell={
+          <td
+            rowSpan={3}
+            className="border border-neutral-800 px-1 py-0.5 text-left align-middle font-bold"
+          >
+            <AdminWingName wing={block.wing} />
+          </td>
+        }
+      />
+      <MetricRow
+        label="উপস্থিত"
+        counts={block.present}
+        emphasize={block.wing === "সর্বমোট"}
+        bn={bn}
+      />
+      <MetricRow
+        label="অনুপস্থিত"
+        counts={block.absent}
+        emphasize={block.wing === "সর্বমোট"}
+        bn={bn}
+      />
+    </>
+  );
+}
+
+function BranchBlock({
+  block,
+  bn,
+}: {
+  block: StrengthBranchBlock;
+  bn?: boolean;
+}) {
   return (
     <>
       <tr>
@@ -77,24 +146,151 @@ function BranchBlock({ block }: { block: StrengthBranchBlock }) {
         label="প্রাপ্ত"
         counts={block.held}
         blankOfficer
+        bn={bn}
       />
       <MetricRow
         label="উপস্থিত"
         counts={block.present}
         blankOfficer
+        bn={bn}
       />
       <MetricRow
         label="অনুপস্থিত"
         counts={block.absent}
         blankOfficer
+        bn={bn}
       />
     </>
   );
 }
 
-/** Form 2 letter — Admin Wing daily strength. Officer blank on branch rows. */
+function AbsencePrintCells({
+  row,
+  bn,
+}: {
+  row: StrengthAbsenceRow;
+  bn?: boolean;
+}) {
+  return (
+    <>
+      <CountCell value={row.cl} bn={bn} />
+      <CountCell value={row.pl} bn={bn} />
+      <CountCell value={row.rl} bn={bn} />
+      <CountCell value={row.ml} bn={bn} />
+      <CountCell value={row.maternity} bn={bn} />
+      <CountCell value={row.training} bn={bn} />
+      <CountCell value={row.remaining} bn={bn} />
+      <CountCell value={row.exam} bn={bn} />
+      <CountCell value={row.other} bn={bn} />
+      <CountCell value={row.hospital} bn={bn} />
+      <CountCell value={row.avgPresent} bn={bn} />
+      <CountCell value={row.total} bn={bn} />
+    </>
+  );
+}
+
+function LetterAbsenceTable({ report }: { report: StrengthReport }) {
+  const isHq = report.formNo === 3;
+  const form2 = report.formNo === 2;
+  const total = sumAbsenceRows(report.absence);
+
+  if (!isHq && !form2) {
+    return (
+      <>
+        <p className="mt-3 text-[10px] font-semibold">অনুপস্থিতির বিবরণ</p>
+        <table className="mt-1 w-full border-collapse text-[8px] leading-tight">
+          <thead>
+            <tr className="bg-neutral-100">
+              <th className="border border-neutral-800 px-1 py-1 text-left">
+                উইং
+              </th>
+              <th className="border border-neutral-800 px-0.5 py-1">সিএল</th>
+              <th className="border border-neutral-800 px-0.5 py-1">পিএল</th>
+              <th className="border border-neutral-800 px-0.5 py-1">আরএল</th>
+              <th className="border border-neutral-800 px-0.5 py-1">এমএল</th>
+              <th className="border border-neutral-800 px-0.5 py-1">মাতৃত্ব</th>
+              <th className="border border-neutral-800 px-0.5 py-1">প্রশিক্ষণ</th>
+              <th className="border border-neutral-800 px-0.5 py-1">বাকি</th>
+              <th className="border border-neutral-800 px-0.5 py-1">পরীক্ষা</th>
+              <th className="border border-neutral-800 px-0.5 py-1">অন্যান্য</th>
+              <th className="border border-neutral-800 px-0.5 py-1">হাসপাতাল</th>
+              <th className="border border-neutral-800 px-0.5 py-1">গড় হাজির</th>
+              <th className="border border-neutral-800 px-0.5 py-1">সর্বমোট</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.absence.map((row) => (
+              <tr key={row.wing}>
+                <td className="border border-neutral-800 px-1 py-0.5 text-left font-medium">
+                  <WingName wing={row.wing} />
+                </td>
+                <AbsencePrintCells row={row} bn />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>
+    );
+  }
+
+  return (
+    <table className="mt-3 w-full border-collapse text-[8px] leading-tight">
+        <thead>
+          <tr className="bg-neutral-100">
+            <th colSpan={6} className="border border-neutral-800" />
+            <th colSpan={4} className="border border-neutral-800 px-0.5 py-1 text-center">
+              অস্থায়ী জনবলের বিবরণ
+            </th>
+            <th className="border border-neutral-800" />
+            <th className="border border-neutral-800" />
+            <th className="border border-neutral-800" />
+          </tr>
+          <tr className="bg-neutral-100">
+            <th className="border border-neutral-800 px-1 py-0.5 text-left">উইং</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">সিএল</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">পিএল</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">আরএল</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">এমএল</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">
+              * মাতৃত্বকালীন ছুটি
+            </th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">প্রশিক্ষণ</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">সাক্ষী</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">পরীক্ষা</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">অন্যান্য</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">হাসপাতাল</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">গড় হাজির</th>
+            <th className="border border-neutral-800 px-0.5 py-0.5">সর্বমোট</th>
+          </tr>
+        </thead>
+        <tbody>
+          {report.absence.map((row) => (
+            <tr key={row.wing}>
+              <td className="border border-neutral-800 px-1 py-0.5 text-left font-medium">
+                {form2 ? (
+                  <AdminWingName wing={row.wing} />
+                ) : (
+                  <WingName wing={row.wing} />
+                )}
+              </td>
+              <AbsencePrintCells row={row} bn />
+            </tr>
+          ))}
+          <tr className="bg-neutral-50 font-semibold">
+            <td className="border border-neutral-800 px-1 py-0.5 text-left">
+              সর্বমোট
+            </td>
+            <AbsencePrintCells row={total} bn />
+          </tr>
+        </tbody>
+    </table>
+  );
+}
+
+/** Form 2/3 letter — Admin Wing / HQ Br daily strength. */
 export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
   function StrengthLetter({ report, locale = "bn-BD" }, ref) {
+    const bn = true;
     return (
       <div
         ref={ref}
@@ -104,7 +300,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
           titleBn={report.titleBn}
           wingLabel={report.wingLabel}
           date={report.date}
-          locale={locale}
+          locale="bn-BD"
           compact
         />
 
@@ -127,9 +323,9 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
             </tr>
           </thead>
           <tbody>
-            <MetricRow label="প্রাপ্ত" counts={report.summary.held} />
-            <MetricRow label="উপস্থিত" counts={report.summary.present} />
-            <MetricRow label="অনুপস্থিত" counts={report.summary.absent} />
+            <MetricRow label="প্রাপ্ত" counts={report.summary.held} bn={bn} />
+            <MetricRow label="উপস্থিত" counts={report.summary.present} bn={bn} />
+            <MetricRow label="অনুপস্থিত" counts={report.summary.absent} bn={bn} />
           </tbody>
         </table>
 
@@ -137,8 +333,13 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
         <table className="mt-3 w-full border-collapse text-[8px] leading-tight">
           <thead>
             <tr className="bg-neutral-100">
+              {report.formNo === 2 ? (
+                <th className="border border-neutral-800 px-1 py-1 text-left font-semibold">
+                  উইং
+                </th>
+              ) : null}
               <th className="border border-neutral-800 px-1 py-1 text-left font-semibold">
-                ডিটেইল
+                {report.formNo === 2 ? "জনবল" : "ডিটেইল"}
               </th>
               {STRENGTH_CATEGORIES.map((c) => (
                 <RankColumnHeader
@@ -152,91 +353,66 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
             </tr>
           </thead>
           <tbody>
-            {report.branches.map((block) => (
-              <BranchBlock key={block.wing} block={block} />
-            ))}
-            <tr>
-              <td
-                colSpan={STRENGTH_CATEGORIES.length + 2}
-                className="border border-neutral-800 bg-neutral-200/70 px-1 py-0.5 text-left text-[9px] font-bold"
-              >
-                {report.grandTotal.wing === "সর্বমোট" ? (
-                  "সর্বমোট"
-                ) : (
-                  <WingName wing={report.grandTotal.wing} />
-                )}
-              </td>
-            </tr>
-            <MetricRow
-              label="প্রাপ্ত"
-              counts={report.grandTotal.held}
-              blankOfficer
-              emphasize
-            />
-            <MetricRow
-              label="উপস্থিত"
-              counts={report.grandTotal.present}
-              blankOfficer
-              emphasize
-            />
-            <MetricRow
-              label="অনুপস্থিত"
-              counts={report.grandTotal.absent}
-              blankOfficer
-              emphasize
-            />
+            {report.formNo === 2 ? (
+              <>
+                {report.branches.map((block) => (
+                  <Form2BranchBlock key={block.wing} block={block} bn={bn} />
+                ))}
+                <Form2BranchBlock block={report.grandTotal} bn={bn} />
+              </>
+            ) : (
+              <>
+                {report.branches.map((block) => (
+                  <BranchBlock key={block.wing} block={block} bn={bn} />
+                ))}
+                <tr>
+                  <td
+                    colSpan={STRENGTH_CATEGORIES.length + 2}
+                    className="border border-neutral-800 bg-neutral-200/70 px-1 py-0.5 text-left text-[9px] font-bold"
+                  >
+                    {report.grandTotal.wing === "সর্বমোট" ? (
+                      "সর্বমোট"
+                    ) : (
+                      <WingName wing={report.grandTotal.wing} />
+                    )}
+                  </td>
+                </tr>
+                <MetricRow
+                  label="প্রাপ্ত"
+                  counts={report.grandTotal.held}
+                  blankOfficer
+                  emphasize
+                  bn={bn}
+                />
+                <MetricRow
+                  label="উপস্থিত"
+                  counts={report.grandTotal.present}
+                  blankOfficer
+                  emphasize
+                  bn={bn}
+                />
+                <MetricRow
+                  label="অনুপস্থিত"
+                  counts={report.grandTotal.absent}
+                  blankOfficer
+                  emphasize
+                  bn={bn}
+                />
+              </>
+            )}
           </tbody>
         </table>
 
-        {/* Absence / other duties */}
-        <p className="mt-3 text-[10px] font-semibold">
-          * অন্যান্য কর্তব্য / Absence detail
-        </p>
-        <table className="mt-1 w-full border-collapse text-[8px] leading-tight">
-          <thead>
-            <tr className="bg-neutral-100">
-              <th className="border border-neutral-800 px-1 py-1 text-left">
-                উইং
-              </th>
-              <th className="border border-neutral-800 px-0.5 py-1">সিএল</th>
-              <th className="border border-neutral-800 px-0.5 py-1">পিএল</th>
-              <th className="border border-neutral-800 px-0.5 py-1">আরএল</th>
-              <th className="border border-neutral-800 px-0.5 py-1">এমএল</th>
-              <th className="border border-neutral-800 px-0.5 py-1">মাতৃত্ব</th>
-              <th className="border border-neutral-800 px-0.5 py-1">প্রশিক্ষণ</th>
-              <th className="border border-neutral-800 px-0.5 py-1">বাকি</th>
-              <th className="border border-neutral-800 px-0.5 py-1">পরীক্ষা</th>
-              <th className="border border-neutral-800 px-0.5 py-1">অন্যান্য</th>
-              <th className="border border-neutral-800 px-0.5 py-1">হাসপাতাল</th>
-              <th className="border border-neutral-800 px-0.5 py-1">সর্বমোট</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.absence.map((row) => (
-              <tr key={row.wing}>
-                <td className="border border-neutral-800 px-1 py-0.5 text-left font-medium">
-                  <WingName wing={row.wing} />
-                </td>
-                <CountCell value={row.cl} />
-                <CountCell value={row.pl} />
-                <CountCell value={row.rl} />
-                <CountCell value={row.ml} />
-                <CountCell value={row.maternity} />
-                <CountCell value={row.training} />
-                <CountCell value={row.remaining} />
-                <CountCell value={row.exam} />
-                <CountCell value={row.other} />
-                <CountCell value={row.hospital} />
-                <CountCell value={row.total} />
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {bn ? (
+          <p className="mt-3 text-[10px] font-semibold">* অন্যান্য কর্তব্য</p>
+        ) : null}
+
+        <LetterAbsenceTable report={report} />
 
         {report.formNo === 3 ? (
           <p className="mt-2 text-[10px] font-medium">
-            যাওয়া — {report.movement.going} &nbsp;&nbsp; আসা —{" "}
-            {report.movement.coming}
+            যাওয়া — {toBnDigits(report.movement.going)} &nbsp;&nbsp; আসা —{" "}
+            {toBnDigits(report.movement.coming)}
           </p>
         ) : null}
       </div>

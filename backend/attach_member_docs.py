@@ -19,7 +19,7 @@ MINI_PDF = (
     b"3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
     b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj\n"
     b"4 0 obj<< /Length 80 >>stream\n"
-    b"BT /F1 16 Tf 72 720 Td (RAB Mess member document) Tj ET\n"
+    b"BT /F1 16 Tf 72 720 Td (SRB Mess member document) Tj ET\n"
     b"endstream\nendobj\n"
     b"5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n"
     b"trailer<< /Root 1 0 R >>\n"

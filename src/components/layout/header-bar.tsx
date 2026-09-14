@@ -131,7 +131,7 @@ export function HeaderBar({
             </>
           ) : (
             <div className="min-w-0">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/55">
                 {t("common.rab")}
               </p>
               <p className="truncate text-sm font-semibold tracking-[0.08em] text-white">

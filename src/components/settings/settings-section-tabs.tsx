@@ -84,7 +84,7 @@ export function parseSettingsTab(
   return allowed[0] ?? "rates";
 }
 
-/** In-page Settings sections — Rates / Ranks / Wings / Forces / Rab Bank / Member Bank / Authorized / QR. */
+/** In-page Settings sections — Rates / Ranks / Wings / Forces / SRB Bank / Member Bank / Authorized / QR. */
 export function SettingsSectionTabs({
   value,
   onChange,

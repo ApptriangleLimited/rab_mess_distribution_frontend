@@ -2,6 +2,7 @@ import {
   ADMIN_SUB_WINGS,
   DEFAULT_WING_PARENT,
   HQ_SUB_WINGS,
+  WINGS,
 } from "@/lib/constants";
 import { getState } from "@/lib/store";
 import {
@@ -15,8 +16,6 @@ import {
   authorizedWingDisplayCount,
   isBannedWing,
   listAuthorized,
-  listAuthorizedRootWings,
-  listAuthorizedRootWingsFrom,
 } from "@/lib/store/org-options";
 import type { AuthorizedStrength, DailyTag, User } from "@/lib/types";
 import type { AssignmentCell } from "@/lib/api/assignments";
@@ -277,55 +276,9 @@ export function manpowerWingFamily(
   return "main";
 }
 
-function pushUnique(
-  out: string[],
-  seen: Set<string>,
-  name: string,
-  catalog: string[],
-) {
-  const raw = name.trim();
-  if (!raw || raw === "—" || isBannedWing(raw) || seen.has(raw.toLowerCase())) {
-    return;
-  }
-  const spelled = exactWing(catalog, raw) ?? raw;
-  out.push(spelled);
-  seen.add(spelled.toLowerCase());
-}
-
-/** Form 1 tab — main Daily Cockpit wings only. Admin → Form 2, HQ Br → Form 3. */
-function listForm1WingNames(
-  catalog: string[],
-  memberWings: string[],
-  parents: Record<string, string>,
-): string[] {
-  const roots = catalog.length
-    ? listAuthorizedRootWingsFrom(catalog)
-    : listAuthorizedRootWings();
-  const mainFixed = [
-    ...roots.filter((w) => !isAdminFamilyName(w) && !isHqBrName(w)),
-    "RFTS",
-  ];
-
-  const main: string[] = [];
-  const seen = new Set<string>();
-
-  for (const w of mainFixed) pushUnique(main, seen, w, catalog);
-
-  const extras = [...catalog, ...memberWings].filter((w) => {
-    const name = w.trim();
-    return name && !seen.has(name.toLowerCase()) && !isBannedWing(name);
-  });
-  extras.sort((a, b) => {
-    const ia = catalog.findIndex((w) => w.toLowerCase() === a.toLowerCase());
-    const ib = catalog.findIndex((w) => w.toLowerCase() === b.toLowerCase());
-    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
-  });
-  for (const w of extras) {
-    if (manpowerWingFamily(w, parents) !== "main") continue;
-    pushUnique(main, seen, w, catalog);
-  }
-
-  return main;
+/** Form 1 tab — official daily sheet wings only, in paper order. */
+function listForm1WingNames(): string[] {
+  return [...WINGS];
 }
 
 function projectedTag(userId: string, date: string): DailyTag | "" {
@@ -430,19 +383,22 @@ export function buildManpowerReport(
   const hqHeld = emptyCounts(categories);
   const hqAbsent = emptyCounts(categories);
 
-  const catalogWings = snapshot?.wings?.length ? snapshot.wings : [];
-  const memberWings = snapshot?.extraWings?.length
-    ? snapshot.extraWings
-    : sourceUsers.map((u) => u.wing);
   const parents = mergeParentMap(snapshot?.wingParent ?? state.wing_parent);
-  const form1Wings = listForm1WingNames(catalogWings, memberWings, parents);
+  const form1Wings = listForm1WingNames();
   const authWings = [...form1Wings];
 
   function toCockpitWing(userWing: string): string | null {
     const raw = userWing.trim();
-    if (!raw || raw === "—" || isBannedWing(raw)) return null;
-    if (manpowerWingFamily(raw, parents) !== "main") return null;
-    return exactWing(authWings, raw) ?? raw;
+    if (!raw || raw === "—") return null;
+    const family = manpowerWingFamily(raw, parents);
+    if (family === "admin" || family === "hq") {
+      return exactWing(authWings, "Admin") ?? "Admin";
+    }
+    if (raw.toLowerCase() === "rfts") {
+      return exactWing(authWings, "Training School") ?? "Training School";
+    }
+    if (isBannedWing(raw)) return null;
+    return exactWing(authWings, raw);
   }
 
   const wingMap = new Map<string, WingBucket>();
@@ -574,12 +530,7 @@ export function buildManpowerReport(
     (w) => !authWings.some((a) => a.toLowerCase() === w.toLowerCase()),
   );
   for (const extra of extraWingsInMap) {
-    if (manpowerWingFamily(extra, parents) !== "main") {
-      wingMap.delete(extra);
-      continue;
-    }
-    form1Wings.push(extra);
-    authWings.push(extra);
+    wingMap.delete(extra);
   }
   const wingOrder = [...form1Wings];
 
@@ -682,6 +633,13 @@ export function buildManpowerReport(
 
 export function manpowerRowTotal(counts: ManpowerCounts): number {
   return sumCounts(counts);
+}
+
+export function manpowerRowTotalFor(
+  counts: ManpowerCounts,
+  categories: AuthorizedStrength[],
+): number {
+  return categories.reduce((sum, cat) => sum + (counts[cat.id] ?? 0), 0);
 }
 
 /** Count cells hide minus; বৃদ্ধি/হ্রাস keeps the signed প্রাধিকৃত − প্রাপ্ত value. */

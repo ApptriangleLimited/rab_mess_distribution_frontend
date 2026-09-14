@@ -70,7 +70,7 @@ export const PRITIBHOJ_ADMIN_WING_DEFS: readonly PritibhojWingDef[] = [
   { label: "ডিজি দপ্তর", wings: ["DG Office"] },
   { label: "এডিজি (অপস) দপ্তর", wings: ["ADG (Ops) Office"] },
   { label: "এডিজি (এ্যাডমিন) দপ্তর", wings: ["ADG (Admin) Office"] },
-  { label: "পরিচালক (এ্যাডমিন) দপ্তর", wings: [] },
+  { label: "পরিচালক এ্যাডমিন দপ্তর", wings: ["Director (Admin) Office"] },
   { label: "জেনারেল শাখা", wings: ["Gen Br"] },
   {
     label: "পার্সোনাল শাখা",
@@ -557,7 +557,7 @@ export const PRITIBHOJ_ADMIN_ROWS: PritibhojRow[] = [
 export const PRITIBHOJ_DEMO_META = {
   titleBn:
     "এডিজি এ্যাডমিন (প্রশাসন) এর বিদায়ী উপলক্ষে প্রীতিভোজের পরিসংখ্যান",
-  orgBn: "র‍্যাব ফোর্সেস সদর দপ্তর",
+  orgBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর",
   dateISO: "2023-07-06",
   adminTitleBn: "প্রশাসন ও অর্থ উইং",
   grandTotalManpower: 1913,

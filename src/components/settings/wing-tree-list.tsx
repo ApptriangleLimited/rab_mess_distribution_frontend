@@ -15,6 +15,7 @@ import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
 import { WING_LABELS, wingDisplayLabel } from "@/lib/constants";
+import { wingSettingsLabel } from "@/lib/rank-labels";
 import {
   addWing,
   listWingChildren,
@@ -43,7 +44,7 @@ function WingNode({
   const childCount = children.length;
   const hasChildren = childCount > 0;
   const pad = 12 + depth * 16;
-  const display = wingDisplayLabel(label, state.wing_labels);
+  const display = wingSettingsLabel(label);
 
   function toggleOpen() {
     if (!hasChildren) return;

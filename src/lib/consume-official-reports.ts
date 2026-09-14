@@ -71,6 +71,11 @@ export function toBnDigits(value: number | string) {
   return String(value).replace(/\d/g, (d) => BN_DIGITS[Number(d)] ?? d);
 }
 
+/** `১২৩` / `123` → ASCII digits only. */
+export function fromBnDigits(value: string) {
+  return value.replace(/[০-৯]/g, (d) => String("০১২৩৪৫৬৭৮৯".indexOf(d)));
+}
+
 /** ছুটি — leave besides CL / PL (not WR; WR is রেশন বিহীন). */
 const LEAVE_TAGS: DailyTag[] = ["RL", "JL", "OSL", "AWL", "MOL"];
 const HOSPITAL_TAGS: DailyTag[] = ["MED", "CMH", "BGH", "RBH"];
@@ -305,7 +310,7 @@ export function buildOfficialCampConsume(month: string): OfficialConsumeReport {
   const hq = wings.rows.filter((r) => r.id === "admin");
   const ashkona = wings.rows.filter((r) => r.id !== "admin");
   const rows: OfficialConsumeRow[] = [
-    { ...totalsRow(hq, "র‍্যাব সদর ক্যাম্প"), id: "hq", sl: 1, pageNo: "" },
+    { ...totalsRow(hq, "এসআরবি সদর ক্যাম্প"), id: "hq", sl: 1, pageNo: "" },
     { ...totalsRow(ashkona, "আশকোনা ক্যাম্প"), id: "ashkona", sl: 2, pageNo: "" },
   ];
   return {
@@ -437,9 +442,9 @@ function pairPages(
 
 function wingCampLine(wingId: string) {
   if (wingId === "admin") {
-    return "র‍্যাব সদর ক্যাম্প, র‍্যাব ফোর্সেস সদর দপ্তর";
+    return "এসআরবি সদর ক্যাম্প, এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর";
   }
-  return "আশকোনা ক্যাম্প, র‍্যাব ফোর্সেস সদর দপ্তর";
+  return "আশকোনা ক্যাম্প, এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর";
 }
 
 export function buildOfficialConsumePack(
@@ -565,7 +570,7 @@ export function buildOfficialConsumePack(
     {
       id: "monthly-hq",
       tables: [
-        consumeTable(`উইং অনুযায়ী কনজিউম হিসাব ${monthLabelBn}`, [org, "র‍্যাব সদর দপ্তর ক্যাম্প"], hqRows, {
+        consumeTable(`উইং অনুযায়ী কনজিউম হিসাব ${monthLabelBn}`, [org, "এসআরবি সদর দপ্তর ক্যাম্প"], hqRows, {
           showPageNo: false,
           remarks: true,
         }),

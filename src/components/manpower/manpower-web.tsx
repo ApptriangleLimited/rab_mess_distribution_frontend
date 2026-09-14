@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { StrengthReportTitle } from "@/components/manpower/strength-title";
 import { WingName } from "@/components/manpower/wing-name";
 import { Input } from "@/components/ui/input";
 import { CONSUME_REPORT_META } from "@/lib/constants";
-import { formatDateLong } from "@/lib/date";
+import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import {
   formatManpowerCell,
-  manpowerRowTotal,
+  manpowerRowTotalFor,
   type ManpowerAbsenceRow,
   type ManpowerCounts,
   type ManpowerReport,
@@ -18,9 +19,8 @@ import {
   setManpowerAbsentCount,
   setManpowerHeld,
 } from "@/lib/store/org-options";
-import { authorizedLabelBn } from "@/lib/rank-labels";
+import { form1RankLabelBn, isForm1RankColumn } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
-import { useI18n } from "@/i18n/provider";
 
 type Props = {
   report: ManpowerReport;
@@ -42,7 +42,7 @@ function Cell({
         className,
       )}
     >
-      {formatManpowerCell(value, { signed })}
+      {toBnDigits(formatManpowerCell(value, { signed }))}
     </td>
   );
 }
@@ -109,12 +109,16 @@ function MetricRow({
         />
       ))}
       <Cell
-        value={manpowerRowTotal(counts)}
+        value={manpowerRowTotalFor(counts, categories)}
         signed={signed}
         className="font-semibold"
       />
     </tr>
   );
+}
+
+function asciiDigits(raw: string) {
+  return fromBnDigits(raw).replace(/[^\d]/g, "");
 }
 
 function CountInput({
@@ -129,7 +133,7 @@ function CountInput({
   const [draft, setDraft] = useState<string | null>(null);
 
   function commit(raw: string) {
-    const digits = raw.replace(/[^\d]/g, "");
+    const digits = asciiDigits(raw);
     const n = digits === "" ? 0 : Number(digits);
     if (!Number.isFinite(n) || n < 0) return;
     onCommit(Math.floor(n));
@@ -139,9 +143,9 @@ function CountInput({
   return (
     <td className="border border-neutral-200 px-1 py-1 text-center dark:border-neutral-700">
       <Input
-        value={draft !== null ? draft : String(value)}
+        value={toBnDigits(draft !== null ? draft : String(value))}
         onChange={(e) => {
-          const digits = e.target.value.replace(/[^\d]/g, "");
+          const digits = asciiDigits(e.target.value);
           setDraft(digits);
           if (digits === "") {
             onCommit(0);
@@ -193,14 +197,14 @@ function InputMetricRow({
         <CountInput
           key={`${date}-${wing}-${cat.id}-${kind}`}
           value={counts[cat.id] ?? 0}
-          ariaLabel={`${authorizedLabelBn(cat.label)} ${label} — ${wing}`}
+          ariaLabel={`${form1RankLabelBn(cat.label)} ${label} — ${wing}`}
           onCommit={(n) => {
             if (kind === "held") setManpowerHeld(date, wing, cat.id, n);
             else setManpowerAbsentCount(date, wing, cat.id, n);
           }}
         />
       ))}
-      <Cell value={manpowerRowTotal(counts)} className="font-semibold" />
+      <Cell value={manpowerRowTotalFor(counts, categories)} className="font-semibold" />
     </tr>
   );
 }
@@ -321,7 +325,7 @@ function RankHead({
           key={cat.id}
           className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700"
         >
-          {authorizedLabelBn(cat.label)}
+          {form1RankLabelBn(cat.label)}
         </th>
       ))}
       <th className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700">
@@ -503,25 +507,20 @@ function AbsenceTable({
 
 /** Screen / tab panel view of Form 1 (not print letter). */
 export function ManpowerWeb({ report }: Props) {
-  const { locale } = useI18n();
-  const { date, categories, hq, wings, absence } = report;
-  const dateLabel = formatDateLong(date, locale === "bn" ? "bn-BD" : "en-GB");
+  const { date, hq, wings, absence, grandTotal } = report;
+  const categories = report.categories.filter((c) =>
+    isForm1RankColumn(c.label),
+  );
 
   return (
     <div className="flex flex-col gap-6 p-1 sm:p-2">
       <section className="overflow-hidden rounded-xl border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900">
-        <header className="border-b border-neutral-300 px-3 py-3 text-center dark:border-neutral-700">
-          <p className="text-[11px] font-semibold">
-            {CONSUME_REPORT_META.orgNameBn}
-          </p>
-          <h2 className="mt-0.5 text-base font-bold tracking-wide">
-            দৈনিক জনবলের প্রতিবেদন
-          </h2>
-          <p className="text-[10px] text-neutral-600 dark:text-neutral-400">
-            Daily Manpower Report · {CONSUME_REPORT_META.stationBn}
-          </p>
-          <p className="mt-1 text-xs font-medium">তারিখ / Date: {dateLabel}</p>
-        </header>
+        <StrengthReportTitle
+          titleBn="দৈনিক জনবলের প্রতিবেদন"
+          wingLabel={CONSUME_REPORT_META.orgNameBn}
+          date={date}
+          locale="bn-BD"
+        />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse">
             <thead>
@@ -565,6 +564,17 @@ export function ManpowerWeb({ report }: Props) {
                     editable
                   />
                 ))}
+                <BlockRows
+                  date={date}
+                  wing={grandTotal.wing}
+                  wingLabel="সর্বমোট"
+                  authorized={grandTotal.authorized}
+                  held={grandTotal.held}
+                  shortfall={grandTotal.shortfall}
+                  absent={grandTotal.absent}
+                  categories={categories}
+                  emphasize
+                />
               </tbody>
             </StrengthCard>
           </section>

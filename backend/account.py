@@ -270,7 +270,7 @@ def mfa_setup(
     staff.mfa_secret = encrypt_secret(secret)
     staff.mfa_enabled = False
     db.commit()
-    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=staff.email, issuer_name="RAB Mess")
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=staff.email, issuer_name="SRB Mess")
     return envelope({"otpauth_url": uri, "secret": secret})
 
 

@@ -1,6 +1,6 @@
 # Mess Distribution Frontend
 
-Next.js 16 App Router prototype for RAB mess distribution roles (CC, Daily, Mess, Consume, Ration).
+Next.js 16 App Router prototype for SRB-Special Response Battalion mess distribution roles (CC, Daily, Mess, Consume, Ration).
 
 ## Quick start
 

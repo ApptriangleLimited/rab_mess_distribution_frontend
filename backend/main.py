@@ -78,7 +78,7 @@ configure_logging()
 settings.assert_secure()
 
 app = FastAPI(
-    title="RAB Mess CC API",
+    title="SRB-Special Response Battalion Mess CC API",
     version="0.2.0",
     docs_url=None if settings.is_production else "/docs",
     redoc_url=None if settings.is_production else "/redoc",
@@ -169,7 +169,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         "invalid email" in detail.lower() or "credentials" in detail.lower()
     ):
         code = "AUTH_INVALID_CREDENTIALS"
-    if exc.status_code == 409 and "RAB" in detail:
+    if exc.status_code == 409 and ("RAB" in detail or "SRB" in detail):
         code = "CONFLICT_RAB_ID"
     return fail(exc.status_code, str(exc.detail), code, request=request)
 
@@ -589,9 +589,9 @@ def create_member(
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
     if body.member_type != "guest" and not body.rab_id.strip():
-        raise HTTPException(status_code=400, detail="RAB ID is required")
+        raise HTTPException(status_code=400, detail="SRB ID is required")
     if find_member_by_rab(db, body.rab_id):
-        raise HTTPException(status_code=409, detail="A member with this RAB ID already exists")
+        raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
 
     row = Member(id=new_id("u"), created_by=staff.id)
     apply_member_fields(row, body)
@@ -606,7 +606,7 @@ def create_member(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="A member with this RAB ID already exists") from exc
+        raise HTTPException(status_code=409, detail="A member with this SRB ID already exists") from exc
     db.refresh(row)
     bust_members()
     return envelope(member_out(row), "Member request sent successfully", 201)
@@ -635,7 +635,7 @@ def update_member(
     if row is None:
         raise HTTPException(status_code=404, detail="User not found")
     if find_member_by_rab(db, body.rab_id, exclude_id=member_id):
-        raise HTTPException(status_code=409, detail="A member with this RAB ID already exists")
+        raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     apply_member_fields(row, body)
     if body.status in ("0", "1"):
         row.status = body.status
@@ -646,7 +646,7 @@ def update_member(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="A member with this RAB ID already exists") from exc
+        raise HTTPException(status_code=409, detail="A member with this SRB ID already exists") from exc
     db.refresh(row)
     bust_members()
     return envelope(member_out(row), "Member updated")

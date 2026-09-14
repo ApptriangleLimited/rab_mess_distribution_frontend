@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { IconChevronDown } from "@tabler/icons-react";
+import { useState, type ReactNode } from "react";
 import { StrengthReportTitle } from "@/components/manpower/strength-title";
 import { WingName } from "@/components/manpower/wing-name";
-import { useI18n } from "@/i18n/provider";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/hooks/use-store";
+import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import {
   STRENGTH_CATEGORIES,
   strengthMetricTotal,
+  sumAbsenceRows,
+  type StrengthAbsenceRow,
   type StrengthBranchBlock,
   type StrengthCounts,
   type StrengthReport,
@@ -25,16 +26,43 @@ type Props = {
   report: StrengthReport;
 };
 
+function formatCount(value: number, bn?: boolean) {
+  const n = Math.abs(value);
+  return bn ? toBnDigits(n) : String(n);
+}
+
+function asciiDigits(raw: string) {
+  return fromBnDigits(raw).replace(/[^\d]/g, "");
+}
+
+function inputCount(raw: string | null, stored: number, bn?: boolean) {
+  const ascii = raw !== null ? raw : String(stored);
+  return bn ? toBnDigits(ascii) : ascii;
+}
+
 function CountCell({
   value,
   blank,
+  bn,
 }: {
   value: number;
   blank?: boolean;
+  bn?: boolean;
 }) {
   return (
     <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm tabular-nums dark:border-neutral-700">
-      {blank ? "—" : Math.abs(value)}
+      {blank ? "—" : formatCount(value, bn)}
+    </td>
+  );
+}
+
+function WingNameCell({ children }: { children: ReactNode }) {
+  return (
+    <td
+      rowSpan={3}
+      className="sticky left-0 z-[2] w-36 border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-semibold align-middle dark:border-neutral-700 dark:bg-neutral-900"
+    >
+      {children}
     </td>
   );
 }
@@ -44,20 +72,31 @@ function MetricRow({
   counts,
   blankOfficer,
   emphasize,
+  wingCell,
+  withWing,
+  bn,
 }: {
   label: string;
   counts: StrengthCounts;
   blankOfficer?: boolean;
   emphasize?: boolean;
+  wingCell?: ReactNode;
+  withWing?: boolean;
+  bn?: boolean;
 }) {
   return (
     <tr
       className={cn(
-        emphasize &&
-          "bg-neutral-100 font-semibold dark:bg-neutral-800/80",
+        emphasize && "bg-neutral-100 font-semibold dark:bg-neutral-800/80",
       )}
     >
-      <td className="sticky left-0 z-[1] border border-neutral-200 bg-inherit px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700">
+      {wingCell}
+      <td
+        className={cn(
+          "sticky z-[1] border border-neutral-200 bg-inherit px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700",
+          withWing ? "left-36" : "left-0",
+        )}
+      >
         {label}
       </td>
       {STRENGTH_CATEGORIES.map((cat) => (
@@ -65,10 +104,11 @@ function MetricRow({
           key={cat.id}
           value={counts[cat.id] ?? 0}
           blank={blankOfficer && cat.id === "officer"}
+          bn={bn}
         />
       ))}
       <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
-        {strengthMetricTotal(counts, !!blankOfficer)}
+        {formatCount(strengthMetricTotal(counts, !!blankOfficer), bn)}
       </td>
     </tr>
   );
@@ -79,11 +119,15 @@ function OfficerHeldRow({
   wing,
   counts,
   officerAuthorizedId,
+  wingCell,
+  bn,
 }: {
   date: string;
   wing: string;
   counts: StrengthCounts;
   officerAuthorizedId: string;
+  wingCell?: ReactNode;
+  bn?: boolean;
 }) {
   const state = useStore();
   const row = state.authorized.find((r) => r.id === officerAuthorizedId);
@@ -100,7 +144,7 @@ function OfficerHeldRow({
   }
 
   function commit(raw: string) {
-    const digits = raw.replace(/[^\d]/g, "");
+    const digits = asciiDigits(raw);
     if (digits === "") {
       setDraft("");
       applyHeld(0);
@@ -114,7 +158,8 @@ function OfficerHeldRow({
 
   return (
     <tr>
-      <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
+      {wingCell}
+      <td className="sticky left-36 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
         প্রাপ্ত
       </td>
       {STRENGTH_CATEGORIES.map((cat) => {
@@ -125,9 +170,9 @@ function OfficerHeldRow({
               className="border border-neutral-200 px-1 py-1 text-center dark:border-neutral-700"
             >
               <Input
-                value={draft !== null ? draft : String(stored)}
+                value={inputCount(draft, stored, bn)}
                 onChange={(e) => {
-                  const digits = e.target.value.replace(/[^\d]/g, "");
+                  const digits = asciiDigits(e.target.value);
                   setDraft(digits);
                   if (digits !== "") {
                     const n = Number(digits);
@@ -147,10 +192,10 @@ function OfficerHeldRow({
             </td>
           );
         }
-        return <CountCell key={cat.id} value={counts[cat.id] ?? 0} />;
+        return <CountCell key={cat.id} value={counts[cat.id] ?? 0} bn={bn} />;
       })}
       <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
-        {strengthMetricTotal(counts)}
+        {formatCount(strengthMetricTotal(counts), bn)}
       </td>
     </tr>
   );
@@ -161,11 +206,13 @@ function OfficerAbsentRow({
   wing,
   counts,
   held,
+  bn,
 }: {
   date: string;
   wing: string;
   counts: StrengthCounts;
   held: StrengthCounts;
+  bn?: boolean;
 }) {
   const state = useStore();
   const stored = authorizedWingDisplayCount(
@@ -176,7 +223,7 @@ function OfficerAbsentRow({
   const heldN = held.officer ?? 0;
 
   function commit(raw: string) {
-    const digits = raw.replace(/[^\d]/g, "");
+    const digits = asciiDigits(raw);
     if (digits === "") {
       setDraft("");
       setManpowerOfficerAbsent(date, wing, 0);
@@ -190,7 +237,7 @@ function OfficerAbsentRow({
 
   return (
     <tr>
-      <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
+      <td className="sticky left-36 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
         অনুপস্থিত
       </td>
       {STRENGTH_CATEGORIES.map((cat) => {
@@ -201,9 +248,9 @@ function OfficerAbsentRow({
               className="border border-neutral-200 px-1 py-1 text-center dark:border-neutral-700"
             >
               <Input
-                value={draft !== null ? draft : String(stored)}
+                value={inputCount(draft, stored, bn)}
                 onChange={(e) => {
-                  const digits = e.target.value.replace(/[^\d]/g, "");
+                  const digits = asciiDigits(e.target.value);
                   setDraft(digits);
                   if (digits !== "") {
                     const n = Number(digits);
@@ -229,20 +276,44 @@ function OfficerAbsentRow({
             </td>
           );
         }
-        return <CountCell key={cat.id} value={counts[cat.id] ?? 0} />;
+        return <CountCell key={cat.id} value={counts[cat.id] ?? 0} bn={bn} />;
       })}
       <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
-        {strengthMetricTotal(counts)}
+        {formatCount(strengthMetricTotal(counts), bn)}
       </td>
     </tr>
   );
 }
 
-function RankHead() {
+function AdminWingName({ wing }: { wing: string }) {
+  const key = wing.trim().toLowerCase();
+  if (wing === "সর্বমোট") return <>সর্বমোট</>;
+  if (key === "mt br" || key === "mt branch") return <>এমটি</>;
+  if (key === "new / temporary attached") return <>নতুন / অস্থায়ী সংযুক্ত</>;
+  return <WingName wing={wing} />;
+}
+
+function RankHead({
+  withWing,
+  metricLabel = "বিবরণ",
+}: {
+  withWing?: boolean;
+  metricLabel?: string;
+}) {
   return (
     <tr className="bg-neutral-100 dark:bg-neutral-800">
-      <th className="sticky left-0 z-[1] border border-neutral-200 bg-neutral-100 px-3 py-2 text-left text-xs font-semibold dark:border-neutral-700 dark:bg-neutral-800">
-        ডিটেইল
+      {withWing ? (
+        <th className="sticky left-0 z-[2] w-36 border border-neutral-200 bg-neutral-100 px-3 py-2 text-left text-xs font-semibold dark:border-neutral-700 dark:bg-neutral-800">
+          উইং
+        </th>
+      ) : null}
+      <th
+        className={cn(
+          "sticky z-[1] border border-neutral-200 bg-neutral-100 px-3 py-2 text-left text-xs font-semibold dark:border-neutral-700 dark:bg-neutral-800",
+          withWing ? "left-36" : "left-0",
+        )}
+      >
+        {metricLabel}
       </th>
       {STRENGTH_CATEGORIES.map((c) => (
         <th
@@ -259,133 +330,114 @@ function RankHead() {
   );
 }
 
-function BranchCard({
+function BranchRows({
   block,
   date,
   officerAuthorizedId,
   editableOfficer,
-  collapsible = true,
-  defaultOpen,
+  bn,
+  form2,
 }: {
   block: StrengthBranchBlock;
   date: string;
   officerAuthorizedId: string | null;
   editableOfficer?: boolean;
-  collapsible?: boolean;
-  defaultOpen?: boolean;
+  bn?: boolean;
+  form2?: boolean;
 }) {
-  const [open, setOpen] = useState(defaultOpen ?? true);
-  if (block.withoutRecord) {
-    return (
-      <div className="rounded-xl border border-dashed border-neutral-300 px-3 py-2.5 text-sm text-neutral-500 dark:border-neutral-600">
-        <WingName wing={block.wing} /> — রেকর্ড নেই
-      </div>
-    );
-  }
-  const canEdit = editableOfficer && Boolean(officerAuthorizedId);
-  const showBody = !collapsible || open;
-  return (
-    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
-      {collapsible ? (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-2 bg-neutral-50 px-3 py-2.5 text-left text-sm font-semibold dark:bg-neutral-800/60"
-        >
-          <span className="min-w-0 truncate">
-            <WingName wing={block.wing} />
-          </span>
-          <IconChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 text-neutral-400 transition",
-              open ? "rotate-0" : "-rotate-90",
-            )}
-          />
-        </button>
-      ) : (
-        <div className="bg-neutral-50 px-3 py-2.5 text-sm font-semibold dark:bg-neutral-800/60">
-          <span className="min-w-0 truncate">
-            <WingName wing={block.wing} />
-          </span>
-        </div>
-      )}
-      {showBody ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse">
-            <thead>
-              <RankHead />
-            </thead>
-            <tbody>
-              {canEdit && officerAuthorizedId ? (
-                <OfficerHeldRow
-                  date={date}
-                  wing={block.wing}
-                  counts={block.held}
-                  officerAuthorizedId={officerAuthorizedId}
-                />
-              ) : (
-                <MetricRow label="প্রাপ্ত" counts={block.held} />
-              )}
-              <MetricRow label="উপস্থিত" counts={block.present} />
-              {canEdit ? (
-                <OfficerAbsentRow
-                  date={date}
-                  wing={block.wing}
-                  counts={block.absent}
-                  held={block.held}
-                />
-              ) : (
-                <MetricRow label="অনুপস্থিত" counts={block.absent} />
-              )}
-            </tbody>
-          </table>
-        </div>
+  const canEdit = editableOfficer && Boolean(officerAuthorizedId) && !block.withoutRecord;
+  const wingCell = (
+    <WingNameCell>
+      {form2 ? <AdminWingName wing={block.wing} /> : <WingName wing={block.wing} />}
+      {block.withoutRecord ? (
+        <span className="mt-0.5 block text-[11px] font-normal text-neutral-500">
+          রেকর্ড নেই
+        </span>
       ) : null}
-    </div>
+    </WingNameCell>
+  );
+
+  return (
+    <>
+      {canEdit && officerAuthorizedId ? (
+        <OfficerHeldRow
+          date={date}
+          wing={block.wing}
+          counts={block.held}
+          officerAuthorizedId={officerAuthorizedId}
+          wingCell={wingCell}
+          bn={bn}
+        />
+      ) : (
+        <MetricRow
+          label="প্রাপ্ত"
+          counts={block.held}
+          blankOfficer={block.withoutRecord}
+          withWing
+          wingCell={wingCell}
+          bn={bn}
+        />
+      )}
+      <MetricRow
+        label="উপস্থিত"
+        counts={block.present}
+        blankOfficer={block.withoutRecord}
+        withWing
+        bn={bn}
+      />
+      {canEdit ? (
+        <OfficerAbsentRow
+          date={date}
+          wing={block.wing}
+          counts={block.absent}
+          held={block.held}
+          bn={bn}
+        />
+      ) : (
+        <MetricRow
+          label="অনুপস্থিত"
+          counts={block.absent}
+          blankOfficer={block.withoutRecord}
+          withWing
+          bn={bn}
+        />
+      )}
+    </>
   );
 }
 
-/** Screen / tab panel view of Form 2/3 (not print letter). */
-export function StrengthWeb({ report }: Props) {
-  const { locale } = useI18n();
-  const editableOfficer = true;
-  const [branchesOpen, setBranchesOpen] = useState(true);
-  const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
+function AbsenceCells({
+  row,
+  bn,
+}: {
+  row: StrengthAbsenceRow;
+  bn?: boolean;
+}) {
   return (
-    <div className="flex flex-col gap-4 p-1 sm:p-2">
-      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
-        <StrengthReportTitle
-          titleBn={report.titleBn}
-          wingLabel={report.wingLabel}
-          date={report.date}
-          locale={dateLocale}
-        />
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse">
-            <thead>
-              <RankHead />
-            </thead>
-            <tbody>
-              <MetricRow
-                label="প্রাপ্ত"
-                counts={report.grandTotal.held}
-                emphasize
-              />
-              <MetricRow
-                label="উপস্থিত"
-                counts={report.grandTotal.present}
-                emphasize
-              />
-              <MetricRow
-                label="অনুপস্থিত"
-                counts={report.grandTotal.absent}
-                emphasize
-              />
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <>
+      <CountCell value={row.cl} bn={bn} />
+      <CountCell value={row.pl} bn={bn} />
+      <CountCell value={row.rl} bn={bn} />
+      <CountCell value={row.ml} bn={bn} />
+      <CountCell value={row.maternity} bn={bn} />
+      <CountCell value={row.training} bn={bn} />
+      <CountCell value={row.remaining} bn={bn} />
+      <CountCell value={row.exam} bn={bn} />
+      <CountCell value={row.other} bn={bn} />
+      <CountCell value={row.hospital} bn={bn} />
+      <CountCell value={row.avgPresent} bn={bn} />
+      <CountCell value={row.total} bn={bn} />
+    </>
+  );
+}
 
+function HqAbsenceSection({ report }: { report: StrengthReport }) {
+  const isHq = report.formNo === 3;
+  const form2 = report.formNo === 2;
+  const total = sumAbsenceRows(report.absence);
+
+  if (!isHq && !form2) {
+    return (
       <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
         <h3 className="border-b border-neutral-200 px-3 py-2 text-sm font-bold dark:border-neutral-700">
           অনুপস্থিতির বিবরণ
@@ -428,6 +480,9 @@ export function StrengthWeb({ report }: Props) {
                   হাসপাতাল
                 </th>
                 <th className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700">
+                  গড় হাজির
+                </th>
+                <th className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700">
                   সর্বমোট
                 </th>
               </tr>
@@ -438,53 +493,192 @@ export function StrengthWeb({ report }: Props) {
                   <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
                     <WingName wing={row.wing} />
                   </td>
-                  <CountCell value={row.cl} />
-                  <CountCell value={row.pl} />
-                  <CountCell value={row.rl} />
-                  <CountCell value={row.ml} />
-                  <CountCell value={row.maternity} />
-                  <CountCell value={row.training} />
-                  <CountCell value={row.remaining} />
-                  <CountCell value={row.exam} />
-                  <CountCell value={row.other} />
-                  <CountCell value={row.hospital} />
-                  <CountCell value={row.total} />
+                  <AbsenceCells row={row} bn />
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+    );
+  }
 
-      <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
-        <button
-          type="button"
-          onClick={() => setBranchesOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2.5 text-left text-sm font-bold dark:border-neutral-700 dark:bg-neutral-800/60"
-        >
-          <span>শাখা অনুযায়ী</span>
-          <IconChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 text-neutral-400 transition",
-              branchesOpen ? "rotate-0" : "-rotate-90",
-            )}
-          />
-        </button>
-        {branchesOpen ? (
-          <div className="flex flex-col gap-2 p-2 sm:p-3">
-            {report.branches.map((block) => (
-              <BranchCard
-                key={block.wing}
-                block={block}
-                date={report.date}
-                officerAuthorizedId={report.officerAuthorizedId}
-                editableOfficer={editableOfficer}
-                collapsible={false}
+  return (
+    <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] border-collapse text-sm">
+          <thead>
+            <tr className="bg-neutral-100 dark:bg-neutral-800">
+              <th
+                colSpan={6}
+                className="border border-neutral-200 dark:border-neutral-700"
               />
+              <th
+                colSpan={4}
+                className="border border-neutral-200 px-2 py-1.5 text-center text-xs font-semibold dark:border-neutral-700"
+              >
+                অস্থায়ী জনবলের বিবরণ
+              </th>
+              <th className="border border-neutral-200 dark:border-neutral-700" />
+              <th className="border border-neutral-200 dark:border-neutral-700" />
+              <th className="border border-neutral-200 dark:border-neutral-700" />
+            </tr>
+            <tr className="bg-neutral-100 dark:bg-neutral-800">
+              <th className="sticky left-0 z-[1] border border-neutral-200 bg-neutral-100 px-3 py-1.5 text-left text-xs font-semibold dark:border-neutral-700 dark:bg-neutral-800">
+                উইং
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                সিএল
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                পিএল
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                আরএল
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                এমএল
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                * মাতৃত্বকালীন ছুটি
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                প্রশিক্ষণ
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                সাক্ষী
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                পরীক্ষা
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                অন্যান্য
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                হাসপাতাল
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                গড় হাজির
+              </th>
+              <th className="border border-neutral-200 px-2 py-1.5 text-xs font-semibold dark:border-neutral-700">
+                সর্বমোট
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.absence.map((row) => (
+              <tr key={row.wing}>
+                <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
+                  {form2 ? (
+                    <AdminWingName wing={row.wing} />
+                  ) : (
+                    <WingName wing={row.wing} />
+                  )}
+                </td>
+                <AbsenceCells row={row} bn />
+              </tr>
             ))}
-          </div>
-        ) : null}
+            <tr className="bg-neutral-100 font-semibold dark:bg-neutral-800/80">
+              <td className="sticky left-0 z-[1] border border-neutral-200 bg-neutral-100 px-3 py-1.5 text-left text-sm dark:border-neutral-700 dark:bg-neutral-800">
+                সর্বমোট
+              </td>
+              <AbsenceCells row={total} bn />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/** Screen / tab panel view of Form 2/3 (not print letter). */
+export function StrengthWeb({ report }: Props) {
+  const isHq = report.formNo === 3;
+  const form2 = report.formNo === 2;
+  const bn = true;
+  return (
+    <div className="flex flex-col gap-6 p-1 sm:p-2">
+      <section className="overflow-hidden rounded-xl border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900">
+        <StrengthReportTitle
+          titleBn={report.titleBn}
+          wingLabel={report.wingLabel}
+          date={report.date}
+          locale="bn-BD"
+        />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse">
+            <thead>
+              <RankHead metricLabel={form2 ? "ডিটেইল" : "বিবরণ"} />
+            </thead>
+            <tbody>
+              <MetricRow
+                label="প্রাপ্ত"
+                counts={report.grandTotal.held}
+                emphasize
+                bn={bn}
+              />
+              <MetricRow
+                label="উপস্থিত"
+                counts={report.grandTotal.present}
+                emphasize
+                bn={bn}
+              />
+              <MetricRow
+                label="অনুপস্থিত"
+                counts={report.grandTotal.absent}
+                emphasize
+                bn={bn}
+              />
+            </tbody>
+          </table>
+        </div>
       </section>
+
+      <section className="flex flex-col gap-2">
+        {form2 ? null : (
+          <h3 className="px-1 text-sm font-bold">{report.wingLabel}</h3>
+        )}
+        <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse">
+              <thead>
+                <RankHead
+                  withWing
+                  metricLabel={form2 ? "জনবল" : "বিবরণ"}
+                />
+              </thead>
+              <tbody>
+                {report.branches.map((block) => (
+                  <BranchRows
+                    key={block.wing}
+                    block={block}
+                    date={report.date}
+                    officerAuthorizedId={report.officerAuthorizedId}
+                    editableOfficer
+                    bn={bn}
+                    form2={form2}
+                  />
+                ))}
+                {form2 ? (
+                  <BranchRows
+                    block={report.grandTotal}
+                    date={report.date}
+                    officerAuthorizedId={null}
+                    bn={bn}
+                    form2
+                  />
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      {isHq || form2 ? (
+        <h3 className="px-1 text-sm font-bold">* অন্যান্য কর্তব্য</h3>
+      ) : null}
+
+      <HqAbsenceSection report={report} />
     </div>
   );
 }

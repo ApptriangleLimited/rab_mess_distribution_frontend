@@ -16,7 +16,7 @@ const AUTHORIZED_LABEL_BN: Record<string, string> = {
   rt: "আরটি",
   asi: "এএসআই",
   aasi: "এএএসআই",
-  ance: "এএনসিই",
+  ance: "এনসি(ই)",
   "nc(e)": "এনসি(ই)",
   nce: "এনসি(ই)",
   attached: "সংযুক্ত",
@@ -27,7 +27,7 @@ const AUTHORIZED_LABEL_BN: Record<string, string> = {
 const WING_LABEL_BN: Record<string, string> = {
   "ops wg": "অপস উইং",
   "int wg": "ইন্ট উইং",
-  "l & m wg": "এল এন্ড এম উইং",
+  "l & m wg": "লিঃ এন্ড মিডিঃ উইং",
   "air wg": "এয়ার উইং",
   "comm & mis wg": "যোগাযোগ উইং",
   "inv wg": "তদন্ত উইং",
@@ -39,8 +39,9 @@ const WING_LABEL_BN: Record<string, string> = {
   "admin (new)": "এ্যাডমিন (নতুন)",
   "admin (old)": "এ্যাডমিন (পুরাতন)",
   "dg office": "ডিজি দপ্তর",
-  "adg (ops) office": "এডিজি (অপাঃ) দপ্তর",
-  "adg (admin) office": "এডিজি (এ্যাডমিন) দপ্তর",
+  "adg (ops) office": "এডিজি অপস দপ্তর",
+  "adg (admin) office": "এডিজি এ্যাডমিন দপ্তর",
+  "director (admin) office": "পরিচালক এ্যাডমিন দপ্তর",
   "fin br": "অর্থ শাখা",
   "per br": "পার্সোনেল শাখা",
   "gen br": "জেনারেল শাখা",
@@ -62,8 +63,8 @@ const WING_LABEL_BN: Record<string, string> = {
   "record branch": "রেকর্ড শাখা",
   "forces mess": "ফোর্সেস মেস",
   "field mess": "ফিল্ড মেস",
-  "mt branch": "এমটি",
-  "new / temporary attached": "নতুন / অস্থায়ী সংযুক্ত",
+  "mt branch": "এমটি শাখা",
+  "new / temporary attached": "নতুন অস্থায়ী সংযুক্ত",
   সদর: "সদর",
   sadar: "সদর",
   hq: "সদর",
@@ -79,6 +80,19 @@ function normalizeKey(label: string): string {
 export function authorizedLabelBn(englishLabel: string): string {
   const key = normalizeKey(englishLabel);
   return AUTHORIZED_LABEL_BN[key] ?? englishLabel;
+}
+
+/** Form 1 paper rank headers — hide সংযুক্ত (not on the official sheet). */
+export function isForm1RankColumn(englishLabel: string): boolean {
+  const key = normalizeKey(englishLabel);
+  return key !== "attached" && key !== "attach";
+}
+
+/** Form 1 rank header. Paper: অফিসার…এনসি(ই) সিভিল. */
+export function form1RankLabelBn(englishLabel: string): string {
+  const key = normalizeKey(englishLabel);
+  if (key === "co") return "কনস্টেবল";
+  return authorizedLabelBn(englishLabel);
 }
 
 /** Bangla wing name for print. Fallback = English short. Match still English. */

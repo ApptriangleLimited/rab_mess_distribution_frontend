@@ -29,6 +29,7 @@ import { monthDateBounds } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
 import { buildRangeLedger, withReportSource } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
+import { wingSettingsLabel } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
 
 function defaultRange() {
@@ -219,7 +220,7 @@ export default function RationMonthlyClient() {
                 <SelectItem value="all">{t("common.allWing")}</SelectItem>
                 {wings.map((w) => (
                   <SelectItem key={w} value={w}>
-                    {w}
+                    {wingSettingsLabel(w)}
                   </SelectItem>
                 ))}
               </SelectContent>
