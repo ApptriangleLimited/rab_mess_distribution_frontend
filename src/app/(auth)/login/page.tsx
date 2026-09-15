@@ -128,8 +128,6 @@ export default function LoginPage() {
         data.refresh_token,
         data.staff.email,
       );
-      const { syncStoreFromApi } = await import("@/lib/api/app-sync");
-      await syncStoreFromApi();
       try {
         if (rememberMe) {
           localStorage.setItem(REMEMBER_EMAIL_KEY, nextEmail);

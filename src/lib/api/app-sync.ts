@@ -1,6 +1,7 @@
 import { apiJson } from "@/lib/api/client";
 import {
   isApiFeatureMissing,
+  markApiFeatureMissing,
   rememberMissingRoute,
 } from "@/lib/api/compat";
 import { isCcApiEnabled } from "@/lib/api/mode";
@@ -116,8 +117,10 @@ export async function syncStoreFromApi() {
     const remote = await fetchAppSnapshot();
     applyApiSnapshot(snapshotToState(remote));
   } catch (err) {
-    if (rememberMissingRoute("snapshot", err)) return;
-    throw err;
+    // Older hosts (api.ms.apptriangle.com) have login but no snapshot.
+    // A 404 page often has no CORS headers, so fetch throws without .status.
+    rememberMissingRoute("snapshot", err);
+    markApiFeatureMissing("snapshot");
   } finally {
     syncing = false;
   }
