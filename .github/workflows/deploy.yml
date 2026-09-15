@@ -95,8 +95,25 @@ jobs:
             echo "Leaving Postgres and Redis running (same .env passwords / volumes)..."
             $COMPOSE up -d postgres redis
 
-            echo "Recreating app containers only..."
-            $COMPOSE up -d --no-deps --force-recreate --remove-orphans api worker web nginx
+            echo "Recreating API first so nginx/web do not wait on a cold health check..."
+            $COMPOSE up -d --no-deps --force-recreate --remove-orphans api
+            live_ok=0
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
+              if $COMPOSE exec -T api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"; then
+                live_ok=1
+                break
+              fi
+              echo "API not live yet (attempt ${i}/24)..."
+              sleep 5
+            done
+            if [ "$live_ok" != 1 ]; then
+              echo "FATAL: API did not become live. Last logs:" >&2
+              $COMPOSE logs --tail=80 api >&2
+              exit 1
+            fi
+
+            echo "Recreating worker, web, and nginx..."
+            $COMPOSE up -d --no-deps --force-recreate --remove-orphans worker web nginx
 
             echo "Checking container status..."
             $COMPOSE ps
@@ -105,15 +122,6 @@ jobs:
             $COMPOSE run --rm api alembic upgrade head
 
             echo "Deployment health gate (in-network)..."
-            live_ok=0
-            for i in 1 2 3 4 5 6 7 8 9 10; do
-              if $COMPOSE exec -T api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"; then
-                live_ok=1
-                break
-              fi
-              sleep 3
-            done
-            test "$live_ok" = 1
             $COMPOSE exec -T api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"
 
             if [ -n "${HEALTH_BASE_URL:-}" ]; then

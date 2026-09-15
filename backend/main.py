@@ -398,7 +398,8 @@ def postgres_up() -> bool:
 
 @app.get("/health")
 def health():
-    return envelope({"status": "ok", "redis": "up" if redis_up() else "down"})
+    """Process liveness only — Redis/DB belong on /health/ready."""
+    return envelope({"status": "ok"})
 
 
 @app.get("/health/live")
