@@ -5,6 +5,7 @@ import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatMonthLong } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
+import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -190,21 +191,19 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           </tfoot>
         </table>
 
-        <div className="mt-10 grid grid-cols-4 gap-4 text-center text-[9px]">
-          {(
+        <ConsumeSignOff
+          className="gap-3 text-[9px]"
+          labels={(
             [
+              "consume.signDailySi",
               "consume.signConsumeSi",
               "consume.signPicketSi",
               "consume.signSeniorDad",
               "consume.signMessPresident",
+              "consume.signLastOfficer",
             ] as const
-          ).map((key) => (
-            <div key={key} className="pt-8">
-              <div className="mx-auto mb-2 h-px w-28 bg-black" />
-              <p>{t(key)}</p>
-            </div>
-          ))}
-        </div>
+          ).map((key) => t(key))}
+        />
       </div>
     );
   },

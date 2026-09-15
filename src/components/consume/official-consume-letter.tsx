@@ -10,6 +10,7 @@ import {
   type OfficialConsumeRow,
   type OfficialConsumeTable,
 } from "@/lib/consume-official-reports";
+import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,11 +19,12 @@ type Props = {
 };
 
 const SIGNS = [
+  "দৈনিক এসআই",
   "কনজিউম এসআই",
   "সিকিউ এসআই",
   "সিনিয়র ডিএডি (প্রশাসন)",
-  "সিনিয়র সহকারী পরিচালক (জেনারেল)\nসভাপতি, মেস কমিটি, ফোর্সেস মেস",
-  "মেজর\nউপ-পরিচালক (সদর দপ্তর)\nর‌্যাব ফোর্সেস সদর দপ্তর",
+  "সভাপতি\nমেস কমিটি, ফোর্সেস মেস",
+  "মেজর\nউপ-পরিচালক (সদর দপ্তর)\nএসআরবি ফোর্সেস সদর দপ্তর",
 ] as const;
 
 function cell(n: number) {
@@ -30,18 +32,7 @@ function cell(n: number) {
 }
 
 function Signs() {
-  return (
-    <footer className="mt-10 grid grid-cols-5 gap-2 text-center text-[9px] leading-tight text-black">
-      {SIGNS.map((label) => (
-        <div key={label} className="min-w-0 pt-8">
-          <div className="mx-auto mb-1.5 h-px w-full max-w-[7.5rem] bg-black" />
-          {label.split("\n").map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-        </div>
-      ))}
-    </footer>
-  );
+  return <ConsumeSignOff labels={SIGNS} className="text-[9px]" />;
 }
 
 function Header({ table }: { table: OfficialConsumeTable }) {
@@ -64,26 +55,28 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
     <table className="w-full border-collapse text-[9px] text-black">
       <thead>
         <tr>
-          <th className="border border-black px-1 py-1">ক্র/নং</th>
-          <th className="border border-black px-1 py-1 text-left">
+          <th className="border border-black px-1 py-1 align-bottom">ক্র/নং</th>
+          <th className="border border-black px-1 py-1 text-left align-bottom">
             {table.kind === "consume-pages" ? "পাতা নং" : "উইংয়ের নাম"}
           </th>
           {pageCol ? (
-            <th className="border border-black px-1 py-1">পাতা নং</th>
+            <th className="border border-black px-1 py-1 align-bottom">পাতা নং</th>
           ) : null}
-          <th className="border border-black px-1 py-1">জেনারেল</th>
-          <th className="border border-black px-1 py-1">এমএস</th>
-          <th className="border border-black px-1 py-1">এফআর</th>
-          <th className="border border-black px-1 py-1">সিএল</th>
-          <th className="border border-black px-1 py-1">পিএল</th>
-          <th className="border border-black px-1 py-1">কমান্ডো ডিউটি</th>
-          <th className="border border-black px-1 py-1">ট্রেনিং</th>
-          <th className="border border-black px-1 py-1">ছুটি</th>
-          <th className="border border-black px-1 py-1">হাসপাতাল</th>
-          <th className="border border-black px-1 py-1">রেশন বিহীন</th>
-          <th className="border border-black px-1 py-1">মোট দিন</th>
+          <th className="border border-black px-1 py-1 align-bottom">জনবল</th>
+          <th className="border border-black px-1 py-1 align-bottom">মেস</th>
+          <th className="border border-black px-1 py-1 align-bottom">এফআর</th>
+          <th className="border border-black px-1 py-1 align-bottom">সিএল</th>
+          <th className="border border-black px-1 py-1 align-bottom">পিএল</th>
+          <th className="border border-black px-1 py-1 align-bottom">সিডি</th>
+          <th className="border border-black px-1 py-1 align-bottom">ট্রেনিং</th>
+          <th className="border border-black px-1 py-1 align-bottom">সাক্ষী</th>
+          <th className="border border-black px-1 py-1 align-bottom">হাসপাতাল</th>
+          <th className="border border-black px-1 py-1 align-bottom leading-tight">
+            রেশন বিহীন
+          </th>
+          <th className="border border-black px-1 py-1 align-bottom">মোট দিন</th>
           {table.remarks ? (
-            <th className="border border-black px-1 py-1">মন্তব্য</th>
+            <th className="border border-black px-1 py-1 align-bottom">মন্তব্য</th>
           ) : null}
         </tr>
       </thead>
@@ -141,17 +134,19 @@ function TagTable({ table }: { table: OfficialConsumeTable }) {
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
         <tr>
-          <th className="border border-black px-1.5 py-1">ক্র/নং</th>
-          <th className="border border-black px-1.5 py-1 text-left">
+          <th className="border border-black px-1.5 py-1 align-bottom">ক্র/নং</th>
+          <th className="border border-black px-1.5 py-1 text-left align-bottom">
             উইংয়ের নাম
           </th>
           {table.showPageNo ? (
-            <th className="border border-black px-1.5 py-1">পাতা নং</th>
+            <th className="border border-black px-1.5 py-1 align-bottom">পাতা নং</th>
           ) : null}
-          <th className="border border-black px-1.5 py-1">জেনারেল</th>
-          <th className="border border-black px-1.5 py-1">{table.tagLabel}</th>
+          <th className="border border-black px-1.5 py-1 align-bottom">জনবল</th>
+          <th className="border border-black px-1.5 py-1 align-bottom">
+            {table.tagLabel}
+          </th>
           {table.remarks ? (
-            <th className="border border-black px-1.5 py-1">মন্তব্য</th>
+            <th className="border border-black px-1.5 py-1 align-bottom">মন্তব্য</th>
           ) : null}
         </tr>
       </thead>
@@ -186,24 +181,24 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
         <tr>
-          <th className="border border-black px-1 py-1">ক্র/নং</th>
-          <th className="border border-black px-1 py-1 text-left">
+          <th className="border border-black px-1 py-1 align-bottom">ক্র/নং</th>
+          <th className="border border-black px-1 py-1 text-left align-bottom">
             উইংয়ের নাম
           </th>
           {table.showPageNo ? (
-            <th className="border border-black px-1 py-1">পাতা নং</th>
+            <th className="border border-black px-1 py-1 align-bottom">পাতা নং</th>
           ) : null}
           {table.showManpower ? (
-            <th className="border border-black px-1 py-1">জেনারেল</th>
+            <th className="border border-black px-1 py-1 align-bottom">জনবল</th>
           ) : null}
-          <th className="border border-black px-1 py-1">সিএল</th>
-          <th className="border border-black px-1 py-1">পিএল</th>
-          <th className="border border-black px-1 py-1">ট্রেনিং</th>
-          <th className="border border-black px-1 py-1">ছুটি</th>
-          <th className="border border-black px-1 py-1">হাসপাতাল</th>
-          <th className="border border-black px-1 py-1">সর্বমোট</th>
+          <th className="border border-black px-1 py-1 align-bottom">সিএল</th>
+          <th className="border border-black px-1 py-1 align-bottom">পিএল</th>
+          <th className="border border-black px-1 py-1 align-bottom">ট্রেনিং</th>
+          <th className="border border-black px-1 py-1 align-bottom">সাক্ষী</th>
+          <th className="border border-black px-1 py-1 align-bottom">হাসপাতাল</th>
+          <th className="border border-black px-1 py-1 align-bottom">সর্বমোট</th>
           {table.remarks ? (
-            <th className="border border-black px-1 py-1">মন্তব্য</th>
+            <th className="border border-black px-1 py-1 align-bottom">মন্তব্য</th>
           ) : null}
         </tr>
       </thead>

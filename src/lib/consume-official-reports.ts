@@ -76,7 +76,7 @@ export function fromBnDigits(value: string) {
   return value.replace(/[০-৯]/g, (d) => String("০১২৩৪৫৬৭৮৯".indexOf(d)));
 }
 
-/** ছুটি — leave besides CL / PL (not WR; WR is রেশন বিহীন). */
+/** সাক্ষী column — leave besides CL / PL (not WR; WR is রেশন বিহীন). */
 const LEAVE_TAGS: DailyTag[] = ["RL", "JL", "OSL", "AWL", "MOL"];
 const HOSPITAL_TAGS: DailyTag[] = ["MED", "CMH", "BGH", "RBH"];
 
@@ -342,7 +342,7 @@ export function buildOfficialLeaveBill(month: string): OfficialConsumeReport {
   const wings = buildOfficialWingConsume(month);
   return {
     ...wings,
-    title: `সকল উইং এর সিএল, পিএল, ট্রেনিং, ছুটি ও হাসপাতাল বিলের সারাংশ ${officialMonthLabelBn(month)}`,
+    title: `সকল উইং এর সিএল, পিএল, ট্রেনিং, সাক্ষী ও হাসপাতাল বিলের সারাংশ ${officialMonthLabelBn(month)}`,
   };
 }
 
@@ -504,7 +504,7 @@ export function buildOfficialConsumePack(
     const perWing = WING_DEFS.map((def) => {
       const row = wings.rows.find((r) => r.id === def.id) ?? rowFromBucket(def, 1, emptyBucket());
       return consumeTable(
-        `উইং অনুযায়ী সিএল, পিএল, ট্রেনিং, ছুটি ও হাসপাতাল বিলের সারাংশ ${monthLabelBn}`,
+        `উইং অনুযায়ী সিএল, পিএল, ট্রেনিং, সাক্ষী ও হাসপাতাল বিলের সারাংশ ${monthLabelBn}`,
         [org],
         [{ ...row, sl: 1 }],
         {

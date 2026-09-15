@@ -4,6 +4,7 @@ import { forwardRef } from "react";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatBdt, type TagBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
+import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -159,26 +160,19 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
         </tfoot>
       </table>
 
-      <footer
-        className={cn(
-          "mt-10 grid gap-8 text-center text-[11px] text-black",
-          "grid-cols-2 sm:grid-cols-4",
-        )}
-      >
-        {(
+      <ConsumeSignOff
+        className="grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
+        labels={(
           [
+            "consume.signDailySi",
             "consume.signConsumeSi",
             "consume.signScheduleSi",
             "consume.signSeniorDad",
             "consume.signMessPresident",
+            "consume.signLastOfficer",
           ] as const
-        ).map((key) => (
-          <div key={key} className="pt-10">
-            <div className="mx-auto mb-2 h-px w-28 bg-black" />
-            <p>{t(key)}</p>
-          </div>
-        ))}
-      </footer>
+        ).map((key) => t(key))}
+      />
     </div>
   );
   },
