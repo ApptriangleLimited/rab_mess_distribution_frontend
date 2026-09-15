@@ -342,7 +342,7 @@ export function setTagRange(
   const trg_tone = trgToneForWrite(userId, tag, meta);
   setState((prev) => {
     const earliest = allowed.reduce((min, d) => (d < min ? d : min), allowed[0]!);
-    let next = freezePriorTags(
+    const next = freezePriorTags(
       prev.assignments,
       prev.users,
       userId,

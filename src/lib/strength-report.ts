@@ -428,7 +428,7 @@ function branchesForScope(
   if (scope === "hq") {
     const roots = ["HQ Br"];
     const listed = [...HQ_SUB_WINGS];
-    let branches = listed.filter((w) => !isBannedWing(w));
+    const branches = listed.filter((w) => !isBannedWing(w));
     return {
       branches,
       roots,
@@ -455,7 +455,7 @@ export function buildStrengthReport(
 ): StrengthReport {
   const state = getState();
   const cfg = branchesForScope(scope);
-  let { branches } = cfg;
+  const { branches } = cfg;
   const branchSet = new Set(branches);
   const wingParent = {
     ...DEFAULT_WING_PARENT,

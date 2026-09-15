@@ -115,6 +115,23 @@ export function OrgListSection({
   const { toast } = useToast();
   const state = useStore();
   const copy = COPY[kind];
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [formValue, setFormValue] = useState("");
+  const [formElaborate, setFormElaborate] = useState("");
+  const [deleteLabel, setDeleteLabel] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expandedRankForces, setExpandedRankForces] = useState<
+    Record<string, boolean>
+  >({});
+  const [forceRankForce, setForceRankForce] = useState<string | null>(null);
+  const [editingForceRank, setEditingForceRank] = useState<string | null>(null);
+  const [forceRankShort, setForceRankShort] = useState("");
+  const [forceRankFull, setForceRankFull] = useState("");
+  const [deleteForceRank, setDeleteForceRank] = useState<{
+    force: string;
+    rank: string;
+  } | null>(null);
 
   if (kind === "wing") {
     return (
@@ -143,24 +160,6 @@ export function OrgListSection({
   const ranks = state.ranks;
   const forces = state.forces;
   const expandable = kind === "rank" || kind === "force";
-
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingLabel, setEditingLabel] = useState<string | null>(null);
-  const [formValue, setFormValue] = useState("");
-  const [formElaborate, setFormElaborate] = useState("");
-  const [deleteLabel, setDeleteLabel] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [expandedRankForces, setExpandedRankForces] = useState<
-    Record<string, boolean>
-  >({});
-  const [forceRankForce, setForceRankForce] = useState<string | null>(null);
-  const [editingForceRank, setEditingForceRank] = useState<string | null>(null);
-  const [forceRankShort, setForceRankShort] = useState("");
-  const [forceRankFull, setForceRankFull] = useState("");
-  const [deleteForceRank, setDeleteForceRank] = useState<{
-    force: string;
-    rank: string;
-  } | null>(null);
 
   function rankForceKey(rank: string, force: string) {
     return `${rank}::${force}`;
