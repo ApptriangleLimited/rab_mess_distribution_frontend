@@ -51,6 +51,7 @@ services:
         NEXT_PUBLIC_API_URL: ""
         NEXT_PUBLIC_API_BASE_URL: ""
         API_PROXY_URL: http://api:8000
+        GIT_SHA: ${GIT_SHA:-dev}
 
   nginx:
     image: nginx:1.27-alpine
