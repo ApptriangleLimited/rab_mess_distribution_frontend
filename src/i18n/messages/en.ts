@@ -843,6 +843,7 @@ export const en = {
     viewDocument: "View",
     documentUnavailable: "This document cannot be opened.",
     documentOpenFail: "Could not open the document.",
+    fileTooLarge: "File is too large. PNG or JPG up to 2.5 MB is allowed.",
     placeholders: {
       name: "Full name",
       personalId: "e.g. NID / personal no.",

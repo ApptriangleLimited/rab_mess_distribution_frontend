@@ -88,7 +88,7 @@ class Settings:
         self.storage_region = os.getenv("STORAGE_REGION", "us-east-1")
         self.storage_access_key = os.getenv("STORAGE_ACCESS_KEY", "")
         self.storage_secret_key = os.getenv("STORAGE_SECRET_KEY", "")
-        self.max_upload_bytes = int(os.getenv("MAX_UPLOAD_BYTES", str(8 * 1024 * 1024)))
+        self.max_upload_bytes = int(os.getenv("MAX_UPLOAD_BYTES", str(32 * 1024 * 1024)))
 
     @property
     def is_production(self) -> bool:

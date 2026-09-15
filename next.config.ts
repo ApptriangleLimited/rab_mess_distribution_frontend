@@ -35,6 +35,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  experimental: {
+    proxyClientMaxBodySize: "8mb",
+    serverActions: {
+      bodySizeLimit: "8mb",
+    },
+  },
   /** Hide the Next.js “N” route/bundler badge in local dev. */
   devIndicators: false,
   async rewrites() {

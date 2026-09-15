@@ -339,7 +339,9 @@ export function UserForm({
       } catch (err) {
         toast(
           err instanceof ApiClientError
-            ? err.detail
+            ? err.status === 413
+              ? t("cc.fileTooLarge")
+              : err.detail
             : t("cc.documentOpenFail"),
           "error",
         );

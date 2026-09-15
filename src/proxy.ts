@@ -12,6 +12,7 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/") ||
+    pathname.startsWith("/upload/") ||
     pathname.startsWith("/favicon") ||
     pathname.includes(".")
   ) {

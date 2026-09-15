@@ -59,6 +59,7 @@ ROLE_PERMISSIONS = {
         "report.view",
         "snapshot.read",
         "snapshot.write",
+        "file.upload",
         "file.download",
         "notification.view",
         "auth.manage",

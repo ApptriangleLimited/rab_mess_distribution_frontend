@@ -153,7 +153,9 @@ export async function apiJson<T>(path: string, init?: RequestInit, retried = fal
     throw new ApiClientError(
       res.status,
       problem.code ?? "INTERNAL_ERROR",
-      problem.detail ?? problem.message ?? "Request failed",
+      res.status === 413
+        ? "File is too large. PNG or JPG up to 2.5 MB is allowed."
+        : (problem.detail ?? problem.message ?? "Request failed"),
       problem.errors ?? [],
     );
   }

@@ -30,15 +30,57 @@ export function normalizeDocuments(docs: unknown): DocumentMeta[] {
   });
 }
 
-export function uploadFile(
+/** Host nginx often caps /api at 1MB and the old live API has no POST /files. */
+const UPLOAD_PATH = "/upload/files";
+const CONTENT_PATH = (id: string) => `/upload/files/${encodeURIComponent(id)}/content`;
+/** Send PNG/JPG as-is through 2.5 MB. Only shrink bigger camera shots. */
+const KEEP_AS_IS_BYTES = Math.round(2.5 * 1024 * 1024);
+
+async function compressImage(file: File): Promise<File> {
+  if (typeof createImageBitmap !== "function") return file;
+  const bitmap = await createImageBitmap(file);
+  const maxEdge = 1600;
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return file;
+  }
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.82),
+  );
+  if (!blob || blob.size >= file.size) return file;
+  const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+  return new File([blob], name, { type: "image/jpeg" });
+}
+
+async function prepareUploadFile(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  if (file.size <= KEEP_AS_IS_BYTES) return file;
+  try {
+    return await compressImage(file);
+  } catch {
+    return file;
+  }
+}
+
+export async function uploadFile(
   file: File,
   opts: { entity_type?: string; entity_id?: string } = {},
 ) {
+  const ready = await prepareUploadFile(file);
   const body = new FormData();
-  body.append("upload", file);
+  body.append("upload", ready);
   body.append("entity_type", opts.entity_type ?? "");
   body.append("entity_id", opts.entity_id ?? "");
-  return apiJson<UploadedFile>("/api/v1/files", { method: "POST", body });
+  return apiJson<UploadedFile>(UPLOAD_PATH, { method: "POST", body });
 }
 
 export type DocumentKind = "image" | "pdf" | "file";
@@ -79,7 +121,7 @@ export async function downloadFileBlob(fileId: string): Promise<Blob> {
   const headers = new Headers({ Accept: "*/*" });
   const token = getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(apiUrl(`/api/v1/files/${encodeURIComponent(fileId)}/content`), {
+  const res = await fetch(apiUrl(CONTENT_PATH(fileId)), {
     headers,
   });
   if (!res.ok) {

@@ -845,6 +845,7 @@ export const bn = {
     viewDocument: "দেখুন",
     documentUnavailable: "এই ডকুমেন্ট খোলা যাচ্ছে না।",
     documentOpenFail: "ডকুমেন্ট খোলা যায়নি।",
+    fileTooLarge: "ফাইলটি বড়। ২.৫ এমবি পর্যন্ত PNG বা JPG চলবে।",
     placeholders: {
       name: "পূর্ণ নাম",
       personalId: "যেমন NID / পার্সোনাল নং",
