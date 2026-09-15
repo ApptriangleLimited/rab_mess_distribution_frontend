@@ -51,7 +51,11 @@ services:
     container_name: rab-mess-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg://mess:${POSTGRES_PASSWORD:-mess}@postgres:5432/rab_mess
+      POSTGRES_USER: mess
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mess}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: rab_mess
       REDIS_URL: redis://redis:6379/0
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-120}
@@ -94,7 +98,11 @@ services:
     restart: unless-stopped
     command: ["python", "worker.py"]
     environment:
-      DATABASE_URL: postgresql+psycopg://mess:${POSTGRES_PASSWORD:-mess}@postgres:5432/rab_mess
+      POSTGRES_USER: mess
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mess}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: rab_mess
       REDIS_URL: redis://redis:6379/0
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       JWT_SECRET: ${JWT_SECRET:-local-dev-cc-jwt-secret-change-me}

@@ -78,6 +78,19 @@ def test_redis_log_target_hides_password(monkeypatch):
     assert "redis:6379" in target
 
 
+def test_database_url_encodes_special_password(monkeypatch):
+    from database import resolve_database_url
+
+    monkeypatch.setenv("POSTGRES_HOST", "postgres")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "p@ss/word$x")
+    monkeypatch.setenv("POSTGRES_USER", "mess")
+    monkeypatch.setenv("POSTGRES_DB", "rab_mess")
+    url = resolve_database_url()
+    assert "p@ss/word" not in url
+    assert "p%40ss%2Fword%24x" in url
+    assert url.startswith("postgresql+psycopg://mess:")
+
+
 def test_production_requires_redis_password(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET", "a" * 40)
