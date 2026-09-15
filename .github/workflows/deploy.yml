@@ -50,8 +50,10 @@ jobs:
             if [ -f "$ENV_BACKUP" ]; then
               cp -a "$ENV_BACKUP" "$ENV_FILE"
               echo "Restored server .env (Postgres/Redis/JWT unchanged)"
-            else
-              echo "WARNING: no server .env — copy env.docker.example to .env" >&2
+            fi
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "FATAL: server .env is missing. Leave the production file on the host; it is not in GitHub." >&2
+              exit 1
             fi
 
             GIT_SHA="$(git rev-parse HEAD)"
@@ -60,10 +62,12 @@ jobs:
             # Compose interpolates Postgres/Redis/JWT from the restored .env.
             set -a
             # shellcheck disable=SC1091
-            if [ -f "$ENV_FILE" ]; then
-              . "$ENV_FILE"
-            fi
+            . "$ENV_FILE"
             set +a
+            if [ -z "${POSTGRES_PASSWORD:-}" ] || [ -z "${REDIS_PASSWORD:-}" ]; then
+              echo "FATAL: .env must set POSTGRES_PASSWORD and REDIS_PASSWORD" >&2
+              exit 1
+            fi
             # Never bake api.ms.apptriangle.com into the Next client (CORS).
             export NEXT_PUBLIC_API_URL=
             export NEXT_PUBLIC_API_BASE_URL=
@@ -88,8 +92,11 @@ jobs:
             echo "Building Docker images..."
             $COMPOSE build web api
 
-            echo "Starting containers..."
-            $COMPOSE up -d --force-recreate --remove-orphans
+            echo "Leaving Postgres and Redis running (same .env passwords / volumes)..."
+            $COMPOSE up -d postgres redis
+
+            echo "Recreating app containers only..."
+            $COMPOSE up -d --no-deps --force-recreate --remove-orphans api worker web nginx
 
             echo "Checking container status..."
             $COMPOSE ps
