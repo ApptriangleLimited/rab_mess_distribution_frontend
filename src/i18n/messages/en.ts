@@ -205,12 +205,10 @@ export const en = {
     welcome: "Welcome",
     subtitle: "Staff username and password. Role comes from the account.",
     panelBlurb:
-      "Frontend prototype for CC, Daily, Mess, Consume, and Ration workflows.",
+      "Duty desks for CC, Daily, Mess, Consume, and Ration.",
     panelTag: "Duty gate",
     gateLabel: "Sign in",
     chooseDuty: "Duty desk",
-    localOnly: "Staff login against the API. Demo usernames are {role}@mess.rab.",
-    localOnlyDemo: "Frontend demo — no API. Data stays in this browser.",
     subtitleDemo: "Use a demo username and password, or pick a desk below.",
     passwordHintDemo: "Each demo desk shows its username and password.",
     email: "Username",

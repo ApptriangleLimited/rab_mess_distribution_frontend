@@ -1,6 +1,7 @@
 import { apiJson } from "@/lib/api/client";
 import {
   isApiFeatureMissing,
+  isLegacyLiveApi,
   markApiFeatureMissing,
   rememberMissingRoute,
 } from "@/lib/api/compat";
@@ -92,6 +93,9 @@ function stateToPayload(state: AppState) {
 }
 
 export function fetchAppSnapshot() {
+  if (isLegacyLiveApi() || isApiFeatureMissing("snapshot")) {
+    return Promise.reject(new Error("snapshot unavailable"));
+  }
   return apiJson<AppSnapshot>("/api/v1/app/snapshot");
 }
 
@@ -111,7 +115,7 @@ export function importAppSnapshot(state: AppState) {
 
 export async function syncStoreFromApi() {
   if (!isCcApiEnabled() || !getAccessToken() || syncing) return;
-  if (isApiFeatureMissing("snapshot")) return;
+  if (isLegacyLiveApi() || isApiFeatureMissing("snapshot")) return;
   syncing = true;
   try {
     const remote = await fetchAppSnapshot();
@@ -128,7 +132,7 @@ export async function syncStoreFromApi() {
 
 function schedulePersist(state: AppState) {
   if (!isCcApiEnabled() || !getAccessToken() || syncing) return;
-  if (isApiFeatureMissing("snapshot")) return;
+  if (isLegacyLiveApi() || isApiFeatureMissing("snapshot")) return;
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     void saveAppSnapshot(state).catch((err) => {

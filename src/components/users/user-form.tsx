@@ -332,7 +332,7 @@ export function UserForm({
       try {
         const row = await uploadFile(file, { entity_type: "member" });
         uploaded.push({
-          id: row.id,
+          id: row.id || row.file_id,
           name: row.original_name || file.name,
           size: row.size || file.size,
         });

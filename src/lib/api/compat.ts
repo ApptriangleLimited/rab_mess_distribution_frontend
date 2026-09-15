@@ -1,21 +1,45 @@
 /** Older hosts (e.g. api.ms.apptriangle.com) have login but not every current route. */
 
+import { apiBaseUrl } from "@/lib/api/mode";
+
 export type ApiFeature = "snapshot" | "tag-requests" | "member-get";
 
 const STORAGE_KEY = "rab.api.missing";
 const missing = new Set<ApiFeature>();
 
-function configuredApiHost(): string {
-  return (
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    ""
-  ).toLowerCase();
+function envApiText(): string {
+  return [
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.NEXT_PUBLIC_API_BASE_URL,
+    process.env.API_PROXY_URL,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
-/** Live ms API predates snapshot / tag-request / member-get routes. */
+function requestApiHost(): string {
+  const base = apiBaseUrl();
+  if (base) {
+    try {
+      return new URL(base).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+  if (typeof window !== "undefined") return window.location.hostname.toLowerCase();
+  return "";
+}
+
+/** Live ms frontend / API predates snapshot / tag-request / member-get routes. */
 export function isLegacyLiveApi(): boolean {
-  return configuredApiHost().includes("api.ms.apptriangle.com");
+  if (envApiText().includes("api.ms.apptriangle.com")) return true;
+  const host = requestApiHost();
+  return (
+    host === "api.ms.apptriangle.com" ||
+    host === "ms.apptriangle.com" ||
+    host === "www.ms.apptriangle.com"
+  );
 }
 
 function persistMissing() {
@@ -48,6 +72,7 @@ function loadMissing() {
 loadMissing();
 
 export function isApiFeatureMissing(feature: ApiFeature) {
+  if (feature === "snapshot" && isLegacyLiveApi()) return true;
   return missing.has(feature);
 }
 

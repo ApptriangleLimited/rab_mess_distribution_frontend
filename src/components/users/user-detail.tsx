@@ -22,8 +22,7 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
-import { downloadFileBlob } from "@/lib/api/files";
-import { isCcApiEnabled } from "@/lib/api/mode";
+import { openStoredDocument } from "@/lib/api/files";
 import { MEMBER_TYPES } from "@/lib/constants";
 import type { ApprovalStatus, DocumentMeta, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
@@ -138,23 +137,11 @@ export function UserDetail({
 }) {
   const t = useT();
   const { toast } = useToast();
-  const apiOn = isCcApiEnabled();
   const meta = [user.rank, user.wing, user.phone].filter(Boolean).join(" · ");
 
   async function openDocument(doc: DocumentMeta) {
-    if (doc.url) {
-      window.open(doc.url, "_blank", "noopener,noreferrer");
-      return;
-    }
-    if (!doc.id || !apiOn) {
-      toast(t("cc.documentUnavailable"), "error");
-      return;
-    }
     try {
-      const blob = await downloadFileBlob(doc.id);
-      const href = URL.createObjectURL(blob);
-      window.open(href, "_blank", "noopener,noreferrer");
-      window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
+      await openStoredDocument(doc);
     } catch (err) {
       toast(
         err instanceof ApiClientError ? err.detail : t("cc.documentOpenFail"),

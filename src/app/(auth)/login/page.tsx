@@ -214,68 +214,74 @@ export default function LoginPage() {
     ? undefined
     : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 } };
 
+  const productWords = t("common.productName").split(/\s+/).filter(Boolean);
+
   return (
     <div className="relative min-h-dvh overflow-hidden bg-page-dark text-white md:grid md:grid-cols-[1.08fr_0.92fr]">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_10%,rgba(6,121,87,0.28),transparent_55%),radial-gradient(ellipse_at_90%_80%,rgba(44,103,160,0.12),transparent_50%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_18%_0%,rgba(6,121,87,0.32),transparent_48%),radial-gradient(ellipse_at_80%_100%,rgba(5,107,75,0.18),transparent_42%)]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]"
+        className="pointer-events-none absolute inset-0 opacity-[0.045] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_at_30%_20%,black_10%,transparent_72%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/45"
       />
 
-      <section className="relative flex flex-col justify-between px-6 py-8 sm:px-10 sm:py-12 md:min-h-dvh md:px-14 md:py-16">
-        <div className="absolute left-0 top-0 hidden h-full w-1.5 bg-gradient-to-b from-primary-light via-primary to-primary-dark md:block" />
+      <section className="relative flex flex-col justify-between px-6 py-8 sm:px-10 sm:py-12 md:min-h-dvh md:px-16 md:py-16 lg:px-20">
+        <div className="absolute left-0 top-0 hidden h-full w-px bg-gradient-to-b from-primary-light/90 via-primary/70 to-transparent md:block" />
+        <div className="absolute left-0 top-16 hidden h-24 w-px bg-primary-light shadow-[0_0_18px_rgba(10,156,111,0.7)] md:block" />
 
         <motion.div
           {...fade}
           transition={{ duration: 0.45 }}
           className="relative max-w-lg"
         >
-          <div className="mb-8 flex items-center gap-3">
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-sm font-bold shadow-lg shadow-primary/30">
+          <div className="mb-10 flex items-center gap-4">
+            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-primary-light to-primary-dark text-[11px] font-semibold tracking-[0.18em] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_12px_28px_rgba(6,121,87,0.35)]">
               MD
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-page-dark bg-emerald-400" />
+              <span className="absolute inset-[2px] rounded-full border border-white/10" />
             </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">
-                {t("common.rab")} · {t("common.prototype")}
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-white/45">
+                {t("common.rab")}
               </p>
-              <p className="text-xs text-white/40">{t("login.panelTag")}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.22em] text-primary-light/80">
+                {t("login.panelTag")}
+              </p>
             </div>
           </div>
 
-          <h1 className="text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl md:text-[3.15rem]">
-            <span className="bg-gradient-to-br from-white via-white to-white/70 bg-clip-text text-transparent">
-              {t("common.productName")}
-            </span>
+          <h1 className="text-[2.35rem] font-semibold leading-[1.02] tracking-[0.08em] sm:text-5xl md:text-[3.15rem]">
+            {productWords.map((word) => (
+              <span
+                key={word}
+                className="block bg-gradient-to-b from-white via-white to-white/65 bg-clip-text text-transparent"
+              >
+                {word}
+              </span>
+            ))}
           </h1>
-          <div className="mt-4 h-1 w-16 rounded-full bg-gradient-to-r from-primary-light to-primary" />
+          <div className="mt-6 h-px w-24 bg-gradient-to-r from-primary-light via-primary to-transparent" />
 
-          <p className="mt-5 max-w-md text-sm leading-relaxed text-white/60 sm:text-base">
+          <p className="mt-7 max-w-md text-[15px] leading-7 text-white/58">
             {t("login.panelBlurb")}
           </p>
 
-          <ul className="mt-8 hidden gap-2 sm:flex sm:flex-wrap">
-            {VISIBLE_ROLE_KEYS.map((r) => (
-              <li
-                key={r}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-white/55"
-              >
+          <ul className="mt-10 hidden items-center gap-x-3 gap-y-2 text-[10px] font-medium uppercase tracking-[0.2em] text-white/40 sm:flex sm:flex-wrap">
+            {VISIBLE_ROLE_KEYS.map((r, i) => (
+              <li key={r} className="flex items-center gap-3">
+                {i > 0 ? (
+                  <span aria-hidden className="h-px w-3 bg-white/15" />
+                ) : null}
                 {roleLabel(r, locale)}
               </li>
             ))}
           </ul>
         </motion.div>
-
-        <motion.p
-          {...fade}
-          transition={{ duration: 0.45, delay: reduceMotion ? 0 : 0.12 }}
-          className="relative mt-10 text-xs text-white/35 md:mt-0"
-        >
-          {t(apiOn ? "login.localOnly" : "login.localOnlyDemo")}
-        </motion.p>
       </section>
 
       <section className="relative flex items-center justify-center bg-white px-5 py-10 text-neutral-900 shadow-[-24px_0_60px_rgba(0,0,0,0.35)] dark:bg-neutral-950 dark:text-neutral-100 sm:px-8 md:min-h-dvh md:px-12 lg:px-16">

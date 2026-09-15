@@ -3,6 +3,7 @@ import {
   isApiFeatureMissing,
   rememberMissingRoute,
 } from "@/lib/api/compat";
+import { normalizeDocuments } from "@/lib/api/files";
 import { toMemberEntryBody } from "@/lib/api/register";
 import type { UserFormValues } from "@/components/users/user-form";
 import type { ApprovalStatus, MemberType, User, UserStatus, DailyTag } from "@/lib/types";
@@ -100,7 +101,7 @@ export function memberToUser(row: MemberApiRow): User {
     dropdown_no: row.dropdown_no ?? "",
     phone: row.phone ?? "",
     blood_group: row.blood_group ?? "",
-    documents: row.documents ?? [],
+    documents: normalizeDocuments(row.documents),
     documents_verified: Boolean(
       (row as MemberApiRow & { documents_verified?: boolean }).documents_verified,
     ),

@@ -1580,9 +1580,13 @@ export function getServerSnapshot(): AppState {
   };
 }
 
+let hydrated = false;
+
 export function hydrateStore() {
   getState();
   if (typeof window === "undefined") return;
+  if (hydrated) return;
+  hydrated = true;
   void import("@/lib/api/app-sync").then((mod) => {
     void mod.syncStoreFromApi();
   });
