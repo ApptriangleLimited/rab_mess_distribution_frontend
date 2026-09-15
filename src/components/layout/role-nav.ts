@@ -7,9 +7,7 @@ import {
   IconChartBar,
   IconCashBanknote,
   IconFileReport,
-  IconClipboardList,
   IconUsersGroup,
-  IconCalendarEvent,
   IconClockHour4,
   IconCake,
   IconSettings,
@@ -151,9 +149,9 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
-      href: "/admin/state-reports",
-      labelKey: "nav.stateReports",
-      icon: IconClipboardList,
+      href: "/admin/report-requests",
+      labelKey: "nav.reportRequests",
+      icon: IconSend,
       chip: "amber",
     },
     {
@@ -171,18 +169,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     {
       href: "/consume/monthly/summary",
       labelKey: "nav.consumeSummary",
-      icon: IconFileReport,
-      chip: "indigo",
-    },
-    {
-      href: "/mess/planning",
-      labelKey: "nav.mealPlanning",
-      icon: IconCalendarEvent,
-      chip: "amber",
-    },
-    {
-      href: "/mess/reports",
-      labelKey: "nav.mealReports",
       icon: IconFileReport,
       chip: "indigo",
     },

@@ -1,11 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
-  IconCalendarEvent,
   IconChartBar,
-  IconClipboardList,
   IconFileReport,
   IconLayoutDashboard,
   IconSend,
@@ -15,6 +13,8 @@ import {
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
 import { useRequestMenuBadge } from "@/hooks/use-pending-request-counts";
+import { useStore } from "@/hooks/use-store";
+import { pendingPaperReportCount } from "@/lib/store/paper-reports";
 import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n";
 import type { Icon } from "@tabler/icons-react";
@@ -34,11 +34,11 @@ const DASHBOARD_TAB: Tab = {
   match: (path) => path === "/admin",
 };
 
-const STATE_REPORTS_TAB: Tab = {
-  href: "/admin/state-reports",
-  labelKey: "nav.stateReports",
-  icon: IconClipboardList,
-  match: (path) => path.startsWith("/admin/state-reports"),
+const REPORT_REQUESTS_TAB: Tab = {
+  href: "/admin/report-requests",
+  labelKey: "nav.reportRequests",
+  icon: IconFileReport,
+  match: (path) => path.startsWith("/admin/report-requests"),
 };
 
 const BASE_TABS: Tab[] = [
@@ -78,21 +78,6 @@ const BASE_TABS: Tab[] = [
   },
 ];
 
-const ADMIN_MEAL_TABS: Tab[] = [
-  {
-    href: "/mess/planning",
-    labelKey: "nav.mealPlanning",
-    icon: IconCalendarEvent,
-    match: (path) => path.startsWith("/mess/planning"),
-  },
-  {
-    href: "/mess/reports",
-    labelKey: "nav.mealReports",
-    icon: IconFileReport,
-    match: (path) => path.startsWith("/mess/reports"),
-  },
-];
-
 const SETTINGS_TAB: Tab = {
   href: "/settings",
   labelKey: "nav.settings",
@@ -100,7 +85,7 @@ const SETTINGS_TAB: Tab = {
   match: (path) => path.startsWith("/settings"),
 };
 
-/** Ration strip. Admin auto-gets Dashboard + State Reports + meal planning/reports. */
+/** Ration strip. Admin auto-gets Dashboard. */
 export function RationTabs({
   className,
   withDashboard,
@@ -116,13 +101,18 @@ export function RationTabs({
   const t = useT();
   const { session } = useSession();
   const requestBadge = useRequestMenuBadge("/ration/requests");
+  const store = useStore();
+  const paperBadge = useMemo(
+    () => pendingPaperReportCount(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store.paper_report_requests],
+  );
   const showDashboard = withDashboard ?? session?.role === "admin";
   const tabs = showDashboard
     ? [
         DASHBOARD_TAB,
-        STATE_REPORTS_TAB,
+        REPORT_REQUESTS_TAB,
         ...BASE_TABS,
-        ...ADMIN_MEAL_TABS,
         SETTINGS_TAB,
       ]
     : [...BASE_TABS, SETTINGS_TAB];
@@ -138,7 +128,12 @@ export function RationTabs({
         label: t(tab.labelKey),
         icon: tab.icon,
         active: tab.match(pathname),
-        badge: tab.href === "/ration/requests" ? requestBadge : undefined,
+        badge:
+          tab.href === "/ration/requests"
+            ? requestBadge
+            : tab.href === "/admin/report-requests"
+              ? paperBadge
+              : undefined,
       }))}
     />
   );

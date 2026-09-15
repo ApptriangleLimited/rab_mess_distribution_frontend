@@ -4,26 +4,35 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { IconArrowLeft, IconPencil, IconPrinter } from "@tabler/icons-react";
+import { IconArrowLeft, IconPencil, IconPrinter, IconSend } from "@tabler/icons-react";
 import { PritibhojSheets } from "@/components/mess/pritibhoj-sheets";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
+import { PaperStatusBadge } from "@/components/reports/paper-status-badge";
+import { useToast } from "@/components/shared/toast-provider";
 import { usePritibhojEvent } from "@/hooks/use-pritibhoj-event";
+import { useStore } from "@/hooks/use-store";
+import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { formatDateLong } from "@/lib/date";
+import { getPritibhojPaper, submitPritibhojPaper } from "@/lib/store/paper-reports";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { useI18n, useT } from "@/i18n/provider";
 
 export default function MessPritibhojPreviewPage() {
   const t = useT();
   const { locale } = useI18n();
+  const { toast } = useToast();
   const params = useParams<{ id: string }>();
   const reduceMotion = useReducedMotion();
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
   const { event, loading } = usePritibhojEvent(params.id);
+  useStore();
+  const paper = event ? getPritibhojPaper(event.id) : null;
+  const approved = paper?.status === "approved";
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
 
   async function onPrint() {
@@ -89,29 +98,60 @@ export default function MessPritibhojPreviewPage() {
               }
               center={<MessTabs />}
               actions={
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {paper ? <PaperStatusBadge status={paper.status} /> : null}
                   <Button asChild variant="outline" size="sm" className="h-10 rounded-xl">
                     <Link href={`/mess/pritibhoj/${event.id}/edit`}>
                       <IconPencil className="h-4 w-4" />
                       {t("common.edit")}
                     </Link>
                   </Button>
-                  <Button
-                    type="button"
-                    variant="cta"
-                    size="sm"
-                    className="h-10 rounded-xl shadow-sm shadow-primary/20"
-                    disabled={printing}
-                    onClick={() => void onPrint()}
-                  >
-                    <IconPrinter className="h-4 w-4" />
-                    {printing ? t("common.loading") : t("mess.print")}
-                  </Button>
+                  {paper?.status !== "approved" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-10 rounded-xl"
+                      disabled={paper?.status === "submitted"}
+                      onClick={() => {
+                        submitPritibhojPaper({
+                          eventId: event.id,
+                          title: event.title,
+                          date: event.date,
+                        });
+                        notifyCcDataChange();
+                        toast(t("paperReports.submittedToast"), "success");
+                      }}
+                    >
+                      <IconSend className="h-4 w-4" />
+                      {t("paperReports.submit")}
+                    </Button>
+                  ) : null}
+                  {approved ? (
+                    <Button
+                      type="button"
+                      variant="cta"
+                      size="sm"
+                      className="h-10 rounded-xl shadow-sm shadow-primary/20"
+                      disabled={printing}
+                      onClick={() => void onPrint()}
+                    >
+                      <IconPrinter className="h-4 w-4" />
+                      {printing ? t("common.loading") : t("paperReports.print")}
+                    </Button>
+                  ) : null}
                 </div>
               }
             />
           </div>
         </div>
+
+        {!approved ? (
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            {paper?.status === "submitted"
+              ? t("paperReports.waitingAdmin")
+              : t("paperReports.needApprove")}
+          </p>
+        ) : null}
 
         <div ref={printRef}>
           <PritibhojSheets event={event} dateLocale={dateLocale} />

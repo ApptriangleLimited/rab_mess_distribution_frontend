@@ -34,6 +34,12 @@ type ProblemBody = {
 type Envelope<T> = { ok?: boolean; success?: boolean; data: T } & Record<string, unknown>;
 
 export function apiUrl(path: string) {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname.toLowerCase();
+    if (host === "ms.apptriangle.com" || host === "www.ms.apptriangle.com") {
+      return path;
+    }
+  }
   const base = apiBaseUrl();
   return base ? `${base}${path}` : path;
 }

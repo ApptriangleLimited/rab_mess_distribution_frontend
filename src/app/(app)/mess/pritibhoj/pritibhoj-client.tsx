@@ -28,7 +28,9 @@ import {
   deletePritibhojEventApi,
   listPritibhojEventsApi,
 } from "@/lib/api/pritibhoj";
+import { PaperStatusBadge } from "@/components/reports/paper-status-badge";
 import { formatDateDisplay } from "@/lib/date";
+import { getPritibhojPaper } from "@/lib/store/paper-reports";
 import {
   deletePritibhojEvent,
   eventManpower,
@@ -175,11 +177,14 @@ export default function MessPritibhojClient() {
                     <th className="px-4 py-3">{t("mess.pritibhoj.title")}</th>
                     <th className="px-4 py-3">{t("mess.pritibhoj.occasion")}</th>
                     <th className="px-4 py-3">{t("mess.pritibhoj.colManpower")}</th>
+                    <th className="px-4 py-3">{t("paperReports.colStatus")}</th>
                     <th className="px-4 py-3 text-right">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((event) => (
+                  {filtered.map((event) => {
+                    const paper = getPritibhojPaper(event.id);
+                    return (
                     <tr
                       key={event.id}
                       className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
@@ -200,6 +205,9 @@ export default function MessPritibhojClient() {
                       </td>
                       <td className="px-4 py-3 tabular-nums text-neutral-700 dark:text-neutral-300">
                         {eventManpower(event)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {paper ? <PaperStatusBadge status={paper.status} /> : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1.5">
@@ -229,19 +237,21 @@ export default function MessPritibhojClient() {
                               <IconEdit className="h-4 w-4" />
                             </Link>
                           </Button>
-                          <Button
-                            asChild
-                            variant="ghost"
-                            size="icon"
-                            className={rowActionClass("print")}
-                          >
-                            <Link
-                              href={`/mess/pritibhoj/${event.id}/print`}
-                              aria-label={t("mess.print")}
+                          {paper?.status === "approved" ? (
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className={rowActionClass("print")}
                             >
-                              <IconPrinter className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                              <Link
+                                href={`/mess/pritibhoj/${event.id}/print`}
+                                aria-label={t("paperReports.print")}
+                              >
+                                <IconPrinter className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          ) : null}
                           <Button
                             type="button"
                             variant="ghost"
@@ -255,7 +265,8 @@ export default function MessPritibhojClient() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

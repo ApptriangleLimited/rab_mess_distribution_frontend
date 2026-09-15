@@ -1,4 +1,7 @@
+import path from "node:path";
 import type { NextConfig } from "next";
+
+const projectRoot = path.resolve(__dirname);
 
 const API_ON = (() => {
   const raw = process.env.NEXT_PUBLIC_USE_API?.trim().toLowerCase();
@@ -28,6 +31,10 @@ const API_BASE = (
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
+  },
   /** Hide the Next.js “N” route/bundler badge in local dev. */
   devIndicators: false,
   async rewrites() {

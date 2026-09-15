@@ -41,6 +41,40 @@ export function uploadFile(
   return apiJson<UploadedFile>("/api/v1/files", { method: "POST", body });
 }
 
+export type DocumentKind = "image" | "pdf" | "file";
+
+export type LoadedDocument = {
+  url: string;
+  name: string;
+  kind: DocumentKind;
+  /** False for public http URLs — do not revoke those. */
+  owned: boolean;
+};
+
+function mimeFromName(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "png") return "image/png";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "gif") return "image/gif";
+  if (ext === "webp") return "image/webp";
+  if (ext === "bmp") return "image/bmp";
+  if (ext === "pdf") return "application/pdf";
+  return "";
+}
+
+function typedBlob(blob: Blob, name: string): Blob {
+  if (blob.type && blob.type !== "application/octet-stream") return blob;
+  const mime = mimeFromName(name);
+  return mime ? new Blob([blob], { type: mime }) : blob;
+}
+
+export function documentKind(name: string, mime = ""): DocumentKind {
+  const type = mime || mimeFromName(name);
+  if (type.startsWith("image/")) return "image";
+  if (type === "application/pdf") return "pdf";
+  return "file";
+}
+
 export async function downloadFileBlob(fileId: string): Promise<Blob> {
   const headers = new Headers({ Accept: "*/*" });
   const token = getAccessToken();
@@ -64,20 +98,41 @@ function isPublicHttpUrl(url: string): boolean {
   }
 }
 
-/** Open a member document with the staff token. Do not `window.open` API file URLs. */
-export async function openStoredDocument(doc: DocumentMeta) {
+export async function loadStoredDocument(doc: DocumentMeta): Promise<LoadedDocument> {
   const id = documentFileId(doc);
   if (id) {
-    const blob = await downloadFileBlob(id);
-    const href = URL.createObjectURL(blob);
-    window.open(href, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
-    return;
+    const blob = typedBlob(await downloadFileBlob(id), doc.name);
+    return {
+      url: URL.createObjectURL(blob),
+      name: doc.name,
+      kind: documentKind(doc.name, blob.type),
+      owned: true,
+    };
   }
   const url = doc.url?.trim() ?? "";
   if (url && isPublicHttpUrl(url)) {
-    window.open(url, "_blank", "noopener,noreferrer");
-    return;
+    return {
+      url,
+      name: doc.name,
+      kind: documentKind(doc.name),
+      owned: false,
+    };
   }
   throw new ApiClientError(404, "FILE_DOWNLOAD", "Could not open document.");
+}
+
+/** Open a member document with the staff token. Do not `window.open` API file URLs. */
+export async function openStoredDocument(doc: DocumentMeta) {
+  const loaded = await loadStoredDocument(doc);
+  if (loaded.kind === "file") {
+    const link = document.createElement("a");
+    link.href = loaded.url;
+    link.download = loaded.name;
+    link.click();
+  } else {
+    window.open(loaded.url, "_blank", "noopener,noreferrer");
+  }
+  if (loaded.owned) {
+    window.setTimeout(() => URL.revokeObjectURL(loaded.url), 60_000);
+  }
 }

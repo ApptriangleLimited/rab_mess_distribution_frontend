@@ -83,6 +83,9 @@ export function deletePritibhojEvent(id: string): void {
   setState((prev) => ({
     ...prev,
     pritibhoj_events: (prev.pritibhoj_events ?? []).filter((row) => row.id !== id),
+    paper_report_requests: (prev.paper_report_requests ?? []).filter(
+      (row) => !(row.kind === "pritibhoj" && row.ref === id),
+    ),
   }));
 }
 

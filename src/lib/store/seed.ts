@@ -508,6 +508,7 @@ export function createLiveCatalogState(): AppState {
     assignments: [],
     tag_requests: [],
     pritibhoj_events: [],
+    paper_report_requests: [],
     meal_plans: [],
     meal_assigns: [],
     guest_meals: [],
@@ -637,6 +638,7 @@ export function createSeedState(): AppState {
     meal_shifts,
     guest_meals: seedGuestMeals(users),
     pritibhoj_events: demoPritibhojEvents(),
+    paper_report_requests: [],
     tag_requests: demoTagRequests(users),
     version: SEED_VERSION,
   };

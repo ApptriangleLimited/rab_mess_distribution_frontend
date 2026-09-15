@@ -42,6 +42,7 @@ const CATALOG_KEYS = [
   "member_banks",
   "manpower_held",
   "manpower_absent",
+  "paper_report_requests",
 ] as const;
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,6 +90,7 @@ function stateToPayload(state: AppState) {
     pritibhoj_events: (state.pritibhoj_events ?? []).filter(
       (row) => !String(row.id ?? "").startsWith("pb_demo_"),
     ),
+    paper_report_requests: state.paper_report_requests ?? [],
   };
 }
 

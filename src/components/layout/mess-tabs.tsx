@@ -35,7 +35,7 @@ const TABS = [
   },
 ] as const;
 
-/** Ledger / Shifts / Pritibhoj — header strip. Meal reports stay on admin. */
+/** Ledger / Shifts / Pritibhoj — header strip. */
 export function MessTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();

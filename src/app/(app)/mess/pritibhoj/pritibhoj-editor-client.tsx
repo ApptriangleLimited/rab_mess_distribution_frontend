@@ -21,6 +21,7 @@ import {
   createPritibhojEventApi,
   updatePritibhojEventApi,
 } from "@/lib/api/pritibhoj";
+import { savePritibhojPaper } from "@/lib/store/paper-reports";
 import {
   createPritibhojEvent,
   defaultPritibhojAdminRows,
@@ -126,6 +127,11 @@ export default function MessPritibhojEditorClient({
         toast(t("mess.pritibhoj.missing"), "error");
         return;
       }
+      savePritibhojPaper({
+        eventId: saved.id,
+        title: saved.title,
+        date: saved.date,
+      });
       toast(t("mess.pritibhoj.saved"), "success");
       router.push(`/mess/pritibhoj/${saved.id}`);
     } catch (err) {

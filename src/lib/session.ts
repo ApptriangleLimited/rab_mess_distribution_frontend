@@ -191,6 +191,9 @@ export function homeForRole(role: Role) {
 
 export function isRoleAllowed(role: Role, pathname: string) {
   if (pathname.startsWith("/settings")) return true;
+  if (role === "admin" && pathname.startsWith("/admin/state-reports")) {
+    return false;
+  }
   const map: Record<Role, string | string[]> = {
     cc: "/cc",
     daily: "/daily",
@@ -198,15 +201,8 @@ export function isRoleAllowed(role: Role, pathname: string) {
     consume: "/consume",
     /** Ration also uses Consume panels (ledger / bills / summary). */
     ration: ["/ration", "/consume"],
-    /** Admin = ration panels + /admin dashboard + meal planning/reports. */
-    admin: [
-      "/admin",
-      "/ration",
-      "/consume",
-      "/mess/planning",
-      "/mess/reports",
-      "/mess/guests",
-    ],
+    /** Admin = ration panels + /admin dashboard. */
+    admin: ["/admin", "/ration", "/consume"],
   };
   const allowed = map[role];
   const prefixes = Array.isArray(allowed) ? allowed : [allowed];

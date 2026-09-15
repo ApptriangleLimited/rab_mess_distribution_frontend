@@ -528,21 +528,23 @@ function SettingsPageInner() {
           </p>
           <div className="mt-4 max-w-xs space-y-2">
             <Label>{t("settings.activeRole")}</Label>
-            <Select
-              value={session?.role}
-              onValueChange={(v) => onSwitchRole(v as Role)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("common.selectRole")} />
-              </SelectTrigger>
-              <SelectContent>
-                {rolesForPicker(session?.role).map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {roleLabel(r, locale)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {session?.role ? (
+              <Select
+                value={session.role}
+                onValueChange={(v) => onSwitchRole(v as Role)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("common.selectRole")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {rolesForPicker(session.role).map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {roleLabel(r, locale)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
           </div>
         </SectionCard>
       </motion.div>

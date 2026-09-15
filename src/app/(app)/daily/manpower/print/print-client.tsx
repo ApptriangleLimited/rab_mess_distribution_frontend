@@ -9,9 +9,11 @@ import { StrengthLetter } from "@/components/manpower/strength-letter";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useManpowerDay } from "@/hooks/use-manpower-day";
 import { useStore } from "@/hooks/use-store";
 import { formatDateLong, todayISO } from "@/lib/date";
+import { isPaperApproved } from "@/lib/store/paper-reports";
 import { buildManpowerReport } from "@/lib/manpower-report";
 import { buildStrengthReport } from "@/lib/strength-report";
 import { printLetterElement } from "@/lib/print-letter-pdf";
@@ -39,6 +41,7 @@ export function ManpowerPrintClient() {
       : todayISO();
   const form = parseForm(searchParams.get("form"));
 
+  const approved = isPaperApproved("manpower", date, form);
   const { apiOn, loading, snapshot } = useManpowerDay(date);
   const reportSnapshot = apiOn
     ? snapshot ?? {
@@ -105,16 +108,18 @@ export function ManpowerPrintClient() {
             </Button>
           }
           actions={
-            <Button
-              type="button"
-              size="sm"
-              className="rounded-xl"
-              disabled={printing || loading}
-              onClick={onPrint}
-            >
-              <IconPrinter className="h-4 w-4" />
-              {printing || loading ? t("common.loading") : t("mess.print")}
-            </Button>
+            approved ? (
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-xl"
+                disabled={printing || loading}
+                onClick={onPrint}
+              >
+                <IconPrinter className="h-4 w-4" />
+                {printing || loading ? t("common.loading") : t("paperReports.print")}
+              </Button>
+            ) : null
           }
         />
       </div>
@@ -122,13 +127,19 @@ export function ManpowerPrintClient() {
       {loading ? (
         <p className="p-4 text-sm text-neutral-500">{t("common.loading")}</p>
       ) : null}
-      {form === "1" && !loading ? (
+      {!approved && !loading ? (
+        <EmptyState
+          title={t("paperReports.needApprove")}
+          description={t("paperReports.waitingAdmin")}
+        />
+      ) : null}
+      {approved && form === "1" && !loading ? (
         <ManpowerLetter ref={printRef} report={form1} locale={dateLocale} />
       ) : null}
-      {form === "2" && !loading ? (
+      {approved && form === "2" && !loading ? (
         <StrengthLetter ref={printRef} report={form2} locale={dateLocale} />
       ) : null}
-      {form === "3" && !loading ? (
+      {approved && form === "3" && !loading ? (
         <StrengthLetter ref={printRef} report={form3} locale={dateLocale} />
       ) : null}
     </PagePane>

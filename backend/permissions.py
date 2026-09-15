@@ -124,13 +124,21 @@ CATALOG_SLICE = {
     "manpower_officer_absent",
     "manpower_held",
     "manpower_absent",
+    "paper_report_requests",
 }
 
 SNAPSHOT_WRITE_KEYS = {
     "admin": None,
     "cc": CATALOG_SLICE,
     "daily": {"approved_dates", "suppressed_carries", "boro_khana_dates"} | CATALOG_SLICE,
-    "mess": {"meal_shifts", "meal_plans", "meal_assigns", "guest_meals", "pritibhoj_events"},
+    "mess": {
+        "meal_shifts",
+        "meal_plans",
+        "meal_assigns",
+        "guest_meals",
+        "pritibhoj_events",
+        "paper_report_requests",
+    },
     "consume": {"state_reports"},
     "ration": CATALOG_SLICE,
 }

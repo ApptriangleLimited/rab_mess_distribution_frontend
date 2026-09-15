@@ -5,9 +5,6 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconBuildingBank,
-  IconCalendarEvent,
-  IconCircleCheck,
-  IconCopy,
   IconSoup,
   IconTags,
   IconUserCheck,
@@ -468,70 +465,6 @@ export default function AdminDashboardClient() {
               carried: stats.messTomorrowCarried,
             })}
           </p>
-        </div>
-
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              href: "/mess/reports",
-              label: t("pages.adminDashboard.meals.planned"),
-              hint: t("pages.adminDashboard.meals.plannedHint"),
-              value: stats.mealPlanned,
-              icon: IconCalendarEvent,
-              tone: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
-            },
-            {
-              href: "/mess/reports?status=1",
-              label: t("pages.adminDashboard.meals.consume"),
-              hint: t("pages.adminDashboard.meals.consumeHint"),
-              value: stats.mealConsume,
-              icon: IconCircleCheck,
-              tone: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-            },
-            {
-              href: "/mess/reports?status=2",
-              label: t("pages.adminDashboard.meals.duplicate"),
-              hint: t("pages.adminDashboard.meals.duplicateHint"),
-              value: stats.mealDuplicate,
-              icon: IconCopy,
-              tone: "bg-rose-500/12 text-rose-700 dark:text-rose-300",
-            },
-            {
-              href: "/mess/reports?audience=guest",
-              label: t("pages.adminDashboard.meals.guests"),
-              hint: t("pages.adminDashboard.meals.guestsHint"),
-              value: stats.mealGuests,
-              icon: IconUserPlus,
-              tone: "bg-amber-500/12 text-amber-800 dark:text-amber-300",
-            },
-          ].map((card) => {
-            const Icon = card.icon;
-            return (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="rounded-2xl border border-neutral-200 bg-white p-3.5 transition hover:border-primary/30 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      "inline-flex h-8 w-8 items-center justify-center rounded-xl",
-                      card.tone,
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="text-2xl font-semibold tabular-nums tracking-tight text-neutral-900 dark:text-white">
-                    {card.value}
-                  </span>
-                </div>
-                <p className="mt-2 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
-                  {card.label}
-                </p>
-                <p className="text-[10px] text-neutral-400">{card.hint}</p>
-              </Link>
-            );
-          })}
         </div>
 
         <div className="grid gap-3 lg:grid-cols-2">

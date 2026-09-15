@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   IconBuilding,
   IconBuildingBank,
@@ -13,6 +14,7 @@ import {
   IconShield,
   IconTags,
   IconUsers,
+  IconX,
   type Icon,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +24,10 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
-import { openStoredDocument } from "@/lib/api/files";
+import {
+  loadStoredDocument,
+  type LoadedDocument,
+} from "@/lib/api/files";
 import { MEMBER_TYPES } from "@/lib/constants";
 import type { ApprovalStatus, DocumentMeta, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
@@ -138,16 +143,56 @@ export function UserDetail({
   const t = useT();
   const { toast } = useToast();
   const meta = [user.rank, user.wing, user.phone].filter(Boolean).join(" · ");
+  const [preview, setPreview] = useState<LoadedDocument | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  const previewRef = useRef<LoadedDocument | null>(null);
+  previewRef.current = preview;
+
+  useEffect(() => {
+    return () => {
+      const current = previewRef.current;
+      if (current?.owned) URL.revokeObjectURL(current.url);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!preview) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPreview(null);
+    }
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [preview]);
 
   async function openDocument(doc: DocumentMeta) {
+    const key = `${doc.id ?? doc.name}`;
+    setOpening(key);
     try {
-      await openStoredDocument(doc);
+      const loaded = await loadStoredDocument(doc);
+      setPreview((prev) => {
+        if (prev?.owned) URL.revokeObjectURL(prev.url);
+        return loaded;
+      });
     } catch (err) {
       toast(
         err instanceof ApiClientError ? err.detail : t("cc.documentOpenFail"),
         "error",
       );
+    } finally {
+      setOpening(null);
     }
+  }
+
+  function closePreview() {
+    setPreview((prev) => {
+      if (prev?.owned) URL.revokeObjectURL(prev.url);
+      return null;
+    });
   }
 
   return (
@@ -385,10 +430,13 @@ export function UserDetail({
                     variant="outline"
                     size="sm"
                     className="h-7 shrink-0 rounded-md px-2 text-xs"
+                    disabled={opening === `${doc.id ?? doc.name}`}
                     onClick={() => void openDocument(doc)}
                   >
                     <IconEye className="h-3.5 w-3.5" />
-                    {t("cc.viewDocument")}
+                    {opening === `${doc.id ?? doc.name}`
+                      ? t("common.loading")
+                      : t("cc.viewDocument")}
                   </Button>
                 </li>
               ))}
@@ -396,6 +444,65 @@ export function UserDetail({
           )}
         </DetailBlock>
       </div>
+      {preview && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-label={preview.name}
+            >
+              <button
+                type="button"
+                className="absolute inset-0 bg-page-dark/70 backdrop-blur-sm"
+                aria-label={t("common.cancel")}
+                onClick={closePreview}
+              />
+              <div className="relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-950">
+                <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2.5 dark:border-neutral-800">
+                  <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+                    {preview.name}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg"
+                    onClick={closePreview}
+                    aria-label={t("common.cancel")}
+                  >
+                    <IconX className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex min-h-[12rem] flex-1 items-center justify-center bg-neutral-100 p-3 dark:bg-neutral-900">
+                  {preview.kind === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview.url}
+                      alt={preview.name}
+                      className="max-h-[78vh] max-w-full object-contain"
+                    />
+                  ) : preview.kind === "pdf" ? (
+                    <iframe
+                      title={preview.name}
+                      src={preview.url}
+                      className="h-[78vh] w-full rounded-md bg-white"
+                    />
+                  ) : (
+                    <a
+                      href={preview.url}
+                      download={preview.name}
+                      className="text-sm font-medium text-primary underline"
+                    >
+                      {t("cc.viewDocument")}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </SectionCard>
   );
 }

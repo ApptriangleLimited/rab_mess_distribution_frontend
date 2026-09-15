@@ -31,6 +31,13 @@ jobs:
 
             cd "$REPO_DIR"
 
+            ENV_FILE="$REPO_DIR/.env"
+            ENV_BACKUP="/tmp/rab-mess-frontend.env.bak"
+            if [ -f "$ENV_FILE" ]; then
+              cp -a "$ENV_FILE" "$ENV_BACKUP"
+              echo "Preserved server .env"
+            fi
+
             echo "Fetching latest develop branch..."
             git fetch origin develop
 
@@ -40,11 +47,27 @@ jobs:
             echo "Synchronizing repository with origin/develop..."
             git reset --hard origin/develop
 
+            if [ -f "$ENV_BACKUP" ]; then
+              cp -a "$ENV_BACKUP" "$ENV_FILE"
+              echo "Restored server .env (Postgres/Redis/JWT unchanged)"
+            else
+              echo "WARNING: no server .env — copy env.docker.example to .env" >&2
+            fi
+
             GIT_SHA="$(git rev-parse HEAD)"
             export GIT_SHA
-            # Server .env must not bake api.ms.apptriangle.com into the Next client.
+
+            # Compose interpolates Postgres/Redis/JWT from the restored .env.
+            set -a
+            # shellcheck disable=SC1091
+            if [ -f "$ENV_FILE" ]; then
+              . "$ENV_FILE"
+            fi
+            set +a
+            # Never bake api.ms.apptriangle.com into the Next client (CORS).
             export NEXT_PUBLIC_API_URL=
             export NEXT_PUBLIC_API_BASE_URL=
+            export API_PROXY_URL=http://api:8000
 
             echo "Verifying Git status..."
             git status

@@ -54,6 +54,7 @@ CATALOG_KEYS = (
     "member_banks",
     "manpower_held",
     "manpower_absent",
+    "paper_report_requests",
 )
 
 
@@ -291,6 +292,7 @@ def build_snapshot(db: Session) -> dict:
                     "wings",
                     "forces",
                     "member_banks",
+                    "paper_report_requests",
                 }
                 else {},
             )

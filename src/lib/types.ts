@@ -301,6 +301,25 @@ export type PritibhojEvent = {
   admin_rows: PritibhojRow[];
 };
 
+export type PaperReportKind = "manpower" | "pritibhoj";
+export type PaperReportStatus = "draft" | "submitted" | "approved";
+export type ManpowerFormId = "1" | "2" | "3";
+
+export type PaperReportRequest = {
+  id: string;
+  kind: PaperReportKind;
+  /** Manpower date or Pritibhoj event id. */
+  ref: string;
+  form?: ManpowerFormId;
+  title: string;
+  date: string;
+  status: PaperReportStatus;
+  submitted_at: string;
+  submitted_by: string;
+  reviewed_at: string;
+  reviewed_by: string;
+};
+
 export interface AppState {
   users: User[];
   assignments: DailyAssignment[];
@@ -376,5 +395,7 @@ export interface AppState {
   guest_meals: GuestMeal[];
   /** Saved Pritibhoj feast manpower sheets. */
   pritibhoj_events: PritibhojEvent[];
+  /** Daily/Mess paper reports waiting for admin approve before print. */
+  paper_report_requests: PaperReportRequest[];
   version: number;
 }

@@ -52,6 +52,7 @@ import type {
   AllowanceRate,
   AppState,
   EmergencyContact,
+  PaperReportRequest,
   PritibhojEvent,
   User,
 } from "@/lib/types";
@@ -203,6 +204,42 @@ function ensurePritibhojEvents(state: AppState): PritibhojEvent[] {
   if (apiBacked) return cleaned;
   if (cleaned.length === 0) return demoPritibhojEvents();
   return cleaned;
+}
+
+function ensurePaperReports(raw: unknown): PaperReportRequest[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PaperReportRequest[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Partial<PaperReportRequest>;
+    const kind =
+      row.kind === "pritibhoj"
+        ? "pritibhoj"
+        : row.kind === "manpower"
+          ? "manpower"
+          : null;
+    const id = String(row.id ?? "").trim();
+    const ref = String(row.ref ?? "").trim();
+    if (!kind || !id || !ref) continue;
+    const status =
+      row.status === "approved" || row.status === "submitted"
+        ? row.status
+        : "draft";
+    out.push({
+      id,
+      kind,
+      ref,
+      form: row.form === "2" || row.form === "3" || row.form === "1" ? row.form : undefined,
+      title: String(row.title ?? ""),
+      date: String(row.date ?? ""),
+      status,
+      submitted_at: String(row.submitted_at ?? ""),
+      submitted_by: String(row.submitted_by ?? ""),
+      reviewed_at: String(row.reviewed_at ?? ""),
+      reviewed_by: String(row.reviewed_by ?? ""),
+    });
+  }
+  return out;
 }
 
 /** Swap battalion-era defaults → parent-force list once. */
@@ -1474,6 +1511,10 @@ function normalizeState(state: AppState): AppState {
     meal_shifts: Array.isArray(state.meal_shifts) ? state.meal_shifts : [],
     guest_meals: Array.isArray(state.guest_meals) ? state.guest_meals : [],
     pritibhoj_events: ensurePritibhojEvents(state),
+    paper_report_requests: ensurePaperReports(
+      (state as AppState & { paper_report_requests?: unknown })
+        .paper_report_requests,
+    ),
     tag_requests: apiBacked
       ? storedTagRequests(state.tag_requests)
       : ensureTagRequests(state.tag_requests, state.users ?? []),
@@ -1535,6 +1576,7 @@ export function getServerSnapshot(): AppState {
     meal_shifts: [],
     guest_meals: [],
     pritibhoj_events: [],
+    paper_report_requests: [],
     tag_requests: [],
     version: 0,
   };
