@@ -78,12 +78,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "purple",
     },
     {
-      href: "/mess/reports",
-      labelKey: "nav.mealReports",
-      icon: IconFileReport,
-      chip: "indigo",
-    },
-    {
       href: "/mess/pritibhoj",
       labelKey: "nav.pritibhoj",
       icon: IconCake,

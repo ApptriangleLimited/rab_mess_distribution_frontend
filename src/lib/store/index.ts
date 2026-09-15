@@ -34,7 +34,10 @@ import {
   officialSenderAccounts,
 } from "@/lib/official-senders";
 import { isCcApiEnabled } from "@/lib/api/mode";
-import { demoPritibhojEvents, lockPritibhojSheets } from "@/lib/pritibhoj-demo";
+import {
+  demoPritibhojEvents,
+  normalizePritibhojEvent,
+} from "@/lib/pritibhoj-demo";
 import {
   ensureTagRequests,
   MIN_TAG_REQUESTS_PER_QUEUE,
@@ -50,7 +53,6 @@ import type {
   AppState,
   EmergencyContact,
   PritibhojEvent,
-  PritibhojRow,
   User,
 } from "@/lib/types";
 
@@ -184,50 +186,8 @@ function ensureDayWingCatMap(
   return out;
 }
 
-function sanitizePritibhojRow(raw: unknown): PritibhojRow | null {
-  if (!raw || typeof raw !== "object") return null;
-  const row = raw as Record<string, unknown>;
-  const wing = String(row.wing ?? "").trim();
-  if (!wing) return null;
-  return {
-    wing,
-    officer: asFiniteNumber(row.officer),
-    dad: asFiniteNumber(row.dad),
-    azadHall: asFiniteNumber(row.azadHall),
-    distribution: asFiniteNumber(row.distribution),
-    others: asFiniteNumber(row.others),
-    civilian: asFiniteNumber(row.civilian),
-    nonMuslim: asFiniteNumber(row.nonMuslim),
-    total: asFiniteNumber(row.total),
-    azadHallDist: asFiniteNumber(row.azadHallDist),
-    distribution2: asFiniteNumber(row.distribution2),
-    totalDistribution: asFiniteNumber(row.totalDistribution),
-  };
-}
-
 function sanitizePritibhojEvent(raw: unknown): PritibhojEvent | null {
-  if (!raw || typeof raw !== "object") return null;
-  const event = raw as Record<string, unknown>;
-  const id = String(event.id ?? "").trim();
-  if (!id) return null;
-  return lockPritibhojSheets({
-    id,
-    title: String(event.title ?? "").trim() || "Pritibhoj",
-    occasion: String(event.occasion ?? "").trim(),
-    date: String(event.date ?? "").trim(),
-    org: String(event.org ?? "").trim(),
-    created_at: String(event.created_at ?? ""),
-    main_rows: Array.isArray(event.main_rows)
-      ? event.main_rows
-          .map(sanitizePritibhojRow)
-          .filter((row): row is PritibhojRow => row !== null)
-      : [],
-    admin_rows: Array.isArray(event.admin_rows)
-      ? event.admin_rows
-          .map(sanitizePritibhojRow)
-          .filter((row): row is PritibhojRow => row !== null)
-      : [],
-  });
+  return normalizePritibhojEvent(raw);
 }
 
 function ensurePritibhojEvents(state: AppState): PritibhojEvent[] {

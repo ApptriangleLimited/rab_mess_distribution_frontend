@@ -30,7 +30,7 @@ services:
       APP_ENV: ${APP_ENV:-production}
       SEED_STAFF: ${SEED_STAFF:-false}
       ENABLE_HSTS: ${ENABLE_HSTS:-false}
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://ms.apptriangle.com}
+      CORS_ORIGINS: https://ms.apptriangle.com,https://www.ms.apptriangle.com,${CORS_ORIGINS:-}
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
     restart: always
 

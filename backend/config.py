@@ -54,6 +54,13 @@ class Settings:
             "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"
         )
         self.cors_origins = [item.strip() for item in raw.split(",") if item.strip()]
+        if self.app_env == "production":
+            for origin in (
+                "https://ms.apptriangle.com",
+                "https://www.ms.apptriangle.com",
+            ):
+                if origin not in self.cors_origins:
+                    self.cors_origins.append(origin)
         self.login_fail_limit = int(os.getenv("LOGIN_FAIL_LIMIT", "8"))
         self.login_fail_window = int(os.getenv("LOGIN_FAIL_WINDOW_SECONDS", "900"))
         self.register_limit = int(os.getenv("REGISTER_LIMIT", "10"))

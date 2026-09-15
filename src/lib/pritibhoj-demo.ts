@@ -563,6 +563,70 @@ export const PRITIBHOJ_DEMO_META = {
   grandTotalManpower: 1913,
 };
 
+function asFiniteNumber(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function firstNumber(row: Record<string, unknown>, ...keys: string[]): number {
+  for (const key of keys) {
+    if (row[key] != null && row[key] !== "") return asFiniteNumber(row[key]);
+  }
+  return 0;
+}
+
+/** Accept camelCase or snake_case rows from the API / JSONB store. */
+export function normalizePritibhojRow(raw: unknown): PritibhojRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const wing = String(row.wing ?? "").trim();
+  if (!wing) return null;
+  return finalizePritibhojRow({
+    wing,
+    officer: firstNumber(row, "officer"),
+    dad: firstNumber(row, "dad"),
+    azadHall: firstNumber(row, "azadHall", "azad_hall"),
+    distribution: firstNumber(row, "distribution"),
+    others: firstNumber(row, "others"),
+    civilian: firstNumber(row, "civilian"),
+    nonMuslim: firstNumber(row, "nonMuslim", "non_muslim"),
+    total: firstNumber(row, "total"),
+    azadHallDist: firstNumber(row, "azadHallDist", "azad_hall_dist"),
+    distribution2: firstNumber(row, "distribution2", "distribution_2"),
+    totalDistribution: firstNumber(
+      row,
+      "totalDistribution",
+      "total_distribution",
+    ),
+  });
+}
+
+export function normalizePritibhojEvent(raw: unknown): PritibhojEvent | null {
+  if (!raw || typeof raw !== "object") return null;
+  const event = raw as Record<string, unknown>;
+  const id = String(event.id ?? "").trim();
+  if (!id) return null;
+  const date = String(event.date ?? "").trim().slice(0, 10);
+  return lockPritibhojSheets({
+    id,
+    title: String(event.title ?? "").trim() || "Pritibhoj",
+    occasion: String(event.occasion ?? "").trim(),
+    date,
+    org: String(event.org ?? "").trim(),
+    created_at: String(event.created_at ?? ""),
+    main_rows: Array.isArray(event.main_rows)
+      ? event.main_rows
+          .map(normalizePritibhojRow)
+          .filter((row): row is PritibhojRow => row !== null)
+      : [],
+    admin_rows: Array.isArray(event.admin_rows)
+      ? event.admin_rows
+          .map(normalizePritibhojRow)
+          .filter((row): row is PritibhojRow => row !== null)
+      : [],
+  });
+}
+
 export function emptyPritibhojRow(wing: string): PritibhojRow {
   return {
     wing,

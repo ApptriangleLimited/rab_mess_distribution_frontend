@@ -5,6 +5,7 @@ import {
   setAccessToken,
   setRefreshToken,
 } from "@/lib/session";
+import { isOldPublicApiHost } from "@/lib/api/compat";
 import { apiBaseUrl, isApiEnabled, isCcApiEnabled } from "@/lib/api/mode";
 
 export type FieldError = { field: string; code: string; message: string };
@@ -47,20 +48,24 @@ function requestHost(path: string): string {
   }
 }
 
-/** Old live API has login/members but no snapshot/import. Never hit the network. */
+const MISSING_ON_OLD_API = [
+  "/api/v1/app/snapshot",
+  "/api/v1/app/import",
+  "/api/v1/tag-requests",
+  "/api/v1/reports/",
+  "/api/v1/pritibhoj",
+  "/api/v1/state-reports",
+  "/api/v1/mess/checkins",
+  "/api/v1/boro-khana",
+  "/api/v1/zk/",
+];
+
+/** Old live API has login/members but not these routes. Never hit the network. */
 function isUnavailableOnLiveApi(path: string): boolean {
-  if (
-    !path.includes("/api/v1/app/snapshot") &&
-    !path.includes("/api/v1/app/import")
-  ) {
+  if (!isOldPublicApiHost() && requestHost(path) !== "api.ms.apptriangle.com") {
     return false;
   }
-  const host = requestHost(path);
-  return (
-    host === "api.ms.apptriangle.com" ||
-    host === "ms.apptriangle.com" ||
-    host === "www.ms.apptriangle.com"
-  );
+  return MISSING_ON_OLD_API.some((prefix) => path.includes(prefix));
 }
 
 let refreshInFlight: Promise<boolean> | null = null;
@@ -110,7 +115,7 @@ export async function apiJson<T>(path: string, init?: RequestInit, retried = fal
     throw new ApiClientError(
       404,
       "API_FEATURE_MISSING",
-      "Snapshot is not available on this API.",
+      "This route is not available on the live API.",
     );
   }
   const headers = new Headers(init?.headers);

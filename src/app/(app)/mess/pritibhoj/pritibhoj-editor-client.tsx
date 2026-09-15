@@ -15,6 +15,7 @@ import { useToast } from "@/components/shared/toast-provider";
 import { usePritibhojCountCtx } from "@/hooks/use-pritibhoj-counts";
 import { todayISO } from "@/lib/date";
 import { ApiClientError } from "@/lib/api/client";
+import { isOldPublicApiHost } from "@/lib/api/compat";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import {
   createPritibhojEventApi,
@@ -111,7 +112,7 @@ export default function MessPritibhojEditorClient({
     setSaving(true);
     try {
       let saved;
-      if (isCcApiEnabled()) {
+      if (isCcApiEnabled() && !isOldPublicApiHost()) {
         saved = event
           ? await updatePritibhojEventApi(event.id, value)
           : await createPritibhojEventApi(value);

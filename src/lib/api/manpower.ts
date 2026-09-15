@@ -1,4 +1,5 @@
-import { apiJson } from "@/lib/api/client";
+import { ApiClientError, apiJson } from "@/lib/api/client";
+import { isOldPublicApiHost } from "@/lib/api/compat";
 import type { AuthorizedStrength, DailyTag, MemberType, User } from "@/lib/types";
 
 export type ManpowerDayMember = {
@@ -24,6 +25,15 @@ export type ManpowerDayData = {
 };
 
 export function fetchManpowerDay(day: string) {
+  if (isOldPublicApiHost()) {
+    return Promise.reject(
+      new ApiClientError(
+        404,
+        "API_FEATURE_MISSING",
+        "Manpower reports are not available on this API.",
+      ),
+    );
+  }
   return apiJson<ManpowerDayData>(
     `/api/v1/reports/manpower?day=${encodeURIComponent(day)}`,
   );

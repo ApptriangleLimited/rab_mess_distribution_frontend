@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
 import { ApiClientError } from "@/lib/api/client";
+import { isOldPublicApiHost } from "@/lib/api/compat";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import {
   deletePritibhojEventApi,
@@ -46,7 +47,9 @@ export default function MessPritibhojClient() {
   const [deleting, setDeleting] = useState<PritibhojEvent | null>(null);
 
   const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
-  const [apiLoading, setApiLoading] = useState(isCcApiEnabled());
+  const [apiLoading, setApiLoading] = useState(
+    isCcApiEnabled() && !isOldPublicApiHost(),
+  );
 
   const storeEvents = useMemo(
     () => listPritibhojEvents().filter((row) => !row.id.startsWith("pb_demo_")),
@@ -54,7 +57,7 @@ export default function MessPritibhojClient() {
   );
 
   useEffect(() => {
-    if (!isCcApiEnabled()) {
+    if (!isCcApiEnabled() || isOldPublicApiHost()) {
       setApiEvents(null);
       setApiLoading(false);
       return;
@@ -79,7 +82,7 @@ export default function MessPritibhojClient() {
     };
   }, []);
 
-  const events = isCcApiEnabled() ? (apiEvents ?? []) : storeEvents;
+  const events = apiEvents ?? storeEvents;
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -271,7 +274,7 @@ export default function MessPritibhojClient() {
           if (!deleting) return;
           void (async () => {
             try {
-              if (isCcApiEnabled()) {
+              if (isCcApiEnabled() && !isOldPublicApiHost()) {
                 await deletePritibhojEventApi(deleting.id);
               }
               deletePritibhojEvent(deleting.id);

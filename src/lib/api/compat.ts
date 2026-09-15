@@ -31,15 +31,16 @@ function requestApiHost(): string {
   return "";
 }
 
-/** Live ms frontend / API predates snapshot / tag-request / member-get routes. */
+/** Older public API host — login/members exist, newer routes do not. */
+export function isOldPublicApiHost(): boolean {
+  return requestApiHost() === "api.ms.apptriangle.com";
+}
+
+/** Talking to the old public API (not same-origin Docker behind nginx). */
 export function isLegacyLiveApi(): boolean {
-  if (envApiText().includes("api.ms.apptriangle.com")) return true;
-  const host = requestApiHost();
-  return (
-    host === "api.ms.apptriangle.com" ||
-    host === "ms.apptriangle.com" ||
-    host === "www.ms.apptriangle.com"
-  );
+  if (isOldPublicApiHost()) return true;
+  if (typeof window !== "undefined") return false;
+  return envApiText().includes("api.ms.apptriangle.com");
 }
 
 function persistMissing() {

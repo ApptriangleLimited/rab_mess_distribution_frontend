@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import {
   IconClockHour4,
-  IconFileReport,
   IconCake,
   IconTags,
 } from "@tabler/icons-react";
@@ -28,13 +27,6 @@ const TABS = [
       path === "/mess/shifts" || path.startsWith("/mess/shifts/"),
   },
   {
-    href: "/mess/reports",
-    labelKey: "nav.mealReports" as const,
-    icon: IconFileReport,
-    match: (path: string) =>
-      path === "/mess/reports" || path.startsWith("/mess/reports/"),
-  },
-  {
     href: "/mess/pritibhoj",
     labelKey: "nav.pritibhoj" as const,
     icon: IconCake,
@@ -43,7 +35,7 @@ const TABS = [
   },
 ] as const;
 
-/** Ledger / Shifts / Reports / Pritibhoj — header strip. */
+/** Ledger / Shifts / Pritibhoj — header strip. Meal reports stay on admin. */
 export function MessTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();

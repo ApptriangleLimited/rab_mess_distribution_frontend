@@ -11,6 +11,7 @@ import {
   manpowerMemberToUser,
   type ManpowerDayData,
 } from "@/lib/api/manpower";
+import { isOldPublicApiHost } from "@/lib/api/compat";
 import { isApiEnabled } from "@/lib/api/mode";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
@@ -19,7 +20,7 @@ import type { DailyTag } from "@/lib/types";
 import type { ManpowerSnapshot } from "@/lib/manpower-report";
 
 export function useManpowerDay(date: string) {
-  const apiOn = isApiEnabled();
+  const apiOn = isApiEnabled() && !isOldPublicApiHost();
   const { toast } = useToast();
   const assignments = useStore().assignments;
   const [data, setData] = useState<ManpowerDayData | null>(null);

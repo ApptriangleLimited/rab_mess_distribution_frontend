@@ -194,7 +194,7 @@ export function isRoleAllowed(role: Role, pathname: string) {
   const map: Record<Role, string | string[]> = {
     cc: "/cc",
     daily: "/daily",
-    mess: "/mess",
+    mess: ["/mess/ledger", "/mess/shifts", "/mess/pritibhoj"],
     consume: "/consume",
     /** Ration also uses Consume panels (ledger / bills / summary). */
     ration: ["/ration", "/consume"],

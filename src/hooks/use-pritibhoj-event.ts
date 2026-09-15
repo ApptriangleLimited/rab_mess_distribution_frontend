@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useStore } from "@/hooks/use-store";
+import { isOldPublicApiHost } from "@/lib/api/compat";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import { fetchPritibhojEvent } from "@/lib/api/pritibhoj";
 import {
@@ -14,14 +15,16 @@ export function usePritibhojEvent(id: string | undefined) {
   const state = useStore();
   const local = id ? getPritibhojEvent(id) : null;
   const [remote, setRemote] = useState<PritibhojEvent | null>(null);
-  const [loading, setLoading] = useState(Boolean(id && isCcApiEnabled()));
+  const [loading, setLoading] = useState(
+    Boolean(id && isCcApiEnabled() && !isOldPublicApiHost()),
+  );
 
   useEffect(() => {
     void state.pritibhoj_events;
   }, [state.pritibhoj_events]);
 
   useEffect(() => {
-    if (!id || !isCcApiEnabled()) {
+    if (!id || !isCcApiEnabled() || isOldPublicApiHost()) {
       setLoading(false);
       return;
     }
@@ -49,8 +52,5 @@ export function usePritibhojEvent(id: string | undefined) {
     };
   }, [id]);
 
-  if (isCcApiEnabled()) {
-    return { event: remote, loading };
-  }
-  return { event: local, loading: false };
+  return { event: remote ?? local, loading };
 }
