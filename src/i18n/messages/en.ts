@@ -338,7 +338,12 @@ export const en = {
     },
     manpower: {
       title: "Daily Manpower Report",
-      subtitle: "Strength by rank and wing for {date}",
+      subtitle: "{count} saved reports in this form",
+      phase: "Phase 2",
+    },
+    manpowerNew: {
+      title: "New manpower report",
+      subtitle: "Fill the report for {date}, then save or submit",
       phase: "Phase 2",
     },
     manpowerPrint: {
@@ -1113,6 +1118,10 @@ export const en = {
     reviewedBy: "Reviewed by {by} · {at}",
   },
   manpower: {
+    new: "Create",
+    searchPlaceholder: "Search this form’s reports…",
+    listEmpty: "No reports in this form yet",
+    listEmptyHint: "Create a report for this tab. Each form keeps its own list.",
     openPrint: "Preview",
     formPicker: "Choose report form",
     form1Short: "Wings",

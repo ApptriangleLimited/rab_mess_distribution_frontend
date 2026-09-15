@@ -339,7 +339,12 @@ export const bn = {
     },
     manpower: {
       title: "দৈনিক জনবলের প্রতিবেদন",
-      subtitle: "{date} এর পদবি ও উইং অনুযায়ী জনবল",
+      subtitle: "এই ফর্মে {count}টি সংরক্ষিত রিপোর্ট",
+      phase: "ফেজ ২",
+    },
+    manpowerNew: {
+      title: "নতুন জনবল রিপোর্ট",
+      subtitle: "{date} এর রিপোর্ট পূরণ করুন, তারপর সংরক্ষণ বা জমা দিন",
       phase: "ফেজ ২",
     },
     manpowerPrint: {
@@ -1116,6 +1121,10 @@ export const bn = {
     reviewedBy: "{by} রিভিউ করেছেন · {at}",
   },
   manpower: {
+    new: "তৈরি করুন",
+    searchPlaceholder: "এই ফর্মের রিপোর্ট খুঁজুন…",
+    listEmpty: "এই ফর্মে এখনো রিপোর্ট নেই",
+    listEmptyHint: "এই ট্যাবের জন্য একটি রিপোর্ট তৈরি করুন। প্রতিটি ফর্মের আলাদা তালিকা।",
     openPrint: "প্রিভিউ",
     formPicker: "রিপোর্ট ফর্ম বেছে নিন",
     form1Short: "উইং",

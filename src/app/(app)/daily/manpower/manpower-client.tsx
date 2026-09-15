@@ -5,34 +5,25 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  IconCheck,
-  IconExternalLink,
+  IconEdit,
+  IconEyeFilled,
+  IconPlus,
   IconPrinter,
-  IconSend,
+  IconUsersGroup,
 } from "@tabler/icons-react";
-import { ManpowerWeb } from "@/components/manpower/manpower-web";
-import { StrengthWeb } from "@/components/manpower/strength-web";
 import { DailyTabs } from "@/components/layout/daily-tabs";
-import { DatePicker } from "@/components/shared/date-picker";
+import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { Button } from "@/components/ui/button";
 import { PaperStatusBadge } from "@/components/reports/paper-status-badge";
-import { useToast } from "@/components/shared/toast-provider";
-import { useManpowerDay } from "@/hooks/use-manpower-day";
+import { SearchFilterBar } from "@/components/shared/search-filter-bar";
+import { Button } from "@/components/ui/button";
+import { rowActionClass } from "@/components/users/row-action-btn";
 import { useStore } from "@/hooks/use-store";
-import { notifyCcDataChange } from "@/lib/api/cc-events";
-import { formatDateDisplay, formatDateLong, todayISO } from "@/lib/date";
-import { buildManpowerReport } from "@/lib/manpower-report";
-import {
-  getManpowerPaper,
-  listPaperReports,
-  saveManpowerPaper,
-  submitManpowerPaper,
-} from "@/lib/store/paper-reports";
-import { buildStrengthReport } from "@/lib/strength-report";
+import { formatDateDisplay } from "@/lib/date";
+import { listPaperReports } from "@/lib/store/paper-reports";
 import { cn } from "@/lib/utils";
-import { useI18n, useT } from "@/i18n/provider";
+import { useT } from "@/i18n/provider";
 
 type FormId = "1" | "2" | "3";
 
@@ -43,61 +34,13 @@ function parseForm(raw: string | null): FormId {
 
 export default function ManpowerClient() {
   const t = useT();
-  const { locale } = useI18n();
-  const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const state = useStore();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  const dateParam = searchParams.get("date");
-  const [date, setDate] = useState(
-    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
-      ? dateParam
-      : todayISO(),
-  );
-
   const form = parseForm(searchParams.get("form"));
-
-  const { apiOn, loading, snapshot } = useManpowerDay(date);
-  const reportSnapshot = apiOn
-    ? snapshot ?? {
-        users: [],
-        tagFor: () => "" as const,
-        prefiltered: true,
-      }
-    : undefined;
-
-  const form1 = useMemo(
-    () => buildManpowerReport(date, reportSnapshot),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, reportSnapshot],
-  );
-  const form2 = useMemo(
-    () => buildStrengthReport(date, "admin", reportSnapshot),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, reportSnapshot],
-  );
-  const form3 = useMemo(
-    () => buildStrengthReport(date, "hq", reportSnapshot),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, reportSnapshot],
-  );
-
-  const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
-  const printHref = `/daily/manpower/print?date=${encodeURIComponent(date)}&form=${form}`;
-  const showReport = !loading;
-  const formTitle =
-    form === "1"
-      ? t("manpower.form1Title")
-      : form === "2"
-        ? t("manpower.form2Title")
-        : t("manpower.form3Title");
-  const paper = getManpowerPaper(date, form);
-  const approved = paper?.status === "approved";
-  const locked = paper?.status === "submitted" || approved;
-  const manpowerRows = listPaperReports("manpower");
+  const [q, setQ] = useState("");
 
   const formTabs: {
     id: FormId;
@@ -124,36 +67,34 @@ export default function ManpowerClient() {
     },
   ];
 
-  function replaceQuery(patch: Record<string, string>) {
-    const params = new URLSearchParams(searchParams.toString());
-    for (const [k, v] of Object.entries(patch)) params.set(k, v);
-    router.replace(`${pathname}?${params.toString()}`);
-  }
+  const rows = useMemo(() => {
+    void state.paper_report_requests;
+    return listPaperReports("manpower").filter((row) => (row.form ?? "1") === form);
+  }, [form, state.paper_report_requests]);
 
-  function pushDate(next: string) {
-    setDate(next);
-    replaceQuery({ date: next, form });
-  }
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return rows;
+    return rows.filter((row) =>
+      [row.date, row.title, row.status, row.form ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [rows, q]);
+
+  const createHref = `/daily/manpower/new?form=${form}`;
 
   function pushForm(next: FormId) {
-    replaceQuery({ date, form: next });
-  }
-
-  function onSave() {
-    saveManpowerPaper(date, form, formTitle);
-    toast(t("paperReports.savedToast"), "success");
-  }
-
-  function onSubmit() {
-    submitManpowerPaper(date, form, formTitle);
-    notifyCcDataChange();
-    toast(t("paperReports.submittedToast"), "success");
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("form", next);
+    router.replace(`${pathname}?${params.toString()}`);
   }
 
   return (
     <PagePane className="gap-5">
       <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-5"
       >
@@ -162,57 +103,25 @@ export default function ManpowerClient() {
             className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20"
             aria-hidden
           />
-          <div
-            className="pointer-events-none absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-nav-accent/10 blur-3xl"
-            aria-hidden
-          />
           <div className="relative">
             <PageHeader
               title={t("pages.manpower.title")}
               subtitle={t("pages.manpower.subtitle", {
-                date: formatDateLong(date, dateLocale),
+                count: String(rows.length),
               })}
               center={<DailyTabs />}
               actions={
-                <div className="flex items-center gap-1.5">
-                  <DatePicker
-                    value={date}
-                    onChange={pushDate}
-                    allowClear={false}
-                    triggerClassName="h-9 w-[9.25rem] rounded-xl"
-                  />
-                  {approved ? (
-                    <>
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-9 gap-1.5 rounded-xl px-2.5"
-                      >
-                        <Link href={printHref} title={t("manpower.openPrint")}>
-                          <IconExternalLink className="h-4 w-4" />
-                          <span className="hidden sm:inline">
-                            {t("manpower.openPrint")}
-                          </span>
-                        </Link>
-                      </Button>
-                      <Button
-                        asChild
-                        size="sm"
-                        className="h-9 gap-1.5 rounded-xl px-2.5 shadow-sm shadow-primary/20"
-                      >
-                        <Link href={printHref} title={t("paperReports.print")}>
-                          <IconPrinter className="h-4 w-4" />
-                          <span className="hidden sm:inline">
-                            {t("paperReports.print")}
-                          </span>
-                        </Link>
-                      </Button>
-                    </>
-                  ) : paper ? (
-                    <PaperStatusBadge status={paper.status} />
-                  ) : null}
-                </div>
+                <Button
+                  asChild
+                  variant="cta"
+                  size="sm"
+                  className="h-10 gap-1.5 rounded-xl shadow-sm shadow-primary/20"
+                >
+                  <Link href={createHref}>
+                    <IconPlus className="h-4 w-4" />
+                    {t("manpower.new")}
+                  </Link>
+                </Button>
               }
             />
           </div>
@@ -251,60 +160,43 @@ export default function ManpowerClient() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-primary/10 bg-neutral-50/80 dark:border-neutral-700 dark:bg-neutral-950/40">
-          {loading ? (
-            <p className="p-4 text-sm text-neutral-500">{t("common.loading")}</p>
-          ) : null}
-          {form === "1" && showReport ? <ManpowerWeb report={form1} /> : null}
-          {form === "2" && showReport ? <StrengthWeb report={form2} /> : null}
-          {form === "3" && showReport ? <StrengthWeb report={form3} /> : null}
-        </div>
+        <SearchFilterBar
+          search={q}
+          onSearchChange={setQ}
+          searchPlaceholder={t("manpower.searchPlaceholder")}
+          searchClassName="w-64 shrink-0 sm:w-72"
+        />
 
-        <div className="flex flex-col gap-3 rounded-2xl border border-primary/10 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
-          {paper?.status === "submitted" ? (
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              {t("paperReports.waitingAdmin")}
-            </p>
-          ) : null}
-          {!approved ? (
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">
-              {t("paperReports.needApprove")}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-10 rounded-xl"
-              disabled={locked || loading}
-              onClick={onSave}
-            >
-              <IconCheck className="h-4 w-4" />
-              {t("paperReports.save")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-10 rounded-xl"
-              disabled={approved || loading}
-              onClick={onSubmit}
-            >
-              <IconSend className="h-4 w-4" />
-              {t("paperReports.submit")}
-            </Button>
-          </div>
-        </div>
-
-        <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-          <div className="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">
-            {t("paperReports.listTitle")}
-          </div>
-          {manpowerRows.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-neutral-500">
-              {t("paperReports.empty")}
-            </p>
-          ) : (
+        {filtered.length === 0 ? (
+          <EmptyState
+            title={t("manpower.listEmpty")}
+            description={t("manpower.listEmptyHint")}
+            action={
+              <Button
+                asChild
+                variant="cta"
+                size="sm"
+                className="h-9 rounded-xl px-3"
+              >
+                <Link href={createHref}>
+                  <IconPlus className="h-3.5 w-3.5" />
+                  {t("manpower.new")}
+                </Link>
+              </Button>
+            }
+          />
+        ) : (
+          <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+            <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+              <IconUsersGroup className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                {form === "1"
+                  ? t("manpower.form1Title")
+                  : form === "2"
+                    ? t("manpower.form2Title")
+                    : t("manpower.form3Title")}
+              </h2>
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
@@ -316,30 +208,68 @@ export default function ManpowerClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {manpowerRows.map((row) => {
-                    const href = `/daily/manpower/print?date=${encodeURIComponent(row.ref)}&form=${row.form ?? "1"}`;
+                  {filtered.map((row) => {
+                    const href = `/daily/manpower/new?date=${encodeURIComponent(row.ref)}&form=${row.form ?? form}`;
+                    const printHref = `/daily/manpower/print?date=${encodeURIComponent(row.ref)}&form=${row.form ?? form}`;
                     return (
                       <tr
                         key={row.id}
-                        className="border-t border-neutral-100 dark:border-neutral-800"
+                        className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
                       >
-                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums text-neutral-700 dark:text-neutral-300">
                           {formatDateDisplay(row.date)}
-                          {row.form ? ` · ${row.form}` : ""}
                         </td>
-                        <td className="px-4 py-3 font-medium">{row.title}</td>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={href}
+                            className="font-semibold text-neutral-900 hover:underline dark:text-white"
+                          >
+                            {row.title}
+                          </Link>
+                        </td>
                         <td className="px-4 py-3">
                           <PaperStatusBadge status={row.status} />
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          {row.status === "approved" ? (
-                            <Button asChild variant="outline" size="sm" className="rounded-xl">
-                              <Link href={href}>
-                                <IconPrinter className="h-4 w-4" />
-                                {t("paperReports.print")}
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className={rowActionClass("view")}
+                            >
+                              <Link href={href} aria-label={t("common.view")}>
+                                <IconEyeFilled className="h-4 w-4" />
                               </Link>
                             </Button>
-                          ) : null}
+                            {row.status === "draft" || row.status === "submitted" ? (
+                              <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                className={rowActionClass("edit")}
+                              >
+                                <Link href={href} aria-label={t("common.edit")}>
+                                  <IconEdit className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            ) : null}
+                            {row.status === "approved" ? (
+                              <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                className={rowActionClass("print")}
+                              >
+                                <Link
+                                  href={printHref}
+                                  aria-label={t("paperReports.print")}
+                                >
+                                  <IconPrinter className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -347,8 +277,8 @@ export default function ManpowerClient() {
                 </tbody>
               </table>
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </motion.div>
     </PagePane>
   );
