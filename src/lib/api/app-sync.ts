@@ -1,4 +1,4 @@
-import { apiJson } from "@/lib/api/client";
+import { ApiClientError, apiJson } from "@/lib/api/client";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import { memberToUser, type MemberApiRow } from "@/lib/api/members";
 import { getAccessToken } from "@/lib/session";
@@ -110,6 +110,10 @@ export async function syncStoreFromApi() {
   try {
     const remote = await fetchAppSnapshot();
     applyApiSnapshot(snapshotToState(remote));
+  } catch (err) {
+    // Older APIs (e.g. api.ms.apptriangle.com) have login but no snapshot yet.
+    if (err instanceof ApiClientError && err.status === 404) return;
+    throw err;
   } finally {
     syncing = false;
   }
