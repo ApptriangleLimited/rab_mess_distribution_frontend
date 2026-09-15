@@ -131,7 +131,9 @@ function MemberListActions({
           </Link>
         </Button>
       </IconTip>
-      {showAcceptActions ? <MemberAcceptActions user={user} iconOnly /> : null}
+      {showAcceptActions ? (
+        <MemberAcceptActions user={user} iconOnly withTag />
+      ) : null}
       {canRequest ? <RequestTagButton user={user} iconOnly /> : null}
     </div>
   );

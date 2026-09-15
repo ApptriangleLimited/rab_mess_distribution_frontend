@@ -73,10 +73,6 @@ export default function DailyEditUserPage() {
       toast(t("cc.nameRequired"), "error");
       return;
     }
-    if (!values.rab_id.trim()) {
-      toast(t("cc.rabIdRequired"), "error");
-      return;
-    }
 
     if (!apiOn) {
       if (findUserByRabId(values.rab_id, user.id)) {
@@ -165,6 +161,7 @@ export default function DailyEditUserPage() {
         <UserForm
           mode="edit"
           variant="daily"
+          showDefaultTag={user.approval_status === "approved"}
           initial={userToFormValues(user)}
           busy={busy}
           onSubmit={onSubmit}

@@ -39,7 +39,7 @@ export function toMemberEntryBody(values: UserFormValues) {
     branch_location: values.branch_location.trim(),
     joining_date: emptyToNull(values.joining_date),
     out_date: emptyToNull(values.out_date),
-    default_tag: (values.default_tag || "MS").trim().toUpperCase() || "MS",
+    default_tag: (values.default_tag || "").trim().toUpperCase(),
     documents: (values.documents ?? []).map((d) => ({
       name: d.name,
       size: d.size,

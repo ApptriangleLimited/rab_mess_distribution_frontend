@@ -963,6 +963,9 @@ export const en = {
     setTag: "Today's tag",
     setTagHint: "Saved for today. Change anytime on Daily Report.",
     defaultTag: "Default tag",
+    acceptDefaultTagHint:
+      "No default tag until Daily accepts. Pick it here. You can change it later from the member page.",
+    changeDefaultTagHint: "Daily can change this member's default tag here.",
     tagRequired: "Pick a tag before continuing",
     mfrLocked: "MFR is locked — change to FR only",
     queuedRation: "{tag} sent to Ration for approval",

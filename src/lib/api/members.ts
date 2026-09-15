@@ -116,7 +116,7 @@ export function memberToUser(row: MemberApiRow): User {
     branch_location: row.branch_location ?? "",
     joining_date: row.joining_date ?? "",
     out_date: row.out_date ?? "",
-    default_tag: ((row.default_tag || "MS").toUpperCase() || "MS") as DailyTag,
+    default_tag: ((row.default_tag || "").toUpperCase() || "") as DailyTag,
     jl_end_date:
       (row as MemberApiRow & { jl_end_date?: string }).jl_end_date ?? "",
     inactive_spans: Array.isArray(
@@ -141,7 +141,16 @@ export function listMembers(params: MemberListParams = {}) {
     qs.set(key, String(value));
   }
   const suffix = qs.toString() ? `?${qs}` : "";
-  return apiJson<MemberListData>(`/api/v1/members${suffix}`);
+  return apiJson<MemberListData>(`/api/v1/members${suffix}`).then((data) => ({
+    ...data,
+    items: [...(data.items ?? [])].sort((a, b) => {
+      const created = (b.created_at || "").localeCompare(a.created_at || "");
+      if (created !== 0) return created;
+      const updated = (b.updated_at || "").localeCompare(a.updated_at || "");
+      if (updated !== 0) return updated;
+      return (b.id || "").localeCompare(a.id || "");
+    }),
+  }));
 }
 
 export type CreateMemberOpts = {

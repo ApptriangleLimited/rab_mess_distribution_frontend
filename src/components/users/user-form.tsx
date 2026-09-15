@@ -94,7 +94,7 @@ const emptyValues = (): UserFormValues => ({
   branch_location: "",
   joining_date: "",
   out_date: "",
-  default_tag: "MS",
+  default_tag: "",
   emergency_contacts: [emptyEmergencyContact()],
 });
 
@@ -127,7 +127,7 @@ export function userToFormValues(user: User): UserFormValues {
     branch_location: user.branch_location ?? "",
     joining_date: user.joining_date ?? "",
     out_date: user.out_date ?? "",
-    default_tag: user.default_tag || "MS",
+    default_tag: user.default_tag || "",
     emergency_contacts: contacts,
   };
 }
@@ -158,6 +158,7 @@ export function UserForm({
   variant = "cc",
   initialTag = "MS",
   busy = false,
+  showDefaultTag = false,
 }: {
   initial?: UserFormValues;
   mode: "create" | "edit";
@@ -167,6 +168,8 @@ export function UserForm({
   variant?: "cc" | "daily" | "public";
   initialTag?: DailyTag;
   busy?: boolean;
+  /** Daily can change default tag only after the member is accepted. */
+  showDefaultTag?: boolean;
 }) {
   const t = useT();
   const { toast } = useToast();
@@ -233,7 +236,7 @@ export function UserForm({
   );
 
   const memberTypeField = (
-    <Field label={t("cc.fields.memberType")}>
+    <Field label={t("cc.fields.memberType")} required>
       <Select
         value={values.member_type}
         onValueChange={(v) => setMemberType(v as MemberType)}
@@ -479,7 +482,6 @@ export function UserForm({
                 <Input
                   value={values.rab_id}
                   onChange={(e) => patch("rab_id", e.target.value)}
-                  required
                   className={inputClass}
                   placeholder={t("cc.placeholders.rabId")}
                 />
@@ -513,7 +515,7 @@ export function UserForm({
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {variant === "daily" ? (
+              {showDefaultTag ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
@@ -548,7 +550,6 @@ export function UserForm({
                 <Input
                   value={values.rab_id}
                   onChange={(e) => patch("rab_id", e.target.value)}
-                  required
                   className={inputClass}
                   placeholder={t("cc.placeholders.rabId")}
                 />
@@ -650,7 +651,7 @@ export function UserForm({
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {variant === "daily" ? (
+              {showDefaultTag ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}

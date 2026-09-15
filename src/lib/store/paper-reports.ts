@@ -30,9 +30,11 @@ export function listPaperReports(kind?: PaperReportKind): PaperReportRequest[] {
   const rows = listAll();
   const filtered = kind ? rows.filter((row) => row.kind === kind) : rows;
   return filtered.sort((a, b) => {
-    const byDate = b.date.localeCompare(a.date);
-    if (byDate !== 0) return byDate;
-    return (b.submitted_at || b.id).localeCompare(a.submitted_at || a.id);
+    const timeA = a.submitted_at || a.reviewed_at || a.date || a.id;
+    const timeB = b.submitted_at || b.reviewed_at || b.date || b.id;
+    const byTime = timeB.localeCompare(timeA);
+    if (byTime !== 0) return byTime;
+    return b.id.localeCompare(a.id);
   });
 }
 

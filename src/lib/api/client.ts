@@ -34,6 +34,8 @@ type ProblemBody = {
 type Envelope<T> = { ok?: boolean; success?: boolean; data: T } & Record<string, unknown>;
 
 export function apiUrl(path: string) {
+  // Next.js upload proxy — never send this to FastAPI on :8000.
+  if (path.startsWith("/upload/")) return path;
   if (typeof window !== "undefined") {
     const host = window.location.hostname.toLowerCase();
     if (host === "ms.apptriangle.com" || host === "www.ms.apptriangle.com") {

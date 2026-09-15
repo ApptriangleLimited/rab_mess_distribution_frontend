@@ -147,7 +147,7 @@ function schedulePersist(state: AppState) {
       if (rememberMissingRoute("snapshot", err)) return;
       console.error("Failed to persist app state to Docker API", err);
     });
-  }, 600);
+  }, 2000);
 }
 
 setPersistHook(schedulePersist);

@@ -7,6 +7,7 @@ import {
   filterUsers,
   findUserByRabId,
   getUser,
+  sortUsersNewestFirst,
   updateUser,
   type UserFilters,
   type UserInput,
@@ -15,7 +16,10 @@ import {
 export function useUsers(filters?: UserFilters) {
   const state = useStore();
   const users = useMemo(
-    () => (filters ? filterUsers(state.users, filters) : state.users),
+    () =>
+      filters
+        ? filterUsers(state.users, filters)
+        : sortUsersNewestFirst(state.users),
     [state.users, filters],
   );
   return {

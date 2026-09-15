@@ -16,7 +16,7 @@ import { acceptMember, rejectMember } from "@/lib/api/members";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import { createTagRequestApi, requestToTagRequest } from "@/lib/api/tag-requests";
 import { approveUser, rejectUser } from "@/lib/store/daily";
-import { getAssignment, setTag } from "@/lib/store/assignments";
+import { setTag } from "@/lib/store/assignments";
 import { updateUser } from "@/lib/store/users";
 import { userToFormValues } from "@/components/users/user-form";
 import {
@@ -55,7 +55,7 @@ export function MemberAcceptActions({
   const apiOn = isCcApiEnabled();
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [busy, setBusy] = useState(false);
-  const [actionTag, setActionTag] = useState<DailyTag>("MS");
+  const [actionTag, setActionTag] = useState<DailyTag | "">("");
   const [sardaChecked, setSardaChecked] = useState(false);
   const [trainingChecked, setTrainingChecked] = useState(false);
   const showTrgPrompt =
@@ -69,8 +69,7 @@ export function MemberAcceptActions({
 
   function open(type: "accept" | "reject") {
     if (withTag) {
-      const existing = getAssignment(user.id, todayISO());
-      setActionTag(existing?.tag ?? "MS");
+      setActionTag(user.default_tag || "");
       setSardaChecked(false);
       setTrainingChecked(false);
     }
@@ -88,12 +87,9 @@ export function MemberAcceptActions({
       setBusy(true);
       try {
         if (pendingAction === "accept") {
-          const queue = withTag ? dutyTagQueue(actionTag) : "immediate";
-          await acceptMember(
-            user.id,
-            withTag && queue === "immediate" ? actionTag : undefined,
-          );
-          if (withTag && queue !== "immediate") {
+          const queue = withTag && actionTag ? dutyTagQueue(actionTag) : "immediate";
+          await acceptMember(user.id, withTag && actionTag ? actionTag : undefined);
+          if (withTag && actionTag && queue !== "immediate") {
             const created = await createTagRequestApi({
               userId: user.id,
               toTag: actionTag,
@@ -135,14 +131,14 @@ export function MemberAcceptActions({
     }
 
     if (pendingAction === "accept") {
-      if (withTag) {
+      if (withTag && actionTag) {
         const queue = dutyTagQueue(actionTag);
+        updateUser(user.id, {
+          ...userToFormValues(user),
+          default_tag: actionTag,
+        });
         if (queue === "immediate") {
           setTag(user.id, todayISO(), actionTag);
-          updateUser(user.id, {
-            ...userToFormValues(user),
-            default_tag: actionTag,
-          });
         } else {
           createDutyTagRequest({
             userId: user.id,
@@ -286,10 +282,10 @@ export function MemberAcceptActions({
             <div className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-neutral-50/80 px-3 py-2.5 dark:border-neutral-700 dark:bg-neutral-900/60">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-                  {t("daily.setTag")}
+                  {t("daily.defaultTag")}
                 </p>
                 <p className="mt-0.5 text-xs text-neutral-500">
-                  {t("daily.setTagHint")}
+                  {t("daily.acceptDefaultTagHint")}
                 </p>
               </div>
               <TagSelector

@@ -63,7 +63,7 @@ export type UserFormRequiredField =
   | "wing"
   | "documents";
 
-/** First missing required member field, else null. */
+/** First missing required member field, else null. SRB ID is optional. */
 export function missingUserFormRequired(
   input: Pick<
     UserInput,
@@ -143,7 +143,7 @@ function newId() {
 }
 
 export function listUsers() {
-  return getState().users;
+  return sortUsersNewestFirst(getState().users);
 }
 
 export function isGuestMember(user: Pick<User, "member_type">): boolean {
@@ -161,7 +161,7 @@ export function filterCockpitMembers<T extends Pick<User, "member_type">>(
   return users.filter(isCockpitMember);
 }
 
-/** Member table order: SRB ID → Rank → Name. */
+/** Duty / bill order: SRB ID → Rank → Name. */
 export function compareUsers(a: User, b: User) {
   const id = a.rab_id.localeCompare(b.rab_id, undefined, {
     numeric: true,
@@ -176,8 +176,21 @@ export function compareUsers(a: User, b: User) {
   return a.name.localeCompare(b.name);
 }
 
+/** Member / request lists: last created first. */
+export function compareUsersNewestFirst(a: User, b: User) {
+  const created = (b.created_at || "").localeCompare(a.created_at || "");
+  if (created !== 0) return created;
+  const updated = (b.updated_at || "").localeCompare(a.updated_at || "");
+  if (updated !== 0) return updated;
+  return b.id.localeCompare(a.id);
+}
+
 export function sortUsers(users: User[]) {
   return [...users].sort(compareUsers);
+}
+
+export function sortUsersNewestFirst(users: User[]) {
+  return [...users].sort(compareUsersNewestFirst);
 }
 
 export function getUser(id: string) {
@@ -186,6 +199,7 @@ export function getUser(id: string) {
 
 export function findUserByRabId(rabId: string, excludeId?: string) {
   const normalized = rabId.trim().toLowerCase();
+  if (!normalized) return null;
   return (
     getState().users.find(
       (u) =>
@@ -220,7 +234,9 @@ export function createUser(
       input.member_type === "civilian" ? !!input.documents_verified : false,
     status: input.status,
     approval_status,
-    default_tag: (input.default_tag || "MS") as DailyTag,
+    default_tag: (approval_status === "pending"
+      ? ""
+      : input.default_tag || "") as DailyTag,
     jl_end_date: "",
     inactive_spans:
       input.status === "0"
@@ -267,7 +283,7 @@ export function updateUser(id: string, input: UserInput): User | null {
       ? input.default_tag === FR_TAG
         ? FR_TAG
         : MFR_TAG
-      : input.default_tag || existing.default_tag || "MS") as DailyTag,
+      : input.default_tag || existing.default_tag || "") as DailyTag,
     jl_end_date: input.status === "1" ? "" : existing.jl_end_date,
     inactive_spans,
     updated_at: nowISO(),
@@ -386,7 +402,7 @@ export function filterUsers(users: User[], filters: UserFilters) {
         .toLowerCase();
       return hay.includes(q);
     })
-    .sort(compareUsers);
+    .sort(compareUsersNewestFirst);
 }
 
 export function userFiltersToSearchParams(filters: UserFilters): URLSearchParams {

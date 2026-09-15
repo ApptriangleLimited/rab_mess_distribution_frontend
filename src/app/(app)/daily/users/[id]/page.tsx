@@ -18,11 +18,14 @@ import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
 import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange, onCcDataChange } from "@/lib/api/cc-events";
-import { getMember, memberToUser, updateMemberStatus } from "@/lib/api/members";
+import { TagSelector } from "@/components/daily/tag-selector";
+import { getMember, memberToUser, updateMemberStatus, updateMemberTag } from "@/lib/api/members";
 import { isDailyApiEnabled } from "@/lib/api/mode";
 import { setUserStatus } from "@/lib/store/daily";
+import { updateUser } from "@/lib/store/users";
+import { userToFormValues } from "@/components/users/user-form";
 import { useT } from "@/i18n/provider";
-import type { User, UserStatus } from "@/lib/types";
+import type { DailyTag, User, UserStatus } from "@/lib/types";
 
 export default function DailyUserDetailPage() {
   const t = useT();
@@ -128,6 +131,32 @@ export default function DailyUserDetailPage() {
 
   const isApproved = user.approval_status === "approved";
 
+  async function onDefaultTag(tag: DailyTag) {
+    if (!user || busy) return;
+    if (apiOn) {
+      setBusy(true);
+      try {
+        const row = await updateMemberTag(user.id, tag);
+        setApiUser(memberToUser(row));
+        notifyCcDataChange();
+        toast(t("daily.tagUpdatedToast"), "success");
+      } catch (err) {
+        toast(
+          err instanceof ApiClientError ? err.detail : t("cc.createFail"),
+          "error",
+        );
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    updateUser(user.id, {
+      ...userToFormValues(user),
+      default_tag: tag,
+    });
+    toast(t("daily.tagUpdatedToast"), "success");
+  }
+
   return (
     <PagePane>
       <motion.div
@@ -176,22 +205,46 @@ export default function DailyUserDetailPage() {
 
         {isApproved ? (
           <SectionCard>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-                  {t("cc.fields.status")}
-                </p>
-                <p className="text-xs text-neutral-500">
-                  {user.status === "1"
-                    ? t("cc.statusActive")
-                    : t("cc.statusInactive")}
-                </p>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                    {t("daily.defaultTag")}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {t("daily.changeDefaultTagHint")}
+                  </p>
+                </div>
+                <TagSelector
+                  value={user.default_tag || ""}
+                  disabled={busy}
+                  allowedTags={
+                    user.default_tag === "MFR" ? ["FR", "MFR"] : undefined
+                  }
+                  onChange={(tag) => {
+                    if (!tag || tag === user.default_tag) return;
+                    void onDefaultTag(tag);
+                  }}
+                  className="h-9 min-w-[12rem] rounded-lg"
+                />
               </div>
-              <StatusToggle
-                user={user}
-                disabled={busy}
-                onToggle={(next) => setStatusNext(next)}
-              />
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200/80 pt-3 dark:border-neutral-700">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                    {t("cc.fields.status")}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {user.status === "1"
+                      ? t("cc.statusActive")
+                      : t("cc.statusInactive")}
+                  </p>
+                </div>
+                <StatusToggle
+                  user={user}
+                  disabled={busy}
+                  onToggle={(next) => setStatusNext(next)}
+                />
+              </div>
             </div>
           </SectionCard>
         ) : null}

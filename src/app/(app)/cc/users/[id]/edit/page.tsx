@@ -74,10 +74,6 @@ export default function CcEditUserPage() {
       toast(t("cc.nameRequired"), "error");
       return;
     }
-    if (!values.rab_id.trim()) {
-      toast(t("cc.rabIdRequired"), "error");
-      return;
-    }
 
     if (!apiOn) {
       if (findUserByRabId(values.rab_id, user.id)) {

@@ -81,7 +81,7 @@ class LoginData(BaseModel):
 
 
 class MemberIn(BaseModel):
-    name: str
+    name: str = ""
     rab_id: str = ""
     personal_id: str = ""
     rfid: str = ""
@@ -101,7 +101,7 @@ class MemberIn(BaseModel):
     branch_location: str = ""
     joining_date: date | None = None
     out_date: date | None = None
-    default_tag: str = "MS"
+    default_tag: str = ""
     documents: list[DocumentIn] = Field(default_factory=list)
     documents_verified: bool = False
     emergency_contacts: list[EmergencyContactIn] = Field(default_factory=list)

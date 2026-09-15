@@ -30,9 +30,21 @@ export function normalizeDocuments(docs: unknown): DocumentMeta[] {
   });
 }
 
-/** Host nginx often caps /api at 1MB and the old live API has no POST /files. */
-const UPLOAD_PATH = "/upload/files";
-const CONTENT_PATH = (id: string) => `/upload/files/${encodeURIComponent(id)}/content`;
+function isLivePublicHost() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname.toLowerCase();
+  return host === "ms.apptriangle.com" || host === "www.ms.apptriangle.com";
+}
+
+/** Live host: Next `/upload/files` (old /api has no files). Local: FastAPI `/api/v1/files`. */
+function uploadPath() {
+  return isLivePublicHost() ? "/upload/files" : "/api/v1/files";
+}
+
+function contentPath(id: string) {
+  const tail = `/${encodeURIComponent(id)}/content`;
+  return isLivePublicHost() ? `/upload/files${tail}` : `/api/v1/files${tail}`;
+}
 /** Send PNG/JPG as-is through 2.5 MB. Only shrink bigger camera shots. */
 const KEEP_AS_IS_BYTES = Math.round(2.5 * 1024 * 1024);
 
@@ -80,7 +92,7 @@ export async function uploadFile(
   body.append("upload", ready);
   body.append("entity_type", opts.entity_type ?? "");
   body.append("entity_id", opts.entity_id ?? "");
-  return apiJson<UploadedFile>(UPLOAD_PATH, { method: "POST", body });
+  return apiJson<UploadedFile>(uploadPath(), { method: "POST", body });
 }
 
 export type DocumentKind = "image" | "pdf" | "file";
@@ -121,7 +133,7 @@ export async function downloadFileBlob(fileId: string): Promise<Blob> {
   const headers = new Headers({ Accept: "*/*" });
   const token = getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(apiUrl(CONTENT_PATH(fileId)), {
+  const res = await fetch(apiUrl(contentPath(fileId)), {
     headers,
   });
   if (!res.ok) {

@@ -558,14 +558,13 @@ def public_register(body: MemberIn, request: Request, db: Session = Depends(get_
     enforce_register_limit(request)
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
-    if body.member_type != "guest" and not body.rab_id.strip():
-        raise HTTPException(status_code=400, detail="SRB ID is required")
     if find_member_by_rab(db, body.rab_id):
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     row = Member(id=new_id("u"), created_by=None)
     apply_member_fields(row, body)
     row.status = "1"
     row.approval_status = "pending"
+    row.default_tag = ""
     db.add(row)
     try:
         db.commit()

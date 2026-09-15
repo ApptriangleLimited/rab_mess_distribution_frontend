@@ -28,10 +28,6 @@ export default function RegisterPage() {
       toast(t("cc.nameRequired"), "error");
       return;
     }
-    if (!values.rab_id.trim()) {
-      toast(t("cc.rabIdRequired"), "error");
-      return;
-    }
 
     if (!apiOn) {
       if (findUserByRabId(values.rab_id)) {

@@ -238,7 +238,7 @@ def member_out(row: Member) -> dict:
         "branch_location": row.branch_location or "",
         "joining_date": iso_date(row.joining_date),
         "out_date": iso_date(row.out_date),
-        "default_tag": (row.default_tag or "MS").upper(),
+        "default_tag": (row.default_tag or "").upper(),
         "jl_end_date": row.jl_end_date or "",
         "inactive_spans": row.inactive_spans or [],
         "emergency_contacts": row.emergency_contacts or [],
@@ -300,7 +300,8 @@ def apply_member_fields(row: Member, body: MemberIn) -> None:
     row.branch_location = body.branch_location.strip()
     row.joining_date = body.joining_date
     row.out_date = body.out_date
-    row.default_tag = normalize_tag(body.default_tag or "MS")
+    raw_tag = (body.default_tag or "").strip()
+    row.default_tag = normalize_tag(raw_tag) if raw_tag else ""
     row.documents = [d.model_dump() for d in body.documents]
     row.documents_verified = bool(body.documents_verified)
     row.emergency_contacts = [
@@ -565,7 +566,7 @@ def list_members(
         return envelope(cached)
     total = query.count()
     rows = (
-        query.order_by(Member.rab_id.asc(), Member.rank.asc(), Member.name.asc())
+        query.order_by(Member.created_at.desc(), Member.updated_at.desc(), Member.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -588,8 +589,6 @@ def create_member(
 ):
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
-    if body.member_type != "guest" and not body.rab_id.strip():
-        raise HTTPException(status_code=400, detail="SRB ID is required")
     if find_member_by_rab(db, body.rab_id):
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
 
@@ -599,6 +598,8 @@ def create_member(
         raise HTTPException(status_code=400, detail="You cannot add yourself")
     row.status = body.status if body.status in ("0", "1") else "1"
     row.approval_status = normalize_approval(body.approval_status, "pending")
+    if row.approval_status == "pending":
+        row.default_tag = ""
     if row.status == "0":
         row.inactive_spans = [{"from": iso_date(row.joining_date) or "1970-01-01", "to": None}]
     db.add(row)
@@ -666,7 +667,10 @@ def accept_member(
         raise HTTPException(status_code=409, detail="This user is already a member.")
     payload = body or AcceptMemberIn()
     if payload.tag:
-        row.default_tag = normalize_tag(payload.tag)
+        try:
+            row.default_tag = normalize_tag(payload.tag)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     row.approval_status = "approved"
     row.status = "1"
     row.updated_at = utcnow()

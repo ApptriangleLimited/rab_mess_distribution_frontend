@@ -32,7 +32,7 @@ import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import { listMembers, memberToUser } from "@/lib/api/members";
-import { compareUsers } from "@/lib/store/users";
+import { compareUsersNewestFirst } from "@/lib/store/users";
 
 import { useT } from "@/i18n/provider";
 import { wingSettingsLabel } from "@/lib/rank-labels";
@@ -107,7 +107,7 @@ export default function RationMembersPage() {
           .toLowerCase()
           .includes(query);
       })
-      .sort(compareUsers);
+      .sort(compareUsersNewestFirst);
   }, [approved, q, rank, wing, status]);
 
   const liveViewUser = viewUser

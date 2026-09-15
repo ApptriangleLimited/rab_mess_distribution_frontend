@@ -277,9 +277,19 @@ def build_snapshot(db: Session) -> dict:
     for row in db.query(ManpowerAbsent).all():
         absent.setdefault(row.date.isoformat(), {})[row.wing] = row.count
     return {
-        "users": [member_payload(row) for row in db.query(Member).all()],
+        "users": [
+            member_payload(row)
+            for row in db.query(Member)
+            .order_by(Member.created_at.desc(), Member.updated_at.desc(), Member.id.desc())
+            .all()
+        ],
         "assignments": [assignment_out(row) for row in db.query(Assignment).all()],
-        "tag_requests": [request_payload(row) for row in db.query(TagRequest).all()],
+        "tag_requests": [
+            request_payload(row)
+            for row in db.query(TagRequest)
+            .order_by(TagRequest.updated_at.desc(), TagRequest.requested_at.desc())
+            .all()
+        ],
         "senders": [sender_out(row) for row in db.query(Sender).order_by(Sender.label).all()],
         "rates": [rate_out(row) for row in db.query(Rate).order_by(Rate.tag).all()],
         **{
@@ -345,7 +355,7 @@ def upsert_member(db: Session, raw: dict) -> None:
             "branch_location": raw.get("branch_location") or "",
             "joining_date": parse_day(raw.get("joining_date")),
             "out_date": parse_day(raw.get("out_date")),
-            "default_tag": raw.get("default_tag") or "MS",
+            "default_tag": raw.get("default_tag") or "",
             "documents": raw.get("documents") or [],
             "documents_verified": bool(raw.get("documents_verified")),
             "emergency_contacts": raw.get("emergency_contacts") or [],

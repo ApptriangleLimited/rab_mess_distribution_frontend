@@ -91,7 +91,16 @@ export function getPendingTagRequest(
 }
 
 export function listTagRequests(): TagRequest[] {
-  return getState().tag_requests;
+  return [...getState().tag_requests].sort((a, b) => {
+    const timeA = a.updated_at || a.requested_at || "";
+    const timeB = b.updated_at || b.requested_at || "";
+    const byUpdated = timeB.localeCompare(timeA);
+    if (byUpdated !== 0) return byUpdated;
+    return (
+      (b.requested_at || "").localeCompare(a.requested_at || "") ||
+      b.id.localeCompare(a.id)
+    );
+  });
 }
 
 export function upsertLocalTagRequest(row: TagRequest) {
