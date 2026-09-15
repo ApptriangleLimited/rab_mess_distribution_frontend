@@ -32,7 +32,12 @@ def sql_literal(value: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--env-file", required=True)
-    parser.add_argument("--compose", nargs="+", default=[])
+    parser.add_argument(
+        "--compose-file",
+        action="append",
+        default=[],
+        help="Compose file (repeat). Do not pass raw `docker compose -f` — argparse treats -f as a flag.",
+    )
     parser.add_argument("--check-only", action="store_true")
     args = parser.parse_args()
 
@@ -52,13 +57,16 @@ def main() -> int:
     if args.check_only:
         print("Host .env has POSTGRES_PASSWORD and REDIS_PASSWORD")
         return 0
-    if not args.compose:
-        print("FATAL: --compose is required unless --check-only", file=sys.stderr)
+    if not args.compose_file:
+        print("FATAL: --compose-file is required unless --check-only", file=sys.stderr)
         return 1
 
     sql = f"ALTER USER mess WITH PASSWORD {sql_literal(password)};"
+    compose = ["docker", "compose"]
+    for compose_file in args.compose_file:
+        compose.extend(["-f", compose_file])
     cmd = [
-        *args.compose,
+        *compose,
         "exec",
         "-T",
         "postgres",

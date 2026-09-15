@@ -91,7 +91,7 @@ jobs:
             $COMPOSE up -d postgres redis
 
             echo "Aligning Postgres role password with host .env (no volume wipe)..."
-            python3 deploy/sync-postgres-password.py --env-file "$ENV_FILE" --compose $COMPOSE
+            python3 deploy/sync-postgres-password.py --env-file "$ENV_FILE" --compose-file docker-compose.yml --compose-file docker-compose.prod.yml
 
             echo "Recreating API first so nginx/web do not wait on a cold health check..."
             $COMPOSE up -d --no-deps --force-recreate --remove-orphans api
