@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconArrowRight,
@@ -74,7 +73,6 @@ const ROLE_META: Record<Role, { icon: Icon; accent: string; chip: string }> = {
 };
 
 export default function LoginPage() {
-  const router = useRouter();
   const { login } = useSession();
   const { toast } = useToast();
   const t = useT();
@@ -110,7 +108,7 @@ export default function LoginPage() {
       username || SEED_STAFF_EMAIL(role),
     );
     toast(t("login.loggedInAs", { role: roleLabel(role, locale) }), "success");
-    router.replace(ROLE_HOMES[role]);
+    window.location.replace(ROLE_HOMES[role]);
   }
 
   async function signIn(nextEmail: string, nextPassword: string) {
@@ -145,7 +143,7 @@ export default function LoginPage() {
         t("login.loggedInAs", { role: roleLabel(data.staff.role, locale) }),
         "success",
       );
-      router.replace(ROLE_HOMES[data.staff.role]);
+      window.location.replace(ROLE_HOMES[data.staff.role]);
     } catch (err) {
       if (err instanceof ApiClientError && err.code === "AUTH_INVALID_CREDENTIALS") {
         toast(t("login.invalidCredentials"), "error");

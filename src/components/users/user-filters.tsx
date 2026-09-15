@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import {
   SearchFilterBar,
@@ -73,6 +73,17 @@ export function UserFiltersBar({
 }: Props) {
   const t = useT();
   const { ranks, wings, wing_labels } = useStore();
+  const wingOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const w of wings) {
+      const key = w.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(w);
+    }
+    return out;
+  }, [wings]);
 
   function patch(partial: Partial<UserFilters>) {
     onChange({ ...value, ...partial });
@@ -140,7 +151,7 @@ export function UserFiltersBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("common.allWing")}</SelectItem>
-            {wings.map((w) => (
+            {wingOptions.map((w) => (
               <SelectItem key={w} value={w}>
                 {wingDisplayLabel(w, wing_labels)}
               </SelectItem>

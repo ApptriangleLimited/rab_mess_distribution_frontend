@@ -1,4 +1,8 @@
 import { apiJson } from "@/lib/api/client";
+import {
+  isApiFeatureMissing,
+  rememberMissingRoute,
+} from "@/lib/api/compat";
 import { memberToUser, type MemberApiRow } from "@/lib/api/members";
 import type {
   DailyTag,
@@ -80,20 +84,49 @@ export function requestMember(row: TagRequestApiRow): User | null {
   return row.member ? memberToUser(row.member) : null;
 }
 
-export function listTagRequests(params: TagRequestListParams = {}) {
+function emptyTagRequestList(params: TagRequestListParams = {}): TagRequestListData {
+  return {
+    items: [],
+    total: 0,
+    page: params.page ?? 1,
+    page_size: params.page_size ?? 25,
+    counts: { daily: 0, ration: 0, consume: 0 },
+    status_counts: { all: 0, requested: 0, updated: 0, rejected: 0 },
+  };
+}
+
+export async function listTagRequests(params: TagRequestListParams = {}) {
+  if (isApiFeatureMissing("tag-requests")) return emptyTagRequestList(params);
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value == null || value === "" || value === "all") continue;
     qs.set(key, String(value));
   }
   const suffix = qs.toString() ? `?${qs}` : "";
-  return apiJson<TagRequestListData>(`/api/v1/tag-requests${suffix}`);
+  try {
+    return await apiJson<TagRequestListData>(`/api/v1/tag-requests${suffix}`);
+  } catch (err) {
+    if (rememberMissingRoute("tag-requests", err)) {
+      return emptyTagRequestList(params);
+    }
+    throw err;
+  }
 }
 
-export function tagRequestCounts() {
-  return apiJson<{ daily: number; ration: number; consume: number }>(
-    "/api/v1/tag-requests/counts",
-  );
+export async function tagRequestCounts() {
+  if (isApiFeatureMissing("tag-requests")) {
+    return { daily: 0, ration: 0, consume: 0 };
+  }
+  try {
+    return await apiJson<{ daily: number; ration: number; consume: number }>(
+      "/api/v1/tag-requests/counts",
+    );
+  } catch (err) {
+    if (rememberMissingRoute("tag-requests", err)) {
+      return { daily: 0, ration: 0, consume: 0 };
+    }
+    throw err;
+  }
 }
 
 export function createTagRequestApi(input: {

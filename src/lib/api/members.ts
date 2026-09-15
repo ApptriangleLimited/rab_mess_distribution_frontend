@@ -1,4 +1,8 @@
-import { apiJson } from "@/lib/api/client";
+import { ApiClientError, apiJson } from "@/lib/api/client";
+import {
+  isApiFeatureMissing,
+  rememberMissingRoute,
+} from "@/lib/api/compat";
 import { toMemberEntryBody } from "@/lib/api/register";
 import type { UserFormValues } from "@/components/users/user-form";
 import type { ApprovalStatus, MemberType, User, UserStatus, DailyTag } from "@/lib/types";
@@ -158,8 +162,23 @@ export function createMember(
   });
 }
 
-export function getMember(id: string) {
-  return apiJson<MemberApiRow>(`/api/v1/members/${id}`);
+async function getMemberFromList(id: string) {
+  const data = await listMembers({ page: 1, page_size: 500 });
+  const row = data.items.find((item) => item.id === id);
+  if (!row) {
+    throw new ApiClientError(404, "NOT_FOUND", "User not found");
+  }
+  return row;
+}
+
+export async function getMember(id: string) {
+  if (isApiFeatureMissing("member-get")) return getMemberFromList(id);
+  try {
+    return await apiJson<MemberApiRow>(`/api/v1/members/${id}`);
+  } catch (err) {
+    if (rememberMissingRoute("member-get", err)) return getMemberFromList(id);
+    throw err;
+  }
 }
 
 export function updateMember(id: string, values: UserFormValues) {

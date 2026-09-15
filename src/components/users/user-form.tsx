@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconAccessPoint,
@@ -38,7 +38,7 @@ import {
   MEMBER_TYPES,
   RELIGIONS,
   BRANCH_DISTRICTS,
-  wingDisplayLabel,
+  rankDisplayLabel,
 } from "@/lib/constants";
 import { SearchableSelect } from "@/components/shared/searchable-select";
 import type { DailyTag, DocumentMeta, MemberType, User } from "@/lib/types";
@@ -53,7 +53,12 @@ import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
 import { uploadFile } from "@/lib/api/files";
 import { isCcApiEnabled } from "@/lib/api/mode";
-import { listRanks, listWings } from "@/lib/store/org-options";
+import {
+  listForces,
+  listRanks,
+  listWings,
+  wingPathLabel,
+} from "@/lib/store/org-options";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
 import { cn, digitsOnly, isValidBdPhone, normalizeBdPhone } from "@/lib/utils";
@@ -139,19 +144,6 @@ const fieldGridClass =
 const personalGridClass =
   "grid items-start grid-cols-2 gap-x-2 gap-y-1.5 lg:grid-cols-6";
 
-function resolveWingParts(
-  wing: string,
-  wingParent: Record<string, string>,
-): { parent: string; sub: string } {
-  const parent = wingParent[wing];
-  if (parent) return { parent, sub: wing };
-  return { parent: wing, sub: "" };
-}
-
-function rootWings(wings: string[], wingParent: Record<string, string>) {
-  return wings.filter((w) => !wingParent[w]);
-}
-
 function formatDocSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -179,19 +171,19 @@ export function UserForm({
   const t = useT();
   const { toast } = useToast();
   const reduceMotion = useReducedMotion();
-  const { ranks, wings, wing_labels, wing_parent, member_banks, forces } =
-    useStore();
+  const store = useStore();
+  const { member_banks, rank_labels } = store;
+  const ranks = useMemo(() => listRanks(), [store.ranks]);
+  const wings = useMemo(() => listWings(), [store.wings]);
+  const forces = useMemo(() => listForces(), [store.forces]);
   const [values, setValues] = useState<UserFormValues>(
     initial ?? emptyValues(),
   );
   const [todayTag, setTodayTag] = useState<DailyTag>(initialTag);
   const [dragOver, setDragOver] = useState(false);
   const apiOn = isCcApiEnabled();
-  const wingParts = resolveWingParts(values.wing, wing_parent);
-  const parentWingOptions = rootWings(wings, wing_parent);
   const isCivilian = values.member_type === "civilian";
   const isGuest = values.member_type === "guest";
-  const wingLabel = (w: string) => wingDisplayLabel(w, wing_labels);
 
   const rankField = (
     <Field label={t("cc.fields.rank")} required>
@@ -199,6 +191,7 @@ export function UserForm({
         options={ranks}
         value={values.rank}
         onChange={(v) => patch("rank", v)}
+        getOptionLabel={(r) => rankDisplayLabel(r, values.force, rank_labels)}
         placeholder={t("cc.selectRank")}
         triggerClassName={selectTriggerClass}
       />
@@ -208,10 +201,10 @@ export function UserForm({
   const wingField = (
     <Field label={t("cc.fields.wing")} required>
       <SearchableSelect
-        options={parentWingOptions}
-        value={wingParts.parent}
-        onChange={setParentWing}
-        getOptionLabel={wingLabel}
+        options={wings}
+        value={values.wing}
+        onChange={(v) => patch("wing", v)}
+        getOptionLabel={wingPathLabel}
         placeholder={t("cc.selectWing")}
         triggerClassName={selectTriggerClass}
       />
@@ -268,10 +261,6 @@ export function UserForm({
         inactiveLabel={t("cc.statusInactive")}
       />
     ) : null;
-
-  function setParentWing(parent: string) {
-    setValues((prev) => ({ ...prev, wing: parent }));
-  }
 
   function patch<K extends keyof UserFormValues>(
     key: K,

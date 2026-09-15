@@ -594,7 +594,7 @@ export function createSeedState(): AppState {
     senders,
     rates,
     ranks: [...RANKS],
-    wings: [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS],
+    wings: [...new Set([...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS])],
     wing_parent: { ...DEFAULT_WING_PARENT },
     wing_labels: {},
     forces: [...FORCES],

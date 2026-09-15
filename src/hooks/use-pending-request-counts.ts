@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/hooks/use-store";
 import { onCcDataChange } from "@/lib/api/cc-events";
 import { isCcApiEnabled } from "@/lib/api/mode";
+import { isApiFeatureMissing } from "@/lib/api/compat";
 import { tagRequestCounts } from "@/lib/api/tag-requests";
 import {
   pendingRequestCountForHref,
@@ -22,7 +23,7 @@ export function usePendingRequestCounts() {
   useEffect(() => onCcDataChange(() => setTick((n) => n + 1)), []);
 
   useEffect(() => {
-    if (!apiOn) return;
+    if (!apiOn || isApiFeatureMissing("tag-requests")) return;
     let cancelled = false;
     tagRequestCounts()
       .then((data) => {

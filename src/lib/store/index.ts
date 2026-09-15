@@ -305,6 +305,22 @@ function isLegacyWings(raw: unknown): boolean {
   return seen.size === LEGACY_WINGS.length;
 }
 
+function uniqueWingLabels(labels: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of labels) {
+    const label = String(item ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
 /** Core SRB wings + Admin sub-branches + user-added. Drop Alpha…Support forever. */
 function ensureWings(raw: unknown): string[] {
   const banned = new Set(
@@ -312,8 +328,8 @@ function ensureWings(raw: unknown): string[] {
       w.toLowerCase(),
     ),
   );
-  if (isLegacyWings(raw)) return [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS];
-  const base: string[] = [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS];
+  const base = uniqueWingLabels([...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS]);
+  if (isLegacyWings(raw)) return base;
   const seen = new Set<string>(base.map((r) => r.toLowerCase()));
   if (!Array.isArray(raw)) return base;
   for (const item of raw) {

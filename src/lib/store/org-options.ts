@@ -21,7 +21,16 @@ export function listRanks(): string[] {
 }
 
 export function listWings(): string[] {
-  return getState().wings.filter((w) => !BANNED_WINGS.has(w.toLowerCase()));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const w of getState().wings) {
+    if (BANNED_WINGS.has(w.toLowerCase())) continue;
+    const key = w.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(w);
+  }
+  return out;
 }
 
 /** Direct children of `parent` (null = root wings). Order follows catalog. */
@@ -30,7 +39,14 @@ export function listWingChildrenFrom(
   wingParent: Record<string, string>,
   parent: string | string[] | null,
 ): string[] {
-  const live = wings.filter((w) => !BANNED_WINGS.has(w.toLowerCase()));
+  const seen = new Set<string>();
+  const live = wings.filter((w) => {
+    if (BANNED_WINGS.has(w.toLowerCase())) return false;
+    const key = w.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   if (parent === null) {
     return live.filter((w) => !wingParent[w]);
   }

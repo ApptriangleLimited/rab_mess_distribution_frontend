@@ -15,7 +15,7 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.includes(".")
   ) {
-    return NextResponse.next();
+    return NextResponse.next({ request });
   }
 
   const session = parseSessionCookie(request.cookies.get(SESSION_COOKIE)?.value);
@@ -39,7 +39,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return NextResponse.next({ request });
 }
 
 export const config = {

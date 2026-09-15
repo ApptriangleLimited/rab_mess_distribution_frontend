@@ -1,4 +1,8 @@
-import { ApiClientError, apiJson } from "@/lib/api/client";
+import { apiJson } from "@/lib/api/client";
+import {
+  isApiFeatureMissing,
+  rememberMissingRoute,
+} from "@/lib/api/compat";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import { memberToUser, type MemberApiRow } from "@/lib/api/members";
 import { getAccessToken } from "@/lib/session";
@@ -106,13 +110,13 @@ export function importAppSnapshot(state: AppState) {
 
 export async function syncStoreFromApi() {
   if (!isCcApiEnabled() || !getAccessToken() || syncing) return;
+  if (isApiFeatureMissing("snapshot")) return;
   syncing = true;
   try {
     const remote = await fetchAppSnapshot();
     applyApiSnapshot(snapshotToState(remote));
   } catch (err) {
-    // Older APIs (e.g. api.ms.apptriangle.com) have login but no snapshot yet.
-    if (err instanceof ApiClientError && err.status === 404) return;
+    if (rememberMissingRoute("snapshot", err)) return;
     throw err;
   } finally {
     syncing = false;
@@ -121,9 +125,11 @@ export async function syncStoreFromApi() {
 
 function schedulePersist(state: AppState) {
   if (!isCcApiEnabled() || !getAccessToken() || syncing) return;
+  if (isApiFeatureMissing("snapshot")) return;
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     void saveAppSnapshot(state).catch((err) => {
+      if (rememberMissingRoute("snapshot", err)) return;
       console.error("Failed to persist app state to Docker API", err);
     });
   }, 600);
