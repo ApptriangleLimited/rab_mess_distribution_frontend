@@ -72,7 +72,7 @@ function loadMissing() {
 loadMissing();
 
 export function isApiFeatureMissing(feature: ApiFeature) {
-  if (feature === "snapshot" && isLegacyLiveApi()) return true;
+  if (isLegacyLiveApi()) return true;
   return missing.has(feature);
 }
 
@@ -95,7 +95,7 @@ export function isMissingRouteError(err: unknown): boolean {
 
 export function rememberMissingRoute(feature: ApiFeature, err: unknown): boolean {
   if (feature === "member-get") {
-    if (!isMissingRouteError(err)) return false;
+    if (!isNotFoundError(err) && !isMissingRouteError(err)) return false;
   } else if (!isNotFoundError(err)) {
     return false;
   }

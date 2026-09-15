@@ -1,6 +1,7 @@
 import { ApiClientError, apiJson } from "@/lib/api/client";
 import {
   isApiFeatureMissing,
+  isLegacyLiveApi,
   rememberMissingRoute,
 } from "@/lib/api/compat";
 import { normalizeDocuments } from "@/lib/api/files";
@@ -164,16 +165,25 @@ export function createMember(
 }
 
 async function getMemberFromList(id: string) {
-  const data = await listMembers({ page: 1, page_size: 500 });
-  const row = data.items.find((item) => item.id === id);
-  if (!row) {
-    throw new ApiClientError(404, "NOT_FOUND", "User not found");
+  const pageSize = 200;
+  let page = 1;
+  let total = Infinity;
+  while ((page - 1) * pageSize < total) {
+    const data = await listMembers({ page, page_size: pageSize });
+    const row = data.items.find((item) => item.id === id);
+    if (row) return row;
+    total = data.total ?? data.items.length;
+    if (!data.items.length) break;
+    page += 1;
+    if (page > 25) break;
   }
-  return row;
+  throw new ApiClientError(404, "NOT_FOUND", "User not found");
 }
 
 export async function getMember(id: string) {
-  if (isApiFeatureMissing("member-get")) return getMemberFromList(id);
+  if (isLegacyLiveApi() || isApiFeatureMissing("member-get")) {
+    return getMemberFromList(id);
+  }
   try {
     return await apiJson<MemberApiRow>(`/api/v1/members/${id}`);
   } catch (err) {

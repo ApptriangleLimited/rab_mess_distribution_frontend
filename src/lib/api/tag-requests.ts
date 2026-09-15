@@ -1,6 +1,7 @@
 import { apiJson } from "@/lib/api/client";
 import {
   isApiFeatureMissing,
+  isLegacyLiveApi,
   rememberMissingRoute,
 } from "@/lib/api/compat";
 import { memberToUser, type MemberApiRow } from "@/lib/api/members";
@@ -96,7 +97,9 @@ function emptyTagRequestList(params: TagRequestListParams = {}): TagRequestListD
 }
 
 export async function listTagRequests(params: TagRequestListParams = {}) {
-  if (isApiFeatureMissing("tag-requests")) return emptyTagRequestList(params);
+  if (isLegacyLiveApi() || isApiFeatureMissing("tag-requests")) {
+    return emptyTagRequestList(params);
+  }
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value == null || value === "" || value === "all") continue;
@@ -114,7 +117,7 @@ export async function listTagRequests(params: TagRequestListParams = {}) {
 }
 
 export async function tagRequestCounts() {
-  if (isApiFeatureMissing("tag-requests")) {
+  if (isLegacyLiveApi() || isApiFeatureMissing("tag-requests")) {
     return { daily: 0, ration: 0, consume: 0 };
   }
   try {

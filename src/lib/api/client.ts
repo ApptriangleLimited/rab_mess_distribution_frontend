@@ -37,6 +37,32 @@ export function apiUrl(path: string) {
   return base ? `${base}${path}` : path;
 }
 
+function requestHost(path: string): string {
+  try {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "http://localhost";
+    return new URL(apiUrl(path), origin).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/** Old live API has login/members but no snapshot/import. Never hit the network. */
+function isUnavailableOnLiveApi(path: string): boolean {
+  if (
+    !path.includes("/api/v1/app/snapshot") &&
+    !path.includes("/api/v1/app/import")
+  ) {
+    return false;
+  }
+  const host = requestHost(path);
+  return (
+    host === "api.ms.apptriangle.com" ||
+    host === "ms.apptriangle.com" ||
+    host === "www.ms.apptriangle.com"
+  );
+}
+
 let refreshInFlight: Promise<boolean> | null = null;
 
 async function tryRefreshAccessToken(): Promise<boolean> {
@@ -79,6 +105,13 @@ function shouldAttemptRefresh(path: string, status: number) {
 export async function apiJson<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   if (!isApiEnabled() && !isCcApiEnabled()) {
     throw new ApiClientError(503, "API_DISABLED", "API is off (demo mode).");
+  }
+  if (isUnavailableOnLiveApi(path)) {
+    throw new ApiClientError(
+      404,
+      "API_FEATURE_MISSING",
+      "Snapshot is not available on this API.",
+    );
   }
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");

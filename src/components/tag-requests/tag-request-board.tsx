@@ -310,7 +310,7 @@ export function TagRequestBoard({
       try {
         const updated = await acceptTagRequest(pendingUpdate.id);
         upsertLocalTagRequest(requestToTagRequest(updated));
-        await syncStoreFromApi();
+        await syncStoreFromApi().catch(() => undefined);
         notifyCcDataChange();
         toast(
           canAct && mode !== "daily"

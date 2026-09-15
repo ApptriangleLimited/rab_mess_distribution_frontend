@@ -100,6 +100,9 @@ export function fetchAppSnapshot() {
 }
 
 export function saveAppSnapshot(state: AppState) {
+  if (isLegacyLiveApi() || isApiFeatureMissing("snapshot")) {
+    return Promise.resolve({} as AppSnapshot);
+  }
   return apiJson<AppSnapshot>("/api/v1/app/snapshot", {
     method: "PUT",
     body: JSON.stringify(stateToPayload(state)),
@@ -107,6 +110,9 @@ export function saveAppSnapshot(state: AppState) {
 }
 
 export function importAppSnapshot(state: AppState) {
+  if (isLegacyLiveApi() || isApiFeatureMissing("snapshot")) {
+    return Promise.resolve({} as AppSnapshot);
+  }
   return apiJson<AppSnapshot>("/api/v1/app/import", {
     method: "POST",
     body: JSON.stringify(stateToPayload(state)),
