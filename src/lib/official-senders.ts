@@ -100,12 +100,13 @@ export function isFreshMoneyTag(tag: string) {
   return FRESH_MONEY_TAGS.some((t) => t.toLowerCase() === tag.toLowerCase());
 }
 
-export function isFrFuelSender(
-  sender: Pick<SenderAccount, "mapped_tags" | "label">,
-) {
+export function isFrFuelSender(sender: {
+  mapped_tags?: readonly string[] | null;
+  label?: string | null;
+}) {
   return (
-    sender.mapped_tags.some((t) => isFrFuelTag(t)) ||
-    isFirewoodFrLabel(sender.label)
+    (sender.mapped_tags ?? []).some((t) => isFrFuelTag(t)) ||
+    isFirewoodFrLabel(sender.label ?? "")
   );
 }
 

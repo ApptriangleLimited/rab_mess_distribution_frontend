@@ -94,7 +94,7 @@ export function TagBillPanel({
     [members],
   );
 
-  const tagKey = Array.isArray(tag) ? tag.join("+") : tag;
+  const tagKey = typeof tag === "string" ? tag : tag.join("+");
   const dayHeader = displayTag || tagKey;
   const showFuel = bill.tags.includes("FR") || bill.fuelRate > 0;
 
