@@ -61,13 +61,26 @@ export type UserFormRequiredField =
   | "name"
   | "rank"
   | "wing"
-  | "documents";
+  | "documents"
+  | "bank";
 
 /** First missing required member field, else null. SRB ID is optional. */
 export function missingUserFormRequired(
   input: Pick<
     UserInput,
-    "personal_id" | "name" | "rank" | "wing" | "documents" | "member_type" | "dropdown_no"
+    | "personal_id"
+    | "name"
+    | "rank"
+    | "wing"
+    | "documents"
+    | "member_type"
+    | "dropdown_no"
+    | "bank_name"
+    | "account_name"
+    | "account_number"
+    | "routing"
+    | "branch"
+    | "branch_location"
   >,
 ): UserFormRequiredField | null {
   if (input.member_type === "guest") {
@@ -84,6 +97,18 @@ export function missingUserFormRequired(
   if (!input.rank.trim()) return "rank";
   if (!input.wing.trim()) return "wing";
   if (!input.documents?.length) return "documents";
+  if (input.member_type === "permanent") {
+    if (
+      !input.bank_name.trim() ||
+      !input.account_name.trim() ||
+      !input.account_number.trim() ||
+      !input.routing.trim() ||
+      !input.branch.trim() ||
+      !input.branch_location.trim()
+    ) {
+      return "bank";
+    }
+  }
   return null;
 }
 
@@ -329,6 +354,7 @@ export type UserFilters = {
   q?: string;
   status?: UserStatus | "all";
   approval?: ApprovalStatus | "all";
+  member_type?: MemberType | "all";
   wing?: string | "all";
   rank?: string | "all";
   /**
@@ -393,6 +419,13 @@ export function filterUsers(users: User[], filters: UserFilters) {
       if (filters.rank && filters.rank !== "all" && u.rank !== filters.rank) {
         return false;
       }
+      if (
+        filters.member_type &&
+        filters.member_type !== "all" &&
+        (u.member_type ?? "permanent") !== filters.member_type
+      ) {
+        return false;
+      }
       if (!matchesMemberDateFilter(u, dateFrom, dateTo)) {
         return false;
       }
@@ -413,6 +446,9 @@ export function userFiltersToSearchParams(filters: UserFilters): URLSearchParams
   if (filters.approval && filters.approval !== "all") {
     params.set("approval", filters.approval);
   }
+  if (filters.member_type && filters.member_type !== "all") {
+    params.set("member_type", filters.member_type);
+  }
   if (filters.wing && filters.wing !== "all") params.set("wing", filters.wing);
   if (filters.rank && filters.rank !== "all") params.set("rank", filters.rank);
   if (filters.date_from?.trim()) params.set("date_from", filters.date_from.trim());
@@ -425,6 +461,7 @@ export function userFiltersFromSearchParams(
 ): UserFilters {
   const status = search.get("status");
   const approval = search.get("approval");
+  const memberType = search.get("member_type");
   return {
     q: search.get("q") ?? "",
     status: status === "0" || status === "1" ? status : "all",
@@ -434,6 +471,14 @@ export function userFiltersFromSearchParams(
       approval === "rejected" ||
       approval === "ended"
         ? approval
+        : "all",
+    member_type:
+      memberType === "new" ||
+      memberType === "attached" ||
+      memberType === "permanent" ||
+      memberType === "guest" ||
+      memberType === "civilian"
+        ? memberType
         : "all",
     wing: search.get("wing") || "all",
     rank: search.get("rank") || "all",

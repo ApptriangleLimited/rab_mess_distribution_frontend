@@ -557,7 +557,7 @@ export const PRITIBHOJ_ADMIN_ROWS: PritibhojRow[] = [
 export const PRITIBHOJ_DEMO_META = {
   titleBn:
     "এডিজি এ্যাডমিন (প্রশাসন) এর বিদায়ী উপলক্ষে প্রীতিভোজের পরিসংখ্যান",
-  orgBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর",
+  orgBn: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর",
   dateISO: "2023-07-06",
   adminTitleBn: "প্রশাসন ও অর্থ উইং",
   grandTotalManpower: 1913,

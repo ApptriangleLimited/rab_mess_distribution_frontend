@@ -16,7 +16,7 @@ type Args = {
 function memberRows(users: User[]) {
   return users.map((u, i) => [
     String(i + 1),
-    u.rab_id || "—",
+    u.personal_id || "—",
     u.rank || "—",
     u.name,
     u.wing || "—",

@@ -4,6 +4,17 @@ import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatMonthLong } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
+import { tagPrintFill } from "@/lib/tag-colors";
+import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
+
+function hexRgb(hex: string): [number, number, number] {
+  const raw = hex.replace("#", "");
+  return [
+    Number.parseInt(raw.slice(0, 2), 16),
+    Number.parseInt(raw.slice(2, 4), 16),
+    Number.parseInt(raw.slice(4, 6), 16),
+  ];
+}
 
 type Args = {
   month: string;
@@ -57,6 +68,7 @@ export function downloadConsumeLedgerPdf({
 
   const head = [
     "Ser",
+    "Pers No",
     "Rank",
     "Name",
     ...dayHeaders.map(String),
@@ -66,6 +78,7 @@ export function downloadConsumeLedgerPdf({
 
   const body = rows.map((row, i) => [
     String(i + 1),
+    row.user.personal_id || "—",
     row.user.rank,
     row.user.name,
     ...(rangeMode
@@ -84,6 +97,7 @@ export function downloadConsumeLedgerPdf({
   const foot = [
     "",
     "",
+    "",
     "Grand total",
     ...dayHeaders.map(() => ""),
     ...tagTotals,
@@ -96,34 +110,50 @@ export function downloadConsumeLedgerPdf({
     body,
     foot: [foot],
     styles: {
-      fontSize: 4.5,
-      cellPadding: 0.4,
+      fontSize: 6.5,
+      cellPadding: 0.8,
       halign: "center",
       valign: "middle",
       lineWidth: 0.1,
       lineColor: 0,
       textColor: 20,
+      overflow: "visible",
+      minCellWidth: 4.2,
     },
     headStyles: {
       fillColor: [235, 235, 235],
       textColor: 20,
       fontStyle: "bold",
-      fontSize: 4.5,
+      fontSize: 6.5,
     },
     footStyles: {
       fillColor: [255, 255, 255],
       textColor: 20,
       fontStyle: "bold",
-      fontSize: 4.5,
+      fontSize: 6.5,
     },
     columnStyles: {
-      0: { cellWidth: 6 },
-      1: { cellWidth: 12, halign: "left" },
-      2: { cellWidth: 22, halign: "left" },
+      0: { cellWidth: 7 },
+      1: { cellWidth: 14, halign: "left" },
+      2: { cellWidth: 14, halign: "left" },
+      3: { cellWidth: 24, halign: "left" },
     },
     theme: "grid",
     margin: { left: 6, right: 6 },
     tableWidth: "auto",
+    didParseCell: (data) => {
+      if (data.section !== "body" || data.column.index < 4) return;
+      if (data.column.index >= 4 + dayHeaders.length) return;
+      const row = rows[data.row.index];
+      const tag = String(data.cell.raw ?? "").trim();
+      if (!row || !tag) return;
+      const tone = isTrgTag(tag) ? resolveTrgTone(row.user.force) : undefined;
+      const fill = tagPrintFill(tag, tone);
+      data.cell.styles.fillColor = hexRgb(fill.bg);
+      data.cell.styles.textColor = hexRgb(fill.fg);
+      data.cell.styles.fontStyle = "bold";
+      data.cell.styles.fontSize = 6;
+    },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

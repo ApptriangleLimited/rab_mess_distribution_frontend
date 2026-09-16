@@ -2,12 +2,17 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { IconDownload, IconPrinter } from "@tabler/icons-react";
+import { IconDownload, IconFileSpreadsheet, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { CommunityBankLetterPrint } from "@/components/ration/community-bank-letter-print";
+import { CommunityFuelLetterPrint } from "@/components/ration/community-fuel-letter-print";
 import { FrTransferLetterPrint } from "@/components/ration/fr-transfer-letter-print";
+import { SonaliBankLetterPrint } from "@/components/ration/sonali-bank-letter-print";
+import { SonaliFuelLetterPrint } from "@/components/ration/sonali-fuel-letter-print";
 import { StaffPayoutPrint } from "@/components/ration/staff-payout-print";
+import { TrustBankLetterPrint } from "@/components/ration/trust-bank-letter-print";
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
@@ -15,13 +20,24 @@ import {
   downloadFrTransferPdf,
   downloadStaffPayoutPdf,
 } from "@/lib/download-letter-pdf";
+import {
+  downloadFrTransferExcel,
+  downloadStaffPayoutExcel,
+} from "@/lib/download-ration-excel";
 import { formatMonthLong, parseMonthInput, todayISO } from "@/lib/date";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   buildFrTransferSheetsByMemberBank,
   buildRationStaffLines,
+  staffSheetToTransferSheet,
   withReportSource,
 } from "@/lib/reports";
+import {
+  isCommunityBankSheet,
+  isCommunityFuelStaffSheet,
+} from "@/lib/community-bank-letter";
+import { isSonaliBankSheet, isSonaliFuelStaffSheet } from "@/lib/sonali-bank-letter";
+import { isTrustBankSheet, isTrustFuelStaffSheet } from "@/lib/trust-bank-letter";
 import { REPORT_PAYOUT_TAGS } from "@/lib/official-senders";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -35,8 +51,9 @@ const TAGS = new Set<string>([
   "MS",
 ]);
 
-function parseTag(raw: string | null): DailyTag | null {
+function parseTag(raw: string | null): DailyTag | "all" | null {
   if (!raw) return null;
+  if (raw.toLowerCase() === "all") return "all";
   const match = [...TAGS].find(
     (code) => code.toLowerCase() === raw.toLowerCase(),
   );
@@ -54,6 +71,7 @@ export default function RationReportPreviewClient() {
   const month = parseMonthInput(searchParams.get("month") ?? "");
   const tag = parseTag(searchParams.get("tag"));
   const senderId = searchParams.get("sender") ?? "";
+  const isAll = tag === "all";
   const isFr = tag === "FR";
 
   const { source } = useReportSource({ month });
@@ -61,7 +79,7 @@ export default function RationReportPreviewClient() {
   const staffSheets = useMemo(() => {
     if (!tag || !senderId || isFr) return [];
     return withReportSource(source, () =>
-      buildRationStaffLines(month, senderId, tag),
+      buildRationStaffLines(month, senderId, isAll ? undefined : tag),
     );
   }, [
     state.assignments,
@@ -71,6 +89,7 @@ export default function RationReportPreviewClient() {
     month,
     tag,
     senderId,
+    isAll,
     isFr,
     source,
   ]);
@@ -94,7 +113,7 @@ export default function RationReportPreviewClient() {
   const sender = state.senders.find((s) => s.id === senderId);
   const monthLabel = formatMonthLong(month);
 
-  function onDownload() {
+  function onDownloadPdf() {
     if (frSheets.length > 0) {
       downloadFrTransferPdf(
         frSheets,
@@ -109,6 +128,21 @@ export default function RationReportPreviewClient() {
     );
   }
 
+  function onDownloadExcel() {
+    if (frSheets.length > 0) {
+      downloadFrTransferExcel(
+        frSheets,
+        `ration-fr-transfer-${month}-${senderId}.xls`,
+      );
+      return;
+    }
+    if (!staffSheets.length || !tag) return;
+    downloadStaffPayoutExcel(
+      staffSheets,
+      `ration-staff-${month}-${tag}-${senderId}.xls`,
+    );
+  }
+
   async function onPrint() {
     const el = letterRef.current;
     if (!el) return;
@@ -118,12 +152,17 @@ export default function RationReportPreviewClient() {
         frSheets.length > 0
           ? `ration-fr-transfer-${month}-${senderId}.pdf`
           : `ration-staff-${month}-${tag}-${senderId}.pdf`;
-      await printLetterElement(
-        el,
-        name,
-        frSheets.length > 0 ? "landscape" : "portrait",
-        { skipInlineStyles: true },
-      );
+      const landscape =
+        frSheets.length > 0 ||
+        staffSheets.some(
+          (sheet) =>
+            (isTrustBankSheet(sheet) && !isTrustFuelStaffSheet(sheet)) ||
+            (isCommunityBankSheet(sheet) && !isCommunityFuelStaffSheet(sheet)) ||
+            (isSonaliBankSheet(sheet) && !isSonaliFuelStaffSheet(sheet)),
+        );
+      await printLetterElement(el, name, landscape ? "landscape" : "portrait", {
+        skipInlineStyles: true,
+      });
     } finally {
       setPrinting(false);
     }
@@ -148,7 +187,7 @@ export default function RationReportPreviewClient() {
               ? t("ration.reportPreviewHint")
               : isFr
                 ? `FR · ${monthLabel} · ${sender!.label} · ${frSheets.length} bank letter(s)`
-                : `${tagLabel(tag!, locale)} · ${monthLabel} · ${sender!.label} · ${staffSheets.length} bank letter(s)`
+                : `${isAll ? t("common.all") : tagLabel(tag!, locale)} · ${monthLabel} · ${sender!.label} · ${staffSheets.length} bank letter(s)`
           }
           actions={
             <>
@@ -158,7 +197,18 @@ export default function RationReportPreviewClient() {
                 variant="outline"
                 className="rounded-lg"
                 disabled={!canAct}
-                onClick={onDownload}
+                onClick={onDownloadExcel}
+              >
+                <IconFileSpreadsheet className="h-3.5 w-3.5" />
+                {t("ration.exportExcel")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-lg"
+                disabled={!canAct}
+                onClick={onDownloadPdf}
               >
                 <IconDownload className="h-3.5 w-3.5" />
                 {t("ration.downloadReport")}
@@ -198,6 +248,24 @@ export default function RationReportPreviewClient() {
           >
             {frSheets.map((sheet, i) => {
               const bank = sheet.lines[0]?.user.bank_name || "—";
+              if (isTrustBankSheet(sheet)) {
+                return (
+                  <TrustBankLetterPrint key={`${bank}-${i}`} sheet={sheet} />
+                );
+              }
+              if (isCommunityBankSheet(sheet)) {
+                return (
+                  <CommunityBankLetterPrint
+                    key={`${bank}-${i}`}
+                    sheet={sheet}
+                  />
+                );
+              }
+              if (isSonaliBankSheet(sheet)) {
+                return (
+                  <SonaliBankLetterPrint key={`${bank}-${i}`} sheet={sheet} />
+                );
+              }
               return (
                 <FrTransferLetterPrint
                   key={`${bank}-${i}`}
@@ -209,11 +277,82 @@ export default function RationReportPreviewClient() {
           </div>
         </div>
       ) : staffSheets.length > 0 ? (
-        <StaffPayoutPrint
-          ref={letterRef}
-          sheets={staffSheets}
-          preview
-        />
+        staffSheets.some(
+          (sheet) =>
+            isTrustBankSheet(sheet) ||
+            isCommunityBankSheet(sheet) ||
+            isSonaliBankSheet(sheet),
+        ) ? (
+          <div className="w-full overflow-x-auto pb-2">
+            <div
+              ref={letterRef}
+              data-print-stack="true"
+              className="flex w-max min-w-full flex-col gap-6"
+            >
+              {staffSheets.map((sheet, i) => {
+                const bank = sheet.memberBank || sheet.sender.bank_name || "—";
+                if (isTrustFuelStaffSheet(sheet)) {
+                  return (
+                    <StaffPayoutPrint
+                      key={`${bank}-${i}`}
+                      sheets={[sheet]}
+                      preview
+                    />
+                  );
+                }
+                if (isTrustBankSheet(sheet)) {
+                  return (
+                    <TrustBankLetterPrint
+                      key={`${bank}-${i}`}
+                      sheet={staffSheetToTransferSheet(sheet)}
+                    />
+                  );
+                }
+                if (isCommunityFuelStaffSheet(sheet)) {
+                  return (
+                    <CommunityFuelLetterPrint
+                      key={`${bank}-${i}`}
+                      sheet={sheet}
+                    />
+                  );
+                }
+                if (isCommunityBankSheet(sheet)) {
+                  return (
+                    <CommunityBankLetterPrint
+                      key={`${bank}-${i}`}
+                      sheet={staffSheetToTransferSheet(sheet)}
+                    />
+                  );
+                }
+                if (isSonaliFuelStaffSheet(sheet)) {
+                  return (
+                    <SonaliFuelLetterPrint
+                      key={`${bank}-${i}`}
+                      sheet={sheet}
+                    />
+                  );
+                }
+                if (isSonaliBankSheet(sheet)) {
+                  return (
+                    <SonaliBankLetterPrint
+                      key={`${bank}-${i}`}
+                      sheet={staffSheetToTransferSheet(sheet)}
+                    />
+                  );
+                }
+                return (
+                  <StaffPayoutPrint
+                    key={`${bank}-${i}`}
+                    sheets={[sheet]}
+                    preview
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <StaffPayoutPrint ref={letterRef} sheets={staffSheets} preview />
+        )
       ) : null}
     </PagePane>
   );

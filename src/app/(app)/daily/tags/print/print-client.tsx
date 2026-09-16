@@ -23,13 +23,16 @@ import {
   formatMonthLong,
   parseMonthInput,
 } from "@/lib/date";
-import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
-import { printLetterElement } from "@/lib/print-letter-pdf";
+import {
+  downloadDailyRegisterPdf,
+  printDailyRegisterPdf,
+} from "@/lib/download-daily-register-pdf";
 import {
   buildDailyRegisterDates,
   buildDailyRegisterFromCells,
 } from "@/lib/reports";
 import { compareUsers } from "@/lib/store/users";
+import type { MemberType, UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
 export default function DailyRegisterPrintClient() {
@@ -47,9 +50,15 @@ export default function DailyRegisterPrintClient() {
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
   const statusParam = searchParams.get("status");
-  const memberStatus: "all" | "0" | "1" =
-    statusParam === "0" || statusParam === "1" || statusParam === "all"
-      ? statusParam
+  const memberStatus: UserStatus = statusParam === "0" ? "0" : "1";
+  const typeParam = searchParams.get("member_type") ?? "all";
+  const memberType: MemberType | "all" =
+    typeParam === "new" ||
+    typeParam === "attached" ||
+    typeParam === "permanent" ||
+    typeParam === "guest" ||
+    typeParam === "civilian"
+      ? typeParam
       : "all";
   const dayCount = daysInMonth(month);
   const loadFrom = dateFrom.trim() || dateInMonth(month, 1);
@@ -61,16 +70,18 @@ export default function DailyRegisterPrintClient() {
     q,
     rank,
     wing,
+    memberType,
     status: memberStatus,
   });
 
-  /** Approved roster — honor status filter (default Active). */
+  /** Approved roster — honor member type + Active / Inactive toggle. */
   const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
     return state.users
       .filter((u) => {
         if (u.approval_status !== "approved") return false;
-        if (memberStatus !== "all" && u.status !== memberStatus) return false;
+        if (u.status !== memberStatus) return false;
+        if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
         if (!query) return true;
@@ -80,7 +91,7 @@ export default function DailyRegisterPrintClient() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [state.users, q, rank, wing, memberStatus]);
+  }, [state.users, q, rank, wing, memberType, memberStatus]);
 
   const users = apiOn ? cockpit.users : demoUsers;
   const loading = apiOn && cockpit.loading;
@@ -122,27 +133,28 @@ export default function DailyRegisterPrintClient() {
   const monthLabel = formatMonthLong(month);
   const canAct = printRows.length > 0 && dayNumbers.length > 0;
 
+  const pdfArgs = {
+    month,
+    dayNumbers,
+    rows: printRows,
+    filename: `attendance-register-${month}.pdf`,
+    coverTitle: t("daily.registerCoverTitle"),
+    sheetTitle: t("daily.registerTitle", { month: monthLabel }),
+    pageOf: (page: number, total: number) =>
+      t("common.pageOf", { page, total }),
+    signLabel: t("daily.signDailySi"),
+  };
+
   function onDownload() {
     if (!canAct) return;
-    downloadDailyRegisterPdf({
-      month,
-      dayNumbers,
-      rows: printRows,
-      filename: `attendance-register-${month}.pdf`,
-    });
+    downloadDailyRegisterPdf(pdfArgs);
   }
 
   async function onPrint() {
-    const el = printRef.current;
-    if (!el || !canAct) return;
+    if (!canAct) return;
     setPrinting(true);
     try {
-      await printLetterElement(
-        el,
-        `attendance-register-${month}.pdf`,
-        "landscape",
-        { preserveColors: true, skipInlineStyles: true },
-      );
+      await printDailyRegisterPdf(pdfArgs);
     } finally {
       setPrinting(false);
     }

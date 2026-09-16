@@ -223,11 +223,14 @@ const SEED_MEMBERS: SeedRow[] = [
   { id: "u_seed_38", name: "Mini Roy", member_type: "civilian", wing: "ADG (Ops) Office", rank: "Civill", force: "Civilian", approval_status: "pending", status: "1", default_tag: "MS", contact: "Mother" },
   { id: "u_seed_39", name: "Tanvir Hasan", member_type: "guest", wing: "ADG (Admin) Office", rank: "DAD", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Host" },
   { id: "u_seed_40", name: "Khaled Mostafa", member_type: "permanent", wing: "Ops Wg", rank: "ASI", force: "Police", approval_status: "ended", status: "0", default_tag: "MS", contact: "Brother", out_date: `${shiftMonthKey(monthKey(), -1)}-20` },
+  { id: "u_seed_41", name: "Rashedul Islam", member_type: "permanent", wing: "Ops Wg", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
+  { id: "u_seed_42", name: "Farzana Akter", member_type: "permanent", wing: "Int Wg", rank: "Constable", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
 ];
 
-function buildDemoUsers(): User[] {
-  return SEED_MEMBERS.map((row, i) => {
-    const n = i + 1;
+const COCKPIT_POLICE_IDS = new Set(["u_seed_41", "u_seed_42"]);
+
+function userFromSeedRow(row: SeedRow, i: number): User {
+  const n = i + 1;
     const isCivilian = row.member_type === "civilian";
     const isGuest = row.member_type === "guest";
     const bank = MEMBER_BANKS[i % MEMBER_BANKS.length]!;
@@ -277,7 +280,71 @@ function buildDemoUsers(): User[] {
         },
       ],
     });
+}
+
+function buildDemoUsers(): User[] {
+  return SEED_MEMBERS.map((row, i) => userFromSeedRow(row, i));
+}
+
+/** Approved Police members for Daily cockpit. Merge if local roster predates them. */
+export function extraCockpitPoliceMembers(): User[] {
+  return SEED_MEMBERS.flatMap((row, i) =>
+    COCKPIT_POLICE_IDS.has(row.id) ? [userFromSeedRow(row, i)] : [],
+  );
+}
+
+const TRUST_FIREWOOD_ROWS: SeedRow[] = [
+  { id: "u_fw_trust_01", name: "Kamrul Hasan", member_type: "permanent", wing: "Ops Wg", rank: "SI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
+  { id: "u_fw_trust_02", name: "Shahida Begum", member_type: "permanent", wing: "Int Wg", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Father" },
+  { id: "u_fw_trust_03", name: "Rezaul Karim", member_type: "permanent", wing: "Per Br", rank: "Constable", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
+  { id: "u_fw_trust_04", name: "Nargis Akter", member_type: "permanent", wing: "Inv Wg", rank: "Insp", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Brother" },
+];
+
+/** Trust Bank + FR days so Firewood FR generate-report has a letter to preview. */
+export function extraTrustFirewoodMembers(): User[] {
+  return TRUST_FIREWOOD_ROWS.map((row, i) => {
+    const n = 9101 + i;
+    return {
+      ...userFromSeedRow(row, 900 + i),
+      default_tag: "FR" as DailyTag,
+      bank_name: "Trust bank",
+      account_name: row.name,
+      account_number: `2202${String(n).padStart(6, "0")}`,
+      routing: `2002791${String(i).padStart(2, "0")}`,
+      branch: "Mirpur",
+      rab_id: `SRB-FW${String(i + 1).padStart(2, "0")}`,
+      personal_id: `PN-FW${n}`,
+      rfid: `RFID-FW${n}`,
+    };
   });
+}
+
+/** FR tags for the current month (and Sept 2026) so the Trust Firewood letter is not empty. */
+export function extraTrustFirewoodAssignments(): DailyAssignment[] {
+  const stamp = nowISO();
+  const months = new Set([monthKey(), "2026-09"]);
+  const today = todayISO();
+  const out: DailyAssignment[] = [];
+  for (const month of months) {
+    const last =
+      month === monthKey()
+        ? Number(today.slice(8, 10))
+        : daysInMonth(month);
+    for (const row of TRUST_FIREWOOD_ROWS) {
+      for (let day = 1; day <= last; day++) {
+        const date = dateInMonth(month, day);
+        out.push({
+          id: `a_fw_${row.id}_${date.replaceAll("-", "")}`,
+          user_id: row.id,
+          date,
+          tag: "FR",
+          updated_by: "daily",
+          updated_at: stamp,
+        });
+      }
+    }
+  }
+  return out;
 }
 
 function buildMemberPlans(users: User[]): MemberPlan[] {
@@ -572,6 +639,13 @@ export function createSeedState(): AppState {
       });
     }
   }
+
+  const extraUsers = extraTrustFirewoodMembers();
+  const haveIds = new Set(users.map((u) => u.id));
+  for (const extra of extraUsers) {
+    if (!haveIds.has(extra.id)) users.push(extra);
+  }
+  assignments.push(...extraTrustFirewoodAssignments());
 
   const senders: SenderAccount[] = officialSenderAccounts();
 

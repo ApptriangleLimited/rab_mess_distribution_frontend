@@ -87,6 +87,8 @@ EXTRA_ROWS = [
     {"id": "u_seed_38", "name": "Mini Roy", "member_type": "civilian", "wing": "ADG (Ops) Office", "rank": "Civill", "force": "Civilian", "approval_status": "pending", "status": "1", "default_tag": "MS", "contact": "Mother"},
     {"id": "u_seed_39", "name": "Tanvir Hasan", "member_type": "guest", "wing": "ADG (Admin) Office", "rank": "DAD", "force": "Army", "approval_status": "approved", "status": "1", "default_tag": "MS", "contact": "Host"},
     {"id": "u_seed_40", "name": "Khaled Mostafa", "member_type": "permanent", "wing": "Ops Wg", "rank": "ASI", "force": "Police", "approval_status": "ended", "status": "0", "default_tag": "MS", "contact": "Brother", "out_date": (TODAY - timedelta(days=20)).isoformat()},
+    {"id": "u_seed_41", "name": "Rashedul Islam", "member_type": "permanent", "wing": "Ops Wg", "rank": "ASI", "force": "Police", "approval_status": "approved", "status": "1", "default_tag": "MS", "contact": "Father"},
+    {"id": "u_seed_42", "name": "Farzana Akter", "member_type": "permanent", "wing": "Int Wg", "rank": "Constable", "force": "Police", "approval_status": "approved", "status": "1", "default_tag": "FR", "contact": "Spouse"},
 ]
 
 REQUEST_SPECS = [

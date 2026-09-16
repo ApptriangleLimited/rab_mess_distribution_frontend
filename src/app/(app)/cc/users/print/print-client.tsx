@@ -71,6 +71,7 @@ export default function CcUsersPrintClient({
       q: filters.q || undefined,
       status: filters.status,
       approval: filters.approval,
+      member_type: filters.member_type,
       wing: filters.wing,
       rank: filters.rank,
       date_from: filters.date_from || undefined,

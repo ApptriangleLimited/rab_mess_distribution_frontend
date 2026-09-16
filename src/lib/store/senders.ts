@@ -39,10 +39,11 @@ export function activeSenders(senders: SenderAccount[] = listSenders()) {
 
 export function sendersForReportTag(
   senders: SenderAccount[],
-  tag: DailyTag | "",
+  tag: DailyTag | "all" | "",
 ) {
   const active = activeSenders(senders);
   if (!tag) return active;
+  if (tag === "all") return active.filter((s) => !isFrFuelSender(s));
   if (isFrFuelTag(tag)) return active.filter(isFrFuelSender);
   return active.filter(
     (s) =>

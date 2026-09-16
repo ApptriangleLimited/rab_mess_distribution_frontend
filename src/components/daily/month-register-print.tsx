@@ -2,12 +2,11 @@
 
 import { forwardRef } from "react";
 import { CONSUME_REPORT_META } from "@/lib/constants";
+import { groupRegisterRowsByWing } from "@/lib/daily-register-wings";
 import { formatMonthDash, formatMonthLong } from "@/lib/date";
-import {
-  registerCellMark,
-  registerDayRuns,
-  type LedgerRow,
-} from "@/lib/reports";
+import type { LedgerRow } from "@/lib/reports";
+import { tagPrintClass, tagPrintCss, tagPrintFill } from "@/lib/tag-colors";
+import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -21,12 +20,6 @@ type Props = {
   preview?: boolean;
 };
 
-const BN_DIGITS = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
-
-function toBnDigits(n: number | string) {
-  return String(n).replace(/\d/g, (d) => BN_DIGITS[Number(d)] ?? d);
-}
-
 /** Landscape attendance register — matches paper garrison register layout. */
 export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
   function MonthRegisterPrint(
@@ -39,14 +32,15 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
     const monthEn = formatMonthLong(month);
     const useBn = locale === "bn";
     const coverMonth = useBn
-      ? toBnDigits(formatMonthDash(month, "bn-BD"))
+      ? formatMonthDash(month, "bn-BD")
       : formatMonthDash(month);
     const coverTitle = useBn
       ? t("daily.registerCoverTitleBn")
       : t("daily.registerCoverTitle");
 
-    const dayLabel = (d: number) => (useBn ? toBnDigits(d) : String(d));
-    const serLabel = (n: number) => (useBn ? toBnDigits(n) : String(n));
+    const dayLabel = (d: number) => String(d);
+    const serLabel = (n: number) => String(n);
+    const blocks = groupRegisterRowsByWing(rows);
 
     return (
       <div
@@ -70,12 +64,17 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
           </div>
         </section>
 
-        <section className="register-sheet bg-white p-4 print:p-0">
+        <style>{tagPrintCss()}</style>
+        {blocks.map((block) => (
+        <section
+          key={block.key}
+          className="register-sheet mb-6 bg-white p-4 print:p-0 last:mb-0"
+        >
         <div className="letter-masthead mb-3 text-center">
-          <p className="text-[11px] font-semibold">
-            {CONSUME_REPORT_META.wingBn}
+          <p className="text-sm font-bold">
+            {block.label}
           </p>
-          <p className="mt-1 text-sm font-bold">
+          <p className="mt-1 text-[11px] font-semibold">
             {t("daily.registerTitleBn", { month: monthBn })}
           </p>
           <p className="mt-0.5 text-[10px] text-neutral-700">
@@ -120,15 +119,13 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => {
-              const runs = registerDayRuns(row.days);
-              return (
+            {block.rows.map((row, i) => (
                 <tr key={row.user.id}>
                   <td className="overflow-hidden border border-black px-0 py-0 text-center tabular-nums">
                     {serLabel(i + 1)}
                   </td>
                   <td className="overflow-hidden border border-black px-0 py-0 font-mono truncate">
-                    {row.user.rab_id}
+                    {row.user.personal_id || "—"}
                   </td>
                   <td className="overflow-hidden border border-black px-0 py-0 truncate">
                     {row.user.rank}
@@ -136,55 +133,46 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
                   <td className="overflow-hidden border border-black px-0 py-0 text-left truncate">
                     {row.user.name}
                   </td>
-                  {runs.map((run, ri) => {
-                    const mark = registerCellMark(run.tag, run.len);
-                    const span = run.len > 1 && Boolean(run.tag);
+                  {row.days.map((tag, di) => {
+                    if (!tag) {
+                      return (
+                        <td
+                          key={`${row.user.id}-${di}`}
+                          className="border border-black px-0 py-0"
+                        />
+                      );
+                    }
+                    const tone = isTrgTag(tag)
+                      ? resolveTrgTone(row.user.force)
+                      : undefined;
+                    const fill = tagPrintFill(tag, tone);
                     return (
                       <td
-                        key={`${row.user.id}-${ri}`}
-                        colSpan={run.len}
-                        className="border border-black px-0 py-0 text-center font-mono"
-                      >
-                        {span ? (
-                          <span className="relative mx-auto flex items-center justify-center px-0.5">
-                            <span
-                              aria-hidden
-                              className="absolute inset-x-0.5 top-1/2 h-px bg-black"
-                            />
-                            <span className="relative z-[1] bg-white px-0.5 text-[6px] font-bold leading-none">
-                              {mark}
-                            </span>
-                          </span>
-                        ) : (
-                          mark
+                        key={`${row.user.id}-${di}`}
+                        className={cn(
+                          tagPrintClass(tag, tone),
+                          "border border-black px-0 py-0 text-center font-mono text-[6px] font-bold leading-none",
                         )}
+                        style={{ backgroundColor: fill.bg, color: fill.fg }}
+                      >
+                        {tag}
                       </td>
                     );
                   })}
                 </tr>
-              );
-            })}
+            ))}
           </tbody>
         </table>
 
-        <div className="mt-8 grid grid-cols-6 gap-1.5 text-center text-[7px] leading-tight">
-          {(
-            [
-              "daily.signDailySi",
-              "daily.signConsumeSi",
-              "daily.signMessCq",
-              "daily.signSeniorDad",
-              "daily.signMessPresident",
-              "daily.signCommandant",
-            ] as const
-          ).map((key) => (
-            <div key={key} className="min-w-0 pt-7">
-              <div className="mx-auto mb-1.5 h-px w-full max-w-[7.5rem] bg-black" />
-              <p>{t(key)}</p>
-            </div>
-          ))}
+        <div className="mt-8 flex justify-end text-center text-[7px] leading-tight">
+          <div className="w-[7.5rem] pt-7">
+            <div className="mb-1.5 h-px w-full bg-black" />
+            <p>{t("daily.signDailySi")}</p>
+            <p className="mt-0.5 font-semibold">{block.label}</p>
+          </div>
         </div>
         </section>
+        ))}
       </div>
     );
   },

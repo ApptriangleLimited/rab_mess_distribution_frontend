@@ -862,10 +862,10 @@ export function defaultForceRanks(
 /** Org header for Consume print bills (prototype defaults). */
 export const CONSUME_REPORT_META = {
   orgName: "SRB-Special Response Battalion Headquarters",
-  orgNameBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর",
+  orgNameBn: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর",
   station: "Kurmitola, Dhaka",
   stationBn: "কুর্মিটোলা, ঢাকা",
-  campBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর ক্যাম্প, কুর্মিটোলা ঢাকা",
+  campBn: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর ক্যাম্প, কুর্মিটোলা ঢাকা",
   wing: "Administration & Finance Wing",
   wingBn: "প্রশাসন ও অর্থ উইং",
   formNo: "Bangladesh Form No-5211",
@@ -878,7 +878,7 @@ export const FR_FUEL_RATE_PER_DAY =
 /** Org / letter defaults for Ration Accounts print & transfer export. */
 export const RATION_REPORT_META = {
   orgName: "SRB-Special Response Battalion Headquarters",
-  orgNameBn: "এসআরবি-স্পেশাল রেসপন্স ব্যাটালিয়ন সদর দপ্তর",
+  orgNameBn: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর",
   govLine: "Government of the People's Republic of Bangladesh",
   policeLine: "Bangladesh Police",
   station: "Kurmitola, Dhaka",
@@ -890,11 +890,19 @@ export const RATION_REPORT_META = {
   paymentInfo: "Fresh Money",
   refPrefix: "SRB HQ/Finance/S33/Pay",
   refPrefixPayAllce: "SRB HQ/Finance/S33/Pay & Allce",
+  /** Official generate-report Ref. No stem — row 1 is 150120250000500001. */
+  transferRefPrefix: "1501202500005",
   subjectFreshMoney: "Disbursement of Fresh Money Bill {month}",
   subjectTagBill:
     "Disbursement of Payment Fresh Money Bill-{monthLabel} Transfer BEFTN to {bank}.",
   subjectFreshMoneyTransfer:
     "Disbursement of Fresh Money Bill {monthLabel} transfer to {bank}.",
+  subjectTrustBeftn:
+    "Disbursement of Fresh Money Bill {monthLabel} BEFTN to Trust Bank.",
+  subjectCommunityBeftn:
+    "Disbursement of Fresh Money Bill {monthLabel} BEFTN to Community Bank.",
+  subjectSonaliTransfer:
+    "Disbursement of Fresh Money Bill {monthLabel} transfer to Sonali Bank.",
 } as const;
 
 export const MEMBER_TYPES: {

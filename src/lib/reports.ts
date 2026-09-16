@@ -19,6 +19,7 @@ import {
 import { projectedCockpitTag } from "@/lib/store/pritibhoj-counts";
 import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
+import { isTrgRationPayable, isTrgTag } from "@/lib/trg-tone";
 import { activeSenders } from "@/lib/store/senders";
 import { parseMoney, roundPaisa } from "@/lib/money";
 import type {
@@ -30,6 +31,11 @@ import type {
 } from "@/lib/types";
 
 export { formatBdt } from "@/lib/money";
+
+/** Fixed generate-report Ref. No — same on every row. */
+export function rationTransferRefNo(_ser?: number) {
+  return `${RATION_REPORT_META.transferRefPrefix}00001`;
+}
 
 /** Live DB snapshot for consume / ration / ledger builders. */
 export type ReportSource = {
@@ -229,6 +235,18 @@ function assignmentsInMonth(month: string): DailyAssignment[] {
   return reportState().assignments.filter((a) => a.date.startsWith(month));
 }
 
+function forceByUserId() {
+  return new Map(reportState().users.map((u) => [u.id, u.force] as const));
+}
+
+/** Skip black TRG days on payment / ration letters. */
+function isPayoutAssignment(
+  assignment: DailyAssignment,
+  forces = forceByUserId(),
+) {
+  return isTrgRationPayable(assignment, forces.get(assignment.user_id) ?? "");
+}
+
 function rateMap() {
   const map = new Map<DailyTag, number>();
   for (const r of reportState().rates) map.set(r.tag, r.amount_per_day);
@@ -261,6 +279,13 @@ export function buildConsumeMonth(month: string) {
     byUser.set(a.user_id, cur);
   }
 
+  const forces = forceByUserId();
+  const payableTrgDays = new Map<string, number>();
+  for (const a of assignments) {
+    if (!isTrgTag(a.tag) || !isPayoutAssignment(a, forces)) continue;
+    payableTrgDays.set(a.user_id, (payableTrgDays.get(a.user_id) ?? 0) + 1);
+  }
+
   const rows: UserMonthRow[] = [];
   for (const [userId, tagDays] of byUser) {
     const user = users.find((u) => u.id === userId);
@@ -271,10 +296,11 @@ export function buildConsumeMonth(month: string) {
     for (const [tag, days] of Object.entries(tagDays) as [DailyTag, number][]) {
       totalDays += days;
       const rate = rates.get(tag) ?? 0;
-      if (rate > 0) {
-        allowanceDays += days;
-        amount = roundPaisa(amount + moneyDays(days, rate));
-      }
+      if (rate <= 0) continue;
+      const payableDays = isTrgTag(tag) ? (payableTrgDays.get(userId) ?? 0) : days;
+      if (payableDays <= 0) continue;
+      allowanceDays += payableDays;
+      amount = roundPaisa(amount + moneyDays(payableDays, rate));
     }
     rows.push({ user, tagDays, totalDays, allowanceDays, amount });
   }
@@ -287,12 +313,19 @@ export function buildConsumeMonth(month: string) {
     cur.userIds.add(a.user_id);
     tagAggMap.set(a.tag, cur);
   }
-  const byTag: TagAggregate[] = [...tagAggMap.entries()].map(([tag, v]) => ({
-    tag,
-    days: v.days,
-    users: v.userIds.size,
-    amount: moneyDays(v.days, rates.get(tag) ?? 0),
-  }));
+  const byTag: TagAggregate[] = [...tagAggMap.entries()].map(([tag, v]) => {
+    const rate = rates.get(tag) ?? 0;
+    const payableDays = isTrgTag(tag)
+      ? assignments.filter((a) => a.tag === tag && isPayoutAssignment(a, forces))
+          .length
+      : v.days;
+    return {
+      tag,
+      days: v.days,
+      users: v.userIds.size,
+      amount: moneyDays(payableDays, rate),
+    };
+  });
   byTag.sort((a, b) => b.days - a.days);
 
   return {
@@ -305,9 +338,23 @@ export function buildConsumeMonth(month: string) {
 }
 
 /** Per-tag formal bill rows (rank → dropdown → name). */
-export function buildTagBill(month: string, tag: DailyTag): {
+export type LeaveMedBillRow = {
+  sl: number;
+  user: User;
+  tagDays: Partial<Record<DailyTag, number>>;
+  totalDays: number;
+  rate: number;
+  amount: number;
+  remarks: string;
+};
+
+export function buildTagBill(
+  month: string,
+  tag: DailyTag | readonly DailyTag[],
+): {
   month: string;
   tag: DailyTag;
+  tags: DailyTag[];
   rate: number;
   fuelRate: number;
   rows: TagBillRow[];
@@ -316,16 +363,35 @@ export function buildTagBill(month: string, tag: DailyTag): {
   totalFuel: number;
   grandTotal: number;
 } {
+  const tags = (Array.isArray(tag) ? tag : [tag]) as DailyTag[];
+  const primary = tags[0] ?? "FR";
   const consume = buildConsumeMonth(month);
-  const rate = rateMap().get(tag) ?? 0;
-  const fuelRate = tag === "FR" ? getFuelRatePerDay() : 0;
+  const rates = rateMap();
+  const rate = rates.get(primary) ?? rates.get("FR") ?? 0;
+  const fuelRate = tags.includes("FR") ? getFuelRatePerDay() : 0;
+  const needsTrg = tags.some((code) => isTrgTag(code));
+  const forces = needsTrg ? forceByUserId() : null;
+  const payableTrgByUser = new Map<string, number>();
+  if (forces) {
+    for (const a of assignmentsInMonth(month)) {
+      if (!isTrgTag(a.tag) || !isPayoutAssignment(a, forces)) continue;
+      payableTrgByUser.set(a.user_id, (payableTrgByUser.get(a.user_id) ?? 0) + 1);
+    }
+  }
 
   const rows: TagBillRow[] = consume.rows
     .map((row) => {
-      const days = row.tagDays[tag] ?? 0;
+      const days = tags.reduce((sum, code) => {
+        const n = isTrgTag(code)
+          ? (payableTrgByUser.get(row.user.id) ?? 0)
+          : (row.tagDays[code] ?? 0);
+        return sum + n;
+      }, 0);
       if (!days) return null;
       const amount = moneyDays(days, rate);
-      const fuelAmount = moneyDays(days, fuelRate);
+      const frDays = tags.includes("FR") ? (row.tagDays.FR ?? 0) : 0;
+      const fuelDays = tags.includes("MFR") ? days : frDays;
+      const fuelAmount = moneyDays(fuelRate ? fuelDays : 0, fuelRate);
       return {
         sl: 0,
         user: row.user,
@@ -344,7 +410,8 @@ export function buildTagBill(month: string, tag: DailyTag): {
 
   return {
     month,
-    tag,
+    tag: primary,
+    tags,
     rate,
     fuelRate,
     rows,
@@ -352,6 +419,72 @@ export function buildTagBill(month: string, tag: DailyTag): {
     totalAmount: roundPaisa(rows.reduce((s, r) => s + r.amount, 0)),
     totalFuel: roundPaisa(rows.reduce((s, r) => s + r.fuelAmount, 0)),
     grandTotal: roundPaisa(rows.reduce((s, r) => s + r.grandTotal, 0)),
+  };
+}
+
+export function buildLeaveMedBill(
+  month: string,
+  tags: readonly DailyTag[] = ["CL", "PL", "TRG", "WIT", "MED", "BGH"],
+): {
+  month: string;
+  tags: DailyTag[];
+  rate: number;
+  rows: LeaveMedBillRow[];
+  tagTotals: Partial<Record<DailyTag, number>>;
+  totalDays: number;
+  totalAmount: number;
+} {
+  const consume = buildConsumeMonth(month);
+  const rates = rateMap();
+  const rate =
+    rates.get("CL") ?? rates.get("FR") ?? rates.get(tags[0] ?? "CL") ?? 0;
+  const forces = forceByUserId();
+  const payableTrgByUser = new Map<string, number>();
+  for (const a of assignmentsInMonth(month)) {
+    if (!isTrgTag(a.tag) || !isPayoutAssignment(a, forces)) continue;
+    payableTrgByUser.set(a.user_id, (payableTrgByUser.get(a.user_id) ?? 0) + 1);
+  }
+
+  const rows: LeaveMedBillRow[] = consume.rows
+    .map((row) => {
+      const tagDays: Partial<Record<DailyTag, number>> = {};
+      let totalDays = 0;
+      for (const code of tags) {
+        const n = isTrgTag(code)
+          ? (payableTrgByUser.get(row.user.id) ?? 0)
+          : (row.tagDays[code] ?? 0);
+        if (!n) continue;
+        tagDays[code] = n;
+        totalDays += n;
+      }
+      if (!totalDays) return null;
+      return {
+        sl: 0,
+        user: row.user,
+        tagDays,
+        totalDays,
+        rate,
+        amount: moneyDays(totalDays, rate),
+        remarks: "",
+      };
+    })
+    .filter((row): row is LeaveMedBillRow => Boolean(row))
+    .sort((a, b) => sortUsersForBill(a.user, b.user))
+    .map((row, i) => ({ ...row, sl: i + 1 }));
+
+  const tagTotals: Partial<Record<DailyTag, number>> = {};
+  for (const code of tags) {
+    tagTotals[code] = rows.reduce((s, r) => s + (r.tagDays[code] ?? 0), 0);
+  }
+
+  return {
+    month,
+    tags: [...tags],
+    rate,
+    rows,
+    tagTotals,
+    totalDays: rows.reduce((s, r) => s + r.totalDays, 0),
+    totalAmount: roundPaisa(rows.reduce((s, r) => s + r.amount, 0)),
   };
 }
 
@@ -795,6 +928,12 @@ export function registerCellMark(tag: LedgerDayCell, len: number): string {
 export function buildRationMonth(month: string) {
   const consume = buildConsumeMonth(month);
   const rates = rateMap();
+  const forces = forceByUserId();
+  const payableTrgDays = new Map<string, number>();
+  for (const a of assignmentsInMonth(month)) {
+    if (!isTrgTag(a.tag) || !isPayoutAssignment(a, forces)) continue;
+    payableTrgDays.set(a.user_id, (payableTrgDays.get(a.user_id) ?? 0) + 1);
+  }
   const eligibleRows = consume.rows
     .map((row) => {
       const parts: {
@@ -808,8 +947,17 @@ export function buildRationMonth(month: string) {
         number,
       ][]) {
         const rate = rates.get(tag) ?? 0;
-        if (rate <= 0 || !days) continue;
-        parts.push({ tag, days, rate, amount: moneyDays(days, rate) });
+        if (rate <= 0) continue;
+        const count = isTrgTag(tag)
+          ? (payableTrgDays.get(row.user.id) ?? 0)
+          : days;
+        if (!count) continue;
+        parts.push({
+          tag,
+          days: count,
+          rate,
+          amount: moneyDays(count, rate),
+        });
       }
       return { ...row, parts };
     })
@@ -834,10 +982,11 @@ export function buildRationReport(month: string): {
   const rateByTag = new Map(rates.map((r) => [r.tag, r.amount_per_day]));
   const assignments = assignmentsInMonth(month);
 
+  const forces = forceByUserId();
   const daysMap = new Map<string, number>();
   for (const a of assignments) {
     const rate = rateByTag.get(a.tag) ?? 0;
-    if (rate <= 0) continue;
+    if (rate <= 0 || !isPayoutAssignment(a, forces)) continue;
     const key = `${a.user_id}::${a.tag}`;
     daysMap.set(key, (daysMap.get(key) ?? 0) + 1);
   }
@@ -1072,8 +1221,9 @@ export function buildRationStaffLines(
       ? getFuelRatePerDay()
       : (rates.find((r) => r.tag === tag)?.amount_per_day ?? 0);
     const daysMap = new Map<string, number>();
+    const forces = forceByUserId();
     for (const a of assignmentsInMonth(month)) {
-      if (a.tag !== countTag) continue;
+      if (a.tag !== countTag || !isPayoutAssignment(a, forces)) continue;
       daysMap.set(a.user_id, (daysMap.get(a.user_id) ?? 0) + 1);
     }
     const rolled = [...daysMap.entries()]
@@ -1162,9 +1312,8 @@ export function buildRationTransferLines(
   const staffSheets = buildRationStaffLines(month, senderId);
 
   return staffSheets.map((sheet) => {
-    const compactDate = reportDate.replace(/-/g, "");
     const lines: RationTransferLine[] = sheet.lines.map((row, i) => {
-      const refNo = `${compactDate}${String(i + 1).padStart(6, "0")}`;
+      const refNo = rationTransferRefNo(i + 1);
       return {
         ser: i + 1,
         date: reportDate,
@@ -1195,6 +1344,38 @@ export function buildRationTransferLines(
   });
 }
 
+/** Staff payout rows → Trust Bank / BEFTN transfer letter rows. Data unchanged. */
+export function staffSheetToTransferSheet(
+  sheet: RationStaffSheet,
+  reportDate = todayISO(),
+): RationTransferSheet {
+  const lines: RationTransferLine[] = sheet.lines.map((row, i) => ({
+    ser: i + 1,
+    date: reportDate,
+    refNo: rationTransferRefNo(i + 1),
+    senderAccountNo: sheet.sender.account_number || "0",
+    receiverRouting: row.user.routing?.trim() || "0",
+    senderRouting: sheet.sender.routing || "0",
+    type: RATION_REPORT_META.transferType,
+    customerAccountName: row.user.account_name?.trim() || row.user.name,
+    customerAccountNo: row.user.account_number?.trim() || "0",
+    amount: row.amount,
+    institute: RATION_REPORT_META.institute,
+    entryDescription: RATION_REPORT_META.entryDescription,
+    paymentInfo: RATION_REPORT_META.paymentInfo,
+    currency: RATION_REPORT_META.currency,
+    user: row.user,
+    missingBank: row.missingBank,
+  }));
+  return {
+    month: sheet.month,
+    sender: sheet.sender,
+    lines,
+    total: sheet.total,
+    reportDate,
+  };
+}
+
 /** FR transfer letter (14-col) — all FR members for bank. Optional single-user filter. */
 export function buildFrTransferSheet(
   month: string,
@@ -1212,11 +1393,10 @@ export function buildFrTransferSheet(
   if (source.length === 0) return null;
 
   const sender = sheets[0]!.sender;
-  const compactDate = reportDate.replace(/-/g, "");
   const lines: RationTransferLine[] = source.map((row, i) => ({
     ser: i + 1,
     date: reportDate,
-    refNo: `${compactDate}${String(i + 1).padStart(6, "0")}`,
+    refNo: rationTransferRefNo(i + 1),
     senderAccountNo: sender.account_number || "0",
     receiverRouting: row.user.routing?.trim() || "0",
     senderRouting: sender.routing || "0",
@@ -1249,7 +1429,6 @@ export function buildFrTransferSheetsByMemberBank(
 ): RationTransferSheet[] {
   const all = buildFrTransferSheet(month, senderId, reportDate);
   if (!all) return [];
-  const compactDate = reportDate.replace(/-/g, "");
   const groups = new Map<string, typeof all.lines>();
   for (const line of all.lines) {
     const key = memberBankLabel(line.user);
@@ -1267,7 +1446,7 @@ export function buildFrTransferSheetsByMemberBank(
       const lines = bankLines.map((line, i) => ({
         ...line,
         ser: i + 1,
-        refNo: `${compactDate}${String(i + 1).padStart(6, "0")}`,
+        refNo: rationTransferRefNo(i + 1),
       }));
       return {
         month: all.month,
@@ -1287,7 +1466,6 @@ export function buildFrTransferSheetsPerUser(
 ): RationTransferSheet[] {
   const all = buildFrTransferSheet(month, senderId, reportDate);
   if (!all) return [];
-  const compactDate = reportDate.replace(/-/g, "");
   return all.lines.map((line, i) => ({
     month: all.month,
     sender: all.sender,
@@ -1296,7 +1474,7 @@ export function buildFrTransferSheetsPerUser(
       {
         ...line,
         ser: 1,
-        refNo: `${compactDate}${String(i + 1).padStart(6, "0")}`,
+        refNo: rationTransferRefNo(i + 1),
       },
     ],
     total: line.amount,

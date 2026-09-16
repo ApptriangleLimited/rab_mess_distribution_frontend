@@ -91,7 +91,7 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
     return (
       <div
         ref={ref}
-        className="mx-auto w-full max-w-[297mm] bg-white p-4 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
+        className="manpower-letter mx-auto w-full max-w-[297mm] bg-white p-4 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
       >
         <StrengthReportTitle
           titleBn="দৈনিক জনবলের প্রতিবেদন"
@@ -120,6 +120,11 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
             signed
           />
           <MetricRow
+            label="উপস্থিত"
+            counts={hq.present}
+            categories={categories}
+          />
+          <MetricRow
             label="অনুপস্থিত"
             counts={hq.absent}
             categories={categories}
@@ -140,6 +145,7 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
                   authorized={block.authorized}
                   held={block.held}
                   shortfall={block.shortfall}
+                  present={block.present}
                   absent={block.absent}
                   categories={categories}
                 />
@@ -149,6 +155,7 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
                 authorized={grandTotal.authorized}
                 held={grandTotal.held}
                 shortfall={grandTotal.shortfall}
+                present={grandTotal.present}
                 absent={grandTotal.absent}
                 categories={categories}
                 emphasize
@@ -334,6 +341,7 @@ function WingGroup({
   authorized,
   held,
   shortfall,
+  present,
   absent,
   categories,
   emphasize,
@@ -342,6 +350,7 @@ function WingGroup({
   authorized: ManpowerCounts;
   held: ManpowerCounts;
   shortfall: ManpowerCounts;
+  present: ManpowerCounts;
   absent: ManpowerCounts;
   categories: ManpowerReport["categories"];
   emphasize?: boolean;
@@ -356,7 +365,7 @@ function WingGroup({
         emphasize={emphasize}
         wingCell={
           <td
-            rowSpan={4}
+            rowSpan={5}
             className={cn(
               "border border-neutral-800 px-1 py-0.5 text-left align-middle font-bold",
               emphasize ? "bg-neutral-50" : undefined,
@@ -378,6 +387,12 @@ function WingGroup({
         categories={categories}
         emphasize={emphasize}
         signed
+      />
+      <MetricRow
+        label="উপস্থিত"
+        counts={present}
+        categories={categories}
+        emphasize={emphasize}
       />
       <MetricRow
         label="অনুপস্থিত"

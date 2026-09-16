@@ -15,6 +15,7 @@ export type MemberListParams = {
   approval?: string;
   wing?: string;
   rank?: string;
+  member_type?: string;
   date_from?: string;
   date_to?: string;
   page?: number;

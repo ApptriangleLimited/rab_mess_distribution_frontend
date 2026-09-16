@@ -2,15 +2,15 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { IconUsers } from "@tabler/icons-react";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { MonthNav } from "@/components/shared/month-nav";
 import {
   SearchFilterBar,
   searchFilterCompactFieldClass,
 } from "@/components/shared/search-filter-bar";
+import { TagBillPrint } from "@/components/consume/tag-bill-print";
+import { WingSummaryButton } from "@/components/consume/wing-summary-button";
 import { EmptyState } from "@/components/shared/empty-state";
-import { UserAvatar } from "@/components/shared/user-avatar";
 import {
   Select,
   SelectContent,
@@ -22,7 +22,6 @@ import { usePagination } from "@/hooks/use-pagination";
 
 import {
   buildTagBill,
-  formatBdt,
   withReportSource,
   type ReportSource,
 } from "@/lib/reports";
@@ -33,16 +32,18 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   month: string;
-  tag: DailyTag;
+  tag: DailyTag | readonly DailyTag[];
+  displayTag?: string;
   onMonthChange: (month: string) => void;
   tiles?: ReactNode;
   source?: ReportSource;
 };
 
-/** Tag bill body — filters + member table (inline under by-tag tabs). */
+/** Tag bill body — filters + member table (inline under consume filters). */
 export function TagBillPanel({
   month,
   tag,
+  displayTag,
   onMonthChange,
   tiles,
   source,
@@ -66,7 +67,7 @@ export function TagBillPanel({
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (wing !== "all" && row.user.wing !== wing) return false;
       if (!query) return true;
-      return [row.user.name, row.user.rab_id, row.user.wing, row.user.rank]
+      return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.wing, row.user.rank]
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -93,12 +94,14 @@ export function TagBillPanel({
     [members],
   );
 
-  const showFuel = tag === "FR" || bill.fuelRate > 0;
+  const tagKey = Array.isArray(tag) ? tag.join("+") : tag;
+  const dayHeader = displayTag || tagKey;
+  const showFuel = bill.tags.includes("FR") || bill.fuelRate > 0;
 
   const resetKey = useMemo(
     () =>
-      `${month}|${tag}|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
-    [month, tag, q, rank, wing, members],
+      `${month}|${tagKey}|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
+    [month, tagKey, q, rank, wing, members],
   );
   const {
     page,
@@ -117,7 +120,7 @@ export function TagBillPanel({
   return (
     <div className="flex flex-col gap-0">
       <motion.div
-        key={tag}
+        key={tagKey}
         initial={reduceMotion ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
@@ -170,6 +173,11 @@ export function TagBillPanel({
               </SelectContent>
             </Select>
           </div>
+          <WingSummaryButton
+            month={month}
+            wing={wing}
+            back={`/consume/monthly?month=${month}`}
+          />
         </SearchFilterBar>
 
         {bill.rows.length === 0 ? (
@@ -177,116 +185,19 @@ export function TagBillPanel({
         ) : members.length === 0 ? (
           <EmptyState title={t("common.noResults")} />
         ) : (
-          <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
-            <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-2.5 dark:border-neutral-800">
-              <IconUsers className="h-3.5 w-3.5 text-neutral-400" />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-                {t("consume.perUser")}
-              </span>
-              <span className="ml-auto text-[11px] tabular-nums text-neutral-400">
-                {members.length}/{bill.rows.length}
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
-                  <tr>
-                    <th className="w-12 px-4 py-3 text-center">
-                      {t("consume.colSl")}
-                    </th>
-                    <th className="min-w-[12rem] px-4 py-3">
-                      {t("consume.colName")}
-                    </th>
-                    <th className="px-4 py-3">{t("consume.colRank")}</th>
-                    <th className="px-4 py-3 text-center font-mono">{tag}</th>
-                    <th className="px-4 py-3 text-right">
-                      {t("consume.colFreshAmount")}
-                    </th>
-                    {showFuel ? (
-                      <th className="px-4 py-3 text-right">
-                        {t("consume.colFuelAmount")}
-                      </th>
-                    ) : null}
-                    <th className="px-4 py-3 text-right">
-                      {t("consume.colGrandTotal")}
-                    </th>
-                    <th className="min-w-[6rem] px-4 py-3">
-                      {t("consume.colRemarks")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((row) => (
-                    <tr
-                      key={row.user.id}
-                      className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
-                    >
-                      <td className="px-4 py-3 text-center tabular-nums text-neutral-400">
-                        {row.sl}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <UserAvatar name={row.user.name} />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
-                              {row.user.name}
-                            </p>
-                            <p className="font-mono text-xs text-neutral-500">
-                              {row.user.rab_id}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">
-                        {row.user.rank || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-center font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
-                        {row.days}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
-                        {formatBdt(row.amount)}
-                      </td>
-                      {showFuel ? (
-                        <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
-                          {formatBdt(row.fuelAmount)}
-                        </td>
-                      ) : null}
-                      <td className="px-4 py-3 text-right font-mono text-sm font-semibold tabular-nums text-primary">
-                        {formatBdt(row.grandTotal)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-neutral-400">
-                        {row.remarks || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-primary/15 bg-gradient-to-r from-emerald-50/80 via-white to-sky-50/50 dark:border-primary/25 dark:from-primary/10 dark:via-neutral-950 dark:to-neutral-950">
-                    <td
-                      colSpan={3}
-                      className="px-4 py-3.5 text-right text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400"
-                    >
-                      {t("consume.billTotal")}
-                    </td>
-                    <td className="px-4 py-3.5 text-center font-mono font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
-                      {filteredDays}
-                    </td>
-                    <td className="px-4 py-3.5 text-right font-mono font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
-                      {formatBdt(filteredFresh)}
-                    </td>
-                    {showFuel ? (
-                      <td className="px-4 py-3.5 text-right font-mono font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
-                        {formatBdt(filteredFuel)}
-                      </td>
-                    ) : null}
-                    <td className="px-4 py-3.5 text-right font-mono text-lg font-bold tabular-nums text-primary">
-                      {formatBdt(filteredTotal)}
-                    </td>
-                    <td className="px-4 py-3.5" />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+          <section className="flex flex-col gap-3">
+            <TagBillPrint
+              month={month}
+              tag={dayHeader}
+              tagLabel={dayHeader}
+              rows={pageItems}
+              totalDays={filteredDays}
+              totalAmount={filteredFresh}
+              totalFuel={filteredFuel}
+              grandTotal={filteredTotal}
+              showFuel={showFuel}
+              preview
+            />
             <ListPagination
               page={page}
               totalPages={totalPages}

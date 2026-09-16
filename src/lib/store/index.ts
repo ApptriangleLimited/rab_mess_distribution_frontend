@@ -32,6 +32,7 @@ import { parseMoney } from "@/lib/money";
 import {
   isLegacyDemoSenders,
   officialSenderAccounts,
+  renameFirewoodFrSender,
 } from "@/lib/official-senders";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import {
@@ -46,6 +47,9 @@ import {
 import {
   createLiveCatalogState,
   createSeedState,
+  extraCockpitPoliceMembers,
+  extraTrustFirewoodAssignments,
+  extraTrustFirewoodMembers,
   SEED_VERSION,
 } from "@/lib/store/seed";
 import type {
@@ -1280,6 +1284,32 @@ export function getState(): AppState {
   return seeded;
 }
 
+function ensureCockpitPoliceMembers(users: User[]): User[] {
+  const extras = extraCockpitPoliceMembers();
+  if (extras.length === 0) return users;
+  const ids = new Set(users.map((u) => u.id));
+  const missing = extras.filter((u) => !ids.has(u.id));
+  return missing.length ? [...users, ...missing] : users;
+}
+
+function ensureTrustFirewoodMembers(users: User[]): User[] {
+  const extras = extraTrustFirewoodMembers();
+  if (extras.length === 0) return users;
+  const ids = new Set(users.map((u) => u.id));
+  const missing = extras.filter((u) => !ids.has(u.id));
+  return missing.length ? [...users, ...missing] : users;
+}
+
+function ensureTrustFirewoodAssignments(
+  assignments: AppState["assignments"],
+): AppState["assignments"] {
+  const extras = extraTrustFirewoodAssignments();
+  if (extras.length === 0) return assignments;
+  const keys = new Set(assignments.map((a) => `${a.user_id}|${a.date}`));
+  const missing = extras.filter((a) => !keys.has(`${a.user_id}|${a.date}`));
+  return missing.length ? [...assignments, ...missing] : assignments;
+}
+
 function normalizeState(state: AppState): AppState {
   const member_banks = ensureMemberBanks(state.member_banks);
   const bankSet = new Map(
@@ -1287,7 +1317,7 @@ function normalizeState(state: AppState): AppState {
   );
   return {
     ...state,
-    users: (state.users ?? []).map((u) => {
+    users: ensureTrustFirewoodMembers(ensureCockpitPoliceMembers((state.users ?? []).map((u) => {
       const legacy = u as LegacyUser;
       const {
         emergency_name: _n,
@@ -1320,7 +1350,8 @@ function normalizeState(state: AppState): AppState {
         ),
         emergency_contacts: normalizeEmergencyContacts(legacy),
       };
-    }),
+    }))),
+    assignments: ensureTrustFirewoodAssignments(state.assignments ?? []),
     rates: ensureRateOnlyRates(state.rates ?? []),
     ranks: ensureRanks(state.ranks),
     wings: ensureWings(state.wings),
@@ -1492,7 +1523,9 @@ function normalizeState(state: AppState): AppState {
         active: s.active !== false,
         branch_location: s.branch_location ?? "",
       }));
-      return isLegacyDemoSenders(raw) ? officialSenderAccounts() : raw;
+      return isLegacyDemoSenders(raw)
+        ? officialSenderAccounts()
+        : raw.map(renameFirewoodFrSender);
     })(),
     approved_dates: Array.isArray(state.approved_dates)
       ? state.approved_dates

@@ -38,7 +38,7 @@ import {
 import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
 import { useStore } from "@/hooks/use-store";
 import { isDailyApiEnabled } from "@/lib/api/mode";
-import { DAILY_TAGS } from "@/lib/constants";
+import { DAILY_TAGS, MEMBER_TYPES } from "@/lib/constants";
 import {
   daysInMonth,
   eachISODate,
@@ -62,7 +62,7 @@ import {
   MFR_TAG,
 } from "@/lib/store/daily";
 import { compareUsers } from "@/lib/store/users";
-import type { DailyTag } from "@/lib/types";
+import type { DailyTag, MemberType, UserStatus } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -96,8 +96,9 @@ export default function TagsPageClient() {
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
-  /** Default: every approved member (active, inactive, guest). */
-  const [memberStatus, setMemberStatus] = useState<"all" | "0" | "1">("all");
+  const [memberType, setMemberType] = useState<MemberType | "all">("all");
+  /** Default Active; toggle the right-side switch for Inactive. */
+  const [memberStatus, setMemberStatus] = useState<UserStatus>("1");
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
 
@@ -107,6 +108,7 @@ export default function TagsPageClient() {
     q,
     rank,
     wing,
+    memberType,
     status: memberStatus,
   });
 
@@ -143,13 +145,14 @@ export default function TagsPageClient() {
     autoApplyCarryForward(ids, today);
   }, [apiOn, today, state.users]);
 
-  /** Approved roster — filter by Active / Inactive / All (default Active). */
+  /** Approved roster — member type + Active / Inactive toggle (default Active). */
   const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
     return state.users
       .filter((u) => {
         if (u.approval_status !== "approved") return false;
-        if (memberStatus !== "all" && u.status !== memberStatus) return false;
+        if (u.status !== memberStatus) return false;
+        if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
         if (!query) return true;
@@ -159,7 +162,7 @@ export default function TagsPageClient() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [state.users, q, rank, wing, memberStatus]);
+  }, [state.users, q, rank, wing, memberType, memberStatus]);
 
   const users = apiOn ? cockpit.users : demoUsers;
 
@@ -297,9 +300,10 @@ export default function TagsPageClient() {
     if (q.trim()) params.set("q", q.trim());
     if (rank !== "all") params.set("rank", rank);
     if (wing !== "all") params.set("wing", wing);
-    if (memberStatus !== "all") params.set("status", memberStatus);
+    if (memberType !== "all") params.set("member_type", memberType);
+    params.set("status", memberStatus);
     return `/daily/tags/print?${params.toString()}`;
-  }, [month, dateFrom, dateTo, q, rank, wing, memberStatus]);
+  }, [month, dateFrom, dateTo, q, rank, wing, memberType, memberStatus]);
 
   function onTagChange(userId: string, date: string, tag: DailyTag | "") {
     const user = users.find((u) => u.id === userId);
@@ -382,28 +386,28 @@ export default function TagsPageClient() {
                     )}
                     aria-label={t("common.search")}
                   />
-                  <div className="w-[7.25rem] shrink-0">
+                  <div className="w-[8.5rem] shrink-0">
                     <Select
-                      value={memberStatus}
+                      value={memberType}
                       onValueChange={(v) =>
-                        setMemberStatus(v as "all" | "0" | "1")
+                        setMemberType(v as MemberType | "all")
                       }
                     >
                       <SelectTrigger
                         className={cn(fieldClass, "h-9 w-full rounded-xl")}
+                        aria-label={t("cc.fields.memberType")}
                       >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">
-                          {t("cc.statusActive")}
-                        </SelectItem>
-                        <SelectItem value="0">
-                          {t("cc.statusInactive")}
-                        </SelectItem>
                         <SelectItem value="all">
-                          {t("common.allStatus")}
+                          {t("common.allMemberType")}
                         </SelectItem>
+                        {MEMBER_TYPES.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {t(item.labelKey)}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -490,9 +494,25 @@ export default function TagsPageClient() {
             {t("common.loading")}
           </p>
         ) : users.length === 0 ? (
-          <EmptyState title={t("daily.emptyTags")} />
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-end">
+              <ActiveInactiveToggle
+                value={memberStatus}
+                onChange={setMemberStatus}
+              />
+            </div>
+            <EmptyState title={t("daily.emptyTags")} />
+          </div>
         ) : visibleDates.length === 0 || boardUsers.length === 0 ? (
-          <EmptyState title={t("common.noResults")} />
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-end">
+              <ActiveInactiveToggle
+                value={memberStatus}
+                onChange={setMemberStatus}
+              />
+            </div>
+            <EmptyState title={t("common.noResults")} />
+          </div>
         ) : (
           <RegisterBoard
             users={boardUsers}
@@ -515,6 +535,12 @@ export default function TagsPageClient() {
             }
             dateFrom={dateFrom}
             dateTo={dateTo}
+            toolbarEnd={
+              <ActiveInactiveToggle
+                value={memberStatus}
+                onChange={setMemberStatus}
+              />
+            }
           />
         )}
       </motion.div>
@@ -542,6 +568,57 @@ function EqualTagRows({ children }: { children: ReactNode }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ActiveInactiveToggle({
+  value,
+  onChange,
+}: {
+  value: UserStatus;
+  onChange: (next: UserStatus) => void;
+}) {
+  const t = useT();
+  const active = value === "1";
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={active}
+      aria-label={active ? t("cc.statusActive") : t("cc.statusInactive")}
+      onClick={() => onChange(active ? "0" : "1")}
+      className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-2 dark:border-neutral-600 dark:bg-neutral-900"
+    >
+      <span
+        className={cn(
+          "text-[11px] font-semibold",
+          active ? "text-neutral-400" : "text-neutral-700 dark:text-neutral-200",
+        )}
+      >
+        {t("cc.statusInactive")}
+      </span>
+      <span
+        className={cn(
+          "relative h-5 w-9 rounded-full transition-colors",
+          active ? "bg-primary" : "bg-neutral-300 dark:bg-neutral-600",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left]",
+            active ? "left-4" : "left-0.5",
+          )}
+        />
+      </span>
+      <span
+        className={cn(
+          "text-[11px] font-semibold",
+          active ? "text-primary" : "text-neutral-400",
+        )}
+      >
+        {t("cc.statusActive")}
+      </span>
+    </button>
   );
 }
 

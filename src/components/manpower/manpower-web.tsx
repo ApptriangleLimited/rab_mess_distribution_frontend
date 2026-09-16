@@ -56,7 +56,7 @@ function WingNameCell({
 }) {
   return (
     <td
-      rowSpan={4}
+      rowSpan={5}
       className={cn(
         "sticky left-0 z-[2] w-36 border border-neutral-200 px-3 py-1.5 text-left text-sm font-semibold align-middle dark:border-neutral-700",
         emphasize
@@ -216,6 +216,7 @@ function BlockRows({
   authorized,
   held,
   shortfall,
+  present,
   absent,
   categories,
   editable,
@@ -223,11 +224,12 @@ function BlockRows({
 }: {
   date: string;
   wing: string;
-  /** Paper: wing name spans the four field rows. */
+  /** Paper: wing name spans the five field rows. */
   wingLabel?: ReactNode;
   authorized: ManpowerCounts;
   held: ManpowerCounts;
   shortfall: ManpowerCounts;
+  present: ManpowerCounts;
   absent: ManpowerCounts;
   categories: ManpowerReport["categories"];
   editable?: boolean;
@@ -273,6 +275,13 @@ function BlockRows({
         categories={categories}
         emphasize={emphasize}
         signed
+        withWing={withWing}
+      />
+      <MetricRow
+        label="উপস্থিত"
+        counts={present}
+        categories={categories}
+        emphasize={emphasize}
         withWing={withWing}
       />
       {editable ? (
@@ -533,6 +542,7 @@ export function ManpowerWeb({ report }: Props) {
                 authorized={hq.authorized}
                 held={hq.held}
                 shortfall={hq.shortfall}
+                present={hq.present}
                 absent={hq.absent}
                 categories={categories}
               />
@@ -559,6 +569,7 @@ export function ManpowerWeb({ report }: Props) {
                     authorized={block.authorized}
                     held={block.held}
                     shortfall={block.shortfall}
+                    present={block.present}
                     absent={block.absent}
                     categories={categories}
                     editable
@@ -571,6 +582,7 @@ export function ManpowerWeb({ report }: Props) {
                   authorized={grandTotal.authorized}
                   held={grandTotal.held}
                   shortfall={grandTotal.shortfall}
+                  present={grandTotal.present}
                   absent={grandTotal.absent}
                   categories={categories}
                   emphasize

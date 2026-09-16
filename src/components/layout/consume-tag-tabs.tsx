@@ -1,83 +1,60 @@
 "use client";
 
-import { tagCellClass } from "@/components/daily/register-board";
-import { useStore } from "@/hooks/use-store";
-import { listAllTags } from "@/lib/store/rates";
-import type { DailyTag } from "@/lib/types";
-import { tagLabel } from "@/i18n";
-import { useI18n, useT } from "@/i18n/provider";
+import {
+  CONSUME_FILTERS,
+  consumeFilterLabel,
+  type ConsumeFilter,
+} from "@/lib/consume-filters";
+import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
-export type TagTabStat = {
-  tag: DailyTag;
-  days: number;
-  users: number;
-  amount: number;
-};
-
-export type ConsumeTagTab = DailyTag | "all";
-
 type Props = {
-  value: ConsumeTagTab | null;
-  onChange: (tag: ConsumeTagTab) => void;
-  /** Tags with data stay vivid; empty tags dim when stats passed. */
-  stats?: TagTabStat[];
+  value: ConsumeFilter;
+  onChange: (filter: ConsumeFilter) => void;
+  counts?: Partial<Record<ConsumeFilter, number>>;
   className?: string;
 };
 
-/** By-tag tabs — All + code-only stamps. */
-export function ConsumeTagTabs({ value, onChange, stats, className }: Props) {
+const LABEL_KEY = {
+  "fr-mfr": "consume.filterFrMfr",
+  cd: "consume.filterCd",
+  "leave-med": "consume.filterLeaveMed",
+} as const;
+
+/** Three consume bills — not the old per-tag chip row. */
+export function ConsumeTagTabs({ value, onChange, counts, className }: Props) {
   const t = useT();
-  const { locale } = useI18n();
-  const state = useStore();
-  const tags = listAllTags();
-  const byCode = new Map((stats ?? []).map((s) => [s.tag, s]));
-  void state.rates;
 
   return (
     <nav
       className={cn("flex w-full flex-wrap gap-1.5", className)}
       aria-label={t("consume.byTag")}
     >
-      <button
-        type="button"
-        aria-pressed={value === "all"}
-        onClick={() => onChange("all")}
-        className={cn(
-          "inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold tracking-wide transition",
-          value === "all"
-            ? "border-neutral-900 bg-primary text-white shadow-sm dark:border-white"
-            : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800",
-        )}
-      >
-        {t("common.all")}
-      </button>
-
-      {tags.map((code) => {
-        const active = value === code;
-        const quiet = stats != null && !byCode.has(code);
-        const count = byCode.get(code)?.users;
-
+      {CONSUME_FILTERS.map((id) => {
+        const active = value === id;
+        const count = counts?.[id] ?? 0;
         return (
           <button
-            key={code}
+            key={id}
             type="button"
-            title={tagLabel(code, locale)}
             aria-pressed={active}
-            aria-label={`${code} ${tagLabel(code, locale)}`}
-            onClick={() => onChange(code)}
+            title={consumeFilterLabel(id)}
+            onClick={() => onChange(id)}
             className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 font-mono text-xs font-bold tracking-wide transition",
-              tagCellClass(code),
+              "inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold tracking-wide transition",
               active
-                ? "border-neutral-900 shadow-sm dark:border-white"
-                : "border-transparent opacity-85 hover:opacity-100",
-              quiet && !active && "opacity-35 hover:opacity-55",
+                ? "border-primary bg-primary text-white shadow-sm"
+                : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800",
             )}
           >
-            {code}
-            {count != null && count > 0 ? (
-              <span className="rounded-md bg-black/10 px-1.5 py-px text-[10px] font-extrabold tabular-nums dark:bg-white/15">
+            {t(LABEL_KEY[id])}
+            {count > 0 ? (
+              <span
+                className={cn(
+                  "rounded-md px-1.5 py-px text-[10px] font-extrabold tabular-nums",
+                  active ? "bg-white/20" : "bg-black/10 dark:bg-white/15",
+                )}
+              >
                 {count}
               </span>
             ) : null}

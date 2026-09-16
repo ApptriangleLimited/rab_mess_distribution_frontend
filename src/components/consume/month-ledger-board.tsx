@@ -45,12 +45,12 @@ type Props = {
 
 const DENSITY = {
   default: {
-    ser: 36,
-    id: 92,
-    rank: 96,
-    name: 140,
+    ser: 44,
+    id: 132,
+    rank: 108,
+    name: 176,
     tag: 40,
-    pad: undefined as string | undefined,
+    pad: "6px 10px",
     rowH: undefined as number | undefined,
     chrome: "px-3 py-2",
     chromeText: "text-xs",
@@ -224,7 +224,7 @@ export function MonthLedgerBoard({
               )}
             >
               <th
-                className="sticky left-0 z-40 border-b border-r border-neutral-300 bg-neutral-100 text-center dark:border-neutral-700 dark:bg-neutral-900"
+                className="sticky left-0 z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 text-center dark:border-neutral-700 dark:bg-neutral-900"
                 style={{ width: SER_W, minWidth: SER_W, padding: cellPad }}
               >
                 {t("daily.colSerial")}
@@ -232,19 +232,19 @@ export function MonthLedgerBoard({
               {!hideUserDetails ? (
                 <>
                   <th
-                    className="sticky z-40 border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
+                    className="sticky z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
                     style={{ left: SER_W, width: ID_W, minWidth: ID_W, padding: cellPad }}
                   >
                     {t("daily.colId")}
                   </th>
                   <th
-                    className="sticky z-40 border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
+                    className="sticky z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
                     style={{ left: SER_W + ID_W, width: RANK_W, minWidth: RANK_W, padding: cellPad }}
                   >
                     {t("cc.fields.rank")}
                   </th>
                   <th
-                    className="sticky z-40 border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
+                    className="sticky z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
                     style={{ left: NAME_LEFT, width: NAME_W, minWidth: NAME_W, padding: cellPad }}
                   >
                     {t("cc.fields.name")}
@@ -347,7 +347,7 @@ export function MonthLedgerBoard({
                 >
                   <td
                     className={cn(
-                      "sticky left-0 z-30 border-b border-r border-neutral-200 text-center font-mono text-neutral-500 dark:border-neutral-800",
+                      "sticky left-0 z-30 box-border overflow-hidden border-b border-r border-neutral-200 text-center font-mono text-neutral-500 dark:border-neutral-800",
                       d.bodyMono,
                       stickyBg,
                       hideUserDetails &&
@@ -362,17 +362,17 @@ export function MonthLedgerBoard({
                     <>
                       <td
                         className={cn(
-                          "sticky z-30 border-b border-r border-neutral-200 font-mono text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
+                          "sticky z-30 box-border overflow-hidden border-b border-r border-neutral-200 font-mono text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
                           d.bodyMono,
                           stickyBg,
                         )}
                         style={{ left: SER_W, width: ID_W, minWidth: ID_W, padding: cellPad }}
                       >
-                        {row.user.rab_id}
+                        {row.user.personal_id || "—"}
                       </td>
                       <td
                         className={cn(
-                          "sticky z-30 truncate border-b border-r border-neutral-200 text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
+                          "sticky z-30 box-border truncate overflow-hidden border-b border-r border-neutral-200 text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
                           d.bodyText,
                           stickyBg,
                         )}
@@ -388,7 +388,7 @@ export function MonthLedgerBoard({
                       </td>
                       <td
                         className={cn(
-                          "sticky z-30 truncate border-b border-r border-neutral-200 font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
+                          "sticky z-30 box-border truncate overflow-hidden border-b border-r border-neutral-200 font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
                           d.bodyText,
                           stickyBg,
                         )}

@@ -52,6 +52,23 @@ export function formatMonthBill(month: string) {
   return `${short}-${y}`;
 }
 
+/** `2026-09-01` → `1st September 2026`. */
+export function formatDateOrdinal(iso: string) {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const day = d.getDate();
+  const suffix =
+    day % 10 === 1 && day !== 11
+      ? "st"
+      : day % 10 === 2 && day !== 12
+        ? "nd"
+        : day % 10 === 3 && day !== 13
+          ? "rd"
+          : "th";
+  const month = d.toLocaleString("en-US", { month: "long" });
+  return `${day}${suffix} ${month} ${d.getFullYear()}`;
+}
+
 /** `2026-07-15` → `15 July 2026` */
 export function formatDateLong(iso: string, locale = "en-GB") {
   const d = new Date(`${iso}T12:00:00`);

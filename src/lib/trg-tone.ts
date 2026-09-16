@@ -1,5 +1,5 @@
 import { tagCellClass } from "@/lib/tag-colors";
-import type { DailyTag, TrgTone } from "@/lib/types";
+import type { DailyAssignment, DailyTag, TrgTone } from "@/lib/types";
 
 function normForce(force: string) {
   return force.trim().toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ");
@@ -40,12 +40,39 @@ export function isTrgTag(tag?: DailyTag | "" | null): tag is "TRG" {
 /**
  * Force check at write time.
  * Army / Navy / Air Force → black.
+ * Police Sarda checked → black.
  * Police / Ansar / BGB + Training checked → black; otherwise red.
  */
-export function resolveTrgTone(force: string, trainingChecked = false): TrgTone {
+export function resolveTrgTone(
+  force: string,
+  trainingChecked = false,
+  sardaChecked = false,
+): TrgTone {
   if (isBlackTrgForce(force)) return "black";
+  if (needsTrgSardaPrompt(force) && sardaChecked) return "black";
   if (needsTrgTrainingPrompt(force) && trainingChecked) return "black";
   return "red";
+}
+
+/** Stored tone, else force default (Army/Navy/Air Force → black). */
+export function assignmentTrgTone(
+  assignment: Pick<DailyAssignment, "tag" | "trg_tone">,
+  force = "",
+): TrgTone | undefined {
+  if (!isTrgTag(assignment.tag)) return undefined;
+  if (assignment.trg_tone === "black" || assignment.trg_tone === "red") {
+    return assignment.trg_tone;
+  }
+  return resolveTrgTone(force);
+}
+
+/** Red TRG is payable / ration-eligible. Black TRG is not. */
+export function isTrgRationPayable(
+  assignment: Pick<DailyAssignment, "tag" | "trg_tone">,
+  force = "",
+): boolean {
+  if (!isTrgTag(assignment.tag)) return true;
+  return assignmentTrgTone(assignment, force) !== "black";
 }
 
 /** Black TRG uses white text so the label stays readable. */

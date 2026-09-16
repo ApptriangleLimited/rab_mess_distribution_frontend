@@ -8,7 +8,9 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
@@ -114,7 +116,7 @@ type RangeMenu = {
 
 
 /** Sticky result cols (tag day-counts + All) — match consume ledger. */
-const NAME_STICKY_LEFT = 224;
+const NAME_STICKY_LEFT = 264;
 const NAME_STICKY_W = 173;
 const RESULT_TAG_W = 40;
 const RESULT_LEFT0 = NAME_STICKY_LEFT + NAME_STICKY_W;
@@ -136,6 +138,7 @@ export function RegisterBoard({
   boroKhanaDates,
   onBoroKhanaToggle,
   projectedTagMembers,
+  toolbarEnd,
 }: {
   users: User[];
   month: string;
@@ -154,6 +157,8 @@ export function RegisterBoard({
   boroKhanaDates?: string[];
   onBoroKhanaToggle?: (date: string, on: boolean) => void;
   projectedTagMembers?: (tag: DailyTag, date: string) => User[];
+  /** Extra control on the register hint row (far right). */
+  toolbarEnd?: ReactNode;
 }) {
   void _paintTag;
   void _onPaintTagChange;
@@ -423,7 +428,7 @@ export function RegisterBoard({
     const user = users.find((u) => u.id === userId);
     const force = user?.force ?? "";
     const trg_tone = isTrgTag(tag)
-      ? resolveTrgTone(force, Boolean(opts?.training))
+      ? resolveTrgTone(force, Boolean(opts?.training), Boolean(opts?.sarda))
       : undefined;
     const trg_sarda =
       isTrgTag(tag) && needsTrgSardaPrompt(force)
@@ -591,6 +596,9 @@ export function RegisterBoard({
               ? t("daily.hideTagTotals")
               : t("daily.showTagTotals")}
           </button>
+          {toolbarEnd ? (
+            <div className="ml-auto shrink-0">{toolbarEnd}</div>
+          ) : null}
         </div>
         <div
           className={cn(
@@ -601,16 +609,16 @@ export function RegisterBoard({
           <table className="w-max min-w-full border-collapse text-left text-sm">
             <thead className="sticky top-0 z-30">
               <tr className="bg-neutral-100 text-[11px] font-bold uppercase tracking-wide text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
-                <th className="sticky left-0 z-40 w-9 border-b border-r border-neutral-300 bg-neutral-100 px-1 py-2 text-center dark:border-neutral-700 dark:bg-neutral-900">
+                <th className="sticky left-0 z-40 box-border w-9 overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 px-1.5 py-2 text-center dark:border-neutral-700 dark:bg-neutral-900">
                   {t("daily.colSerial")}
                 </th>
-                <th className="sticky left-9 z-40 w-[92px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
+                <th className="sticky left-9 z-40 box-border w-[132px] overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 px-2.5 py-2 dark:border-neutral-700 dark:bg-neutral-900">
                   {t("daily.colId")}
                 </th>
-                <th className="sticky left-[128px] z-40 w-[96px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
+                <th className="sticky left-[168px] z-40 box-border w-[96px] overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 px-2.5 py-2 dark:border-neutral-700 dark:bg-neutral-900">
                   {t("cc.fields.rank")}
                 </th>
-                <th className="sticky left-[224px] z-40 w-[173px] min-w-[173px] max-w-[173px] border-b border-r border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900">
+                <th className="sticky left-[264px] z-40 box-border w-[173px] min-w-[173px] max-w-[173px] overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 px-2.5 py-2 dark:border-neutral-700 dark:bg-neutral-900">
                   {t("cc.fields.name")}
                 </th>
                 {resultTags.map((code, i) => {
@@ -829,7 +837,7 @@ export function RegisterBoard({
                   >
                     <td
                       className={cn(
-                        "sticky left-0 z-20 border-b border-r border-neutral-200 px-1 py-0 text-center font-mono text-[11px] text-neutral-500 dark:border-neutral-800",
+                        "sticky left-0 z-20 box-border overflow-hidden border-b border-r border-neutral-200 px-1.5 py-1 text-center font-mono text-[11px] text-neutral-500 dark:border-neutral-800",
                         stickyBg,
                       )}
                     >
@@ -837,15 +845,15 @@ export function RegisterBoard({
                     </td>
                     <td
                       className={cn(
-                        "sticky left-9 z-20 border-b border-r border-neutral-200 px-2 py-0 font-mono text-[11px] text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
+                        "sticky left-9 z-20 box-border w-[132px] overflow-hidden border-b border-r border-neutral-200 px-2.5 py-1 font-mono text-[11px] text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
                         stickyBg,
                       )}
                     >
-                      {user.rab_id}
+                      {user.personal_id || "—"}
                     </td>
                     <td
                       className={cn(
-                        "sticky left-[128px] z-20 max-w-[96px] truncate border-b border-r border-neutral-200 px-2 py-0 text-xs text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
+                        "sticky left-[168px] z-20 box-border w-[96px] max-w-[96px] truncate overflow-hidden border-b border-r border-neutral-200 px-2.5 py-1 text-xs text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
                         stickyBg,
                       )}
                     >
@@ -853,12 +861,20 @@ export function RegisterBoard({
                     </td>
                     <td
                       className={cn(
-                        "sticky left-[224px] z-20 w-[173px] min-w-[173px] max-w-[173px] border-b border-r border-neutral-200 px-2 py-0 text-xs font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
+                        "sticky left-[264px] z-20 box-border w-[173px] min-w-[173px] max-w-[173px] overflow-hidden border-b border-r border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
                         stickyBg,
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-1 truncate">
-                        <span className="truncate">{user.name}</span>
+                        <Link
+                          href={`/daily/users/${user.id}`}
+                          title={user.name}
+                          className="truncate text-primary underline-offset-2 hover:underline"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {user.name}
+                        </Link>
                         {user.status !== "1" ? (
                           <span className="shrink-0 rounded bg-neutral-200/80 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
                             {t("cc.statusInactive")}
@@ -1497,9 +1513,13 @@ function DayMsCdRow({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="truncate font-medium text-neutral-900 dark:text-white">
+          <Link
+            href={`/daily/users/${user.id}`}
+            title={user.name}
+            className="truncate font-medium text-primary underline-offset-2 hover:underline"
+          >
             {user.name}
-          </p>
+          </Link>
           <span
             className={cn(
               "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
@@ -1510,7 +1530,7 @@ function DayMsCdRow({
           </span>
         </div>
         <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-neutral-400">
-          <span className="font-mono">{user.rab_id}</span>
+          <span className="font-mono">{user.personal_id || "—"}</span>
           {user.rank ? ` · ${user.rank}` : null}
           {user.wing ? ` · ${user.wing}` : null}
         </p>

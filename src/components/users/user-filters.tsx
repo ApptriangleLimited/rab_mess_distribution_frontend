@@ -13,9 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ApprovalStatus, UserStatus } from "@/lib/types";
+import type { ApprovalStatus, MemberType, UserStatus } from "@/lib/types";
 import type { UserFilters } from "@/lib/store/users";
-import { wingDisplayLabel } from "@/lib/constants";
+import { MEMBER_TYPES, wingDisplayLabel } from "@/lib/constants";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,7 @@ export function UserFiltersBar({
   const filtersActive =
     (value.status != null && value.status !== "all") ||
     (value.approval != null && value.approval !== "all") ||
+    (value.member_type != null && value.member_type !== "all") ||
     (value.wing != null && value.wing !== "all") ||
     (value.rank != null && value.rank !== "all") ||
     Boolean(value.date_from?.trim()) ||
@@ -102,18 +103,19 @@ export function UserFiltersBar({
       search={value.q ?? ""}
       onSearchChange={(q) => patch({ q })}
       searchPlaceholder={t("cc.searchPlaceholder")}
+      searchClassName="w-[16rem] max-w-[16rem] flex-none"
       filtersActive={filtersActive}
       tiles={tiles}
+      tilesBesideSearch={Boolean(tiles) && !wrapTiles}
       wrapTiles={wrapTiles}
-      singleLine
       className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
     >
-      <div className="min-w-0 flex-1">
+      <div className="grid w-full min-w-0 basis-full grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
         <Select
           value={value.status ?? "all"}
           onValueChange={(v) => patch({ status: v as UserStatus | "all" })}
         >
-          <SelectTrigger className={fieldClass}>
+          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.status")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -122,15 +124,13 @@ export function UserFiltersBar({
             <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      <div className="min-w-0 flex-1">
         <Select
           value={value.approval ?? "all"}
           onValueChange={(v) =>
             patch({ approval: v as ApprovalStatus | "all" })
           }
         >
-          <SelectTrigger className={fieldClass}>
+          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.approval")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -140,13 +140,32 @@ export function UserFiltersBar({
             <SelectItem value="rejected">{t("cc.approvalRejected")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      <div className="min-w-0 flex-1">
+        <Select
+          value={value.member_type ?? "all"}
+          onValueChange={(v) =>
+            patch({ member_type: v as MemberType | "all" })
+          }
+        >
+          <SelectTrigger
+            className={fieldClass}
+            aria-label={t("cc.fields.memberType")}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("common.allMemberType")}</SelectItem>
+            {MEMBER_TYPES.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {t(item.labelKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select
           value={value.wing ?? "all"}
           onValueChange={(v) => patch({ wing: v })}
         >
-          <SelectTrigger className={fieldClass}>
+          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.wing")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -158,13 +177,11 @@ export function UserFiltersBar({
             ))}
           </SelectContent>
         </Select>
-      </div>
-      <div className="min-w-0 flex-1">
         <Select
           value={value.rank ?? "all"}
           onValueChange={(v) => patch({ rank: v })}
         >
-          <SelectTrigger className={cn(fieldClass)}>
+          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.rank")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -176,14 +193,14 @@ export function UserFiltersBar({
             ))}
           </SelectContent>
         </Select>
+        <MemberDateFilter
+          from={value.date_from ?? ""}
+          to={value.date_to ?? ""}
+          onFrom={(v) => patch({ date_from: v })}
+          onTo={(v) => patch({ date_to: v })}
+          className="min-w-0"
+        />
       </div>
-      <MemberDateFilter
-        from={value.date_from ?? ""}
-        to={value.date_to ?? ""}
-        onFrom={(v) => patch({ date_from: v })}
-        onTo={(v) => patch({ date_to: v })}
-        className="min-w-0 flex-1"
-      />
     </SearchFilterBar>
   );
 }

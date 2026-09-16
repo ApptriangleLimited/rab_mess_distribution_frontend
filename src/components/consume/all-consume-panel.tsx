@@ -209,7 +209,7 @@ export function AllConsumePanel({
                             {row.user.name}
                           </p>
                           <p className="font-mono text-xs text-neutral-500">
-                            {row.user.rab_id}
+                            {row.user.personal_id || "—"}
                           </p>
                         </div>
                       </div>

@@ -147,7 +147,7 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
                         {row.ser}
                       </td>
                       <td className="border border-black px-1 py-0.5 font-mono">
-                        {row.user.rab_id}
+                        {row.user.personal_id || row.user.rab_id}
                       </td>
                       <td className="border border-black px-1 py-0.5 text-center">
                         {row.user.rank}

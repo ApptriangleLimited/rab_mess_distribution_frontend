@@ -2,10 +2,10 @@
 
 import { forwardRef, type ReactNode } from "react";
 import {
+  officialBghDays,
   officialHospitalDays,
   officialLeaveDays,
   officialLeaveTotal,
-  toBnDigits,
   type OfficialConsumePack,
   type OfficialConsumeRow,
   type OfficialConsumeTable,
@@ -19,16 +19,16 @@ type Props = {
 };
 
 const SIGNS = [
-  "দৈনিক এসআই",
+  "ডেইলি এসআই",
   "কনজিউম এসআই",
-  "সিকিউ এসআই",
+  "মেস সি কিউ এসআই",
   "সিনিয়র ডিএডি (প্রশাসন)",
   "সভাপতি\nমেস কমিটি, ফোর্সেস মেস",
   "মেজর\nউপ-পরিচালক (সদর দপ্তর)\nএসআরবি ফোর্সেস সদর দপ্তর",
 ] as const;
 
 function cell(n: number) {
-  return n ? toBnDigits(n) : "০";
+  return n ? String(n) : "0";
 }
 
 function Signs() {
@@ -71,6 +71,7 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
           <th className="border border-black px-1 py-1 align-bottom">ট্রেনিং</th>
           <th className="border border-black px-1 py-1 align-bottom">সাক্ষী</th>
           <th className="border border-black px-1 py-1 align-bottom">হাসপাতাল</th>
+          <th className="border border-black px-1 py-1 align-bottom">বিজিএইচ</th>
           <th className="border border-black px-1 py-1 align-bottom leading-tight">
             রেশন বিহীন
           </th>
@@ -114,6 +115,9 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialHospitalDays(row.tagDays))}
+            </td>
+            <td className="border border-black px-1 py-1 text-center tabular-nums">
+              {cell(officialBghDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.WR ?? 0)}
@@ -196,6 +200,7 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
           <th className="border border-black px-1 py-1 align-bottom">ট্রেনিং</th>
           <th className="border border-black px-1 py-1 align-bottom">সাক্ষী</th>
           <th className="border border-black px-1 py-1 align-bottom">হাসপাতাল</th>
+          <th className="border border-black px-1 py-1 align-bottom">বিজিএইচ</th>
           <th className="border border-black px-1 py-1 align-bottom">সর্বমোট</th>
           {table.remarks ? (
             <th className="border border-black px-1 py-1 align-bottom">মন্তব্য</th>
@@ -231,6 +236,9 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
               {cell(officialHospitalDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
+              {cell(officialBghDays(row.tagDays))}
+            </td>
+            <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialLeaveTotal(row.tagDays))}
             </td>
           </DataRow>
@@ -255,7 +263,7 @@ function DataRow({
   return (
     <tr className={cn(isTotal && "font-semibold")}>
       <td className="border border-black px-1 py-1 text-center">
-        {row.sl ? toBnDigits(row.sl) : ""}
+        {row.sl || ""}
       </td>
       <td className="border border-black px-1 py-1 text-left">{row.label}</td>
       {pageCol ? (

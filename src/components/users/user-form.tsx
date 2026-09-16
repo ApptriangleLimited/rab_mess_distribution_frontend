@@ -187,6 +187,7 @@ export function UserForm({
   const apiOn = isCcApiEnabled();
   const isCivilian = values.member_type === "civilian";
   const isGuest = values.member_type === "guest";
+  const isPermanent = values.member_type === "permanent";
 
   const rankField = (
     <Field label={t("cc.fields.rank")} required>
@@ -416,6 +417,7 @@ export function UserForm({
         rank: "cc.rankRequired",
         wing: "cc.wingRequired",
         documents: "cc.documentsRequired",
+        bank: "cc.bankRequired",
       }[missing] as "cc.personalNoRequired";
       toast(t(messageKey), "error");
       return;
@@ -756,11 +758,12 @@ export function UserForm({
         <FormSection
           icon={IconBuildingBank}
           title={t("cc.sectionBank")}
+          required={isPermanent}
           delay={0.05}
           reduceMotion={!!reduceMotion}
         >
           <div className={fieldGridClass}>
-            <Field label={t("cc.fields.bankName")}>
+            <Field label={t("cc.fields.bankName")} required={isPermanent}>
               <Select
                 value={values.bank_name || undefined}
                 onValueChange={(v) => patch("bank_name", v)}
@@ -777,7 +780,7 @@ export function UserForm({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label={t("cc.fields.accountName")}>
+            <Field label={t("cc.fields.accountName")} required={isPermanent}>
               <Input
                 value={values.account_name}
                 onChange={(e) => patch("account_name", e.target.value)}
@@ -785,7 +788,7 @@ export function UserForm({
                 placeholder={t("cc.placeholders.accountName")}
               />
             </Field>
-            <Field label={t("cc.fields.accountNumber")}>
+            <Field label={t("cc.fields.accountNumber")} required={isPermanent}>
               <FieldInput
                 icon={IconCreditCard}
                 value={values.account_number}
@@ -795,7 +798,7 @@ export function UserForm({
                 inputMode="numeric"
               />
             </Field>
-            <Field label={t("cc.fields.routing")}>
+            <Field label={t("cc.fields.routing")} required={isPermanent}>
               <Input
                 value={values.routing}
                 onChange={(e) => patch("routing", digitsOnly(e.target.value))}
@@ -803,7 +806,7 @@ export function UserForm({
                 className={inputClass}
               />
             </Field>
-            <Field label={t("cc.fields.branch")}>
+            <Field label={t("cc.fields.branch")} required={isPermanent}>
               <SearchableSelect
                 options={BRANCH_DISTRICTS}
                 value={values.branch}
@@ -812,7 +815,7 @@ export function UserForm({
                 triggerClassName={selectTriggerClass}
               />
             </Field>
-            <Field label={t("cc.fields.branchLocation")}>
+            <Field label={t("cc.fields.branchLocation")} required={isPermanent}>
               <FieldInput
                 icon={IconMapPin}
                 value={values.branch_location}

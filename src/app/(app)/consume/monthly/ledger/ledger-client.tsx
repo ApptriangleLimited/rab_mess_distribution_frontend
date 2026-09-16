@@ -13,6 +13,7 @@ import {
   searchFilterFieldClass,
 } from "@/components/shared/search-filter-bar";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
+import { WingSummaryButton } from "@/components/consume/wing-summary-button";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -207,6 +208,12 @@ export default function ConsumeLedgerClient() {
               </SelectContent>
             </Select>
           </div>
+          <WingSummaryButton
+            month={month}
+            wing={wing}
+            back={`/consume/monthly/ledger`}
+            className="h-10 shrink-0 rounded-xl px-3"
+          />
         </SearchFilterBar>
 
         {ledger.rows.length === 0 ? (

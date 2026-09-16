@@ -1,7 +1,9 @@
+import { tagPrintCss } from "@/lib/tag-colors";
+
 /** Print letter via dedicated window (Chrome honors @page landscape more reliably). */
 
 export type PrintLetterOptions = {
-  /** Keep table fills and grid lines (Pritibhoj and other colored sheets). */
+  /** Keep preview fills, colors, and class styles. Default true. */
   preserveColors?: boolean;
   /** Skip computed-style copy (large registers hang Chrome before print). */
   skipInlineStyles?: boolean;
@@ -96,10 +98,8 @@ function keepPrintFill(
   preserveColors: boolean,
   skipInlineStyles = false,
 ) {
-  if (TABLE_TAGS.has(node.tagName) && (preserveColors || skipInlineStyles)) {
-    return true;
-  }
-  if (!preserveColors) return false;
+  if (preserveColors || skipInlineStyles) return true;
+  if (TABLE_TAGS.has(node.tagName)) return true;
   return (
     node.classList.contains("register-cover") ||
     node.classList.contains("register-cover-label") ||
@@ -165,10 +165,22 @@ function letterSheetCss() {
     break-inside: avoid;
   }
   .month-ledger-print table {
-    table-layout: fixed !important;
+    table-layout: auto !important;
   }
   .month-ledger-print th,
-  .month-ledger-print td,
+  .month-ledger-print td {
+    padding: 3px 3px !important;
+    font-size: 9px !important;
+    overflow-wrap: normal !important;
+    word-wrap: normal !important;
+    word-break: keep-all !important;
+    white-space: nowrap !important;
+  }
+  .month-ledger-print td.register-tag {
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    padding: 3px 2px !important;
+  }
   .transfer-sheet-print th,
   .transfer-sheet-print td {
     padding: 1px 2px !important;
@@ -298,9 +310,22 @@ function colorSheetCss() {
   .register-sheet th,
   .register-sheet td {
     border: 1px solid #000 !important;
-    color: #000 !important;
-    background: #fff !important;
     padding: 1px 2px !important;
+  }
+  .month-register-print thead th,
+  .register-sheet thead th {
+    background: #f4f4f4 !important;
+    color: #000 !important;
+  }
+  .month-register-print td:not(.register-tag),
+  .register-sheet td:not(.register-tag) {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .month-register-print td.register-tag,
+  .register-sheet td.register-tag {
+    font-weight: 700 !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   }
   .register-sheet tr {
     page-break-inside: avoid;
@@ -333,6 +358,40 @@ function printAndWait(win: Window) {
   });
 }
 
+function previewMatchCss() {
+  return `
+  html, body, * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .no-print { display: none !important; }
+  td.register-tag,
+  td.register-tag * {
+    color: inherit !important;
+  }
+  ${colorSheetCss()}
+  ${tagPrintCss()}
+  `;
+}
+
+function copyDocumentStyles(fromDoc: Document, toDoc: Document) {
+  fromDoc.querySelectorAll("link[rel='stylesheet'], style").forEach((node) => {
+    toDoc.head.appendChild(toDoc.importNode(node, true));
+  });
+}
+
+async function waitForPrintAssets(win: Window) {
+  await waitForPaint(win);
+  try {
+    await win.document.fonts.ready;
+  } catch {
+    /* ignore */
+  }
+  await new Promise<void>((resolve) => {
+    win.setTimeout(() => resolve(), 250);
+  });
+}
+
 function buildPrintHtml(
   orientation: "portrait" | "landscape",
   preserveColors: boolean,
@@ -350,23 +409,31 @@ function buildPrintHtml(
     margin: 0;
     padding: 0;
     background: #fff !important;
-    color: #111 !important;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  ${
+    preserveColors
+      ? previewMatchCss()
+      : `
   * {
     box-shadow: none !important;
     filter: none !important;
     color: #111 !important;
     box-sizing: border-box;
   }
+  td.register-tag,
+  td.register-tag * {
+    color: inherit !important;
+  }
   table { width: 100% !important; max-width: 100% !important; min-width: 0 !important; border-collapse: collapse; table-layout: fixed; }
   th, td { word-wrap: break-word; overflow-wrap: anywhere; }
   ${letterSheetCss()}
-  ${preserveColors ? colorSheetCss() : ""}
+  `
+  }
   .print-page {
     width: 100%;
     max-width: 100%;
@@ -465,6 +532,8 @@ const LARGE_LETTER_SELECTOR = [
   ".mess-reports-letter",
   ".member-list-letter",
   ".official-consume-letter",
+  ".manpower-letter",
+  ".strength-letter",
 ].join(", ");
 
 function shouldSkipInlineStyles(el: HTMLElement, options: PrintLetterOptions) {
@@ -481,7 +550,7 @@ export async function printLetterElement(
   orientation: "portrait" | "landscape" = "landscape",
   options: PrintLetterOptions = {},
 ) {
-  const preserveColors = Boolean(options.preserveColors);
+  const preserveColors = options.preserveColors !== false;
   const skipInlineStyles = shouldSkipInlineStyles(el, options);
   const prevMax = el.style.maxHeight;
   const prevOverflow = el.style.overflow;
@@ -504,13 +573,11 @@ export async function printLetterElement(
       printWin.document.open();
       printWin.document.write(html);
       printWin.document.close();
+      if (preserveColors) copyDocumentStyles(document, printWin.document);
       printWin.document.body.appendChild(
         printWin.document.importNode(clone, true),
       );
-      await waitForPaint(printWin);
-      await new Promise<void>((resolve) => {
-        printWin.setTimeout(() => resolve(), 200);
-      });
+      await waitForPrintAssets(printWin);
       await printAndWait(printWin);
       try {
         printWin.close();
@@ -543,11 +610,9 @@ export async function printLetterElement(
     doc.open();
     doc.write(html);
     doc.close();
+    if (preserveColors) copyDocumentStyles(document, doc);
     doc.body.appendChild(doc.importNode(clone, true));
-    await waitForPaint(win);
-    await new Promise<void>((resolve) => {
-      setTimeout(() => resolve(), 200);
-    });
+    await waitForPrintAssets(win);
     await printAndWait(win);
     iframe.remove();
   } finally {

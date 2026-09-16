@@ -136,6 +136,7 @@ export default function ConsumeLedgerPrintClient() {
     try {
       await printLetterElement(el, `consume-ledger-${month}.pdf`, "landscape", {
         skipInlineStyles: true,
+        preserveColors: true,
       });
     } finally {
       setPrinting(false);

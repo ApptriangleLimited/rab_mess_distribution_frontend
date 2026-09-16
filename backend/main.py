@@ -513,6 +513,7 @@ def list_members(
     approval: str | None = None,
     wing: str | None = None,
     rank: str | None = None,
+    member_type: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     page: int = Query(1, ge=1),
@@ -541,6 +542,8 @@ def list_members(
         query = query.filter(Member.wing == wing)
     if rank and rank != "all":
         query = query.filter(Member.rank == rank)
+    if member_type and member_type != "all":
+        query = query.filter(Member.member_type == member_type)
     if date_from or date_to:
         start = date_from or date_to
         end = date_to or date_from
@@ -557,6 +560,7 @@ def list_members(
         approval=approval,
         wing=wing,
         rank=rank,
+        member_type=member_type,
         date_from=str(date_from) if date_from else None,
         date_to=str(date_to) if date_to else None,
         page=page,

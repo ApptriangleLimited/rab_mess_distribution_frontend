@@ -1,4 +1,4 @@
-import { DEFAULT_WING_PARENT, HQ_SUB_WINGS } from "@/lib/constants";
+import { DEFAULT_WING_PARENT } from "@/lib/constants";
 import {
   manpowerWingFamily,
   type ManpowerSnapshot,
@@ -208,6 +208,48 @@ function addCounts(a: StrengthCounts, b: StrengthCounts): StrengthCounts {
   return out;
 }
 
+function addAbsence(
+  a: Omit<StrengthAbsenceRow, "wing" | "total">,
+  b: Omit<StrengthAbsenceRow, "wing" | "total">,
+): Omit<StrengthAbsenceRow, "wing" | "total"> {
+  return {
+    cl: a.cl + b.cl,
+    pl: a.pl + b.pl,
+    rl: a.rl + b.rl,
+    ml: a.ml + b.ml,
+    maternity: a.maternity + b.maternity,
+    training: a.training + b.training,
+    remaining: a.remaining + b.remaining,
+    exam: a.exam + b.exam,
+    other: a.other + b.other,
+    hospital: a.hospital + b.hospital,
+    avgPresent: a.avgPresent + b.avgPresent,
+  };
+}
+
+/** Paper সদর row = sum of Form 3 offices (not নতুন অস্থায়ী সংযুক্ত). */
+function fillForm3Sadar(map: Map<string, Bucket>) {
+  const sadar = map.get(FORM3_SADAR);
+  if (!sadar) return;
+  let held = emptyCounts();
+  let present = emptyCounts();
+  let absent = emptyCounts();
+  let absence = emptyAbsence();
+  for (const wing of FORM3_ADMIN_WINGS) {
+    if (wing === FORM3_SADAR || wing === FORM3_ATTACHED) continue;
+    const row = map.get(wing);
+    if (!row) continue;
+    held = addCounts(held, row.held);
+    present = addCounts(present, row.present);
+    absent = addCounts(absent, row.absent);
+    absence = addAbsence(absence, row.absence);
+  }
+  sadar.held = held;
+  sadar.present = present;
+  sadar.absent = absent;
+  sadar.absence = absence;
+}
+
 /** উপস্থিত = প্রাপ্ত − অনুপস্থিত. */
 function presentFromHeldAbsent(
   held: StrengthCounts,
@@ -400,6 +442,32 @@ const FORM2_ADMIN_BRANCHES = [
   "New / Temporary Attached",
 ] as const;
 
+/**
+ * Daily → Admin wings (Form 3) — paper order from দৈনিক জনবলের প্রতিবেদন.
+ * সদর is the subtotal of the offices above; নতুন অস্থায়ী সংযুক্ত stays after it.
+ */
+const FORM3_ADMIN_WINGS = [
+  "DG Office",
+  "ADG (Ops) Office",
+  "ADG (Admin) Office",
+  "Director (Admin) Office",
+  "Sup Br",
+  "Per Br",
+  "Gen Br",
+  "Med Br",
+  "Rec Br",
+  "Fin Br",
+  "Proc Br",
+  "Dev Br",
+  "Proj Br",
+  "Wksp Br",
+  "সদর",
+  "New / Temporary Attached",
+] as const;
+
+const FORM3_SADAR = "সদর";
+const FORM3_ATTACHED = "New / Temporary Attached";
+
 const FORM2_WING_ALIASES: Record<string, string> = {
   "hq br": "HQ Br",
   "headquarters branch": "HQ Br",
@@ -427,7 +495,7 @@ function branchesForScope(
 } {
   if (scope === "hq") {
     const roots = ["HQ Br"];
-    const listed = [...HQ_SUB_WINGS];
+    const listed = [...FORM3_ADMIN_WINGS];
     const branches = listed.filter((w) => !isBannedWing(w));
     return {
       branches,
@@ -498,22 +566,13 @@ export function buildStrengthReport(
 
     const form2 = scope === "admin" ? resolveForm2Branch(rawWing) : null;
     if (scope === "admin" && !form2) continue;
+    if (scope === "hq" && isSadarWing(rawWing)) continue;
 
     const exact = [...branchSet].find(
       (b) => b.toLowerCase() === (form2 ?? rawWing).toLowerCase(),
     );
     const branch = form2 ?? exact ?? rawWing;
-    if (scope !== "admin" && !map.has(branch)) {
-      map.set(branch, {
-        held: emptyCounts(),
-        present: emptyCounts(),
-        absent: emptyCounts(),
-        absence: emptyAbsence(),
-      });
-      branches.push(branch);
-      branchSet.add(branch);
-    }
-    if (!branch) continue;
+    if (!branch || !map.has(branch)) continue;
     if (cfg.skipSadarFill && isSadarWing(branch)) continue;
 
     const bucket = map.get(branch);
@@ -531,7 +590,8 @@ export function buildStrengthReport(
     }
   }
 
-  for (const b of map.values()) {
+  for (const [wing, b] of map.entries()) {
+    if (scope === "hq" && isSadarWing(wing)) continue;
     b.present = presentFromHeldAbsent(b.held, b.absent);
   }
 
@@ -546,6 +606,7 @@ export function buildStrengthReport(
   if (officerRow) {
     for (const wing of branches) {
       if (cfg.skipSadarFill && isSadarWing(wing)) continue;
+      if (scope === "hq" && isSadarWing(wing)) continue;
       const bucket = map.get(wing);
       if (!bucket) continue;
       const heldN = authorizedWingDisplayCount(officerRow.held_wings, wing);
@@ -564,6 +625,8 @@ export function buildStrengthReport(
       bucket.present.officer = 0;
     }
   }
+
+  if (scope === "hq") fillForm3Sadar(map);
 
   const branchBlocks: StrengthBranchBlock[] = branches.map((wing) => {
     const b = map.get(wing)!;
@@ -591,6 +654,7 @@ export function buildStrengthReport(
   let summaryAbsent = emptyCounts();
   for (const wing of branches) {
     if (cfg.skipSadarFill && isSadarWing(wing)) continue;
+    if (scope === "hq" && isSadarWing(wing)) continue;
     const b = map.get(wing)!;
     summaryHeld = addCounts(summaryHeld, b.held);
     summaryPresent = addCounts(summaryPresent, b.present);
@@ -601,6 +665,7 @@ export function buildStrengthReport(
   let grandPresent = emptyCounts();
   let grandAbsent = emptyCounts();
   for (const block of branchBlocks) {
+    if (scope === "hq" && isSadarWing(block.wing)) continue;
     grandHeld = addCounts(grandHeld, block.held);
     grandPresent = addCounts(grandPresent, block.present);
     grandAbsent = addCounts(grandAbsent, block.absent);

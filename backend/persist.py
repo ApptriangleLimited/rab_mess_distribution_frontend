@@ -34,6 +34,7 @@ from models import (
     TagRequest,
 )
 from extra import rate_out, sender_out
+from cache import bust_members
 
 router = APIRouter()
 
@@ -95,6 +96,82 @@ def is_demo_id(value: str) -> bool:
     return value.startswith("tr_demo_") or value.startswith("pb_demo_")
 
 
+def _cockpit_police_members(today: date) -> list[dict]:
+    joining = (today - timedelta(days=90)).isoformat()
+    return [
+        {
+            "id": "u_seed_41",
+            "name": "Rashedul Islam",
+            "personal_id": "PN-11041",
+            "rab_id": "SRB-3141",
+            "rfid": "RFID-3141",
+            "rank": "ASI",
+            "wing": "Ops Wg",
+            "force": "Police",
+            "religion": "Islam",
+            "member_type": "permanent",
+            "dropdown_no": "",
+            "phone": "01711200041",
+            "blood_group": "B+",
+            "status": "1",
+            "approval_status": "approved",
+            "bank_name": "Sonali Bank",
+            "account_name": "Rashedul Islam",
+            "account_number": "2202003141",
+            "routing": "200270041",
+            "branch": "Mirpur",
+            "branch_location": "Dhaka",
+            "documents": [
+                {"name": "joining-order.pdf", "size": 352200},
+                {"name": "id-photo.jpg", "size": 141100},
+            ],
+            "documents_verified": False,
+            "joining_date": joining,
+            "out_date": "",
+            "default_tag": "MS",
+            "emergency_contacts": [
+                {"name": "Islam Father", "relation": "Father", "phone": "01811300041"}
+            ],
+            "inactive_spans": [],
+        },
+        {
+            "id": "u_seed_42",
+            "name": "Farzana Akter",
+            "personal_id": "PN-11042",
+            "rab_id": "SRB-3142",
+            "rfid": "RFID-3142",
+            "rank": "Constable",
+            "wing": "Int Wg",
+            "force": "Police",
+            "religion": "Islam",
+            "member_type": "permanent",
+            "dropdown_no": "",
+            "phone": "01711200042",
+            "blood_group": "O+",
+            "status": "1",
+            "approval_status": "approved",
+            "bank_name": "Community bank",
+            "account_name": "Farzana Akter",
+            "account_number": "2202003142",
+            "routing": "200270042",
+            "branch": "Uttara",
+            "branch_location": "Dhaka",
+            "documents": [
+                {"name": "posting-order.pdf", "size": 356400},
+                {"name": "id-photo.jpg", "size": 142200},
+            ],
+            "documents_verified": False,
+            "joining_date": joining,
+            "out_date": "",
+            "default_tag": "FR",
+            "emergency_contacts": [
+                {"name": "Akter Spouse", "relation": "Spouse", "phone": "01811300042"}
+            ],
+            "inactive_spans": [],
+        },
+    ]
+
+
 def seed_persist() -> None:
     db = SessionLocal()
     try:
@@ -123,6 +200,25 @@ def seed_persist() -> None:
                     )
                 )
         db.commit()
+        today = date.today()
+        try:
+            for raw in _cockpit_police_members(today):
+                if db.get(Member, raw["id"]) is None:
+                    upsert_member(db, raw)
+                    upsert_assignment(
+                        db,
+                        {
+                            "id": f"a_seed_{raw['id'][-2:]}_{today.strftime('%Y%m%d')}",
+                            "user_id": raw["id"],
+                            "date": today.isoformat(),
+                            "tag": raw["default_tag"],
+                            "updated_by": "daily",
+                        },
+                    )
+            db.commit()
+            bust_members()
+        except Exception:
+            db.rollback()
     finally:
         db.close()
 
@@ -676,6 +772,22 @@ def consume_month_data(db: Session, month: str) -> dict:
     for row in rows:
         by_user.setdefault(row.user_id, {})
         by_user[row.user_id][row.tag] = by_user[row.user_id].get(row.tag, 0) + 1
+    payable_trg = {}
+    for row in rows:
+        if row.tag != "TRG":
+            continue
+        tone = (row.trg_tone or "").strip().lower()
+        if tone == "black":
+            continue
+        if tone != "red":
+            force = ""
+            member = db.get(Member, row.user_id)
+            if member:
+                force = (member.force or "").strip().lower().replace("-", " ").replace("_", " ")
+            if force in {"army", "navy", "air force"}:
+                continue
+        payable_trg[row.user_id] = payable_trg.get(row.user_id, 0) + 1
+
     items = []
     total = 0.0
     for user_id, tags in by_user.items():
@@ -686,7 +798,11 @@ def consume_month_data(db: Session, month: str) -> dict:
         days = 0
         for tag, count in tags.items():
             days += count
-            amount += count * rates.get(tag, 0)
+            rate = rates.get(tag, 0)
+            if rate <= 0:
+                continue
+            payable = payable_trg.get(user_id, 0) if tag == "TRG" else count
+            amount += payable * rate
         total += amount
         items.append(
             {

@@ -36,7 +36,7 @@ export function GenerateReportDialog({
   const router = useRouter();
   const state = useStore();
   const [month, setMonth] = useState(defaultMonth);
-  const [tag, setTag] = useState<DailyTag | "">("");
+  const [tag, setTag] = useState<DailyTag | "all" | "">("");
   const [senderId, setSenderId] = useState("");
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export function GenerateReportDialog({
   const senders = sendersForReportTag(state.senders, tag);
   const canGenerate = Boolean(tag && senderId);
 
-  function onTagChange(nextTag: DailyTag) {
+  function onTagChange(nextTag: DailyTag | "all") {
     setTag(nextTag);
     const match = sendersForReportTag(state.senders, nextTag)[0] ?? null;
     setSenderId(match?.id ?? "");
@@ -95,15 +95,16 @@ export function GenerateReportDialog({
           <Label>{t("ration.reportTag")}</Label>
           <Select
             value={tag || undefined}
-            onValueChange={(v) => onTagChange(v as DailyTag)}
+            onValueChange={(v) => onTagChange(v as DailyTag | "all")}
           >
             <SelectTrigger className="h-10 rounded-lg">
               <SelectValue placeholder={t("ration.selectTag")} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
               {REPORT_PAYOUT_TAGS.map((code) => (
                 <SelectItem key={code} value={code}>
-                  {code} — {tagLabel(code, locale)}
+                  {tagLabel(code, locale)}
                 </SelectItem>
               ))}
             </SelectContent>

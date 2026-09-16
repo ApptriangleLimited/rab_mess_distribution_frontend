@@ -192,7 +192,11 @@ function AbsencePrintCells({
 function LetterAbsenceTable({ report }: { report: StrengthReport }) {
   const isHq = report.formNo === 3;
   const form2 = report.formNo === 2;
-  const total = sumAbsenceRows(report.absence);
+  const total = sumAbsenceRows(
+    report.formNo === 3
+      ? report.absence.filter((row) => row.wing !== "সদর")
+      : report.absence,
+  );
 
   if (!isHq && !form2) {
     return (
@@ -294,7 +298,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
     return (
       <div
         ref={ref}
-        className="mx-auto w-full max-w-[297mm] bg-white p-3 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
+        className="strength-letter mx-auto w-full max-w-[297mm] bg-white p-3 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
       >
         <StrengthReportTitle
           titleBn={report.titleBn}

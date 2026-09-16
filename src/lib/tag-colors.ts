@@ -75,4 +75,74 @@ export function tagCellClass(tag: string): string {
   return CUSTOM_TAG_PALETTE[hashTag(key) % CUSTOM_TAG_PALETTE.length];
 }
 
+/** Print / PDF fills that match cockpit tag tiles. */
+const TAG_PRINT_FILL: Record<string, { bg: string; fg: string }> = {
+  FR: { bg: "#ecfccb", fg: "#1a2e05" },
+  MS: { bg: "#cde4dd", fg: "#067957" },
+  CL: { bg: "#fef3c7", fg: "#451a03" },
+  PL: { bg: "#e0e7ff", fg: "#1e1b4b" },
+  WR: { bg: "#e7e5e4", fg: "#1c1917" },
+  CD: { bg: "#ede9fe", fg: "#2e1065" },
+  WIT: { bg: "#fae8ff", fg: "#4a044e" },
+  MED: { bg: "#ffe4e6", fg: "#4c0519" },
+  ML: { bg: "#fecaca", fg: "#450a0a" },
+  TRG: { bg: "#cffafe", fg: "#083344" },
+  FUEL: { bg: "#fef9c3", fg: "#422006" },
+  MOL: { bg: "#ccfbf1", fg: "#042f2e" },
+  CMH: { bg: "#dbeafe", fg: "#172554" },
+  RBH: { bg: "#e0f2fe", fg: "#0c4a6e" },
+  BGH: { bg: "#ffedd5", fg: "#7c2d12" },
+  AWL: { bg: "#fce7f3", fg: "#831843" },
+  OSL: { bg: "#f3e8ff", fg: "#3b0764" },
+  RL: { bg: "#d1fae5", fg: "#064e3b" },
+  JL: { bg: "#fee2e2", fg: "#7f1d1d" },
+  PE: { bg: "#e2e8f0", fg: "#0f172a" },
+  LNK: { bg: "#dcfce7", fg: "#14532d" },
+  MFR: { bg: "#fef08a", fg: "#422006" },
+};
+
+const CUSTOM_PRINT_FILL = [
+  { bg: "#ccfbf1", fg: "#042f2e" },
+  { bg: "#dbeafe", fg: "#172554" },
+  { bg: "#e0f2fe", fg: "#0c4a6e" },
+  { bg: "#ffedd5", fg: "#7c2d12" },
+  { bg: "#d1fae5", fg: "#064e3b" },
+  { bg: "#fce7f3", fg: "#831843" },
+  { bg: "#fee2e2", fg: "#7f1d1d" },
+  { bg: "#f3e8ff", fg: "#3b0764" },
+] as const;
+
+export function tagPrintFill(
+  tag: string,
+  tone?: "black" | "red" | null,
+): { bg: string; fg: string } {
+  const key = tag.trim().toUpperCase();
+  if (!key) return { bg: "#ffffff", fg: "#111111" };
+  if (key === "TRG" && tone === "black") return { bg: "#0a0a0a", fg: "#ffffff" };
+  if (key === "TRG" && tone === "red") return { bg: "#dc2626", fg: "#ffffff" };
+  return TAG_PRINT_FILL[key] ?? CUSTOM_PRINT_FILL[hashTag(key) % CUSTOM_PRINT_FILL.length]!;
+}
+
+export function tagPrintClass(
+  tag: string,
+  tone?: "black" | "red" | null,
+): string {
+  const key = tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!key) return "";
+  if (key === "TRG" && tone === "black") return "register-tag register-tag-TRG-black";
+  if (key === "TRG" && tone === "red") return "register-tag register-tag-TRG-red";
+  return `register-tag register-tag-${key}`;
+}
+
+export function tagPrintCss(): string {
+  const rules = Object.entries(TAG_PRINT_FILL).map(([key, fill]) => {
+    return `.month-register-print td.register-tag-${key},.register-sheet td.register-tag-${key},.month-ledger-print td.register-tag-${key}{background:${fill.bg} !important;color:${fill.fg} !important;}`;
+  });
+  rules.push(
+    `.month-register-print td.register-tag-TRG-black,.register-sheet td.register-tag-TRG-black,.month-ledger-print td.register-tag-TRG-black{background:#0a0a0a !important;color:#ffffff !important;}`,
+    `.month-register-print td.register-tag-TRG-red,.register-sheet td.register-tag-TRG-red,.month-ledger-print td.register-tag-TRG-red{background:#dc2626 !important;color:#ffffff !important;}`,
+  );
+  return rules.join("");
+}
+
 export { TAG_CELL };

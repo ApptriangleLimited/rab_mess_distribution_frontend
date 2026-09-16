@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   month: string;
-  tag: DailyTag;
+  tag: DailyTag | string;
   tagLabel: string;
   rows: TagBillRow[];
   totalDays: number;
@@ -107,7 +107,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
                 {row.sl}
               </td>
               <td className="border border-black px-1.5 py-1 font-mono text-[10px]">
-                {row.user.rab_id}
+                {row.user.personal_id || "—"}
               </td>
               <td className="border border-black px-1.5 py-1">{row.user.rank}</td>
               <td className="border border-black px-1.5 py-1 text-left">

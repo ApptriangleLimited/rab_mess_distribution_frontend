@@ -6,6 +6,8 @@ import { formatMonthLong } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
+import { tagPrintClass, tagPrintCss, tagPrintFill } from "@/lib/tag-colors";
+import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -21,12 +23,6 @@ type Props = {
   /** Show on screen for iframe print capture; default print-only. */
   preview?: boolean;
 };
-
-const BN_DIGITS = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
-
-function toBnDigits(n: number) {
-  return String(n).replace(/\d/g, (d) => BN_DIGITS[Number(d)] ?? d);
-}
 
 /** Landscape Forces Mess consume ledger — matches BN register print. */
 export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
@@ -61,8 +57,8 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
     const monthEn = formatMonthLong(month);
     const useBn = locale === "bn";
 
-    const dayLabel = (d: number) => (useBn ? toBnDigits(d) : String(d));
-    const serLabel = (n: number) => (useBn ? toBnDigits(n) : String(n));
+    const dayLabel = (d: number) => String(d);
+    const serLabel = (n: number) => String(n);
 
     const tagTotals = Object.fromEntries(
       tagCodes.map((code) => [
@@ -78,7 +74,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         className={cn(
           "month-ledger-print text-black",
           preview
-            ? "block overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700"
+            ? "block overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
             : "hidden print:block",
         )}
       >
@@ -99,29 +95,36 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           ) : null}
         </div>
 
-        <table className="w-full border-collapse text-[7px] leading-tight">
+        <style>{tagPrintCss()}</style>
+        <table className="w-full border-collapse text-[9px] leading-none">
           <thead>
             <tr className="border border-black bg-neutral-100">
-              <th className="border border-black px-0.5 py-0.5">
+              <th className="border border-black px-1 py-1">
                 {t("consume.colSl")}
               </th>
-              <th className="border border-black px-0.5 py-0.5 text-left">
+              <th className="border border-black px-1 py-1 text-left">
+                {t("consume.colId")}
+              </th>
+              <th className="border border-black px-1 py-1 text-left">
                 {t("consume.colRank")}
               </th>
-              <th className="border border-black px-0.5 py-0.5 text-left">
+              <th className="border border-black px-1 py-1 text-left">
                 {t("consume.colName")}
               </th>
               {columns.map(({ date, dayNum }) => (
-                <th key={date} className="border border-black px-0 py-0.5 w-3">
+                <th
+                  key={date}
+                  className="min-w-[1.35rem] border border-black px-0.5 py-1"
+                >
                   {dayLabel(dayNum)}
                 </th>
               ))}
               {tagCodes.map((code) => (
-                <th key={code} className="border border-black px-0.5 py-0.5">
+                <th key={code} className="border border-black px-1 py-1">
                   {code}
                 </th>
               ))}
-              <th className="border border-black px-0.5 py-0.5">
+              <th className="border border-black px-1 py-1">
                 {t("consume.colTotalDays")}
               </th>
             </tr>
@@ -129,37 +132,56 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           <tbody>
             {rows.map((row, i) => (
               <tr key={row.user.id}>
-                <td className="border border-black px-0.5 py-0 text-center tabular-nums">
+                <td className="border border-black px-1 py-0.5 text-center tabular-nums">
                   {serLabel(i + 1)}
                 </td>
-                <td className="border border-black px-0.5 py-0 whitespace-nowrap">
+                <td className="border border-black px-1 py-0.5 font-mono whitespace-nowrap">
+                  {row.user.personal_id || "—"}
+                </td>
+                <td className="border border-black px-1 py-0.5 whitespace-nowrap">
                   {row.user.rank}
                 </td>
-                <td className="border border-black px-0.5 py-0 text-left whitespace-nowrap">
+                <td className="border border-black px-1 py-0.5 text-left whitespace-nowrap">
                   {row.user.name}
                 </td>
                 {columns.map(({ date, dayNum }, vi) => {
                   const cell = rangeMode
                     ? (row.days[vi] ?? "")
                     : (row.days[dayNum - 1] ?? "");
+                  if (!cell) {
+                    return (
+                      <td
+                        key={date}
+                        className="min-w-[1.35rem] border border-black px-0.5 py-0.5"
+                      />
+                    );
+                  }
+                  const tone = isTrgTag(cell)
+                    ? resolveTrgTone(row.user.force)
+                    : undefined;
+                  const fill = tagPrintFill(cell, tone);
                   return (
-                  <td
-                    key={date}
-                    className="border border-black px-0 py-0 text-center font-mono"
-                  >
-                    {cell || ""}
-                  </td>
+                    <td
+                      key={date}
+                      className={cn(
+                        tagPrintClass(cell, tone),
+                        "min-w-[1.35rem] border border-black px-0.5 py-0.5 text-center font-mono text-[8px] font-bold leading-none whitespace-nowrap",
+                      )}
+                      style={{ backgroundColor: fill.bg, color: fill.fg }}
+                    >
+                      {cell}
+                    </td>
                   );
                 })}
                 {tagCodes.map((code) => (
                   <td
                     key={code}
-                    className="border border-black px-0.5 py-0 text-center tabular-nums"
+                    className="border border-black px-1 py-0.5 text-center tabular-nums"
                   >
                     {row.tagCounts[code] ?? ""}
                   </td>
                 ))}
-                <td className="border border-black px-0.5 py-0 text-center tabular-nums font-semibold">
+                <td className="border border-black px-1 py-0.5 text-center tabular-nums font-semibold">
                   {row.totalDays || ""}
                 </td>
               </tr>
@@ -168,7 +190,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           <tfoot>
             <tr className="border border-black font-semibold">
               <td
-                colSpan={3}
+                colSpan={4}
                 className="border border-black px-1 py-1 text-right"
               >
                 {t("consume.colGrandTotal")}

@@ -18,7 +18,7 @@ function amt(n: number) {
 
 export function downloadTagBillPdf(args: {
   month: string;
-  tag: DailyTag;
+  tag: DailyTag | string;
   tagLabel: string;
   rows: TagBillRow[];
   showFuel: boolean;
@@ -76,7 +76,7 @@ export function downloadTagBillPdf(args: {
   ];
   const body = rows.map((r) => [
     String(r.sl),
-    r.user.rab_id,
+    r.user.personal_id || "—",
     r.user.rank,
     r.user.name,
     String(r.days),
@@ -202,7 +202,7 @@ export function downloadConsumeMonthPdf(args: {
     ],
     body: rows.map((r, i) => [
       String(i + 1),
-      r.user.rab_id,
+      r.user.personal_id || "—",
       r.user.rank,
       r.user.name,
       String(r.totalDays),

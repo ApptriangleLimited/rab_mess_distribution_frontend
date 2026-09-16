@@ -45,8 +45,9 @@ type Params = {
   q: string;
   rank: string;
   wing: string;
-  /** Member duty status: `1` active, `0` inactive, `all`. Default all. */
-  status?: "all" | "0" | "1";
+  memberType?: string;
+  /** Member duty status: `1` active, `0` inactive. Default active. */
+  status?: "0" | "1";
 };
 
 export function useDailyCockpit({
@@ -55,7 +56,8 @@ export function useDailyCockpit({
   q,
   rank,
   wing,
-  status = "all",
+  memberType = "all",
+  status = "1",
 }: Params) {
   const apiOn = isDailyApiEnabled();
   const { toast } = useToast();
@@ -80,7 +82,8 @@ export function useDailyCockpit({
           q: q.trim() || undefined,
           rank: rank !== "all" ? rank : undefined,
           wing: wing !== "all" ? wing : undefined,
-          status: status !== "all" ? status : undefined,
+          member_type: memberType !== "all" ? memberType : undefined,
+          status,
           page: 1,
           page_size: 500,
         }),
@@ -132,7 +135,7 @@ export function useDailyCockpit({
     } finally {
       setLoading(false);
     }
-  }, [apiOn, dateFrom, dateTo, q, rank, wing, status, toast]);
+  }, [apiOn, dateFrom, dateTo, q, rank, wing, memberType, status, toast]);
 
   useEffect(() => {
     void load();

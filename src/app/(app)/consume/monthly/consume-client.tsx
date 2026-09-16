@@ -13,35 +13,30 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
-import { AllConsumePanel } from "@/components/consume/all-consume-panel";
+import { LeaveMedBillPanel } from "@/components/consume/leave-med-bill-panel";
 import { TagBillPanel } from "@/components/consume/tag-bill-panel";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
-import {
-  ConsumeTagTabs,
-  type ConsumeTagTab,
-} from "@/components/layout/consume-tag-tabs";
+import { ConsumeTagTabs } from "@/components/layout/consume-tag-tabs";
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
-import { isAllowanceTag, isKnownTag } from "@/lib/store/rates";
+import {
+  CONSUME_FILTER_TAGS,
+  consumeFilterLabel,
+  parseConsumeFilter,
+  type ConsumeFilter,
+} from "@/lib/consume-filters";
 import { monthKey } from "@/lib/date";
 import {
-  buildConsumeMonth,
+  buildLeaveMedBill,
   buildTagBill,
   formatBdt,
   withReportSource,
 } from "@/lib/reports";
-import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
-
-function parseTagTab(raw: string | null): ConsumeTagTab | null {
-  if (!raw) return null;
-  if (raw === "all") return "all";
-  return isKnownTag(raw) ? (raw as DailyTag) : null;
-}
 
 export default function ConsumeMonthlyClient() {
   const t = useT();
@@ -57,15 +52,9 @@ export default function ConsumeMonthlyClient() {
     rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : defaultMonth;
 
   const { source, loading } = useReportSource({ month });
-
-  const report = useMemo(
-    () => withReportSource(source, () => buildConsumeMonth(month)),
-    [state.assignments, state.users, state.rates, month, source],
-  );
-
-  const tagStats = useMemo(() => [...report.byTag], [report.byTag]);
-
-  const tag = parseTagTab(searchParams.get("tag")) ?? "all";
+  const filter = parseConsumeFilter(searchParams.get("tag"));
+  const filterTags = CONSUME_FILTER_TAGS[filter];
+  const filterLabel = consumeFilterLabel(filter);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -74,52 +63,63 @@ export default function ConsumeMonthlyClient() {
       params.set("month", defaultMonth);
       dirty = true;
     }
-    if (!parseTagTab(searchParams.get("tag"))) {
-      params.set("tag", "all");
+    if (searchParams.get("tag") !== filter) {
+      params.set("tag", filter);
       dirty = true;
     }
     if (!dirty) return;
     router.replace(`${pathname}?${params.toString()}`);
-  }, [rawMonth, defaultMonth, pathname, router, searchParams]);
-
-  const allowanceDays = useMemo(
-    () => report.rows.reduce((sum, row) => sum + row.allowanceDays, 0),
-    [report.rows],
-  );
-
-  const headerStats = useMemo(() => {
-    if (tag === "all") {
-      return {
-        days: report.assignmentCount,
-        members: report.rows.length,
-        allowance: allowanceDays,
-        amount: report.totalAmount,
-      };
-    }
-    const agg = report.byTag.find((row) => row.tag === tag);
-    const isAllowance = isAllowanceTag(tag);
-    return {
-      days: agg?.days ?? 0,
-      members: agg?.users ?? 0,
-      allowance: isAllowance ? (agg?.days ?? 0) : 0,
-      amount: agg?.amount ?? 0,
-    };
-  }, [tag, report, allowanceDays]);
+  }, [rawMonth, defaultMonth, filter, pathname, router, searchParams]);
 
   const tagBill = useMemo(
     () =>
-      tag === "all"
+      filter === "leave-med"
         ? null
-        : withReportSource(source, () => buildTagBill(month, tag)),
-    [state.assignments, state.users, state.rates, month, tag, source],
+        : withReportSource(source, () => buildTagBill(month, filterTags)),
+    [state.assignments, state.users, state.rates, month, filter, filterTags, source],
   );
 
-  const amountValue =
-    tag !== "all" && tagBill ? tagBill.grandTotal : headerStats.amount;
-  const amountLabel =
-    tag !== "all" && tagBill && (tag === "FR" || tagBill.fuelRate > 0)
-      ? t("consume.colGrandTotal")
-      : t("consume.statAmount");
+  const leaveBill = useMemo(
+    () =>
+      filter === "leave-med"
+        ? withReportSource(source, () => buildLeaveMedBill(month, filterTags))
+        : null,
+    [state.assignments, state.users, state.rates, month, filter, filterTags, source],
+  );
+
+  const counts = useMemo(() => {
+    const fr = withReportSource(source, () =>
+      buildTagBill(month, CONSUME_FILTER_TAGS["fr-mfr"]),
+    );
+    const cd = withReportSource(source, () =>
+      buildTagBill(month, CONSUME_FILTER_TAGS.cd),
+    );
+    const leave = withReportSource(source, () =>
+      buildLeaveMedBill(month, CONSUME_FILTER_TAGS["leave-med"]),
+    );
+    return {
+      "fr-mfr": fr.rows.length,
+      cd: cd.rows.length,
+      "leave-med": leave.rows.length,
+    } satisfies Record<ConsumeFilter, number>;
+  }, [state.assignments, state.users, state.rates, month, source]);
+
+  const headerStats = useMemo(() => {
+    if (leaveBill) {
+      return {
+        days: leaveBill.totalDays,
+        members: leaveBill.rows.length,
+        allowance: leaveBill.totalDays,
+        amount: leaveBill.totalAmount,
+      };
+    }
+    return {
+      days: tagBill?.totalDays ?? 0,
+      members: tagBill?.rows.length ?? 0,
+      allowance: tagBill?.totalDays ?? 0,
+      amount: tagBill?.grandTotal ?? 0,
+    };
+  }, [leaveBill, tagBill]);
 
   function patchQuery(patch: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -132,16 +132,16 @@ export default function ConsumeMonthlyClient() {
     patchQuery({ month: next });
   }
 
-  function setTag(next: ConsumeTagTab) {
+  function setFilter(next: ConsumeFilter) {
     patchQuery({ tag: next });
   }
 
-  const printHref =
-    tag === "all"
-      ? ""
-      : `/consume/monthly/print?month=${month}&tag=${tag}`;
-  const exportDisabled =
-    tag === "all" ? !report.rows.length : !tagBill?.rows.length;
+  const printHref = `/consume/monthly/print?month=${month}&tag=${filter}`;
+  const exportDisabled = headerStats.members === 0;
+  const amountLabel =
+    filter === "fr-mfr"
+      ? t("consume.colGrandTotal")
+      : t("consume.statAmount");
 
   const statsTiles = (
     <>
@@ -166,7 +166,7 @@ export default function ConsumeMonthlyClient() {
       <StatChip
         icon={<IconCoin className="h-3 w-3" />}
         label={amountLabel}
-        value={formatBdt(amountValue)}
+        value={formatBdt(headerStats.amount)}
         tone="primary"
         accent
       />
@@ -195,33 +195,31 @@ export default function ConsumeMonthlyClient() {
               subtitle={t("pages.consumeMonthly.subtitle", { month })}
               center={<ConsumePanelTabs />}
               actions={
-                tag !== "all" ? (
-                  <div className="flex flex-wrap items-center gap-2 no-print">
-                    {!exportDisabled ? (
-                      <Button
-                        asChild
-                        variant="cta"
-                        size="sm"
-                        className="h-9 rounded-xl shadow-sm shadow-primary/20"
-                      >
-                        <Link href={printHref}>
-                          <IconPrinter className="h-3.5 w-3.5" />
-                          {t("consume.printBill")}
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="cta"
-                        size="sm"
-                        className="h-9 rounded-xl"
-                        disabled
-                      >
+                <div className="flex flex-wrap items-center gap-2 no-print">
+                  {!exportDisabled ? (
+                    <Button
+                      asChild
+                      variant="cta"
+                      size="sm"
+                      className="h-9 rounded-xl shadow-sm shadow-primary/20"
+                    >
+                      <Link href={printHref}>
                         <IconPrinter className="h-3.5 w-3.5" />
                         {t("consume.printBill")}
-                      </Button>
-                    )}
-                  </div>
-                ) : null
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="cta"
+                      size="sm"
+                      className="h-9 rounded-xl"
+                      disabled
+                    >
+                      <IconPrinter className="h-3.5 w-3.5" />
+                      {t("consume.printBill")}
+                    </Button>
+                  )}
+                </div>
               }
             />
           </div>
@@ -229,13 +227,10 @@ export default function ConsumeMonthlyClient() {
 
         <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
           <div className="border-b border-neutral-100 bg-gradient-to-br from-white via-white to-emerald-50/40 px-4 py-3.5 dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-              {t("consume.byTag")}
-            </p>
             <ConsumeTagTabs
-              value={tag}
-              onChange={setTag}
-              stats={tagStats}
+              value={filter}
+              onChange={setFilter}
+              counts={counts}
             />
           </div>
 
@@ -243,19 +238,20 @@ export default function ConsumeMonthlyClient() {
             {loading ? (
               <p className="mb-3 text-sm text-neutral-500">{t("common.loading")}</p>
             ) : null}
-            {tag === "all" ? (
-              <AllConsumePanel
-                key={`${month}-all`}
-                rows={report.rows}
+            {filter === "leave-med" ? (
+              <LeaveMedBillPanel
+                key={`${month}-leave-med`}
                 month={month}
                 onMonthChange={setMonth}
                 tiles={statsTiles}
+                source={source}
               />
             ) : (
               <TagBillPanel
-                key={`${month}-${tag}`}
+                key={`${month}-${filter}`}
                 month={month}
-                tag={tag}
+                tag={filterTags}
+                displayTag={filterLabel}
                 onMonthChange={setMonth}
                 tiles={statsTiles}
                 source={source}

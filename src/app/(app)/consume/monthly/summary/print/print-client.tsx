@@ -51,7 +51,7 @@ export default function ConsumeSummaryPrintClient() {
         el,
         `consume-${sheet}-${month}.pdf`,
         officialSheetOrientation(sheet),
-        { skipInlineStyles: true },
+        { skipInlineStyles: true, preserveColors: true },
       );
     } finally {
       setPrinting(false);

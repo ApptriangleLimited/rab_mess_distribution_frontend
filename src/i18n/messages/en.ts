@@ -25,6 +25,7 @@ export const en = {
     allRank: "All rank",
     allStatus: "All status",
     allApproval: "All approval",
+    allMemberType: "All member type",
     allTag: "All tag",
     allShift: "All shifts",
     clearFilters: "Clear filters",
@@ -161,7 +162,7 @@ export const en = {
     LNK: "Link",
     MFR: "Mess Free Ration",
     ML: "ML",
-    FUEL: "FR Fuel",
+    FUEL: "Firewood FR",
     CLFR: "CL→FR monthly (MS)",
   },
   nav: {
@@ -170,7 +171,7 @@ export const en = {
     approvals: "Approvals",
     roster: "Members",
     dailyTags: "Daily Report",
-    dailyCockpit: "Daily Cockpit",
+    dailyCockpit: "Daily RR",
     requests: "Requests",
     requested: "Requested",
     stateReport: "State Report",
@@ -307,7 +308,7 @@ export const en = {
       phase: "Phase 2",
     },
     dailyTags: {
-      title: "Daily Cockpit",
+      title: "Daily RR",
       subtitle: "Attendance register for {month}",
       phase: "Phase 2",
     },
@@ -444,6 +445,11 @@ export const en = {
     consumeSummaryPrint: {
       title: "Summary preview",
       subtitle: "{month} official sheet — review then print",
+      phase: "Phase 4",
+    },
+    consumeWingSummaryPrint: {
+      title: "Wing summary",
+      subtitle: "{wing} · {month}",
       phase: "Phase 4",
     },
     consumeTagBillPrint: {
@@ -640,7 +646,7 @@ export const en = {
       "Remove {name} from the list. Members keep the old name until edited.",
     memberBankDeleted: "Bank deleted",
     ratesHint:
-      "BDT by tag. FR/MS = per day; CLFR = fixed monthly for MS on CL (not FR rate). FUEL = FR fuel/day. Zero = no payout.",
+      "BDT by tag. FR/MS = per day; CLFR = fixed monthly for MS on CL (not FR rate). FUEL = Firewood FR/day. Zero = no payout.",
     ratesSaved: "Rates saved",
     amountPerDay: "Amount / day",
     amountPerMonth: "Amount / month",
@@ -822,6 +828,7 @@ export const en = {
     rankRequired: "Rank required",
     wingRequired: "Wing required",
     documentsRequired: "At least one document required",
+    bankRequired: "Bank details required for a permanent member",
     phoneInvalid: "Enter a valid Bangladesh mobile (01XXXXXXXXX)",
     rabIdRequired: "SRB ID required",
     rabIdDuplicate: "SRB ID already exists",
@@ -979,14 +986,14 @@ export const en = {
     pendingRequest: "requested",
     sardaTitle: "TRG — Sarda",
     sardaBody:
-      "{name} is Police. Check Sarda for black TRG; leave unchecked for red.",
+      "Check Sarda for black TRG on {name} — no payment or ration. Training shows red automatically — payable.",
     sardaLabel: "Sarda",
     sardaConfirm: "Send request",
     sardaBlack: "Black",
     sardaRed: "Red",
     trgPromptTitle: "TRG",
     trgPromptBody:
-      "Check Training for black TRG on {name}. Leave it unchecked for red.",
+      "Check Training for black TRG on {name} — no payment or ration. Leave it unchecked for red — payable.",
     trainingLabel: "Training",
     boardHint:
       "One tag per member per day. Inactive: prior tags stay, empty blank, no fill.",
@@ -1345,7 +1352,13 @@ export const en = {
   },
   consume: {
     month: "Month",
-    byTag: "By tag",
+    byTag: "Bill",
+    filterFrMfr: "FR+MFR",
+    filterCd: "CD",
+    filterLeaveMed: "CL+PL+TRG+WIT+MED+BGH",
+    leaveMedBillTitle:
+      "Fresh money bill — {month} (CL, PL, Training, Witness, Doctor and BGH bill)",
+    colFreshMoneyBabod: "ফ্রেশ মানি বাবদ টাকা",
     perUser: "Per member",
     totalDays: "Total days",
     allowanceDays: "Allowance days",
@@ -1391,13 +1404,13 @@ export const en = {
     signDailySi: "Daily SI",
     signConsumeSi: "Consume SI",
     signPicketSi: "Picket SI",
-    signScheduleSi: "Schedule SI",
+    signScheduleSi: "Mess CQ SI",
     signSeniorDad: "Senior DAD (Admin)",
     signDeputyDirector: "Deputy Director",
     signMessPresident: "President\nMess Committee, Forces Mess",
     signLastOfficer:
       "Major\nDeputy Director (HQ)\nSRB Forces Headquarters",
-    wingSummary: "Wing summary",
+    wingSummary: "Summary",
     wingSummaryTitle: "Consume summary by wing — {month}",
     wingSummaryEmpty: "No wing data for this month.",
     officialWings: "Monthly consume",
@@ -1479,7 +1492,7 @@ export const en = {
     noMembersForTag: "No members with this tag for the month.",
     generateReportTitle: "Generate report",
     generateReportHint:
-      "Pick month, tag, and bank. FR, CL, CD, TRG, MED, RL go to Fresh Money; FR Fuel is paid separately.",
+      "Pick month, tag, and bank. FR, CL, CD, TRG, MED, RL go to Fresh Money; Firewood FR is paid separately.",
     reportDate: "Date",
     reportTag: "Tag",
     reportBank: "Bank account",
@@ -1490,6 +1503,7 @@ export const en = {
     reportPreviewHint: "Review letter, then print or download CSV.",
     reportEmpty: "No members match this month, tag, and bank.",
     downloadReport: "Download PDF",
+    exportExcel: "Download Excel",
     backToForm: "Back",
     signature: "Signature",
     preparedBy: "Prepared by",

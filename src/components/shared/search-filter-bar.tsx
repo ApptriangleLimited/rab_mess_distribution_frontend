@@ -30,6 +30,8 @@ type Props = {
    * Trailing (e.g. print) sits on the right of that row.
    */
   wrapTiles?: boolean;
+  /** Put colored / stat chips on the search row (right of the search field). */
+  tilesBesideSearch?: boolean;
   /** Optional trailing control (e.g. print). */
   trailing?: ReactNode;
   /** Filter fields — inline when `flat`, else expand panel. */
@@ -60,6 +62,7 @@ export function SearchFilterBar({
   filtersActive = false,
   tiles,
   wrapTiles = false,
+  tilesBesideSearch = false,
   hideSearch = false,
   hideFilters = false,
   trailing,
@@ -115,7 +118,19 @@ export function SearchFilterBar({
             </div>
           )}
 
-          {flat && !hideFilters ? (
+          {tiles && tilesBesideSearch && !wrapTiles ? (
+            <div
+              className={cn(
+                "ml-auto flex min-w-0 flex-1 items-center justify-end",
+                compact ? "gap-1" : "gap-1.5",
+                singleLine ? "shrink" : "flex-wrap",
+              )}
+            >
+              {tiles}
+            </div>
+          ) : null}
+
+          {flat && !hideFilters && !tilesBesideSearch ? (
             children
           ) : !flat ? (
             <Button
@@ -144,7 +159,7 @@ export function SearchFilterBar({
             </Button>
           ) : null}
 
-          {tiles && !wrapTiles ? (
+          {tiles && !wrapTiles && !tilesBesideSearch ? (
             <div
               className={cn(
                 "ml-auto flex min-w-0 items-center",
@@ -158,6 +173,21 @@ export function SearchFilterBar({
           {trailing && !trailingOnTileRow ? (
             <div className="shrink-0">{trailing}</div>
           ) : null}
+        </div>
+      ) : null}
+
+      {flat && !hideFilters && tilesBesideSearch ? (
+        <div
+          className={cn(
+            "w-full min-w-0",
+            hasTopControls || (trailing && !trailingOnTileRow)
+              ? compact
+                ? "mt-1.5"
+                : "mt-2.5"
+              : null,
+          )}
+        >
+          {children}
         </div>
       ) : null}
 

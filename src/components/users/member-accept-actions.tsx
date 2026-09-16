@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { UserConfirmCard } from "@/components/daily/user-confirm-card";
 import { UserDetail } from "@/components/users/user-detail";
 import { TagSelector } from "@/components/daily/tag-selector";
+import { TrgToneHint } from "@/components/daily/trg-sarda-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
@@ -97,7 +98,7 @@ export function MemberAcceptActions({
               to: todayISO(),
               queue,
               trg_tone: isTrgTag(actionTag)
-                ? resolveTrgTone(user.force, trainingChecked)
+                ? resolveTrgTone(user.force, trainingChecked, sardaChecked)
                 : undefined,
               trg_sarda:
                 isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
@@ -147,7 +148,7 @@ export function MemberAcceptActions({
             toDate: todayISO(),
             queue,
             trg_tone: isTrgTag(actionTag)
-              ? resolveTrgTone(user.force, trainingChecked)
+              ? resolveTrgTone(user.force, trainingChecked, sardaChecked)
               : undefined,
             trg_sarda:
               isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
@@ -312,6 +313,7 @@ export function MemberAcceptActions({
               <span className="font-medium text-neutral-800 dark:text-neutral-100">
                 {t("daily.sardaLabel")}
               </span>
+              <TrgToneHint black={sardaChecked} />
             </label>
           ) : null}
           {showTrgPrompt ? (
@@ -325,9 +327,7 @@ export function MemberAcceptActions({
               <span className="font-medium text-neutral-800 dark:text-neutral-100">
                 {t("daily.trainingLabel")}
               </span>
-              <span className="ml-auto text-xs text-neutral-500">
-                {trainingChecked ? t("daily.sardaBlack") : t("daily.sardaRed")}
-              </span>
+              <TrgToneHint black={trainingChecked} />
             </label>
           ) : null}
         </div>

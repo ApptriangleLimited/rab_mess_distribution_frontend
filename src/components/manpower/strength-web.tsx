@@ -434,7 +434,11 @@ function AbsenceCells({
 function HqAbsenceSection({ report }: { report: StrengthReport }) {
   const isHq = report.formNo === 3;
   const form2 = report.formNo === 2;
-  const total = sumAbsenceRows(report.absence);
+  const total = sumAbsenceRows(
+    report.formNo === 3
+      ? report.absence.filter((row) => row.wing !== "সদর")
+      : report.absence,
+  );
 
   if (!isHq && !form2) {
     return (

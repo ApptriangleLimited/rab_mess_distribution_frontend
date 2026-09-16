@@ -31,6 +31,11 @@ export function memberListFilterChips(
   if (filters.wing && filters.wing !== "all") {
     chips.push(`${t("cc.fields.wing")}: ${wingLabel(filters.wing)}`);
   }
+  if (filters.member_type && filters.member_type !== "all") {
+    chips.push(
+      `${t("cc.fields.memberType")}: ${t(memberTypeMessageKey(filters.member_type))}`,
+    );
+  }
   if (filters.rank && filters.rank !== "all") {
     chips.push(`${t("cc.fields.rank")}: ${filters.rank}`);
   }
