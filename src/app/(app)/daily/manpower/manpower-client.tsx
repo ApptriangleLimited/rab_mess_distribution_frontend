@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { PaperStatusBadge } from "@/components/reports/paper-status-badge";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { SearchFilterBar } from "@/components/shared/search-filter-bar";
 import { Button } from "@/components/ui/button";
 import { rowActionClass } from "@/components/users/row-action-btn";
@@ -41,6 +42,8 @@ export default function ManpowerClient() {
   const searchParams = useSearchParams();
   const form = parseForm(searchParams.get("form"));
   const [q, setQ] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const formTabs: {
     id: FormId;
@@ -74,14 +77,16 @@ export default function ManpowerClient() {
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
-    if (!query) return rows;
-    return rows.filter((row) =>
-      [row.date, row.title, row.status, row.form ?? ""]
+    return rows.filter((row) => {
+      if (dateFrom && row.date < dateFrom) return false;
+      if (dateTo && row.date > dateTo) return false;
+      if (!query) return true;
+      return [row.date, row.title, row.status, row.form ?? ""]
         .join(" ")
         .toLowerCase()
-        .includes(query),
-    );
-  }, [rows, q]);
+        .includes(query);
+    });
+  }, [rows, q, dateFrom, dateTo]);
 
   const createHref = `/daily/manpower/new?form=${form}`;
 
@@ -127,14 +132,14 @@ export default function ManpowerClient() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 px-2.5 py-2 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900">
-          <span className="shrink-0 px-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+        <div className="rounded-2xl border-2 border-primary/25 bg-white px-3 py-3 shadow-md dark:border-primary/40 dark:bg-neutral-950">
+          <span className="mb-2 block px-0.5 text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
             {t("manpower.formPicker")}
           </span>
           <div
             role="tablist"
             aria-label={t("manpower.formPicker")}
-            className="flex min-w-0 flex-1 flex-wrap gap-1.5"
+            className="flex min-w-0 flex-wrap gap-2.5"
           >
             {formTabs.map((tab) => {
               const active = tab.id === form;
@@ -147,10 +152,10 @@ export default function ManpowerClient() {
                   title={t(tab.hintKey)}
                   onClick={() => pushForm(tab.id)}
                   className={cn(
-                    "rounded-lg border px-2.5 py-1 text-xs font-semibold transition",
+                    "min-w-[9.5rem] rounded-xl border-2 px-5 py-2.5 text-sm font-bold transition sm:min-w-[11rem] sm:px-6 sm:py-3 sm:text-base",
                     active
-                      ? "border-primary/40 bg-primary text-white shadow-sm shadow-primary/20 dark:border-primary/50"
-                      : "border-neutral-200 bg-white text-neutral-700 hover:border-primary/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200",
+                      ? "border-primary bg-primary text-white shadow-md shadow-primary/25 dark:border-primary"
+                      : "border-neutral-300 bg-neutral-50 text-neutral-800 hover:border-primary/50 hover:bg-primary/5 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100",
                   )}
                 >
                   {tab.short}
@@ -165,7 +170,18 @@ export default function ManpowerClient() {
           onSearchChange={setQ}
           searchPlaceholder={t("manpower.searchPlaceholder")}
           searchClassName="w-64 shrink-0 sm:w-72"
-        />
+        >
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onChange={({ from, to }) => {
+              setDateFrom(from);
+              setDateTo(to);
+            }}
+            label={t("common.dateRange")}
+            triggerClassName="h-10 min-w-[13.5rem] rounded-xl px-3 text-sm"
+          />
+        </SearchFilterBar>
 
         {filtered.length === 0 ? (
           <EmptyState
@@ -210,6 +226,7 @@ export default function ManpowerClient() {
                 <tbody>
                   {filtered.map((row) => {
                     const href = `/daily/manpower/new?date=${encodeURIComponent(row.ref)}&form=${row.form ?? form}`;
+                    const editHref = `${href}&edit=1`;
                     const printHref = `/daily/manpower/print?date=${encodeURIComponent(row.ref)}&form=${row.form ?? form}`;
                     return (
                       <tr
@@ -249,12 +266,13 @@ export default function ManpowerClient() {
                                 size="icon"
                                 className={rowActionClass("edit")}
                               >
-                                <Link href={href} aria-label={t("common.edit")}>
+                                <Link href={editHref} aria-label={t("common.edit")}>
                                   <IconEdit className="h-4 w-4" />
                                 </Link>
                               </Button>
                             ) : null}
-                            {row.status === "approved" ? (
+                            {row.status === "submitted" ||
+                            row.status === "approved" ? (
                               <Button
                                 asChild
                                 variant="ghost"

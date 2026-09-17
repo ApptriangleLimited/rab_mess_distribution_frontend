@@ -1,9 +1,8 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { CONSUME_REPORT_META } from "@/lib/constants";
 import {
-  DAILY_REGISTER_WING_SERIAL,
   groupRegisterRowsByWing,
+  wingPrintOrder,
 } from "@/lib/daily-register-wings";
 import { formatMonthLong } from "@/lib/date";
 import type { LedgerRow } from "@/lib/reports";
@@ -48,18 +47,11 @@ function drawSheetHeader(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text(wingName, pageW / 2, y, { align: "center" });
-  y += 5;
-  doc.setFontSize(9);
-  doc.text(sheetTitle, pageW / 2, y, { align: "center" });
   y += 4.5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.text(
-    `${CONSUME_REPORT_META.orgName} Camp, ${CONSUME_REPORT_META.station}`,
-    pageW / 2,
-    y,
-    { align: "center" },
-  );
+  doc.setFontSize(9);
+  doc.text("SRB Forces Headquarters", pageW / 2, y, { align: "center" });
+  y += 4.5;
+  doc.text(sheetTitle, pageW / 2, y, { align: "center" });
 }
 
 function drawDailySi(
@@ -95,11 +87,16 @@ export function buildDailyRegisterPdf({
   sheetTitle,
   pageOf = (page, total) => `Page ${page} of ${total}`,
   signLabel = "Daily SI",
-  wingSerial = DAILY_REGISTER_WING_SERIAL,
+  wingSerial = wingPrintOrder(),
 }: DailyRegisterPdfArgs) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
+  const tableW = pageW - 8;
+  const dayW = Math.max(
+    5.2,
+    (tableW - 8 - 22 - 16 - 28) / Math.max(dayNumbers.length, 1),
+  );
   const monthLabel = formatMonthLong(month);
   const title = sheetTitle ?? `Attendance Register — ${monthLabel}`;
 
@@ -127,8 +124,8 @@ export function buildDailyRegisterPdf({
   const pageWing = new Map<number, string>();
   const tableOpts = {
     styles: {
-      fontSize: 4.5,
-      cellPadding: 0.35,
+      fontSize: 7,
+      cellPadding: 0.6,
       halign: "center" as const,
       valign: "middle" as const,
       lineWidth: 0.1,
@@ -139,13 +136,20 @@ export function buildDailyRegisterPdf({
       fillColor: [235, 235, 235] as [number, number, number],
       textColor: 20,
       fontStyle: "bold" as const,
-      fontSize: 4.5,
+      fontSize: 7,
     },
     columnStyles: {
-      0: { cellWidth: 5 },
-      1: { cellWidth: 11, halign: "left" as const },
-      2: { cellWidth: 11, halign: "left" as const },
-      3: { cellWidth: 16, halign: "left" as const, overflow: "ellipsize" as const },
+      0: { cellWidth: 8 },
+      1: { cellWidth: 22, halign: "left" as const },
+      2: { cellWidth: 16, halign: "left" as const },
+      3: {
+        cellWidth: 28,
+        halign: "left" as const,
+        overflow: "ellipsize" as const,
+      },
+      ...Object.fromEntries(
+        dayNumbers.map((_, i) => [i + 4, { cellWidth: dayW }]),
+      ),
     },
     theme: "grid" as const,
     margin: {
@@ -154,12 +158,12 @@ export function buildDailyRegisterPdf({
       top: HEADER_TOP + HEADER_H,
       bottom: FOOTER_H,
     },
-    tableWidth: "auto" as const,
+    tableWidth: tableW,
   };
 
   for (const block of blocks) {
-    doc.addPage();
-    const head = ["No.", "Number", "Rank", "Name", ...dayNumbers.map(String)];
+    doc.addPage("a4", "l");
+    const head = ["No.", "Personal no", "Rank", "Name", ...dayNumbers.map(String)];
     const body = block.rows.map((row, i) => [
       String(i + 1),
       row.user.personal_id || "—",

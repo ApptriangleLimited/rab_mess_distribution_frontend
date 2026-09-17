@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   IconArrowLeft,
   IconCheck,
+  IconEdit,
   IconExternalLink,
   IconPrinter,
   IconSend,
@@ -92,8 +93,11 @@ export default function ManpowerEditorClient() {
         ? t("manpower.form2Title")
         : t("manpower.form3Title");
   const paper = getManpowerPaper(date, form);
-  const approved = paper?.status === "approved";
-  const locked = paper?.status === "submitted" || approved;
+  const verified = paper?.status === "approved";
+  const submitted = paper?.status === "submitted";
+  const editing = searchParams.get("edit") === "1";
+  const printable = submitted || verified;
+  const fieldsLocked = verified || (submitted && !editing);
 
   function pushDate(next: string) {
     setDate(next);
@@ -144,13 +148,35 @@ export default function ManpowerEditorClient() {
               center={<DailyTabs />}
               actions={
                 <div className="flex items-center gap-1.5">
-                  <DatePicker
-                    value={date}
-                    onChange={pushDate}
-                    allowClear={false}
-                    triggerClassName="h-9 w-[9.25rem] rounded-xl"
-                  />
-                  {approved ? (
+                  {fieldsLocked ? (
+                    <span className="rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-sm tabular-nums text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                      {formatDateLong(date, dateLocale)}
+                    </span>
+                  ) : (
+                    <DatePicker
+                      value={date}
+                      onChange={pushDate}
+                      allowClear={false}
+                      triggerClassName="h-9 w-[9.25rem] rounded-xl"
+                    />
+                  )}
+                  {paper ? <PaperStatusBadge status={paper.status} /> : null}
+                  {submitted && !editing ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5 rounded-xl px-2.5"
+                    >
+                      <Link
+                        href={`/daily/manpower/new?date=${encodeURIComponent(date)}&form=${form}&edit=1`}
+                      >
+                        <IconEdit className="h-4 w-4" />
+                        <span className="hidden sm:inline">{t("common.edit")}</span>
+                      </Link>
+                    </Button>
+                  ) : null}
+                  {printable ? (
                     <>
                       <Button
                         asChild
@@ -178,8 +204,6 @@ export default function ManpowerEditorClient() {
                         </Link>
                       </Button>
                     </>
-                  ) : paper ? (
-                    <PaperStatusBadge status={paper.status} />
                   ) : null}
                 </div>
               }
@@ -191,9 +215,15 @@ export default function ManpowerEditorClient() {
           {loading ? (
             <p className="p-4 text-sm text-neutral-500">{t("common.loading")}</p>
           ) : null}
-          {form === "1" && showReport ? <ManpowerWeb report={form1} /> : null}
-          {form === "2" && showReport ? <StrengthWeb report={form2} /> : null}
-          {form === "3" && showReport ? <StrengthWeb report={form3} /> : null}
+          {form === "1" && showReport ? (
+            <ManpowerWeb report={form1} readOnly={fieldsLocked} />
+          ) : null}
+          {form === "2" && showReport ? (
+            <StrengthWeb report={form2} readOnly={fieldsLocked} />
+          ) : null}
+          {form === "3" && showReport ? (
+            <StrengthWeb report={form3} readOnly={fieldsLocked} />
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-3 rounded-2xl border border-primary/10 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
@@ -202,7 +232,7 @@ export default function ManpowerEditorClient() {
               {t("paperReports.waitingAdmin")}
             </p>
           ) : null}
-          {!approved ? (
+          {!printable ? (
             <p className="text-sm text-neutral-600 dark:text-neutral-400">
               {t("paperReports.needApprove")}
             </p>
@@ -213,7 +243,7 @@ export default function ManpowerEditorClient() {
               variant="outline"
               size="sm"
               className="h-10 rounded-xl"
-              disabled={locked || loading}
+              disabled={fieldsLocked || loading}
               onClick={onSave}
             >
               <IconCheck className="h-4 w-4" />
@@ -223,7 +253,7 @@ export default function ManpowerEditorClient() {
               type="button"
               size="sm"
               className="h-10 rounded-xl"
-              disabled={approved || loading}
+              disabled={verified || loading}
               onClick={onSubmit}
             >
               <IconSend className="h-4 w-4" />

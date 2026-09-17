@@ -102,10 +102,10 @@ This drops/recreates connections and applies the dump. Test restore on a staging
 | ------- | ----- |
 | 401 after login | JWT_SECRET mismatch between recreate cycles; Redis deny-list |
 | Empty members | Frontend demo mode — `NEXT_PUBLIC_USE_API` must be true at **build** time |
-| API 500 | `docker logs rab-mess-api` — JSON logs include `request_id` |
+| API 500 | `docker logs srb_backend` — JSON logs include `request_id` |
 | Ready fails | `pg_isready`, `redis-cli ping`, `DATABASE_URL` host `postgres` not localhost |
 | Snapshot wiped data | Stop using PUT snapshot from non-admin; restore backup |
 
 ## Workers
 
-`rab-mess-worker` runs RQ against the same Redis. Password-reset mail is enqueued when SMTP is configured; otherwise the job logs `email_skipped`. Token purge runs on worker start.
+`srb_worker` runs RQ against the same Redis. Password-reset mail is enqueued when SMTP is configured; otherwise the job logs `email_skipped`. Token purge runs on worker start.

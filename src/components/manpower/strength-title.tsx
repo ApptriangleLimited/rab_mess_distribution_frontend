@@ -20,7 +20,7 @@ export function StrengthReportTitle({
       className={cn(
         "relative text-center",
         compact
-          ? "border-b border-neutral-800 pb-2 pr-24"
+          ? "border-b border-neutral-800 pb-1.5 pr-20"
           : "border-b border-neutral-300 px-3 py-3 pr-28 dark:border-neutral-700",
       )}
     >

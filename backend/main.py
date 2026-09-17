@@ -78,7 +78,7 @@ configure_logging()
 settings.assert_secure()
 
 app = FastAPI(
-    title="SRB-Special Response Battalion Mess CC API",
+    title="Special Response Battalion (SRB) Mess CC API",
     version="0.2.0",
     docs_url=None if settings.is_production else "/docs",
     redoc_url=None if settings.is_production else "/redoc",
@@ -221,6 +221,7 @@ def member_out(row: Member) -> dict:
         "rank": row.rank or "",
         "wing": row.wing or "",
         "force": row.force or "",
+        "force_rank": row.force_rank or "",
         "religion": row.religion or "",
         "member_type": row.member_type or "permanent",
         "dropdown_no": row.dropdown_no or "",
@@ -238,6 +239,7 @@ def member_out(row: Member) -> dict:
         "branch_location": row.branch_location or "",
         "joining_date": iso_date(row.joining_date),
         "out_date": iso_date(row.out_date),
+        "duty_start": iso_date(row.duty_start),
         "default_tag": (row.default_tag or "").upper(),
         "jl_end_date": row.jl_end_date or "",
         "inactive_spans": row.inactive_spans or [],
@@ -287,6 +289,7 @@ def apply_member_fields(row: Member, body: MemberIn) -> None:
     row.rank = body.rank.strip()
     row.wing = body.wing.strip()
     row.force = body.force.strip()
+    row.force_rank = body.force_rank.strip()
     row.religion = body.religion.strip()
     row.member_type = body.member_type
     row.dropdown_no = body.dropdown_no.strip()
@@ -605,8 +608,10 @@ def create_member(
     row.approval_status = normalize_approval(body.approval_status, "pending")
     if row.approval_status == "pending":
         row.default_tag = ""
+    elif row.duty_start is None:
+        row.duty_start = row.joining_date or date.today()
     if row.status == "0":
-        row.inactive_spans = [{"from": iso_date(row.joining_date) or "1970-01-01", "to": None}]
+        row.inactive_spans = [{"from": date.today().isoformat(), "to": None}]
     db.add(row)
     try:
         db.commit()
@@ -678,10 +683,16 @@ def accept_member(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     row.approval_status = "approved"
     row.status = "1"
+    row.duty_start = date.today()
+    db.query(Assignment).filter(
+        Assignment.user_id == row.id,
+        Assignment.date < row.duty_start,
+    ).delete(synchronize_session=False)
     row.updated_at = utcnow()
     db.commit()
     db.refresh(row)
     bust_members()
+    bust_daily()
     return envelope(member_out(row), "Member request accepted.")
 
 
@@ -731,12 +742,7 @@ def apply_status_spans(row: Member, status: str) -> None:
     spans = [s for s in (row.inactive_spans or []) if isinstance(s, dict)]
     if status == "0":
         if not any(not s.get("to") for s in spans):
-            start = (
-                row.joining_date.isoformat()
-                if row.joining_date and row.joining_date < today
-                else today.isoformat()
-            )
-            spans.append({"from": start, "to": None})
+            spans.append({"from": today.isoformat(), "to": None})
         row.inactive_spans = spans
         return
     yesterday = (today - timedelta(days=1)).isoformat()
@@ -772,6 +778,7 @@ def set_member_status(
         db.commit()
         db.refresh(row)
         bust_members()
+        bust_daily()
     return envelope(member_out(row), "Status updated")
 
 
@@ -1036,8 +1043,9 @@ def accept_tag_request(
             continue
         if not can_assign(row.member, day):
             continue
-        assigned = upsert_assignment(db, row.member, day, row.to_tag, staff)
-        assigned.trg_tone = row.trg_tone
+        assigned = upsert_assignment(
+            db, row.member, day, row.to_tag, staff, row.trg_tone
+        )
         wrote += 1
     if wrote == 0:
         raise HTTPException(status_code=409, detail="No assignable days in this request")

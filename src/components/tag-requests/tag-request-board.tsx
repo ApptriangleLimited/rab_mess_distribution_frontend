@@ -17,6 +17,10 @@ import {
   searchFilterCompactFieldClass,
 } from "@/components/shared/search-filter-bar";
 import { MemberDateFilter } from "@/components/users/user-filters";
+import {
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { TagChip } from "@/components/tag-requests/tag-chip";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -92,7 +96,6 @@ export function TagRequestBoard({
   const { toast } = useToast();
   const state = useStore();
   const apiOn = isCcApiEnabled();
-  const { ranks, wings } = state;
   const tags = listAllTags();
   const reduceMotion = useReducedMotion();
   const today = todayISO();
@@ -458,36 +461,18 @@ export function TagRequestBoard({
             )
           }
         >
-          <div className="w-[6.75rem] shrink">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {ranks.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[6.5rem] shrink">
-            <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {wings.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SettingsRankFilter
+            value={rank}
+            onChange={setRank}
+            className="w-[7.25rem] shrink"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <SettingsWingFilter
+            value={wing}
+            onChange={setWing}
+            className="w-[7.25rem] shrink"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
           <div className="w-[6.75rem] shrink">
             <Select value={tag} onValueChange={setTagFilter}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>

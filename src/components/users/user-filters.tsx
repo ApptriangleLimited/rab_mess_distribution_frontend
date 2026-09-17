@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import {
   SearchFilterBar,
@@ -15,17 +14,17 @@ import {
 } from "@/components/ui/select";
 import type { ApprovalStatus, MemberType, UserStatus } from "@/lib/types";
 import type { UserFilters } from "@/lib/store/users";
-import { MEMBER_TYPES, wingDisplayLabel } from "@/lib/constants";
-import { useStore } from "@/hooks/use-store";
+import { MEMBER_TYPES } from "@/lib/constants";
+import {
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 type Props = {
   value: UserFilters;
   onChange: (next: UserFilters) => void;
-  /** Optional stat / quick-filter chips under (or beside) filters. */
-  tiles?: ReactNode;
-  wrapTiles?: boolean;
 };
 
 const fieldClass = cn(
@@ -68,22 +67,8 @@ export function MemberDateFilter({
 export function UserFiltersBar({
   value,
   onChange,
-  tiles,
-  wrapTiles = false,
 }: Props) {
   const t = useT();
-  const { ranks, wings, wing_labels } = useStore();
-  const wingOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const w of wings) {
-      const key = w.trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push(w);
-    }
-    return out;
-  }, [wings]);
 
   function patch(partial: Partial<UserFilters>) {
     onChange({ ...value, ...partial });
@@ -103,102 +88,87 @@ export function UserFiltersBar({
       search={value.q ?? ""}
       onSearchChange={(q) => patch({ q })}
       searchPlaceholder={t("cc.searchPlaceholder")}
-      searchClassName="w-[16rem] max-w-[16rem] flex-none"
+      searchClassName="min-w-[9rem] max-w-[13rem] shrink"
       filtersActive={filtersActive}
-      tiles={tiles}
-      tilesBesideSearch={Boolean(tiles) && !wrapTiles}
-      wrapTiles={wrapTiles}
+      singleLine
       className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
     >
-      <div className="grid w-full min-w-0 basis-full grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
-        <Select
-          value={value.status ?? "all"}
-          onValueChange={(v) => patch({ status: v as UserStatus | "all" })}
-        >
-          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.status")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("common.allStatus")}</SelectItem>
-            <SelectItem value="1">{t("cc.statusActive")}</SelectItem>
-            <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={value.approval ?? "all"}
-          onValueChange={(v) =>
-            patch({ approval: v as ApprovalStatus | "all" })
-          }
-        >
-          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.approval")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("common.allApproval")}</SelectItem>
-            <SelectItem value="pending">{t("cc.approvalPending")}</SelectItem>
-            <SelectItem value="approved">{t("cc.approvalApproved")}</SelectItem>
-            <SelectItem value="rejected">{t("cc.approvalRejected")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={value.member_type ?? "all"}
-          onValueChange={(v) =>
-            patch({ member_type: v as MemberType | "all" })
-          }
-        >
-          <SelectTrigger
-            className={fieldClass}
-            aria-label={t("cc.fields.memberType")}
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <Select
+            value={value.status ?? "all"}
+            onValueChange={(v) => patch({ status: v as UserStatus | "all" })}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("common.allMemberType")}</SelectItem>
-            {MEMBER_TYPES.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {t(item.labelKey)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+            <SelectTrigger className={fieldClass} aria-label={t("cc.fields.status")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.allStatus")}</SelectItem>
+              <SelectItem value="1">{t("cc.statusActive")}</SelectItem>
+              <SelectItem value="0">{t("cc.statusInactive")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-0 flex-1">
+          <Select
+            value={value.approval ?? "all"}
+            onValueChange={(v) =>
+              patch({ approval: v as ApprovalStatus | "all" })
+            }
+          >
+            <SelectTrigger className={fieldClass} aria-label={t("cc.fields.approval")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.allApproval")}</SelectItem>
+              <SelectItem value="pending">{t("cc.approvalPending")}</SelectItem>
+              <SelectItem value="approved">{t("cc.approvalApproved")}</SelectItem>
+              <SelectItem value="rejected">{t("cc.approvalRejected")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-0 flex-1">
+          <Select
+            value={value.member_type ?? "all"}
+            onValueChange={(v) =>
+              patch({ member_type: v as MemberType | "all" })
+            }
+          >
+            <SelectTrigger
+              className={fieldClass}
+              aria-label={t("cc.fields.memberType")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.allMemberType")}</SelectItem>
+              {MEMBER_TYPES.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {t(item.labelKey)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <SettingsWingFilter
           value={value.wing ?? "all"}
-          onValueChange={(v) => patch({ wing: v })}
-        >
-          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.wing")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("common.allWing")}</SelectItem>
-            {wingOptions.map((w) => (
-              <SelectItem key={w} value={w}>
-                {wingDisplayLabel(w, wing_labels)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+          onChange={(v) => patch({ wing: v })}
+          className="min-w-0 flex-1"
+          triggerClassName={fieldClass}
+        />
+        <SettingsRankFilter
           value={value.rank ?? "all"}
-          onValueChange={(v) => patch({ rank: v })}
-        >
-          <SelectTrigger className={fieldClass} aria-label={t("cc.fields.rank")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("common.allRank")}</SelectItem>
-            {ranks.map((r) => (
-              <SelectItem key={r} value={r}>
-                {r}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(v) => patch({ rank: v })}
+          className="min-w-0 flex-1"
+          triggerClassName={fieldClass}
+        />
         <MemberDateFilter
           from={value.date_from ?? ""}
           to={value.date_to ?? ""}
           onFrom={(v) => patch({ date_from: v })}
           onTo={(v) => patch({ date_to: v })}
-          className="min-w-0"
+          className="min-w-0 flex-1"
+          triggerClassName={fieldClass}
         />
       </div>
     </SearchFilterBar>

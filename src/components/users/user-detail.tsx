@@ -28,7 +28,9 @@ import {
   loadStoredDocument,
   type LoadedDocument,
 } from "@/lib/api/files";
-import { MEMBER_TYPES } from "@/lib/constants";
+import { MEMBER_TYPES, rankDisplayLabel } from "@/lib/constants";
+import { wingPathLabel } from "@/lib/store/org-options";
+import { useStore } from "@/hooks/use-store";
 import type { ApprovalStatus, DocumentMeta, User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
 import { useT } from "@/i18n/provider";
@@ -142,6 +144,7 @@ export function UserDetail({
 }) {
   const t = useT();
   const { toast } = useToast();
+  const store = useStore();
   const meta = [user.rank, user.wing, user.phone].filter(Boolean).join(" · ");
   const [preview, setPreview] = useState<LoadedDocument | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
@@ -279,7 +282,7 @@ export function UserDetail({
           <DetailField
             icon={IconBuilding}
             label={t("cc.fields.wing")}
-            value={user.wing}
+            value={wingPathLabel(user.wing)}
           />
           <DetailField
             icon={IconPhone}
@@ -296,6 +299,17 @@ export function UserDetail({
             label={t("cc.fields.force")}
             value={user.force}
           />
+          {user.force_rank ? (
+            <DetailField
+              icon={IconShield}
+              label={t("cc.fields.forceRank")}
+              value={rankDisplayLabel(
+                user.force_rank,
+                user.force,
+                store.force_rank_labels[user.force],
+              )}
+            />
+          ) : null}
           <DetailField
             icon={IconId}
             label={t("cc.fields.religion")}
@@ -322,11 +336,13 @@ export function UserDetail({
             label={t("cc.fields.dropdownNo")}
             value={user.dropdown_no}
           />
+          {user.member_type !== "civilian" ? (
           <DetailField
             icon={IconTags}
             label={t("daily.defaultTag")}
             value={<TagChip tag={user.default_tag} />}
           />
+          ) : null}
         </dl>
 
         <div className="grid gap-3 border-t border-neutral-200/80 pt-3 lg:grid-cols-2 dark:border-neutral-700">

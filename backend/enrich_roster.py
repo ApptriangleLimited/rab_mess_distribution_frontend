@@ -1,7 +1,7 @@
 """Add more members, fill Daily tags, and seed request queues.
 
 Keeps the existing 16-person roster. Run:
-  docker exec rab-mess-api python enrich_roster.py
+  docker exec srb_backend python enrich_roster.py
 """
 
 from __future__ import annotations
@@ -184,7 +184,7 @@ def seed_requests(db, members: list[Member]) -> int:
     roster = [
         m
         for m in members
-        if m.approval_status == "approved" and m.status == "1" and m.member_type != "guest"
+        if m.approval_status == "approved" and m.status == "1" and m.member_type not in ("guest", "civilian")
     ]
     by_queue: dict[str, list[Member]] = {"daily": [], "ration": [], "consume": []}
     for i, member in enumerate(roster):

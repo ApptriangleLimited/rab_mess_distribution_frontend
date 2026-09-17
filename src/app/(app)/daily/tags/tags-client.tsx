@@ -38,7 +38,7 @@ import {
 import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
 import { useStore } from "@/hooks/use-store";
 import { isDailyApiEnabled } from "@/lib/api/mode";
-import { DAILY_TAGS, MEMBER_TYPES } from "@/lib/constants";
+import { MEMBER_TYPES } from "@/lib/constants";
 import {
   daysInMonth,
   eachISODate,
@@ -59,10 +59,14 @@ import {
   canAssignOnDate,
   canWriteMfrLockedTag,
   isMfrLocked,
-  MFR_TAG,
 } from "@/lib/store/daily";
-import { compareUsers } from "@/lib/store/users";
-import type { DailyTag, MemberType, UserStatus } from "@/lib/types";
+import { countRegisterTags } from "@/lib/store/register-totals";
+import { compareUsers, isCockpitMember } from "@/lib/store/users";
+import {
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
+import type { DailyTag, MemberType, TrgTone, UserStatus } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -86,7 +90,6 @@ export default function TagsPageClient() {
   const { locale } = useI18n();
   const apiOn = isDailyApiEnabled();
   const state = useStore();
-  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const today = todayISO();
   const initial = defaultRange();
@@ -112,13 +115,10 @@ export default function TagsPageClient() {
     status: memberStatus,
   });
 
-  const demoAllTags = useMemo(
+  const allTags = useMemo(
     () => orderTags(listAllTags()),
     [state.rates],
   );
-  const allTags = apiOn
-    ? orderTags(DAILY_TAGS.map((tag) => tag.code))
-    : demoAllTags;
 
   const month = dateFrom.slice(0, 7) || initial.from.slice(0, 7);
   const dayCount = daysInMonth(month);
@@ -139,7 +139,12 @@ export default function TagsPageClient() {
     if (apiOn) return;
     applyDueJlInactivations(today);
     const ids = state.users
-      .filter((u) => u.approval_status === "approved" && u.status === "1")
+      .filter(
+        (u) =>
+          u.approval_status === "approved" &&
+          u.status === "1" &&
+          isCockpitMember(u),
+      )
       .map((u) => u.id);
     if (!ids.length) return;
     autoApplyCarryForward(ids, today);
@@ -151,6 +156,7 @@ export default function TagsPageClient() {
     return state.users
       .filter((u) => {
         if (u.approval_status !== "approved") return false;
+        if (!isCockpitMember(u)) return false;
         if (u.status !== memberStatus) return false;
         if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
@@ -192,85 +198,22 @@ export default function TagsPageClient() {
     [dateFrom, dateTo],
   );
 
-  const { demoTagCounts, demoTagMemberIds } = useMemo(() => {
-    const allowed = new Set(users.map((u) => u.id));
-    const counts: Record<string, number> = {};
-    const memberIds = new Map<string, Set<string>>();
-    for (const tag of allTags) {
-      counts[tag] = 0;
-      memberIds.set(tag, new Set());
-    }
+  const suppressedCarries = apiOn
+    ? cockpit.suppressedCarries
+    : (state.suppressed_carries ?? []);
 
-    const byUserDate = new Map<string, DailyTag>();
-    for (const a of state.assignments) {
-      byUserDate.set(`${a.user_id}|${a.date}`, a.tag);
-    }
-    const suppressedSet = new Set(state.suppressed_carries ?? []);
-
-    for (const user of users) {
-      if (
-        !allowed.has(user.id) ||
-        user.approval_status !== "approved" ||
-        user.status !== "1"
-      ) {
-        continue;
-      }
-      const isMfr = isMfrLocked(user);
-      const defaultTag = user.default_tag;
-
-      for (const date of visibleDates) {
-        if (!canAssignOnDate(user, date)) continue;
-
-        let tag: DailyTag | undefined;
-        if (isMfr) {
-          tag = MFR_TAG;
-        } else {
-          const direct = byUserDate.get(`${user.id}|${date}`);
-          if (direct) {
-            tag = direct;
-          } else if (!suppressedSet.has(`${user.id}|${date}`)) {
-            tag = defaultTag;
-          }
-        }
-
-        if (tag && counts[tag] !== undefined) {
-          counts[tag] += 1;
-          memberIds.get(tag)?.add(user.id);
-        }
-      }
-    }
-
-    return { demoTagCounts: counts, demoTagMemberIds: memberIds };
-  }, [
-    allTags,
-    visibleDates,
-    users,
-    state.assignments,
-    state.suppressed_carries,
-  ]);
-
-  const tagCounts = apiOn ? cockpit.tagCounts : demoTagCounts;
-
-  const allTaggedCount = useMemo(
-    () => allTags.reduce((sum, tag) => sum + (tagCounts[tag] ?? 0), 0),
-    [allTags, tagCounts],
-  );
-
-  const apiTagMemberIds = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const tag of allTags) {
-      const ids = new Set<string>();
-      for (const date of visibleDates) {
-        for (const user of cockpit.projectedTagMembers(tag, date)) {
-          ids.add(user.id);
-        }
-      }
-      map.set(tag, ids);
-    }
-    return map;
-  }, [allTags, visibleDates, cockpit]);
-
-  const tagMemberIds = apiOn ? apiTagMemberIds : demoTagMemberIds;
+  const { counts: tagCounts, memberIds: tagMemberIds, totalDays: allTaggedCount } =
+    useMemo(
+      () =>
+        countRegisterTags(
+          users,
+          visibleDates,
+          assignments,
+          suppressedCarries,
+          today,
+        ),
+      [users, visibleDates, assignments, suppressedCarries, today],
+    );
 
   const boardUsers = useMemo(() => {
     if (tagFilter === "all") return users;
@@ -305,23 +248,33 @@ export default function TagsPageClient() {
     return `/daily/tags/print?${params.toString()}`;
   }, [month, dateFrom, dateTo, q, rank, wing, memberType, memberStatus]);
 
-  function onTagChange(userId: string, date: string, tag: DailyTag | "") {
+  function onTagChange(
+    userId: string,
+    date: string,
+    tag: DailyTag | "",
+    trgTone?: TrgTone,
+  ) {
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
     if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
     if (user && isMfrLocked(user) && !tag) return;
-    if (apiOn) void cockpit.onTagChange(userId, date, tag);
+    if (apiOn) void cockpit.onTagChange(userId, date, tag, trgTone);
     else if (!tag) clearTag(userId, date);
-    else setTag(userId, date, tag);
+    else setTag(userId, date, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
   }
 
-  function onPaintRange(userId: string, dates: string[], tag: DailyTag | "") {
+  function onPaintRange(
+    userId: string,
+    dates: string[],
+    tag: DailyTag | "",
+    trgTone?: TrgTone,
+  ) {
     const user = users.find((u) => u.id === userId);
     if (user && dates.every((d) => !canAssignOnDate(user, d))) return;
     if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
     if (user && isMfrLocked(user) && !tag) return;
-    if (apiOn) void cockpit.onPaintRange(userId, dates, tag);
-    else setTagRange(userId, dates, tag);
+    if (apiOn) void cockpit.onPaintRange(userId, dates, tag, trgTone);
+    else setTagRange(userId, dates, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
   }
 
   const loading = apiOn && cockpit.loading;
@@ -386,7 +339,7 @@ export default function TagsPageClient() {
                     )}
                     aria-label={t("common.search")}
                   />
-                  <div className="w-[8.5rem] shrink-0">
+                  <div className="w-[5.75rem] shrink-0">
                     <Select
                       value={memberType}
                       onValueChange={(v) =>
@@ -399,56 +352,34 @@ export default function TagsPageClient() {
                       >
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
+                      <SelectContent className="w-auto min-w-[14rem]">
+                        <SelectItem value="all" className="whitespace-nowrap">
                           {t("common.allMemberType")}
                         </SelectItem>
                         {MEMBER_TYPES.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
+                          <SelectItem
+                            key={item.value}
+                            value={item.value}
+                            className="whitespace-nowrap"
+                          >
                             {t(item.labelKey)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="w-[6.5rem] shrink-0">
-                    <Select value={rank} onValueChange={setRank}>
-                      <SelectTrigger
-                        className={cn(fieldClass, "h-9 w-full rounded-xl")}
-                      >
-                        <SelectValue placeholder={t("cc.selectRank")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
-                          {t("common.allRank")}
-                        </SelectItem>
-                        {ranks.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-24 shrink-0">
-                    <Select value={wing} onValueChange={setWing}>
-                      <SelectTrigger
-                        className={cn(fieldClass, "h-9 w-full rounded-xl")}
-                      >
-                        <SelectValue placeholder={t("cc.selectWing")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
-                          {t("common.allWing")}
-                        </SelectItem>
-                        {wings.map((w) => (
-                          <SelectItem key={w} value={w}>
-                            {w}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <SettingsRankFilter
+                    value={rank}
+                    onChange={setRank}
+                    className="w-[7.25rem] shrink-0"
+                    triggerClassName={cn(fieldClass, "h-9 w-full rounded-xl")}
+                  />
+                  <SettingsWingFilter
+                    value={wing}
+                    onChange={setWing}
+                    className="w-[7.25rem] shrink-0"
+                    triggerClassName={cn(fieldClass, "h-9 w-full rounded-xl")}
+                  />
                   <DateRangePicker
                     from={dateFrom}
                     to={dateTo}
@@ -525,9 +456,7 @@ export default function TagsPageClient() {
             onTagChange={onTagChange}
             onPaintRange={onPaintRange}
             priorByUser={priorByUserFiltered}
-            suppressedCarries={
-              apiOn ? cockpit.suppressedCarries : (state.suppressed_carries ?? [])
-            }
+            suppressedCarries={suppressedCarries}
             boroKhanaDates={apiOn ? cockpit.boroKhanaDates : undefined}
             onBoroKhanaToggle={apiOn ? cockpit.onBoroKhanaToggle : undefined}
             projectedTagMembers={

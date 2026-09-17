@@ -21,6 +21,8 @@ import type { MessageKey } from "@/i18n";
 import {
   addForce,
   addForceRank,
+  listForces,
+  listRanks,
   removeForceRank,
   renameForceRank,
   addRank,
@@ -34,7 +36,23 @@ import {
   toggleForceRank,
   toggleRankEquivalent,
 } from "@/lib/store/org-options";
-import { forceRankChoices, rankDisplayLabel } from "@/lib/constants";
+import {
+  FORCE_LABELS,
+  FORCE_RANK_LABELS,
+  RANK_LABELS,
+  canonicalForceServiceRank,
+  forceLabelBn,
+  forceOfficialName,
+  forceOfficialSerial,
+  forceRankChoices,
+  forceRankLabelBn,
+  forceRankOfficialSerial,
+  rankDisplayLabel,
+  rankLabelBn,
+  rankOfficialName,
+  rankOfficialSerial,
+  suggestForceRankShort,
+} from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { WingTreeList } from "@/components/settings/wing-tree-list";
 
@@ -119,6 +137,8 @@ export function OrgListSection({
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const [formValue, setFormValue] = useState("");
   const [formElaborate, setFormElaborate] = useState("");
+  const [formBangla, setFormBangla] = useState("");
+  const [formSerial, setFormSerial] = useState("");
   const [deleteLabel, setDeleteLabel] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandedRankForces, setExpandedRankForces] = useState<
@@ -128,6 +148,9 @@ export function OrgListSection({
   const [editingForceRank, setEditingForceRank] = useState<string | null>(null);
   const [forceRankShort, setForceRankShort] = useState("");
   const [forceRankFull, setForceRankFull] = useState("");
+  const [forceRankBangla, setForceRankBangla] = useState("");
+  const [forceRankSerial, setForceRankSerial] = useState("");
+  const [forceRankShortManual, setForceRankShortManual] = useState(false);
   const [deleteForceRank, setDeleteForceRank] = useState<{
     force: string;
     rank: string;
@@ -153,13 +176,31 @@ export function OrgListSection({
     );
   }
 
-  const items =
-    kind === "rank"
-      ? state.ranks
-      : state.forces;
-  const ranks = state.ranks;
-  const forces = state.forces;
+  const forces = listForces();
+  const ranks = listRanks();
+  const items = kind === "rank" ? ranks : forces;
   const expandable = kind === "rank" || kind === "force";
+
+  function parsedSerial() {
+    const raw = formSerial.trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  }
+
+  function nextForceSerial() {
+    const used = listForces()
+      .map((force) => forceOfficialSerial(force, state.force_serials))
+      .filter((n): n is number => n != null);
+    return String(used.length ? Math.max(...used) + 1 : 1);
+  }
+
+  function nextRankSerial() {
+    const used = listRanks()
+      .map((rank) => rankOfficialSerial(rank, state.rank_serials))
+      .filter((n): n is number => n != null);
+    return String(used.length ? Math.max(...used) + 1 : 1);
+  }
 
   function rankForceKey(rank: string, force: string) {
     return `${rank}::${force}`;
@@ -174,15 +215,39 @@ export function OrgListSection({
     setEditingLabel(null);
     setFormValue("");
     setFormElaborate("");
+    setFormBangla("");
+    setFormSerial(
+      kind === "force"
+        ? nextForceSerial()
+        : kind === "rank"
+          ? nextRankSerial()
+          : "",
+    );
     setFormOpen(true);
   }
 
   function startEdit(label: string) {
     setEditingLabel(label);
     setFormValue(label);
-    setFormElaborate(
-      kind === "rank" ? (state.rank_labels[label] ?? "") : "",
-    );
+    if (kind === "force") {
+      setFormElaborate(
+        state.force_labels[label] ?? FORCE_LABELS[label] ?? "",
+      );
+      setFormBangla(state.force_labels_bn[label] ?? forceLabelBn(label));
+      const serial = forceOfficialSerial(label, state.force_serials);
+      setFormSerial(serial != null ? String(serial) : "");
+    } else if (kind === "rank") {
+      setFormElaborate(
+        state.rank_labels[label] ?? RANK_LABELS[label] ?? "",
+      );
+      setFormBangla(state.rank_labels_bn[label] ?? rankLabelBn(label));
+      const serial = rankOfficialSerial(label, state.rank_serials);
+      setFormSerial(serial != null ? String(serial) : "");
+    } else {
+      setFormElaborate("");
+      setFormBangla("");
+      setFormSerial("");
+    }
     setFormOpen(true);
   }
 
@@ -191,6 +256,22 @@ export function OrgListSection({
     setEditingLabel(null);
     setFormValue("");
     setFormElaborate("");
+    setFormBangla("");
+    setFormSerial("");
+  }
+
+  function nextForceRankSerial(force: string) {
+    const used = forceRankChoices(
+      force,
+      ranks,
+      state.force_rank_extras[force] ?? [],
+      state.force_rank_removed[force] ?? [],
+    )
+      .map((rank) =>
+        forceRankOfficialSerial(force, rank, state.force_rank_serials),
+      )
+      .filter((n): n is number => n != null);
+    return String(used.length ? Math.max(...used) + 1 : 1);
   }
 
   function startAddForceRank(force: string) {
@@ -198,13 +279,31 @@ export function OrgListSection({
     setEditingForceRank(null);
     setForceRankShort("");
     setForceRankFull("");
+    setForceRankBangla("");
+    setForceRankSerial(nextForceRankSerial(force));
+    setForceRankShortManual(false);
   }
 
   function startEditForceRank(force: string, rank: string) {
     setForceRankForce(force);
     setEditingForceRank(rank);
     setForceRankShort(rank);
-    setForceRankFull(state.force_rank_labels[force]?.[rank] ?? "");
+    setForceRankFull(
+      state.force_rank_labels[force]?.[rank] ??
+        FORCE_RANK_LABELS[force as keyof typeof FORCE_RANK_LABELS]?.[rank] ??
+        "",
+    );
+    setForceRankBangla(
+      state.force_rank_labels_bn[force]?.[rank] ??
+        forceRankLabelBn(force, rank),
+    );
+    const serial = forceRankOfficialSerial(
+      force,
+      rank,
+      state.force_rank_serials,
+    );
+    setForceRankSerial(serial != null ? String(serial) : "");
+    setForceRankShortManual(true);
   }
 
   function closeForceRankForm() {
@@ -212,6 +311,9 @@ export function OrgListSection({
     setEditingForceRank(null);
     setForceRankShort("");
     setForceRankFull("");
+    setForceRankBangla("");
+    setForceRankSerial("");
+    setForceRankShortManual(false);
   }
 
   function displayRank(short: string, force?: string) {
@@ -223,17 +325,28 @@ export function OrgListSection({
 
   function onSaveForceRank() {
     if (!forceRankForce) return;
-    const short = forceRankShort.trim();
+    const short =
+      canonicalForceServiceRank(forceRankShort.trim()) ||
+      suggestForceRankShort(forceRankFull.trim());
     if (!short) {
       toast(t("settings.orgLabelRequired"), "error");
       return;
     }
+    const bangla = forceRankBangla.trim();
+    const serialRaw = forceRankSerial.trim();
+    const serialN = Number(serialRaw);
+    const serial =
+      serialRaw && Number.isFinite(serialN) && serialN > 0
+        ? Math.floor(serialN)
+        : null;
     if (editingForceRank) {
       const ok = renameForceRank(
         forceRankForce,
         editingForceRank,
         short,
         forceRankFull.trim() || undefined,
+        bangla,
+        serial,
       );
       if (!ok) {
         toast(t("settings.orgLabelDuplicate"), "error");
@@ -247,6 +360,8 @@ export function OrgListSection({
       forceRankForce,
       short,
       forceRankFull.trim() || undefined,
+      bangla,
+      serial,
     );
     if (!created) {
       toast(t("settings.orgLabelDuplicate"), "error");
@@ -265,24 +380,77 @@ export function OrgListSection({
 
   function onSave() {
     const label = formValue.trim();
+    const full = formElaborate.trim();
+    const bangla = formBangla.trim();
+    const serial = parsedSerial();
     if (!label) {
       toast(t("settings.orgLabelRequired"), "error");
       return;
     }
     if (editingLabel) {
-      if (label === editingLabel) {
-        closeForm();
-        return;
-      }
-      const ok =
-        kind === "rank"
-          ? renameRank(editingLabel, label)
-          : kind === "wing"
-            ? renameWing(editingLabel, label)
-            : renameForce(editingLabel, label);
-      if (!ok) {
-        toast(t("settings.orgLabelDuplicate"), "error");
-        return;
+      if (kind === "force") {
+        if (
+          label === editingLabel &&
+          full ===
+            (state.force_labels[editingLabel] ??
+              FORCE_LABELS[editingLabel] ??
+              "") &&
+          bangla ===
+            (state.force_labels_bn[editingLabel] ??
+              forceLabelBn(editingLabel)) &&
+          serial === forceOfficialSerial(editingLabel, state.force_serials)
+        ) {
+          closeForm();
+          return;
+        }
+        if (
+          !renameForce(
+            editingLabel,
+            label,
+            full || undefined,
+            bangla,
+            serial,
+          )
+        ) {
+          toast(t("settings.orgLabelDuplicate"), "error");
+          return;
+        }
+      } else if (kind === "rank") {
+        if (
+          label === editingLabel &&
+          full ===
+            (state.rank_labels[editingLabel] ??
+              RANK_LABELS[editingLabel] ??
+              "") &&
+          bangla ===
+            (state.rank_labels_bn[editingLabel] ??
+              rankLabelBn(editingLabel)) &&
+          serial === rankOfficialSerial(editingLabel, state.rank_serials)
+        ) {
+          closeForm();
+          return;
+        }
+        if (
+          !renameRank(
+            editingLabel,
+            label,
+            full || undefined,
+            bangla,
+            serial,
+          )
+        ) {
+          toast(t("settings.orgLabelDuplicate"), "error");
+          return;
+        }
+      } else {
+        if (label === editingLabel) {
+          closeForm();
+          return;
+        }
+        if (!renameWing(editingLabel, label)) {
+          toast(t("settings.orgLabelDuplicate"), "error");
+          return;
+        }
       }
       if (kind === "rank" || kind === "force") {
         setExpanded((prev) => {
@@ -300,10 +468,10 @@ export function OrgListSection({
     }
     const created =
       kind === "rank"
-        ? addRank(label, formElaborate.trim() || undefined)
+        ? addRank(label, full || undefined, bangla, serial)
         : kind === "wing"
           ? addWing(label)
-          : addForce(label);
+          : addForce(label, full || undefined, bangla, serial);
     if (!created) {
       toast(t("settings.orgLabelDuplicate"), "error");
       return;
@@ -441,6 +609,43 @@ export function OrgListSection({
                     : [];
                 const rowTitle =
                   kind === "rank" ? displayRank(label) : label;
+                const catalogSerial =
+                  kind === "force"
+                    ? forceOfficialSerial(label, state.force_serials)
+                    : kind === "rank"
+                      ? rankOfficialSerial(label, state.rank_serials)
+                      : null;
+                const catalogOfficial =
+                  kind === "force"
+                    ? forceOfficialName(label, state.force_labels)
+                    : kind === "rank"
+                      ? label
+                      : "";
+                const catalogFull =
+                  kind === "rank"
+                    ? rankOfficialName(label, state.rank_labels)
+                    : "";
+                const catalogBn =
+                  kind === "force"
+                    ? forceLabelBn(label, state.force_labels_bn)
+                    : kind === "rank"
+                      ? rankLabelBn(label, state.rank_labels_bn)
+                      : "";
+                const showCatalogBn =
+                  (kind === "force" || kind === "rank") &&
+                  Boolean(catalogBn) &&
+                  catalogBn.toLowerCase() !== catalogOfficial.toLowerCase() &&
+                  catalogBn.toLowerCase() !== label.toLowerCase();
+                const showCatalogShort =
+                  kind === "rank"
+                    ? Boolean(catalogFull) &&
+                      catalogFull.trim().toLowerCase() !==
+                        label.trim().toLowerCase()
+                    : kind === "force" &&
+                      label.trim().toLowerCase() !==
+                        catalogOfficial.trim().toLowerCase();
+                const catalogSub =
+                  kind === "rank" ? catalogFull : label;
                 return (
                   <li
                     key={label}
@@ -464,6 +669,18 @@ export function OrgListSection({
                             />
                           </button>
                         ) : null}
+                        {kind === "force" || kind === "rank" ? (
+                          catalogSerial != null ? (
+                            <span
+                              className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-neutral-900/10 px-1.5 font-mono text-[11px] font-semibold tabular-nums text-neutral-600 dark:bg-white/10 dark:text-neutral-300"
+                              title={t("settings.wingSerial")}
+                            >
+                              {catalogSerial}
+                            </span>
+                          ) : (
+                            <span className="inline-flex h-7 w-7 shrink-0" aria-hidden />
+                          )
+                        ) : null}
                         <div className="min-w-0 flex-1">
                           <button
                             type="button"
@@ -476,9 +693,31 @@ export function OrgListSection({
                                 ? () => toggleExpand(label)
                                 : undefined
                             }
+                            title={
+                              kind === "force" || kind === "rank"
+                                ? `${catalogOfficial}${showCatalogBn ? ` (${catalogBn})` : ""}${showCatalogShort ? ` · ${label}` : ""}`
+                                : undefined
+                            }
                           >
-                            {rowTitle}
+                            {kind === "force" || kind === "rank" ? (
+                              <>
+                                {catalogOfficial}
+                                {showCatalogBn ? (
+                                  <span className="font-medium text-neutral-500">
+                                    {" "}
+                                    ({catalogBn})
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : (
+                              rowTitle
+                            )}
                           </button>
+                          {showCatalogShort ? (
+                            <p className="mt-0.5 truncate text-[11px] font-medium text-neutral-500">
+                              {catalogSub}
+                            </p>
+                          ) : null}
                           {kind === "rank" &&
                           !open &&
                           rankMatchLines.length > 0 ? (
@@ -713,6 +952,28 @@ export function OrgListSection({
                           <ul className="mt-1.5 divide-y divide-neutral-100 border-t border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
                             {forceRanks.map((rank) => {
                               const on = forceAssignedRanks.includes(rank);
+                              const rankSerial = forceRankOfficialSerial(
+                                label,
+                                rank,
+                                state.force_rank_serials,
+                              );
+                              const rankBn = forceRankLabelBn(
+                                label,
+                                rank,
+                                state.force_rank_labels_bn,
+                              );
+                              const rankFull =
+                                state.force_rank_labels[label]?.[rank] ??
+                                FORCE_RANK_LABELS[
+                                  label as keyof typeof FORCE_RANK_LABELS
+                                ]?.[rank] ??
+                                rank;
+                              const showRankBn =
+                                Boolean(rankBn) &&
+                                rankBn.toLowerCase() !== rank.toLowerCase() &&
+                                rankBn.toLowerCase() !== rankFull.toLowerCase();
+                              const showRankShort =
+                                rank.toLowerCase() !== rankFull.toLowerCase();
                               return (
                                 <li key={rank}>
                                   <div
@@ -747,15 +1008,33 @@ export function OrgListSection({
                                       >
                                         <IconCheck className="h-3 w-3" />
                                       </span>
-                                      <span
-                                        className={cn(
-                                          "min-w-0 truncate text-sm font-medium",
-                                          on
-                                            ? "text-primary"
-                                            : "text-neutral-700 dark:text-neutral-200",
-                                        )}
-                                      >
-                                        {displayRank(rank, label)}
+                                      {rankSerial != null ? (
+                                        <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded bg-neutral-900/10 px-1 font-mono text-[10px] font-semibold tabular-nums text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
+                                          {rankSerial}
+                                        </span>
+                                      ) : null}
+                                      <span className="min-w-0 truncate">
+                                        <span
+                                          className={cn(
+                                            "block truncate text-sm font-medium",
+                                            on
+                                              ? "text-primary"
+                                              : "text-neutral-700 dark:text-neutral-200",
+                                          )}
+                                        >
+                                          {rankFull}
+                                          {showRankBn ? (
+                                            <span className="font-normal text-neutral-500">
+                                              {" "}
+                                              ({rankBn})
+                                            </span>
+                                          ) : null}
+                                        </span>
+                                        {showRankShort ? (
+                                          <span className="block truncate text-[11px] font-medium text-neutral-500">
+                                            {rank}
+                                          </span>
+                                        ) : null}
                                       </span>
                                     </button>
                                     <div className="flex shrink-0 gap-0.5 opacity-70 transition group-hover:opacity-100">
@@ -830,41 +1109,101 @@ export function OrgListSection({
         onConfirm={onSave}
       >
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label className="text-[11px] text-neutral-500">{t(copy.name)}</Label>
-            <Input
-              value={formValue}
-              onChange={(e) => setFormValue(e.target.value)}
-              placeholder={t(copy.placeholder)}
-              autoFocus
-              className="h-9 rounded-lg text-sm"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  onSave();
-                }
-              }}
-            />
-          </div>
-          {kind === "rank" && !editingLabel ? (
-            <div className="space-y-1.5">
-              <Label className="text-[11px] text-neutral-500">
-                {t("settings.rankFullName")}
-              </Label>
-              <Input
-                value={formElaborate}
-                onChange={(e) => setFormElaborate(e.target.value)}
-                placeholder={t("settings.rankFullPlaceholder")}
-                className="h-9 rounded-lg text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    onSave();
-                  }
-                }}
-              />
-            </div>
-          ) : null}
+          {kind === "force" || kind === "rank" ? (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-neutral-500">
+                  {t("settings.wingSerialField")}
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={formSerial}
+                  onChange={(e) => setFormSerial(e.target.value)}
+                  placeholder={t("settings.wingSerialPlaceholder")}
+                  autoFocus
+                  className="h-9 rounded-lg text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onSave();
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-neutral-500">
+                  {t("settings.wingFullName")}
+                </Label>
+                <Input
+                  value={formElaborate}
+                  onChange={(e) => setFormElaborate(e.target.value)}
+                  placeholder={t("settings.wingFullPlaceholder")}
+                  className="h-9 rounded-lg text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onSave();
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-neutral-500">
+                  {t("settings.wingBanglaName")}
+                </Label>
+                <Input
+                  value={formBangla}
+                  onChange={(e) => setFormBangla(e.target.value)}
+                  placeholder={t("settings.wingBanglaPlaceholder")}
+                  className="h-9 rounded-lg text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onSave();
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-neutral-500">
+                  {t("settings.wingShortName")}
+                </Label>
+                <Input
+                  value={formValue}
+                  onChange={(e) => setFormValue(e.target.value)}
+                  placeholder={t(copy.placeholder)}
+                  className="h-9 rounded-lg text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onSave();
+                    }
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-neutral-500">{t(copy.name)}</Label>
+                <Input
+                  value={formValue}
+                  onChange={(e) => setFormValue(e.target.value)}
+                  placeholder={t(copy.placeholder)}
+                  autoFocus
+                  className="h-9 rounded-lg text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onSave();
+                    }
+                  }}
+                />
+              </div>
+            </>
+          )}
         </div>
       </ConfirmDialog>
 
@@ -890,12 +1229,15 @@ export function OrgListSection({
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-[11px] text-neutral-500">
-              {t("settings.forceRankShort")}
+              {t("settings.wingSerialField")}
             </Label>
             <Input
-              value={forceRankShort}
-              onChange={(e) => setForceRankShort(e.target.value)}
-              placeholder={t("settings.forceRankShortPlaceholder")}
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={forceRankSerial}
+              onChange={(e) => setForceRankSerial(e.target.value)}
+              placeholder={t("settings.wingSerialPlaceholder")}
               autoFocus
               className="h-9 rounded-lg text-sm"
               onKeyDown={(e) => {
@@ -912,8 +1254,56 @@ export function OrgListSection({
             </Label>
             <Input
               value={forceRankFull}
-              onChange={(e) => setForceRankFull(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setForceRankFull(next);
+                if (!forceRankShortManual) {
+                  const suggested = suggestForceRankShort(next);
+                  if (suggested) setForceRankShort(suggested);
+                }
+              }}
               placeholder={t("settings.forceRankFullPlaceholder")}
+              className="h-9 rounded-lg text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSaveForceRank();
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] text-neutral-500">
+              {t("settings.wingBanglaName")}
+            </Label>
+            <Input
+              value={forceRankBangla}
+              onChange={(e) => setForceRankBangla(e.target.value)}
+              placeholder={t("settings.wingBanglaPlaceholder")}
+              className="h-9 rounded-lg text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSaveForceRank();
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] text-neutral-500">
+              {t("settings.wingShortName")}
+            </Label>
+            <Input
+              value={forceRankShort}
+              onChange={(e) => {
+                setForceRankShortManual(true);
+                setForceRankShort(e.target.value);
+              }}
+              onBlur={() => {
+                const canon = canonicalForceServiceRank(forceRankShort);
+                if (canon) setForceRankShort(canon);
+              }}
+              placeholder={t("settings.forceRankShortPlaceholder")}
               className="h-9 rounded-lg text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {

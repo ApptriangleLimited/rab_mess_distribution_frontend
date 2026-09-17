@@ -12,12 +12,9 @@ import { LeaveMedBillPrint } from "@/components/consume/leave-med-bill-print";
 import { WingSummaryButton } from "@/components/consume/wing-summary-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { usePagination } from "@/hooks/use-pagination";
 import { LEAVE_MED_BILL_TAGS } from "@/lib/consume-filters";
 import {
@@ -44,7 +41,6 @@ export function LeaveMedBillPanel({
 }: Props) {
   const t = useT();
   const state = useStore();
-  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -131,42 +127,18 @@ export function LeaveMedBillPanel({
           tiles={tiles}
         >
           <MonthNav compact month={month} onChange={onMonthChange} />
-          <div className="w-[6.75rem] shrink">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger
-                className={cn(fieldClass, "w-full")}
-                aria-label={t("cc.filterRank")}
-              >
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {ranks.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[6.5rem] shrink">
-            <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger
-                className={cn(fieldClass, "w-full")}
-                aria-label={t("cc.filterWing")}
-              >
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {wings.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SettingsRankFilter
+            value={rank}
+            onChange={setRank}
+            className="w-[7.25rem] shrink"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <SettingsWingFilter
+            value={wing}
+            onChange={setWing}
+            className="w-[7.25rem] shrink"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
           <WingSummaryButton
             month={month}
             wing={wing}

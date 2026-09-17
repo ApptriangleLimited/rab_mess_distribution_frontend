@@ -23,19 +23,13 @@ import {
   SearchFilterBar,
   searchFilterFieldClass,
 } from "@/components/shared/search-filter-bar";
+import { SettingsRankFilter } from "@/components/shared/settings-catalog-filters";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { StaffPayoutPrint } from "@/components/ration/staff-payout-print";
 import { TransferSheetPrint } from "@/components/ration/transfer-sheet-print";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 
@@ -62,7 +56,6 @@ type PrintKind = "staff" | "transfer";
 export default function RationSenderReportClient() {
   const t = useT();
   const state = useStore();
-  const { ranks } = state;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -412,21 +405,12 @@ export default function RationSenderReportClient() {
               <IconChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="w-[9.5rem] shrink-0">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {ranks.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SettingsRankFilter
+            value={rank}
+            onChange={setRank}
+            className="w-[9.5rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
         </SearchFilterBar>
 
         {!hasLines ? (

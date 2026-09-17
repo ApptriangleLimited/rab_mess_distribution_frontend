@@ -13,7 +13,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { useManpowerDay } from "@/hooks/use-manpower-day";
 import { useStore } from "@/hooks/use-store";
 import { formatDateLong, todayISO } from "@/lib/date";
-import { isPaperApproved } from "@/lib/store/paper-reports";
+import {
+  isPaperPrintable,
+  isPaperVerified,
+} from "@/lib/store/paper-reports";
 import { buildManpowerReport } from "@/lib/manpower-report";
 import { buildStrengthReport } from "@/lib/strength-report";
 import { printLetterElement } from "@/lib/print-letter-pdf";
@@ -41,7 +44,8 @@ export function ManpowerPrintClient() {
       : todayISO();
   const form = parseForm(searchParams.get("form"));
 
-  const approved = isPaperApproved("manpower", date, form);
+  const printable = isPaperPrintable("manpower", date, form);
+  const verified = isPaperVerified("manpower", date, form);
   const { apiOn, loading, snapshot } = useManpowerDay(date);
   const reportSnapshot = apiOn
     ? snapshot ?? {
@@ -84,7 +88,7 @@ export function ManpowerPrintClient() {
       await printLetterElement(
         el,
         `manpower-form${form}-${date}.pdf`,
-        "landscape",
+        "portrait",
       );
     } finally {
       setPrinting(false);
@@ -108,7 +112,7 @@ export function ManpowerPrintClient() {
             </Button>
           }
           actions={
-            approved ? (
+            printable ? (
               <Button
                 type="button"
                 size="sm"
@@ -127,20 +131,35 @@ export function ManpowerPrintClient() {
       {loading ? (
         <p className="p-4 text-sm text-neutral-500">{t("common.loading")}</p>
       ) : null}
-      {!approved && !loading ? (
+      {!printable && !loading ? (
         <EmptyState
           title={t("paperReports.needApprove")}
           description={t("paperReports.waitingAdmin")}
         />
       ) : null}
-      {approved && form === "1" && !loading ? (
-        <ManpowerLetter ref={printRef} report={form1} locale={dateLocale} />
+      {printable && form === "1" && !loading ? (
+        <ManpowerLetter
+          ref={printRef}
+          report={form1}
+          locale={dateLocale}
+          verified={verified}
+        />
       ) : null}
-      {approved && form === "2" && !loading ? (
-        <StrengthLetter ref={printRef} report={form2} locale={dateLocale} />
+      {printable && form === "2" && !loading ? (
+        <StrengthLetter
+          ref={printRef}
+          report={form2}
+          locale={dateLocale}
+          verified={verified}
+        />
       ) : null}
-      {approved && form === "3" && !loading ? (
-        <StrengthLetter ref={printRef} report={form3} locale={dateLocale} />
+      {printable && form === "3" && !loading ? (
+        <StrengthLetter
+          ref={printRef}
+          report={form3}
+          locale={dateLocale}
+          verified={verified}
+        />
       ) : null}
     </PagePane>
   );

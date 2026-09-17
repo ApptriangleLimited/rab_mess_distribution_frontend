@@ -2,6 +2,17 @@ import {
   defaultForceRanks,
   FORCE_DEFAULT_RANKS,
   FORCES,
+  FORCE_LABELS,
+  FORCE_LABELS_BN,
+  FORCE_CATALOG_SERIALS,
+  PINNED_FORCE_LADDERS,
+  FORCE_RANK_LABELS,
+  FORCE_RANK_LABELS_BN,
+  FORCE_RANK_SERIALS,
+  FORCE_RANK_SHORT_RENAMES,
+  canonicalForceName,
+  canonicalForceServiceRank,
+  defaultForceRankForSrb,
   forceRankChoices,
   LEGACY_AIR_FORCE_RANKS,
   LEGACY_ANSAR_RANKS,
@@ -12,6 +23,7 @@ import {
   LEGACY_NAVY_RANKS,
   LEGACY_POLICE_RANKS,
   LEGACY_RANKS,
+  DROPPED_MAIN_WINGS,
   LEGACY_WINGS,
   ADMIN_SUB_WINGS,
   HQ_SUB_WINGS,
@@ -24,8 +36,17 @@ import {
   DAILY_TAGS,
   RATE_ONLY_TAGS,
   RANKS,
+  RANK_LABELS,
+  RANK_LABELS_BN,
+  RANK_CATALOG_SERIALS,
+  canonicalRankName,
+  isPreviousSrbRankCatalog,
   STORE_KEY,
   WINGS,
+  WING_LABELS,
+  WING_LABELS_BN,
+  WING_CATALOG_SERIALS,
+  canonicalWingName,
   authorizedIdForLabel,
 } from "@/lib/constants";
 import { parseMoney } from "@/lib/money";
@@ -69,6 +90,8 @@ const listeners = new Set<Listener>();
 let persistHook: PersistHook | null = null;
 let persistPaused = false;
 let apiBacked = false;
+/** Avoid re-running catalog heal on every getState() (new object → React loop). */
+let catalogHealed = false;
 
 export function setPersistHook(hook: PersistHook | null) {
   persistHook = hook;
@@ -113,10 +136,12 @@ export function applyApiSnapshot(partial: Partial<AppState>) {
     }
     merged[key] = value as never;
   }
+  catalogHealed = true;
   memory = normalizeState(merged);
   writeStorage(memory);
   listeners.forEach((l) => l());
   persistPaused = false;
+  persistHook?.(memory);
 }
 
 type LegacyUser = User & {
@@ -177,14 +202,15 @@ function ensureDayWingCatMap(
     if (!wings || typeof wings !== "object") continue;
     const wingMap: Record<string, Record<string, number>> = {};
     for (const [wing, cats] of Object.entries(wings as Record<string, unknown>)) {
-      if (!wing.trim() || !cats || typeof cats !== "object") continue;
-      const catMap: Record<string, number> = {};
+      const wingKey = canonicalWingName(wing);
+      if (!wingKey || !cats || typeof cats !== "object") continue;
+      const catMap: Record<string, number> = { ...(wingMap[wingKey] ?? {}) };
       for (const [catId, n] of Object.entries(cats as Record<string, unknown>)) {
         const num = Number(n);
         if (!catId.trim() || !Number.isFinite(num) || num < 0) continue;
-        catMap[catId] = Math.floor(num);
+        catMap[catId] = (catMap[catId] ?? 0) + Math.floor(num);
       }
-      if (Object.keys(catMap).length) wingMap[wing] = catMap;
+      if (Object.keys(catMap).length) wingMap[wingKey] = catMap;
     }
     if (Object.keys(wingMap).length) out[date] = wingMap;
   }
@@ -322,28 +348,30 @@ function uniqueWingLabels(labels: readonly string[]): string[] {
   return out;
 }
 
-/** Core SRB wings + Admin sub-branches + user-added. Drop Alpha…Support forever. */
+/** Keep stored wings so Settings add/remove persists. Official Admin/HQ subs are always present. */
 function ensureWings(raw: unknown): string[] {
   const banned = new Set(
-    [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS, ...LEGACY_HQ_SUB_WINGS].map((w) =>
-      w.toLowerCase(),
-    ),
+    [
+      ...LEGACY_WINGS,
+      ...LEGACY_FORM1_WINGS,
+      ...LEGACY_HQ_SUB_WINGS,
+      ...DROPPED_MAIN_WINGS,
+    ].map((w) => w.toLowerCase()),
   );
-  const base = uniqueWingLabels([...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS]);
-  if (isLegacyWings(raw)) return base;
-  const seen = new Set<string>(base.map((r) => r.toLowerCase()));
-  if (!Array.isArray(raw)) return base;
-  for (const item of raw) {
-    const label = String(item ?? "")
-      .trim()
-      .replace(/\s+/g, " ");
-    if (!label) continue;
-    const key = label.toLowerCase();
-    if (banned.has(key) || seen.has(key)) continue;
-    seen.add(key);
-    base.push(label);
-  }
-  return base;
+  const catalog = uniqueWingLabels([
+    ...WINGS,
+    ...ADMIN_SUB_WINGS,
+    ...HQ_SUB_WINGS,
+  ]);
+  if (isLegacyWings(raw) || !Array.isArray(raw)) return catalog;
+  const stored = uniqueWingLabels(
+    raw.map((item) => canonicalWingName(String(item ?? ""))).filter((label) => {
+      const key = label.trim().toLowerCase();
+      return Boolean(key) && !banned.has(key);
+    }),
+  );
+  if (!stored.length) return catalog;
+  return uniqueWingLabels([...stored, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS]);
 }
 
 /** Core member-bank catalog + user-added names. */
@@ -372,13 +400,15 @@ function parseAuthorizedWings(raw: unknown): Record<string, number> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const out: Record<string, number> = {};
   for (const [wingRaw, countRaw] of Object.entries(raw as Record<string, unknown>)) {
-    const wing = String(wingRaw ?? "")
-      .trim()
-      .replace(/\s+/g, " ");
+    const wing = canonicalWingName(
+      String(wingRaw ?? "")
+        .trim()
+        .replace(/\s+/g, " "),
+    );
     if (!wing) continue;
     const n = Number(countRaw);
     if (!Number.isFinite(n) || n < 0) continue;
-    out[wing] = Math.floor(n);
+    out[wing] = (out[wing] ?? 0) + Math.floor(n);
   }
   return out;
 }
@@ -400,25 +430,25 @@ const AUTHORIZED_LABEL_MIGRATE: Record<string, string> = {
   others: "RT",
   other: "RT",
   rt: "RT",
-  nco: "ASI",
-  asi: "ASI",
-  lnco: "AASI",
-  aasi: "AASI",
+  nco: "SI",
+  si: "SI",
+  lnco: "ASI",
+  aasi: "ASI",
   nayek: "Naik",
   naik: "Naik",
   or: "Constable",
   co: "Constable",
   constable: "Constable",
   cook: "Cook",
-  "lp(e)": "ANCE",
-  lpe: "ANCE",
-  "lp (e)": "ANCE",
-  "nc(e)": "ANCE",
-  nce: "ANCE",
-  ance: "ANCE",
-  civil: "Civill",
-  civill: "Civill",
-  civilian: "Civill",
+  "lp(e)": "NCE",
+  lpe: "NCE",
+  "lp (e)": "NCE",
+  "nc(e)": "NCE",
+  nce: "NCE",
+  ance: "NCE",
+  civil: "Civil",
+  civill: "Civil",
+  civilian: "Civil",
   attached: "Attached",
 };
 
@@ -458,28 +488,44 @@ function ensureAuthorized(
       if (idRaw === "auth_jco" || lpNorm === "jco") label = "DAD";
       else if (idRaw === "auth_others" || lpNorm === "others" || lpNorm === "other")
         label = "RT";
-      else if (idRaw === "auth_nco" || lpNorm === "nco") label = "ASI";
+      else if (
+        idRaw === "auth_nco" ||
+        idRaw === "auth_asi" ||
+        idRaw === "auth_si" ||
+        lpNorm === "nco" ||
+        lpNorm === "si"
+      )
+        label = "SI";
       else if (
         idRaw === "auth_lnco" ||
         idRaw === "auth_aasi" ||
         lpNorm === "lnco" ||
-        lpNorm === "aasi"
+        lpNorm === "aasi" ||
+        label === "এএএসআই"
       )
-        label = "AASI";
+        label = "ASI";
       else if (
         idRaw === "auth_lpe" ||
         lpNorm === "lp(e)" ||
         lpNorm === "lpe" ||
         lpNorm === "lp (e)" ||
         idRaw === "auth_nce" ||
+        idRaw === "auth_ance" ||
         lpNorm === "nc(e)" ||
-        lpNorm === "nce"
+        lpNorm === "nce" ||
+        lpNorm === "ance"
       )
-        label = "ANCE";
+        label = "NCE";
       else if (idRaw === "auth_or" || lpNorm === "or" || lpNorm === "co")
         label = "Constable";
       else if (idRaw === "auth_nayek" || lpNorm === "nayek") label = "Naik";
-      else if (idRaw === "auth_civil" || lpNorm === "civil") label = "Civill";
+      else if (
+        idRaw === "auth_civil" ||
+        idRaw === "auth_civill" ||
+        lpNorm === "civil" ||
+        lpNorm === "civill"
+      )
+        label = "Civil";
       else if (idRaw === "auth_officer" || lpNorm === "officer") label = "Officer";
       else if (idRaw === "auth_attached" || lpNorm === "attached")
         label = "Attached";
@@ -740,12 +786,16 @@ function ensureWingParent(
       : {};
   const out: Record<string, string> = {};
   for (const [childRaw, parentRaw] of Object.entries(src)) {
-    const child = String(childRaw ?? "")
-      .trim()
-      .replace(/\s+/g, " ");
-    const parent = String(parentRaw ?? "")
-      .trim()
-      .replace(/\s+/g, " ");
+    const child = canonicalWingName(
+      String(childRaw ?? "")
+        .trim()
+        .replace(/\s+/g, " "),
+    );
+    const parent = canonicalWingName(
+      String(parentRaw ?? "")
+        .trim()
+        .replace(/\s+/g, " "),
+    );
     if (!child || !parent) continue;
     if (!wingSet.has(child) || !wingSet.has(parent)) continue;
     if (child.toLowerCase() === parent.toLowerCase()) continue;
@@ -769,20 +819,20 @@ function ensureWingParent(
     if (!wingSet.has(child) || !wingSet.has(parent)) continue;
     out[child] = parent;
   }
+  const hqKids = new Set(HQ_SUB_WINGS.map((wing) => wing.toLowerCase()));
+  for (const [child, parent] of Object.entries(out)) {
+    if (parent.toLowerCase() !== "hq br") continue;
+    if (hqKids.has(child.toLowerCase())) continue;
+    if (wingSet.has("Admin")) out[child] = "Admin";
+    else delete out[child];
+  }
   return out;
 }
 
 function ensureForces(raw: unknown): string[] {
-  if (isLegacyForces(raw)) return [...FORCES];
-  return ensureStringList(raw, FORCES);
-}
-
-function ensureRanks(raw: unknown): string[] {
-  // Always keep core SRB catalog; append user-added ranks after.
-  if (isLegacyRanks(raw)) return [...RANKS];
-  const base: string[] = [...RANKS];
-  const seen = new Set<string>(base.map((r) => r.toLowerCase()));
-  if (!Array.isArray(raw)) return base;
+  if (isLegacyForces(raw) || !Array.isArray(raw)) return [...FORCES];
+  const seen = new Set<string>();
+  const stored: string[] = [];
   for (const item of raw) {
     const label = String(item ?? "")
       .trim()
@@ -791,9 +841,194 @@ function ensureRanks(raw: unknown): string[] {
     const key = label.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
+    stored.push(label);
+  }
+  return stored.length ? stored : [...FORCES];
+}
+
+function ensureForceLabels(
+  raw: unknown,
+  forces: string[],
+): Record<string, string> {
+  const remapped = remapWingKeyedRecord(raw, (value) => {
+    const label = String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    return label || undefined;
+  });
+  const out = ensureRankLabels(remapped, forces);
+  for (const force of forces) {
+    const catalog = FORCE_LABELS[force];
+    if (!catalog) continue;
+    if (!(out[force] ?? "").trim()) out[force] = catalog;
+  }
+  return out;
+}
+
+function ensureForceLabelsBn(
+  raw: unknown,
+  forces: string[],
+): Record<string, string> {
+  const remapped = remapWingKeyedRecord(raw, (value) => {
+    const label = String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    return label || undefined;
+  });
+  const out = ensureRankLabels(remapped, forces);
+  for (const force of forces) {
+    const catalog = FORCE_LABELS_BN[force];
+    if (!catalog) continue;
+    if (!(out[force] ?? "").trim()) out[force] = catalog;
+  }
+  return out;
+}
+
+function ensureForceSerials(
+  raw: unknown,
+  forces: string[],
+): Record<string, number> {
+  const allowed = new Set(forces.map((f) => f.toLowerCase()));
+  const remapped = remapWingKeyedRecord(raw, (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    return Math.floor(n);
+  });
+  const out: Record<string, number> = {};
+  for (const [short, n] of Object.entries(remapped)) {
+    if (!allowed.has(short.toLowerCase())) continue;
+    out[short] = n;
+  }
+  for (const [force, serial] of Object.entries(FORCE_CATALOG_SERIALS)) {
+    if (!allowed.has(force.toLowerCase())) continue;
+    if (out[force] == null) out[force] = serial;
+  }
+  return out;
+}
+
+function ensureRanks(raw: unknown): string[] {
+  // Always keep core SRB catalog; append user-added ranks after.
+  if (isLegacyRanks(raw)) return [...RANKS];
+  const base: string[] = [...RANKS];
+  const seen = new Set<string>(base.map((r) => r.toLowerCase()));
+  if (!Array.isArray(raw)) return base;
+  const catalog = raw.map((item) => String(item ?? "").trim());
+  for (const item of raw) {
+    const label = canonicalRankName(
+      String(item ?? "")
+        .trim()
+        .replace(/\s+/g, " "),
+      catalog,
+    );
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
     base.push(label);
   }
   return base;
+}
+
+function ensureSrbRankLabels(
+  raw: unknown,
+  ranks: string[],
+): Record<string, string> {
+  const remapped = remapRankKeyedRecord(raw, (value) => {
+    const label = String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    return label || undefined;
+  });
+  const out = ensureRankLabels(remapped, ranks);
+  for (const rank of ranks) {
+    const catalog = RANK_LABELS[rank];
+    if (!catalog) continue;
+    if (!(out[rank] ?? "").trim()) out[rank] = catalog;
+  }
+  return out;
+}
+
+function ensureSrbRankLabelsBn(
+  raw: unknown,
+  ranks: string[],
+): Record<string, string> {
+  const remapped = remapRankKeyedRecord(raw, (value) => {
+    const label = String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    return label || undefined;
+  });
+  const out = ensureRankLabels(remapped, ranks);
+  for (const rank of ranks) {
+    const catalog = RANK_LABELS_BN[rank];
+    if (!catalog) continue;
+    const current = (out[rank] ?? "").trim();
+    if (!current) {
+      out[rank] = catalog;
+      continue;
+    }
+    if (rank === "SI" && (current === "এএসআই" || current.toLowerCase() === "asi")) {
+      out[rank] = catalog;
+      continue;
+    }
+    if (
+      rank === "ASI" &&
+      (current === "এসআই" ||
+        current === "এএএসআই" ||
+        current.toLowerCase() === "aasi")
+    ) {
+      out[rank] = catalog;
+      continue;
+    }
+    if (rank === "Cook") {
+      out[rank] = catalog;
+    }
+  }
+  return out;
+}
+
+function ensureSrbRankSerials(
+  raw: unknown,
+  ranks: string[],
+): Record<string, number> {
+  const allowed = new Set(ranks.map((r) => r.toLowerCase()));
+  const remapped = remapRankKeyedRecord(raw, (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    return Math.floor(n);
+  });
+  const out: Record<string, number> = {};
+  for (const [short, n] of Object.entries(remapped)) {
+    if (!allowed.has(short.toLowerCase())) continue;
+    out[short] = n;
+  }
+  for (const [rank, serial] of Object.entries(RANK_CATALOG_SERIALS)) {
+    if (!allowed.has(rank.toLowerCase())) continue;
+    if (out[rank] == null) out[rank] = serial;
+  }
+  return out;
+}
+
+function remapRankKeyedRecord<T>(
+  raw: unknown,
+  mapValue: (value: unknown) => T | undefined,
+): Record<string, T> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const catalog = Object.keys(raw as Record<string, unknown>);
+  const out: Record<string, T> = {};
+  for (const [short, value] of Object.entries(raw as Record<string, unknown>)) {
+    const key = canonicalRankName(
+      String(short ?? "")
+        .trim()
+        .replace(/\s+/g, " "),
+      catalog,
+    );
+    if (!key) continue;
+    const next = mapValue(value);
+    if (next === undefined) continue;
+    out[key] = next;
+  }
+  return out;
 }
 
 function ensureForceRankExtras(
@@ -813,9 +1048,11 @@ function ensureForceRankExtras(
     const cleaned: string[] = [];
     const seen = new Set<string>();
     for (const item of list) {
-      const label = String(item ?? "")
-        .trim()
-        .replace(/\s+/g, " ");
+      const label = canonicalForceServiceRank(
+        String(item ?? "")
+          .trim()
+          .replace(/\s+/g, " "),
+      );
       if (!label) continue;
       const key = label.toLowerCase();
       if (seen.has(key) || ladderSet.has(key)) continue;
@@ -842,9 +1079,11 @@ function ensureForceRankRemoved(
     const cleaned: string[] = [];
     const seen = new Set<string>();
     for (const item of list) {
-      const label = String(item ?? "")
-        .trim()
-        .replace(/\s+/g, " ");
+      const label = canonicalForceServiceRank(
+        String(item ?? "")
+          .trim()
+          .replace(/\s+/g, " "),
+      );
       if (!label) continue;
       const key = label.toLowerCase();
       if (seen.has(key)) continue;
@@ -879,9 +1118,11 @@ function ensureForceRankLabels(
         : {};
     const labels: Record<string, string> = {};
     for (const [short, long] of Object.entries(forceSrc)) {
-      const s = String(short ?? "")
-        .trim()
-        .replace(/\s+/g, " ");
+      const s = canonicalForceServiceRank(
+        String(short ?? "")
+          .trim()
+          .replace(/\s+/g, " "),
+      );
       const l = String(long ?? "")
         .trim()
         .replace(/\s+/g, " ");
@@ -889,7 +1130,113 @@ function ensureForceRankLabels(
       if (!allowed.has(s.toLowerCase())) continue;
       labels[s] = l;
     }
+    const catalog = FORCE_RANK_LABELS[force as (typeof FORCES)[number]] ?? {};
+    for (const [short, long] of Object.entries(catalog)) {
+      if (!allowed.has(short.toLowerCase())) continue;
+      const have = (labels[short] ?? "").trim();
+      if (!have || have.toLowerCase() === short.toLowerCase()) {
+        labels[short] = long;
+      }
+    }
     out[force] = labels;
+  }
+  return out;
+}
+
+function ensureForceRankLabelsBn(
+  raw: unknown,
+  forces: string[],
+  extras: Record<string, string[]>,
+  removed: Record<string, string[]>,
+): Record<string, Record<string, string>> {
+  const src =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const out: Record<string, Record<string, string>> = {};
+  for (const force of forces) {
+    const allowed = new Set(
+      forceRankChoices(force, [], extras[force] ?? [], removed[force] ?? []).map(
+        (r) => r.toLowerCase(),
+      ),
+    );
+    const forceSrc =
+      src[force] && typeof src[force] === "object" && !Array.isArray(src[force])
+        ? (src[force] as Record<string, unknown>)
+        : {};
+    const labels: Record<string, string> = {};
+    for (const [short, long] of Object.entries(forceSrc)) {
+      const s = canonicalForceServiceRank(
+        String(short ?? "")
+          .trim()
+          .replace(/\s+/g, " "),
+      );
+      const l = String(long ?? "")
+        .trim()
+        .replace(/\s+/g, " ");
+      if (!s || !l) continue;
+      if (!allowed.has(s.toLowerCase())) continue;
+      labels[s] = l;
+    }
+    const catalog = FORCE_RANK_LABELS_BN[force as (typeof FORCES)[number]] ?? {};
+    for (const [short, long] of Object.entries(catalog)) {
+      if (!allowed.has(short.toLowerCase())) continue;
+      const current = (labels[short] ?? "").trim();
+      if (!current || current.includes("মেসেঞ্জার")) labels[short] = long;
+    }
+    out[force] = labels;
+  }
+  return out;
+}
+
+function ensureForceRankSerials(
+  raw: unknown,
+  forces: string[],
+  extras: Record<string, string[]>,
+  removed: Record<string, string[]>,
+): Record<string, Record<string, number>> {
+  const src =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const out: Record<string, Record<string, number>> = {};
+  for (const force of forces) {
+    const choices = forceRankChoices(
+      force,
+      [],
+      extras[force] ?? [],
+      removed[force] ?? [],
+    );
+    const allowed = new Set(choices.map((r) => r.toLowerCase()));
+    const forceSrc =
+      src[force] && typeof src[force] === "object" && !Array.isArray(src[force])
+        ? (src[force] as Record<string, unknown>)
+        : {};
+    const serials: Record<string, number> = {};
+    for (const [short, value] of Object.entries(forceSrc)) {
+      const s = canonicalForceServiceRank(
+        String(short ?? "")
+          .trim()
+          .replace(/\s+/g, " "),
+      );
+      const n = Number(value);
+      if (!s || !allowed.has(s.toLowerCase())) continue;
+      if (!Number.isFinite(n) || n <= 0) continue;
+      serials[s] = Math.floor(n);
+    }
+    const catalog = FORCE_RANK_SERIALS[force] ?? {};
+    for (const [short, n] of Object.entries(catalog)) {
+      if (!allowed.has(short.toLowerCase())) continue;
+      if (serials[short] == null) serials[short] = n;
+    }
+    let next = Math.max(0, ...Object.values(serials), 0) + 1;
+    for (const rank of choices) {
+      if (serials[rank] == null) {
+        serials[rank] = next;
+        next += 1;
+      }
+    }
+    out[force] = serials;
   }
   return out;
 }
@@ -918,11 +1265,93 @@ function ensureRankLabels(
   return out;
 }
 
+function remapWingKeyedRecord<T>(
+  raw: unknown,
+  mapValue: (value: unknown) => T | undefined,
+): Record<string, T> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, T> = {};
+  for (const [short, value] of Object.entries(raw as Record<string, unknown>)) {
+    const key = canonicalWingName(
+      String(short ?? "")
+        .trim()
+        .replace(/\s+/g, " "),
+    );
+    if (!key) continue;
+    const next = mapValue(value);
+    if (next === undefined) continue;
+    out[key] = next;
+  }
+  return out;
+}
+
 function ensureWingLabels(
   raw: unknown,
   wings: string[],
 ): Record<string, string> {
-  return ensureRankLabels(raw, wings);
+  const remapped = remapWingKeyedRecord(raw, (value) => {
+    const label = String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    return label || undefined;
+  });
+  const out = ensureRankLabels(remapped, wings);
+  for (const wing of [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS]) {
+    const catalog = WING_LABELS[wing];
+    if (!catalog) continue;
+    const current = (out[wing] ?? "").trim();
+    if (
+      !current ||
+      current.toLowerCase() === wing.toLowerCase() ||
+      current.toLowerCase() === "admin wing" ||
+      current.toLowerCase() === "training school" ||
+      current.toLowerCase() === "director (admin) office"
+    ) {
+      out[wing] = catalog;
+    }
+  }
+  return out;
+}
+
+function ensureWingLabelsBn(
+  raw: unknown,
+  wings: string[],
+): Record<string, string> {
+  const remapped = remapWingKeyedRecord(raw, (value) => {
+    const label = String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    return label || undefined;
+  });
+  const out = ensureRankLabels(remapped, wings);
+  for (const wing of [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS]) {
+    const catalog = WING_LABELS_BN[wing];
+    if (!catalog) continue;
+    if (!(out[wing] ?? "").trim()) out[wing] = catalog;
+  }
+  return out;
+}
+
+function ensureWingSerials(
+  raw: unknown,
+  wings: string[],
+): Record<string, number> {
+  const allowed = new Set(wings.map((w) => w.toLowerCase()));
+  const remapped = remapWingKeyedRecord(raw, (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    return Math.floor(n);
+  });
+  const out: Record<string, number> = {};
+  for (const [short, n] of Object.entries(remapped)) {
+    if (!allowed.has(short.toLowerCase())) continue;
+    out[short] = n;
+  }
+  for (const [wing, serial] of Object.entries(WING_CATALOG_SERIALS)) {
+    if (!allowed.has(wing.toLowerCase())) continue;
+    if (out[wing] == null) out[wing] = serial;
+  }
+  return out;
 }
 
 /** Keep known forces; ladder ranks + user extras allowed. */
@@ -953,14 +1382,34 @@ function ensureForceRanks(
     const hasDefaultLadder = Boolean(
       FORCE_DEFAULT_RANKS[force as (typeof FORCES)[number]],
     );
+    if ((PINNED_FORCE_LADDERS as readonly string[]).includes(force)) {
+      const removedSet = new Set(
+        (removed[force] ?? []).map((r) => r.toLowerCase()),
+      );
+      const official = (
+        FORCE_DEFAULT_RANKS[force as (typeof FORCES)[number]] ?? []
+      ).filter((r) => !removedSet.has(r.toLowerCase()));
+      const officialSet = new Set(
+        (FORCE_DEFAULT_RANKS[force as (typeof FORCES)[number]] ?? []).map((r) =>
+          r.toLowerCase(),
+        ),
+      );
+      const extra = (extras[force] ?? []).filter(
+        (r) => !officialSet.has(r.toLowerCase()),
+      );
+      out[force] = [...official, ...extra];
+      continue;
+    }
 
     if (hasDefaultLadder || choices.length > 0) {
       const kept: string[] = [];
       const seen = new Set<string>();
       for (const item of list) {
-        const label = String(item ?? "")
-          .trim()
-          .replace(/\s+/g, " ");
+        const label = canonicalForceServiceRank(
+          String(item ?? "")
+            .trim()
+            .replace(/\s+/g, " "),
+        );
         if (!label) continue;
         const canon = choiceByKey.get(label.toLowerCase());
         if (!canon) continue;
@@ -1008,7 +1457,10 @@ function ensureRankForces(
       : {};
   const out: Record<string, string[]> = {};
   for (const rank of ranks) {
-    const list = Array.isArray(src[rank]) ? src[rank] : [];
+    const rawList =
+      src[rank] ??
+      src[Object.keys(src).find((k) => canonicalRankName(k, Object.keys(src)) === rank) ?? ""];
+    const list = Array.isArray(rawList) ? rawList : [];
     const cleaned: string[] = [];
     const seen = new Set<string>();
     for (const item of list) {
@@ -1041,9 +1493,12 @@ function ensureRankEquivalents(
       : {};
   const out: Record<string, Record<string, string[]>> = {};
   for (const rank of ranks) {
+    const rawRank =
+      src[rank] ??
+      src[Object.keys(src).find((k) => canonicalRankName(k, Object.keys(src)) === rank) ?? ""];
     const rankSrc =
-      src[rank] && typeof src[rank] === "object" && !Array.isArray(src[rank])
-        ? (src[rank] as Record<string, unknown>)
+      rawRank && typeof rawRank === "object" && !Array.isArray(rawRank)
+        ? (rawRank as Record<string, unknown>)
         : {};
     const byForce: Record<string, string[]> = {};
     for (const force of forces) {
@@ -1061,9 +1516,11 @@ function ensureRankEquivalents(
       const cleaned: string[] = [];
       const seen = new Set<string>();
       for (const item of list) {
-        const label = String(item ?? "")
-          .trim()
-          .replace(/\s+/g, " ");
+        const label = canonicalForceServiceRank(
+          String(item ?? "")
+            .trim()
+            .replace(/\s+/g, " "),
+        );
         if (!label) continue;
         const canon = choiceByKey.get(label.toLowerCase());
         if (!canon) continue;
@@ -1094,9 +1551,12 @@ function ensureRankForceWings(
       : {};
   const out: Record<string, Record<string, string[]>> = {};
   for (const rank of ranks) {
+    const rawRank =
+      src[rank] ??
+      src[Object.keys(src).find((k) => canonicalRankName(k, Object.keys(src)) === rank) ?? ""];
     const rankSrc =
-      src[rank] && typeof src[rank] === "object" && !Array.isArray(src[rank])
-        ? (src[rank] as Record<string, unknown>)
+      rawRank && typeof rawRank === "object" && !Array.isArray(rawRank)
+        ? (rawRank as Record<string, unknown>)
         : {};
     const byForce: Record<string, string[]> = {};
     const assignedForces = rankForces[rank] ?? [];
@@ -1106,9 +1566,11 @@ function ensureRankForceWings(
       const cleaned: string[] = [];
       const seen = new Set<string>();
       for (const item of list) {
-        const label = String(item ?? "")
-          .trim()
-          .replace(/\s+/g, " ");
+        const label = canonicalWingName(
+          String(item ?? "")
+            .trim()
+            .replace(/\s+/g, " "),
+        );
         if (!label || !wingSet.has(label)) continue;
         const key = label.toLowerCase();
         if (seen.has(key)) continue;
@@ -1203,14 +1665,92 @@ export function getState(): AppState {
   }
   if (memory && isCurrentSeed(memory)) {
     const hasBanned = memory.wings.some((w) =>
-      [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS].some(
+      [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS, ...DROPPED_MAIN_WINGS].some(
         (b) => b.toLowerCase() === w.toLowerCase(),
       ),
     );
-    const form1OrderStale = WINGS.some((wing, i) => {
-      const roots = memory!.wings.filter((w) => !memory!.wing_parent[w]);
-      return (roots[i] ?? "").toLowerCase() !== wing.toLowerCase();
+    const catalogMetaMissing =
+      !memory.wing_labels_bn || !memory.wing_serials;
+    const officialLabelsStale = WINGS.some((wing) => {
+      const want = WING_LABELS[wing];
+      if (!want) return false;
+      const have = (memory!.wing_labels[wing] ?? "").trim();
+      return (
+        !have ||
+        have.toLowerCase() === wing.toLowerCase() ||
+        have.toLowerCase() === "admin wing" ||
+        have.toLowerCase() === "training school"
+      );
     });
+    const officialSubs = [...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS];
+    const haveWings = new Set(memory.wings.map((w) => w.toLowerCase()));
+    const strayHqKids = Object.entries(memory!.wing_parent ?? {}).some(
+      ([child, parent]) =>
+        (parent ?? "").trim().toLowerCase() === "hq br" &&
+        !HQ_SUB_WINGS.some((wing) => wing.toLowerCase() === child.toLowerCase()),
+    );
+    const adminHqCatalogStale =
+      officialSubs.some((wing) => !haveWings.has(wing.toLowerCase())) ||
+      HQ_SUB_WINGS.some((wing) => memory!.wing_parent[wing] !== "HQ Br") ||
+      strayHqKids ||
+      officialSubs.some((wing) => memory!.wing_serials?.[wing] == null) ||
+      officialSubs.some(
+        (wing) => !(memory!.wing_labels_bn?.[wing] ?? "").trim(),
+      );
+    const officialServiceRanksStale = PINNED_FORCE_LADDERS.some((force) => {
+      const removed = new Set(
+        (memory!.force_rank_removed[force] ?? []).map((r) =>
+          canonicalForceServiceRank(r).toLowerCase(),
+        ),
+      );
+      const have = (memory!.force_ranks[force] ?? []).map((r) =>
+        canonicalForceServiceRank(r.trim()).toLowerCase(),
+      );
+      const haveSet = new Set(have);
+      const want = FORCE_DEFAULT_RANKS[force] ?? [];
+      const missingOfficial = want.some(
+        (rank) =>
+          !removed.has(rank.toLowerCase()) && !haveSet.has(rank.toLowerCase()),
+      );
+      const hasLegacyLong = (memory!.force_ranks[force] ?? []).some((r) =>
+        Boolean(
+          FORCE_RANK_SHORT_RENAMES[r.trim().replace(/\s+/g, " ").toLowerCase()],
+        ),
+      );
+      return missingOfficial || hasLegacyLong;
+    });
+    const forceRankCatalogMetaMissing = PINNED_FORCE_LADDERS.some((force) => {
+      const removed = new Set(
+        (memory!.force_rank_removed[force] ?? []).map((r) =>
+          canonicalForceServiceRank(r).toLowerCase(),
+        ),
+      );
+      const want = (FORCE_DEFAULT_RANKS[force] ?? []).filter(
+        (rank) => !removed.has(rank.toLowerCase()),
+      );
+      const bn = memory!.force_rank_labels_bn?.[force] ?? {};
+      const serials = memory!.force_rank_serials?.[force] ?? {};
+      return want.some(
+        (rank) =>
+          !(bn[rank] ?? "").trim() ||
+          (bn[rank] ?? "").includes("মেসেঞ্জার") ||
+          serials[rank] == null,
+      );
+    });
+    const forceCatalogMetaMissing =
+      !memory.force_labels_bn ||
+      !memory.force_serials ||
+      memory.forces.some((force) => memory!.force_serials?.[force] == null);
+    const rankCatalogMetaMissing =
+      !memory.rank_labels_bn ||
+      !memory.rank_serials ||
+      memory.ranks.some((rank) => memory!.rank_serials?.[rank] == null);
+    const officialSrbRanksStale =
+      isPreviousSrbRankCatalog(memory!.ranks) ||
+      RANKS.some(
+        (rank) =>
+          !memory!.ranks.some((have) => have.toLowerCase() === rank.toLowerCase()),
+      );
     const authStale = memory.authorized.some((row) => {
       const wings = row.wings ?? {};
       if (Object.keys(wings).length === 0) return false;
@@ -1225,20 +1765,31 @@ export function getState(): AppState {
             .length < MIN_TAG_REQUESTS_PER_QUEUE,
       );
     if (
-      hasBanned ||
-      form1OrderStale ||
-      authStale ||
-      shortRequestQueues ||
-      (!apiBacked && isLegacyDemoSenders(memory.senders))
+      !catalogHealed &&
+      (hasBanned ||
+        officialLabelsStale ||
+        adminHqCatalogStale ||
+        forceCatalogMetaMissing ||
+        rankCatalogMetaMissing ||
+        officialSrbRanksStale ||
+        officialServiceRanksStale ||
+        forceRankCatalogMetaMissing ||
+        catalogMetaMissing ||
+        authStale ||
+        shortRequestQueues ||
+        (!apiBacked && isLegacyDemoSenders(memory.senders)))
     ) {
+      catalogHealed = true;
       memory = normalizeState(memory);
       writeStorage(memory);
+      if (!persistPaused) persistHook?.(memory);
     }
     return memory;
   }
 
   const fromDisk = readStorage();
   if (fromDisk && isCurrentSeed(fromDisk)) {
+    catalogHealed = true;
     memory = normalizeState(
       isCcApiEnabled()
         ? {
@@ -1279,6 +1830,7 @@ export function getState(): AppState {
   ) {
     seeded.manpower_absent = fromDisk.manpower_absent;
   }
+  catalogHealed = true;
   memory = seeded;
   writeStorage(seeded);
   return seeded;
@@ -1327,9 +1879,17 @@ function normalizeState(state: AppState): AppState {
       } = legacy;
       const rawBank = String(legacy.bank_name ?? "").trim();
       const bank_name = bankSet.get(rawBank.toLowerCase()) ?? "";
+      const member_type = legacy.member_type ?? "permanent";
+      const rank = canonicalRankName(
+        legacy.rank ?? "",
+        Array.isArray(state.ranks) ? state.ranks.map(String) : undefined,
+      );
+      const force = canonicalForceName(legacy.force ?? "", rank, member_type);
+      const storedForceRank = canonicalForceServiceRank(legacy.force_rank ?? "");
       return {
         ...rest,
         joining_date: legacy.joining_date ?? "",
+        duty_start: legacy.duty_start ?? "",
         out_date: legacy.out_date ?? "",
         inactive_spans:
           Array.isArray(legacy.inactive_spans) && legacy.inactive_spans.length > 0
@@ -1337,9 +1897,12 @@ function normalizeState(state: AppState): AppState {
             : legacy.status !== "1"
               ? [{ from: legacy.joining_date || "2020-01-01", to: null }]
               : [],
-        member_type: legacy.member_type ?? "permanent",
+        wing: canonicalWingName(legacy.wing ?? ""),
+        rank,
+        member_type,
         personal_id: legacy.personal_id ?? "",
-        force: legacy.force ?? "",
+        force,
+        force_rank: storedForceRank || defaultForceRankForSrb(force, rank),
         religion: legacy.religion ?? "",
         blood_group: legacy.blood_group ?? "",
         jl_end_date: legacy.jl_end_date ?? "",
@@ -1364,7 +1927,27 @@ function normalizeState(state: AppState): AppState {
       const wings = ensureWings(state.wings);
       return ensureWingLabels(state.wing_labels, wings);
     })(),
+    wing_labels_bn: (() => {
+      const wings = ensureWings(state.wings);
+      return ensureWingLabelsBn(state.wing_labels_bn, wings);
+    })(),
+    wing_serials: (() => {
+      const wings = ensureWings(state.wings);
+      return ensureWingSerials(state.wing_serials, wings);
+    })(),
     forces: ensureForces(state.forces),
+    force_labels: (() => {
+      const forces = ensureForces(state.forces);
+      return ensureForceLabels(state.force_labels, forces);
+    })(),
+    force_labels_bn: (() => {
+      const forces = ensureForces(state.forces);
+      return ensureForceLabelsBn(state.force_labels_bn, forces);
+    })(),
+    force_serials: (() => {
+      const forces = ensureForces(state.forces);
+      return ensureForceSerials(state.force_serials, forces);
+    })(),
     force_rank_extras: (() => {
       const forces = ensureForces(state.forces);
       return ensureForceRankExtras(state.force_rank_extras, forces);
@@ -1384,9 +1967,39 @@ function normalizeState(state: AppState): AppState {
         removed,
       );
     })(),
+    force_rank_labels_bn: (() => {
+      const forces = ensureForces(state.forces);
+      const extras = ensureForceRankExtras(state.force_rank_extras, forces);
+      const removed = ensureForceRankRemoved(state.force_rank_removed, forces);
+      return ensureForceRankLabelsBn(
+        state.force_rank_labels_bn,
+        forces,
+        extras,
+        removed,
+      );
+    })(),
+    force_rank_serials: (() => {
+      const forces = ensureForces(state.forces);
+      const extras = ensureForceRankExtras(state.force_rank_extras, forces);
+      const removed = ensureForceRankRemoved(state.force_rank_removed, forces);
+      return ensureForceRankSerials(
+        state.force_rank_serials,
+        forces,
+        extras,
+        removed,
+      );
+    })(),
     rank_labels: (() => {
       const ranks = ensureRanks(state.ranks);
-      return ensureRankLabels(state.rank_labels, ranks);
+      return ensureSrbRankLabels(state.rank_labels, ranks);
+    })(),
+    rank_labels_bn: (() => {
+      const ranks = ensureRanks(state.ranks);
+      return ensureSrbRankLabelsBn(state.rank_labels_bn, ranks);
+    })(),
+    rank_serials: (() => {
+      const ranks = ensureRanks(state.ranks);
+      return ensureSrbRankSerials(state.rank_serials, ranks);
     })(),
     force_ranks: (() => {
       const ranks = ensureRanks(state.ranks);
@@ -1503,9 +2116,10 @@ function normalizeState(state: AppState): AppState {
         for (const [w, n] of Object.entries(
           wings as Record<string, unknown>,
         )) {
+          const wing = canonicalWingName(w);
           const num = Number(n);
-          if (!w.trim() || !Number.isFinite(num) || num < 0) continue;
-          map[w] = Math.floor(num);
+          if (!wing || !Number.isFinite(num) || num < 0) continue;
+          map[wing] = (map[wing] ?? 0) + Math.floor(num);
         }
         if (Object.keys(map).length) out[date] = map;
       }
@@ -1557,6 +2171,7 @@ function normalizeState(state: AppState): AppState {
 export function setState(next: AppState | ((prev: AppState) => AppState)) {
   const prev = getState();
   const resolved = typeof next === "function" ? next(prev) : next;
+  catalogHealed = false;
   memory = resolved;
   writeStorage(resolved);
   listeners.forEach((l) => l());
@@ -1576,43 +2191,54 @@ export function subscribe(listener: Listener) {
   };
 }
 
+const EMPTY_SERVER_SNAPSHOT: AppState = {
+  users: [],
+  assignments: [],
+  senders: [],
+  rates: [],
+  ranks: [],
+  wings: [],
+  wing_parent: {},
+  wing_labels: {},
+  wing_labels_bn: {},
+  wing_serials: {},
+  forces: [],
+  force_labels: {},
+  force_labels_bn: {},
+  force_serials: {},
+  force_ranks: {},
+  force_rank_extras: {},
+  force_rank_removed: {},
+  force_rank_labels: {},
+  force_rank_labels_bn: {},
+  force_rank_serials: {},
+  rank_labels: {},
+  rank_labels_bn: {},
+  rank_serials: {},
+  rank_forces: {},
+  rank_equivalents: {},
+  rank_force_wings: {},
+  member_banks: [],
+  authorized: [],
+  manpower_officer_absent: {},
+  manpower_held: {},
+  manpower_absent: {},
+  approved_dates: [],
+  suppressed_carries: [],
+  boro_khana_dates: [],
+  state_reports: [],
+  meal_plans: [],
+  meal_assigns: [],
+  meal_shifts: [],
+  guest_meals: [],
+  pritibhoj_events: [],
+  paper_report_requests: [],
+  tag_requests: [],
+  version: 0,
+};
+
 export function getServerSnapshot(): AppState {
-  return {
-    users: [],
-    assignments: [],
-    senders: [],
-    rates: [],
-    ranks: [],
-    wings: [],
-    wing_parent: {},
-    wing_labels: {},
-    forces: [],
-    force_ranks: {},
-    force_rank_extras: {},
-    force_rank_removed: {},
-    force_rank_labels: {},
-    rank_labels: {},
-    rank_forces: {},
-    rank_equivalents: {},
-    rank_force_wings: {},
-    member_banks: [],
-    authorized: [],
-    manpower_officer_absent: {},
-    manpower_held: {},
-    manpower_absent: {},
-    approved_dates: [],
-    suppressed_carries: [],
-    boro_khana_dates: [],
-    state_reports: [],
-    meal_plans: [],
-    meal_assigns: [],
-    meal_shifts: [],
-    guest_meals: [],
-    pritibhoj_events: [],
-    paper_report_requests: [],
-    tag_requests: [],
-    version: 0,
-  };
+  return EMPTY_SERVER_SNAPSHOT;
 }
 
 let hydrated = false;

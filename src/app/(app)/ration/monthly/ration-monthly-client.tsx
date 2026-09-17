@@ -16,12 +16,9 @@ import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
 import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 
@@ -29,7 +26,6 @@ import { monthDateBounds } from "@/lib/date";
 import { downloadCsv } from "@/lib/csv";
 import { buildRangeLedger, withReportSource } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
-import { wingSettingsLabel } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
 
 function defaultRange() {
@@ -39,7 +35,6 @@ function defaultRange() {
 export default function RationMonthlyClient() {
   const t = useT();
   const state = useStore();
-  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const initial = defaultRange();
 
@@ -190,42 +185,18 @@ export default function RationMonthlyClient() {
             onChange={({ from, to }) => applyDateRange(from, to)}
             label={t("common.dateRange")}
           />
-          <div className="w-[9.5rem] shrink-0">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger
-                className={cn(fieldClass, "w-full")}
-                aria-label={t("cc.filterRank")}
-              >
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {ranks.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[9rem] shrink-0">
-            <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger
-                className={cn(fieldClass, "w-full")}
-                aria-label={t("cc.filterWing")}
-              >
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {wings.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {wingSettingsLabel(w)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SettingsRankFilter
+            value={rank}
+            onChange={setRank}
+            className="w-[9.5rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <SettingsWingFilter
+            value={wing}
+            onChange={setWing}
+            className="w-[9rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
         </SearchFilterBar>
 
         {ledger.rows.length === 0 ? (

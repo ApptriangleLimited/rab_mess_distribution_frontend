@@ -1,6 +1,6 @@
 """Attach viewable sample files to member document metadata.
 
-Run: docker exec rab-mess-api python attach_member_docs.py
+Run: docker exec srb_backend python attach_member_docs.py
 """
 
 from __future__ import annotations

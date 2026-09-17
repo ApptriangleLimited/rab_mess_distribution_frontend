@@ -27,9 +27,10 @@ import {
 } from "@/lib/store/tag-requests";
 import {
   isTrgTag,
+  needsTrgPrompt,
   needsTrgSardaPrompt,
-  needsTrgTrainingPrompt,
   resolveTrgTone,
+  trgChoiceRequired,
 } from "@/lib/trg-tone";
 import { todayISO } from "@/lib/date";
 import { useT } from "@/i18n/provider";
@@ -57,30 +58,44 @@ export function MemberAcceptActions({
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [busy, setBusy] = useState(false);
   const [actionTag, setActionTag] = useState<DailyTag | "">("");
+  const [tagError, setTagError] = useState(false);
+  const [trgChoiceError, setTrgChoiceError] = useState(false);
   const [sardaChecked, setSardaChecked] = useState(false);
   const [trainingChecked, setTrainingChecked] = useState(false);
+  const needsTag = withTag && user.member_type !== "civilian";
   const showTrgPrompt =
     pendingAction === "accept" &&
-    withTag &&
+    needsTag &&
     isTrgTag(actionTag) &&
-    needsTrgTrainingPrompt(user.force);
+    needsTrgPrompt(user.force);
   const showSarda = showTrgPrompt && needsTrgSardaPrompt(user.force);
 
   const pending = user.approval_status === "pending";
 
   function open(type: "accept" | "reject") {
-    if (withTag) {
+    if (needsTag) {
       setActionTag(user.default_tag || "");
       setSardaChecked(false);
       setTrainingChecked(false);
     }
+    setTagError(false);
+    setTrgChoiceError(false);
     setPendingAction(type);
   }
 
   async function confirm() {
     if (!pendingAction || busy) return;
-    if (pendingAction === "accept" && withTag && !actionTag) {
-      toast(t("daily.tagRequired"), "error");
+    if (pendingAction === "accept" && needsTag && !actionTag) {
+      setTagError(true);
+      return;
+    }
+    if (
+      pendingAction === "accept" &&
+      needsTag &&
+      isTrgTag(actionTag) &&
+      trgChoiceRequired(user.force, trainingChecked, sardaChecked)
+    ) {
+      setTrgChoiceError(true);
       return;
     }
 
@@ -88,18 +103,20 @@ export function MemberAcceptActions({
       setBusy(true);
       try {
         if (pendingAction === "accept") {
-          const queue = withTag && actionTag ? dutyTagQueue(actionTag) : "immediate";
-          await acceptMember(user.id, withTag && actionTag ? actionTag : undefined);
-          if (withTag && actionTag && queue !== "immediate") {
+          const trgTone = isTrgTag(actionTag)
+            ? resolveTrgTone(user.force, trainingChecked, sardaChecked)
+            : undefined;
+          const queue =
+            needsTag && actionTag ? dutyTagQueue(actionTag, trgTone) : "immediate";
+          await acceptMember(user.id, needsTag && actionTag ? actionTag : undefined);
+          if (needsTag && actionTag && queue !== "immediate") {
             const created = await createTagRequestApi({
               userId: user.id,
               toTag: actionTag,
               from: todayISO(),
               to: todayISO(),
               queue,
-              trg_tone: isTrgTag(actionTag)
-                ? resolveTrgTone(user.force, trainingChecked, sardaChecked)
-                : undefined,
+              trg_tone: trgTone,
               trg_sarda:
                 isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
                   ? sardaChecked
@@ -132,14 +149,23 @@ export function MemberAcceptActions({
     }
 
     if (pendingAction === "accept") {
-      if (withTag && actionTag) {
-        const queue = dutyTagQueue(actionTag);
+      if (needsTag && actionTag) {
+        const trgTone = isTrgTag(actionTag)
+          ? resolveTrgTone(user.force, trainingChecked, sardaChecked)
+          : undefined;
+        const queue = dutyTagQueue(actionTag, trgTone);
         updateUser(user.id, {
           ...userToFormValues(user),
           default_tag: actionTag,
         });
         if (queue === "immediate") {
-          setTag(user.id, todayISO(), actionTag);
+          setTag(
+            user.id,
+            todayISO(),
+            actionTag,
+            "daily",
+            trgTone ? { trg_tone: trgTone } : undefined,
+          );
         } else {
           createDutyTagRequest({
             userId: user.id,
@@ -147,9 +173,7 @@ export function MemberAcceptActions({
             fromDate: todayISO(),
             toDate: todayISO(),
             queue,
-            trg_tone: isTrgTag(actionTag)
-              ? resolveTrgTone(user.force, trainingChecked, sardaChecked)
-              : undefined,
+            trg_tone: trgTone,
             trg_sarda:
               isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
                 ? sardaChecked
@@ -270,6 +294,12 @@ export function MemberAcceptActions({
             ? "max-w-5xl max-h-[calc(100dvh-1.5rem)]"
             : undefined
         }
+        confirmDisabled={
+          pendingAction === "accept" &&
+          showSarda &&
+          !sardaChecked &&
+          !trainingChecked
+        }
         onCancel={() => setPendingAction(null)}
         onConfirm={confirm}
       >
@@ -279,27 +309,42 @@ export function MemberAcceptActions({
           ) : (
             <UserConfirmCard user={user} />
           )}
-          {pendingAction === "accept" && withTag ? (
-            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-neutral-50/80 px-3 py-2.5 dark:border-neutral-700 dark:bg-neutral-900/60">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-                  {t("daily.defaultTag")}
-                </p>
-                <p className="mt-0.5 text-xs text-neutral-500">
-                  {t("daily.acceptDefaultTagHint")}
-                </p>
+          {pendingAction === "accept" && needsTag ? (
+            <div
+              className={
+                tagError
+                  ? "space-y-2 rounded-xl border border-red-300 bg-red-50/90 px-3 py-2.5 dark:border-red-800 dark:bg-red-950/40"
+                  : "space-y-2 rounded-xl border border-neutral-200 bg-neutral-50/80 px-3 py-2.5 dark:border-neutral-700 dark:bg-neutral-900/60"
+              }
+            >
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                    {t("daily.defaultTag")}
+                  </p>
+                  <p className="mt-0.5 text-xs text-neutral-500">
+                    {t("daily.acceptDefaultTagHint")}
+                  </p>
+                </div>
+                <TagSelector
+                  value={actionTag}
+                  onChange={(next) => {
+                    if (next) {
+                      setActionTag(next);
+                      setTagError(false);
+                      setTrgChoiceError(false);
+                      setSardaChecked(false);
+                      setTrainingChecked(false);
+                    }
+                  }}
+                  className="h-9 min-w-[12rem] rounded-lg"
+                />
               </div>
-              <TagSelector
-                value={actionTag}
-                onChange={(next) => {
-                  if (next) {
-                    setActionTag(next);
-                    setSardaChecked(false);
-                    setTrainingChecked(false);
-                  }
-                }}
-                className="h-9 min-w-[12rem] rounded-lg"
-              />
+              {tagError ? (
+                <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                  {t("daily.tagRequired")}
+                </p>
+              ) : null}
             </div>
           ) : null}
           {showSarda ? (
@@ -307,13 +352,18 @@ export function MemberAcceptActions({
               <input
                 type="checkbox"
                 checked={sardaChecked}
-                onChange={(e) => setSardaChecked(e.target.checked)}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setSardaChecked(next);
+                  if (next) setTrainingChecked(false);
+                  setTrgChoiceError(false);
+                }}
                 className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
               />
               <span className="font-medium text-neutral-800 dark:text-neutral-100">
                 {t("daily.sardaLabel")}
               </span>
-              <TrgToneHint black={sardaChecked} />
+              <TrgToneHint black />
             </label>
           ) : null}
           {showTrgPrompt ? (
@@ -321,14 +371,24 @@ export function MemberAcceptActions({
               <input
                 type="checkbox"
                 checked={trainingChecked}
-                onChange={(e) => setTrainingChecked(e.target.checked)}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setTrainingChecked(next);
+                  if (next && showSarda) setSardaChecked(false);
+                  setTrgChoiceError(false);
+                }}
                 className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
               />
               <span className="font-medium text-neutral-800 dark:text-neutral-100">
                 {t("daily.trainingLabel")}
               </span>
-              <TrgToneHint black={trainingChecked} />
+              <TrgToneHint black={false} />
             </label>
+          ) : null}
+          {trgChoiceError ? (
+            <p className="text-sm font-medium text-red-700 dark:text-red-300">
+              {t("daily.trgChoiceRequired")}
+            </p>
           ) : null}
         </div>
       </ConfirmDialog>

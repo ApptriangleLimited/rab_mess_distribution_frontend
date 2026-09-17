@@ -5,19 +5,23 @@ from __future__ import annotations
 import uuid
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from account import catalog_payload, file_out
 from auth import current_staff, hash_password, require_roles
 from security import validate_password
 from rate_limit import enforce_register_limit
 from database import SessionLocal, get_db
-from models import Assignment, BoroKhanaDay, Member, Rate, Sender, Staff
+from models import Assignment, BoroKhanaDay, FileObject, Member, Rate, Sender, Staff
+from persist import CATALOG_KEYS
 from schemas import DUTY_TAGS, MemberIn
+from storage import StorageError, checksum, put_bytes, sniff_mime
+from config import settings
 
 router = APIRouter()
 
@@ -549,6 +553,57 @@ def delete_sender(
     db.delete(row)
     db.commit()
     return envelope({"id": sender_id}, "Sender deleted")
+
+
+PUBLIC_FORM_CATALOG_KEYS = tuple(
+    key
+    for key in CATALOG_KEYS
+    if key
+    not in ("manpower_held", "manpower_absent", "paper_report_requests")
+)
+
+
+@router.get("/api/v1/public/catalog")
+def public_catalog(db: Session = Depends(get_db)):
+    """Dropdowns for the QR /register form — Settings wings, ranks, forces, banks."""
+    payload = catalog_payload(db)
+    return envelope({key: payload.get(key) for key in PUBLIC_FORM_CATALOG_KEYS})
+
+
+@router.post("/api/v1/public/files")
+async def public_upload_file(
+    request: Request,
+    upload: UploadFile = File(...),
+    entity_type: str = Form(""),
+    entity_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Document upload for public member entry (no staff login)."""
+    enforce_register_limit(request)
+    data = await upload.read()
+    if len(data) > settings.max_upload_bytes:
+        raise HTTPException(status_code=413, detail="File is too large")
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    try:
+        _ext, mime = sniff_mime(data, upload.filename or "file", upload.content_type)
+        key = put_bytes(data, upload.filename or "file")
+    except StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    row = FileObject(
+        id=new_id("fl"),
+        original_name=(upload.filename or "file")[:255],
+        storage_key=key,
+        mime_type=mime,
+        size=len(data),
+        checksum=checksum(data),
+        entity_type=(entity_type or "register")[:64],
+        entity_id=entity_id[:64],
+        uploaded_by="public",
+    )
+    db.add(row)
+    db.commit()
+    return envelope(file_out(row), "Uploaded", 201)
 
 
 @router.post("/api/v1/public/register")

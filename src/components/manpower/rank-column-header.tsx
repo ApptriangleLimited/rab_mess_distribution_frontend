@@ -11,7 +11,7 @@ export function RankColumnHeader({
   return (
     <th
       className={cn(
-        "border border-neutral-800 px-0.5 py-1 font-semibold",
+        "border border-neutral-800 px-px py-0.5 text-center text-[7.5px] font-semibold leading-tight break-words",
         className,
       )}
     >

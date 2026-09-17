@@ -23,6 +23,9 @@ type Props = {
   getOptionLabel?: (value: string) => string;
   /** When set, adds a row that clears value to `""`. */
   clearLabel?: string;
+  disabled?: boolean;
+  contentClassName?: string;
+  ariaLabel?: string;
 };
 
 export function SearchableSelect({
@@ -35,6 +38,9 @@ export function SearchableSelect({
   triggerClassName,
   getOptionLabel,
   clearLabel,
+  disabled = false,
+  contentClassName,
+  ariaLabel,
 }: Props) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -60,11 +66,20 @@ export function SearchableSelect({
   }, [allOptions, q, getOptionLabel]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (disabled) return;
+        setOpen(next);
+        if (next) setQ("");
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
+          disabled={disabled}
+          aria-label={ariaLabel}
           className={cn(
             "h-9 w-full justify-between rounded-lg px-3 text-sm font-normal shadow-none",
             triggerClassName,
@@ -82,8 +97,12 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="z-[300] w-[var(--radix-popover-trigger-width)] p-2"
+        className={cn(
+          "z-[300] w-[var(--radix-popover-trigger-width)] p-2",
+          contentClassName,
+        )}
         align="start"
+        collisionPadding={8}
       >
         <div className="relative mb-2">
           <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
@@ -101,7 +120,7 @@ export function SearchableSelect({
               <button
                 type="button"
                 className={cn(
-                  "flex w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800",
+                  "flex w-full whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800",
                   !value && "bg-neutral-100 dark:bg-neutral-800",
                 )}
                 onClick={() => {
@@ -124,7 +143,7 @@ export function SearchableSelect({
                 <button
                   type="button"
                   className={cn(
-                    "flex w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800",
+                    "flex w-full whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800",
                     value === opt && "bg-neutral-100 dark:bg-neutral-800",
                   )}
                   onClick={() => {

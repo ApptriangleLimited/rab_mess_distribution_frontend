@@ -1,4 +1,5 @@
-import { DEFAULT_WING_PARENT } from "@/lib/constants";
+import { canonicalRankName, DEFAULT_WING_PARENT, rankLabelBn } from "@/lib/constants";
+import { manpowerRankLabelBn } from "@/lib/rank-labels";
 import {
   manpowerWingFamily,
   type ManpowerSnapshot,
@@ -52,7 +53,7 @@ export const STRENGTH_CATEGORIES: StrengthCategory[] = [
   { id: "si", labelEn: "SI", labelBn: "এসআই" },
   { id: "asi", labelEn: "ASI", labelBn: "এএসআই" },
   { id: "naik", labelEn: "Naik", labelBn: "নায়েক" },
-  { id: "con", labelEn: "Con", labelBn: "কন" },
+  { id: "con", labelEn: "Constable", labelBn: "কনস্টেবল" },
   { id: "cook", labelEn: "Cook", labelBn: "পাচক" },
   { id: "nce", labelEn: "NC(E)", labelBn: "এনসি(ই)" },
   { id: "civil", labelEn: "Civil", labelBn: "সিভিল" },
@@ -274,10 +275,21 @@ export function strengthMetricTotal(
   return n;
 }
 
+export function strengthCategoryLabelBn(
+  cat: StrengthCategory,
+  overrides?: Record<string, string>,
+): string {
+  if (cat.id === "officer") return cat.labelBn;
+  if (cat.id === "asi") return "এএসআই";
+  return manpowerRankLabelBn(
+    rankLabelBn(cat.labelEn, overrides ?? getState().rank_labels_bn),
+  );
+}
+
 export function strengthCategoryForRank(
   rank: string,
 ): StrengthCategoryId | null {
-  const key = normalize(rank);
+  const key = normalize(canonicalRankName(rank) || rank);
   if (!key) return null;
   if (
     key === "dad" ||
@@ -298,6 +310,7 @@ export function strengthCategoryForRank(
   if (key === "si" || key === "s.i" || key === "sub inspector") return "si";
   if (
     key === "asi" ||
+    key === "aasi" ||
     key === "a.s.i" ||
     key === "assistant sub inspector"
   ) {
@@ -327,6 +340,7 @@ export function strengthCategoryForRank(
     return "nce";
   }
   if (key === "civil" || key === "civill" || key === "civilian") return "civil";
+  if (key === "constable" || key === "const" || key === "con") return "con";
   if (
     key === "officer" ||
     key === "ad" ||
@@ -434,12 +448,12 @@ type Bucket = {
 /** Official Form 2 এ্যাডমিন উইং rows — Record Branch is crossed off the paper. */
 const FORM2_ADMIN_BRANCHES = [
   "HQ Br",
-  "Headquarters Office",
-  "Security Branch",
+  "HQ Office",
+  "SY Br",
   "Forces Mess",
-  "Field Mess",
+  "Fd Mess",
   "MT Br",
-  "New / Temporary Attached",
+  "New Temp Att",
 ] as const;
 
 /**
@@ -450,7 +464,7 @@ const FORM3_ADMIN_WINGS = [
   "DG Office",
   "ADG (Ops) Office",
   "ADG (Admin) Office",
-  "Director (Admin) Office",
+  "Dir Office",
   "Sup Br",
   "Per Br",
   "Gen Br",
@@ -458,30 +472,45 @@ const FORM3_ADMIN_WINGS = [
   "Rec Br",
   "Fin Br",
   "Proc Br",
-  "Dev Br",
   "Proj Br",
+  "Dev Br",
   "Wksp Br",
   "সদর",
-  "New / Temporary Attached",
+  "New Temp Att",
 ] as const;
 
 const FORM3_SADAR = "সদর";
-const FORM3_ATTACHED = "New / Temporary Attached";
+const FORM3_ATTACHED = "New Temp Att";
 
 const FORM2_WING_ALIASES: Record<string, string> = {
   "hq br": "HQ Br",
   "headquarters branch": "HQ Br",
-  "headquarters office": "Headquarters Office",
-  "security branch": "Security Branch",
+  "headquarters office": "HQ Office",
+  "hq office": "HQ Office",
+  "security branch": "SY Br",
+  "sy br": "SY Br",
   "forces mess": "Forces Mess",
-  "field mess": "Field Mess",
+  "field mess": "Fd Mess",
+  "fd mess": "Fd Mess",
   "mt br": "MT Br",
   "mt branch": "MT Br",
-  "new / temporary attached": "New / Temporary Attached",
+  "new / temporary attached": "New Temp Att",
+  "new temp att": "New Temp Att",
 };
 
 function resolveForm2Branch(wing: string): string | null {
   return FORM2_WING_ALIASES[normalize(wing)] ?? null;
+}
+
+const FORM3_WING_ALIASES: Record<string, string> = {
+  "director (admin) office": "Dir Office",
+  "dir office": "Dir Office",
+  "new / temporary attached": "New Temp Att",
+  "new temp att": "New Temp Att",
+};
+
+function resolveForm3Branch(wing: string): string | null {
+  return FORM3_WING_ALIASES[normalize(wing)] ?? null;
 }
 
 function branchesForScope(
@@ -562,16 +591,18 @@ export function buildStrengthReport(
 
     const rawWing = user.wing.trim();
     const family = manpowerWingFamily(rawWing, wingParent);
-    if (scope === "hq" && family !== "hq") continue;
+    if (scope === "hq" && family !== "hq" && family !== "admin") continue;
 
     const form2 = scope === "admin" ? resolveForm2Branch(rawWing) : null;
+    const form3 = scope === "hq" ? resolveForm3Branch(rawWing) : null;
     if (scope === "admin" && !form2) continue;
     if (scope === "hq" && isSadarWing(rawWing)) continue;
 
     const exact = [...branchSet].find(
-      (b) => b.toLowerCase() === (form2 ?? rawWing).toLowerCase(),
+      (b) =>
+        b.toLowerCase() === (form2 ?? form3 ?? rawWing).toLowerCase(),
     );
-    const branch = form2 ?? exact ?? rawWing;
+    const branch = form2 ?? form3 ?? exact ?? rawWing;
     if (!branch || !map.has(branch)) continue;
     if (cfg.skipSadarFill && isSadarWing(branch)) continue;
 

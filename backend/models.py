@@ -50,6 +50,7 @@ class Member(Base):
     rank: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     wing: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     force: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    force_rank: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     religion: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     member_type: Mapped[str] = mapped_column(String(32), nullable=False, default="permanent")
     dropdown_no: Mapped[str] = mapped_column(String(128), nullable=False, default="")
@@ -67,6 +68,8 @@ class Member(Base):
     branch_location: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     joining_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     out_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # First Daily RR day (accept). Days before this stay empty.
+    duty_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     default_tag: Mapped[str] = mapped_column(String(32), nullable=False, default="MS")
     jl_end_date: Mapped[str] = mapped_column(String(16), nullable=False, default="")
     inactive_spans: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)

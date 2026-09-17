@@ -4,14 +4,21 @@ import {
   DAILY_TAGS,
   defaultForceRanks,
   FORCES,
+  FORCE_CATALOG_SERIALS,
+  FORCE_LABELS,
+  FORCE_LABELS_BN,
   RATE_ONLY_TAGS,
   RANKS,
+  RANK_CATALOG_SERIALS,
+  RANK_LABELS,
+  RANK_LABELS_BN,
   RELIGIONS,
   BLOOD_GROUPS,
   WINGS,
   ADMIN_SUB_WINGS,
   HQ_SUB_WINGS,
   DEFAULT_WING_PARENT,
+  WING_CATALOG_SERIALS,
   MEMBER_BANKS,
 } from "@/lib/constants";
 import {
@@ -71,9 +78,11 @@ function user(
     | "documents"
     | "documents_verified"
     | "joining_date"
+    | "duty_start"
     | "out_date"
     | "member_type"
     | "personal_id"
+    | "force_rank"
     | "emergency_contacts"
     | "default_tag"
     | "inactive_spans"
@@ -83,9 +92,11 @@ function user(
     documents?: User["documents"];
     documents_verified?: boolean;
     joining_date?: string;
+    duty_start?: string;
     out_date?: string;
     member_type?: User["member_type"];
     personal_id?: string;
+    force_rank?: string;
     emergency_contacts?: User["emergency_contacts"];
     default_tag?: DailyTag;
     inactive_spans?: User["inactive_spans"];
@@ -99,9 +110,15 @@ function user(
     documents: partial.documents ?? [],
     documents_verified: partial.documents_verified ?? false,
     joining_date: partial.joining_date ?? todayISO(),
+    duty_start:
+      partial.duty_start ??
+      (partial.approval_status === "approved"
+        ? (partial.joining_date ?? todayISO())
+        : ""),
     out_date: partial.out_date ?? "",
     member_type: partial.member_type ?? "permanent",
     personal_id: partial.personal_id ?? "",
+    force_rank: partial.force_rank ?? "",
     emergency_contacts: partial.emergency_contacts ?? [],
     default_tag: partial.default_tag ?? "MS",
     blood_group: partial.blood_group ?? "",
@@ -184,46 +201,46 @@ type SeedRow = {
 /** One complete member per catalog wing, plus extras so every member type is present. */
 const SEED_MEMBERS: SeedRow[] = [
   { id: "u_seed_01", name: "Karim Hossain", member_type: "permanent", wing: "Ops Wg", rank: "Constable", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
-  { id: "u_seed_02", name: "Nusrat Jahan", member_type: "new", wing: "Int Wg", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
-  { id: "u_seed_03", name: "Rafiq Ahmed", member_type: "attached", wing: "L & M Wg", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "MS", contact: "Brother" },
-  { id: "u_seed_04", name: "Farhana Akter", member_type: "civilian", wing: "Air Wg", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "MS", contact: "Mother" },
+  { id: "u_seed_02", name: "Nusrat Jahan", member_type: "new", wing: "Int Wg", rank: "SI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
+  { id: "u_seed_03", name: "Rafiq Ahmed", member_type: "attached", wing: "L & M Wg", rank: "SI", force: "BGB", approval_status: "approved", status: "1", default_tag: "MS", contact: "Brother" },
+  { id: "u_seed_04", name: "Farhana Akter", member_type: "civilian", wing: "Air Wg", rank: "Civil", force: "Civilian", approval_status: "approved", status: "1", default_tag: "MS", contact: "Mother" },
   { id: "u_seed_05", name: "Jamal Uddin", member_type: "guest", wing: "Comm & MIS Wg", rank: "DAD", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Host" },
   { id: "u_seed_06", name: "Tania Rahman", member_type: "permanent", wing: "Inv Wg", rank: "DAD", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
   { id: "u_seed_07", name: "Hasan Mahmud", member_type: "new", wing: "Trg Wg", rank: "Naik", force: "Ansar", approval_status: "pending", status: "1", default_tag: "TRG", contact: "Father" },
-  { id: "u_seed_08", name: "Shila Begum", member_type: "attached", wing: "RFTS", rank: "RT", force: "Navy", approval_status: "approved", status: "1", default_tag: "ML", contact: "Sister" },
-  { id: "u_seed_09", name: "Mehedi Hasan", member_type: "civilian", wing: "Training School", rank: "Civill", force: "Civilian", approval_status: "pending", status: "1", default_tag: "MS", contact: "Uncle" },
-  { id: "u_seed_10", name: "Rina Chowdhury", member_type: "permanent", wing: "R & D Cell", rank: "AASI", force: "Air Force", approval_status: "approved", status: "1", default_tag: "CD", contact: "Spouse" },
+  { id: "u_seed_08", name: "Shila Begum", member_type: "attached", wing: "Training School", rank: "RT", force: "Navy", approval_status: "approved", status: "1", default_tag: "ML", contact: "Sister" },
+  { id: "u_seed_09", name: "Mehedi Hasan", member_type: "civilian", wing: "Training School", rank: "Civil", force: "Civilian", approval_status: "pending", status: "1", default_tag: "MS", contact: "Uncle" },
+  { id: "u_seed_10", name: "Rina Chowdhury", member_type: "permanent", wing: "R & D Cell", rank: "ASI", force: "Air Force", approval_status: "approved", status: "1", default_tag: "CD", contact: "Spouse" },
   { id: "u_seed_11", name: "Omar Faruk", member_type: "permanent", wing: "Admin", rank: "DAD", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
-  { id: "u_seed_12", name: "Lamia Sultana", member_type: "permanent", wing: "Admin (New)", rank: "Cook", force: "Army", approval_status: "approved", status: "1", default_tag: "ML", contact: "Mother" },
-  { id: "u_seed_13", name: "Sajjad Mia", member_type: "permanent", wing: "Admin (Old)", rank: "ASI", force: "Police", approval_status: "ended", status: "0", default_tag: "MS", contact: "Brother", out_date: `${shiftMonthKey(monthKey(), -1)}-15` },
-  { id: "u_seed_14", name: "Ayesha Islam", member_type: "new", wing: "Fin Br", rank: "ANCE", force: "Ansar", approval_status: "approved", status: "1", default_tag: "WR", contact: "Spouse" },
-  { id: "u_seed_15", name: "Babul Karim", member_type: "civilian", wing: "Forces Mess", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
-  { id: "u_seed_16", name: "Nazmul Alam", member_type: "attached", wing: "HQ Br", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "CL", contact: "Cousin" },
+  { id: "u_seed_12", name: "Lamia Sultana", member_type: "permanent", wing: "Admin", rank: "Cook", force: "Army", approval_status: "approved", status: "1", default_tag: "ML", contact: "Mother" },
+  { id: "u_seed_13", name: "Sajjad Mia", member_type: "permanent", wing: "Admin", rank: "SI", force: "Police", approval_status: "ended", status: "0", default_tag: "MS", contact: "Brother", out_date: `${shiftMonthKey(monthKey(), -1)}-15` },
+  { id: "u_seed_14", name: "Ayesha Islam", member_type: "new", wing: "Fin Br", rank: "NCE", force: "Ansar", approval_status: "approved", status: "1", default_tag: "WR", contact: "Spouse" },
+  { id: "u_seed_15", name: "Babul Karim", member_type: "civilian", wing: "Forces Mess", rank: "Civil", force: "Civilian", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
+  { id: "u_seed_16", name: "Nazmul Alam", member_type: "attached", wing: "HQ Br", rank: "SI", force: "BGB", approval_status: "approved", status: "1", default_tag: "CL", contact: "Cousin" },
   { id: "u_seed_17", name: "Imran Kabir", member_type: "permanent", wing: "Per Br", rank: "Constable", force: "Army", approval_status: "approved", status: "1", default_tag: "FR", contact: "Father" },
-  { id: "u_seed_18", name: "Sadia Noor", member_type: "new", wing: "Gen Br", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "CL", contact: "Spouse" },
-  { id: "u_seed_19", name: "Kamal Sheikh", member_type: "attached", wing: "Sup Br", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "PL", contact: "Brother" },
-  { id: "u_seed_20", name: "Rehana Parvin", member_type: "civilian", wing: "Med Br", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "WR", contact: "Mother" },
+  { id: "u_seed_18", name: "Sadia Noor", member_type: "new", wing: "Gen Br", rank: "SI", force: "Police", approval_status: "approved", status: "1", default_tag: "CL", contact: "Spouse" },
+  { id: "u_seed_19", name: "Kamal Sheikh", member_type: "attached", wing: "Sup Br", rank: "SI", force: "BGB", approval_status: "approved", status: "1", default_tag: "PL", contact: "Brother" },
+  { id: "u_seed_20", name: "Rehana Parvin", member_type: "civilian", wing: "Med Br", rank: "Civil", force: "Civilian", approval_status: "approved", status: "1", default_tag: "WR", contact: "Mother" },
   { id: "u_seed_21", name: "Anwar Hossain", member_type: "permanent", wing: "Rec Br", rank: "Naik", force: "Army", approval_status: "approved", status: "1", default_tag: "CD", contact: "Father" },
-  { id: "u_seed_22", name: "Mitu Akter", member_type: "new", wing: "Proc Br", rank: "AASI", force: "Air Force", approval_status: "approved", status: "1", default_tag: "WIT", contact: "Sister" },
-  { id: "u_seed_23", name: "Sohel Rana", member_type: "attached", wing: "Budget Br", rank: "Attached", force: "Navy", approval_status: "approved", status: "1", default_tag: "ML", contact: "Uncle" },
-  { id: "u_seed_24", name: "Nasrin Sultana", member_type: "civilian", wing: "Dev Br", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "TRG", contact: "Spouse" },
+  { id: "u_seed_22", name: "Mitu Akter", member_type: "new", wing: "Proc Br", rank: "ASI", force: "Air Force", approval_status: "approved", status: "1", default_tag: "WIT", contact: "Sister" },
+  { id: "u_seed_23", name: "Sohel Rana", member_type: "attached", wing: "Fin Br", rank: "SI", force: "Navy", approval_status: "approved", status: "1", default_tag: "ML", contact: "Uncle" },
+  { id: "u_seed_24", name: "Nasrin Sultana", member_type: "civilian", wing: "Dev Br", rank: "Civil", force: "Civilian", approval_status: "approved", status: "1", default_tag: "TRG", contact: "Spouse" },
   { id: "u_seed_25", name: "Jahangir Alam", member_type: "permanent", wing: "Wksp Br", rank: "DAD", force: "Police", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
-  { id: "u_seed_26", name: "Popy Das", member_type: "new", wing: "MT Br", rank: "ANCE", force: "Ansar", approval_status: "approved", status: "1", default_tag: "MOL", contact: "Mother" },
-  { id: "u_seed_27", name: "Liton Miah", member_type: "attached", wing: "Rat Br", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "CMH", contact: "Brother" },
-  { id: "u_seed_28", name: "Sharmin Nahar", member_type: "civilian", wing: "Proj Br", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "RBH", contact: "Sister" },
-  { id: "u_seed_29", name: "Faisal Ahmed", member_type: "permanent", wing: "Security Branch - IEC Cell", rank: "RT", force: "Navy", approval_status: "approved", status: "1", default_tag: "BGH", contact: "Spouse" },
-  { id: "u_seed_30", name: "Rubina Yasmin", member_type: "new", wing: "Headquarters Branch", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "AWL", contact: "Father" },
-  { id: "u_seed_31", name: "Shahidul Islam", member_type: "attached", wing: "Headquarters Office", rank: "Attached", force: "Army", approval_status: "approved", status: "1", default_tag: "OSL", contact: "Cousin" },
-  { id: "u_seed_32", name: "Jannatul Ferdous", member_type: "civilian", wing: "Security Branch", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "RL", contact: "Mother" },
-  { id: "u_seed_33", name: "Mamun Reza", member_type: "permanent", wing: "Record Branch", rank: "Cook", force: "Army", approval_status: "approved", status: "1", default_tag: "PE", contact: "Brother" },
-  { id: "u_seed_34", name: "Sumaiya Khan", member_type: "new", wing: "Field Mess", rank: "Constable", force: "Ansar", approval_status: "approved", status: "1", default_tag: "LNK", contact: "Spouse" },
-  { id: "u_seed_35", name: "Arif Chowdhury", member_type: "attached", wing: "MT Branch", rank: "Attached", force: "BGB", approval_status: "approved", status: "1", default_tag: "MFR", contact: "Uncle" },
-  { id: "u_seed_36", name: "Dilara Begum", member_type: "civilian", wing: "New / Temporary Attached", rank: "Civill", force: "Civilian", approval_status: "approved", status: "1", default_tag: "JL", contact: "Sister" },
+  { id: "u_seed_26", name: "Popy Das", member_type: "new", wing: "MT Br", rank: "NCE", force: "Ansar", approval_status: "approved", status: "1", default_tag: "MOL", contact: "Mother" },
+  { id: "u_seed_27", name: "Liton Miah", member_type: "attached", wing: "HQ Br", rank: "SI", force: "BGB", approval_status: "approved", status: "1", default_tag: "CMH", contact: "Brother" },
+  { id: "u_seed_28", name: "Sharmin Nahar", member_type: "civilian", wing: "Proj Br", rank: "Civil", force: "Civilian", approval_status: "approved", status: "1", default_tag: "RBH", contact: "Sister" },
+  { id: "u_seed_29", name: "Faisal Ahmed", member_type: "permanent", wing: "SY Br", rank: "RT", force: "Navy", approval_status: "approved", status: "1", default_tag: "BGH", contact: "Spouse" },
+  { id: "u_seed_30", name: "Rubina Yasmin", member_type: "new", wing: "HQ Br", rank: "SI", force: "Police", approval_status: "approved", status: "1", default_tag: "AWL", contact: "Father" },
+  { id: "u_seed_31", name: "Shahidul Islam", member_type: "attached", wing: "HQ Office", rank: "SI", force: "Army", approval_status: "approved", status: "1", default_tag: "OSL", contact: "Cousin" },
+  { id: "u_seed_32", name: "Jannatul Ferdous", member_type: "civilian", wing: "SY Br", rank: "Civil", force: "Civilian", approval_status: "approved", status: "1", default_tag: "RL", contact: "Mother" },
+  { id: "u_seed_33", name: "Mamun Reza", member_type: "permanent", wing: "Rec Br", rank: "Cook", force: "Army", approval_status: "approved", status: "1", default_tag: "PE", contact: "Brother" },
+  { id: "u_seed_34", name: "Sumaiya Khan", member_type: "new", wing: "Fd Mess", rank: "Constable", force: "Ansar", approval_status: "approved", status: "1", default_tag: "LNK", contact: "Spouse" },
+  { id: "u_seed_35", name: "Arif Chowdhury", member_type: "attached", wing: "MT Br", rank: "SI", force: "BGB", approval_status: "approved", status: "1", default_tag: "MFR", contact: "Uncle" },
+  { id: "u_seed_36", name: "Dilara Begum", member_type: "civilian", wing: "New Temp Att", rank: "Civil", force: "Civilian", approval_status: "approved", status: "1", default_tag: "JL", contact: "Sister" },
   { id: "u_seed_37", name: "Rashid Khan", member_type: "new", wing: "DG Office", rank: "Naik", force: "Army", approval_status: "pending", status: "1", default_tag: "TRG", contact: "Father" },
-  { id: "u_seed_38", name: "Mini Roy", member_type: "civilian", wing: "ADG (Ops) Office", rank: "Civill", force: "Civilian", approval_status: "pending", status: "1", default_tag: "MS", contact: "Mother" },
+  { id: "u_seed_38", name: "Mini Roy", member_type: "civilian", wing: "ADG (Ops) Office", rank: "Civil", force: "Civilian", approval_status: "pending", status: "1", default_tag: "MS", contact: "Mother" },
   { id: "u_seed_39", name: "Tanvir Hasan", member_type: "guest", wing: "ADG (Admin) Office", rank: "DAD", force: "Army", approval_status: "approved", status: "1", default_tag: "MS", contact: "Host" },
-  { id: "u_seed_40", name: "Khaled Mostafa", member_type: "permanent", wing: "Ops Wg", rank: "ASI", force: "Police", approval_status: "ended", status: "0", default_tag: "MS", contact: "Brother", out_date: `${shiftMonthKey(monthKey(), -1)}-20` },
-  { id: "u_seed_41", name: "Rashedul Islam", member_type: "permanent", wing: "Ops Wg", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
+  { id: "u_seed_40", name: "Khaled Mostafa", member_type: "permanent", wing: "Ops Wg", rank: "SI", force: "Police", approval_status: "ended", status: "0", default_tag: "MS", contact: "Brother", out_date: `${shiftMonthKey(monthKey(), -1)}-20` },
+  { id: "u_seed_41", name: "Rashedul Islam", member_type: "permanent", wing: "Ops Wg", rank: "SI", force: "Police", approval_status: "approved", status: "1", default_tag: "MS", contact: "Father" },
   { id: "u_seed_42", name: "Farzana Akter", member_type: "permanent", wing: "Int Wg", rank: "Constable", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
 ];
 
@@ -251,7 +268,7 @@ function userFromSeedRow(row: SeedRow, i: number): User {
       personal_id,
       rab_id,
       rfid: isCivilian ? `CIV-RF-${String(n).padStart(4, "0")}` : `RFID-${3100 + n}`,
-      rank: isCivilian ? "Civill" : row.rank,
+      rank: isCivilian ? "Civil" : row.rank,
       wing: row.wing,
       force: row.force,
       religion: RELIGIONS[i % RELIGIONS.length]!,
@@ -295,7 +312,7 @@ export function extraCockpitPoliceMembers(): User[] {
 
 const TRUST_FIREWOOD_ROWS: SeedRow[] = [
   { id: "u_fw_trust_01", name: "Kamrul Hasan", member_type: "permanent", wing: "Ops Wg", rank: "SI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
-  { id: "u_fw_trust_02", name: "Shahida Begum", member_type: "permanent", wing: "Int Wg", rank: "ASI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Father" },
+  { id: "u_fw_trust_02", name: "Shahida Begum", member_type: "permanent", wing: "Int Wg", rank: "SI", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Father" },
   { id: "u_fw_trust_03", name: "Rezaul Karim", member_type: "permanent", wing: "Per Br", rank: "Constable", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Spouse" },
   { id: "u_fw_trust_04", name: "Nargis Akter", member_type: "permanent", wing: "Inv Wg", rank: "Insp", force: "Police", approval_status: "approved", status: "1", default_tag: "FR", contact: "Brother" },
 ];
@@ -668,18 +685,31 @@ export function createSeedState(): AppState {
     assignments,
     senders,
     rates,
-    ranks: [...RANKS],
+    ranks: [...RANKS, "Attached"],
     wings: [...new Set([...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS])],
     wing_parent: { ...DEFAULT_WING_PARENT },
     wing_labels: {},
+    wing_labels_bn: {},
+    wing_serials: { ...WING_CATALOG_SERIALS },
     forces: [...FORCES],
+    force_labels: { ...FORCE_LABELS },
+    force_labels_bn: { ...FORCE_LABELS_BN },
+    force_serials: { ...FORCE_CATALOG_SERIALS },
     force_ranks: defaultForceRanks(),
     force_rank_extras: Object.fromEntries(FORCES.map((f) => [f, [] as string[]])),
     force_rank_removed: Object.fromEntries(FORCES.map((f) => [f, [] as string[]])),
     force_rank_labels: Object.fromEntries(
       FORCES.map((f) => [f, {} as Record<string, string>]),
     ),
-    rank_labels: {},
+    force_rank_labels_bn: Object.fromEntries(
+      FORCES.map((f) => [f, {} as Record<string, string>]),
+    ),
+    force_rank_serials: Object.fromEntries(
+      FORCES.map((f) => [f, {} as Record<string, number>]),
+    ),
+    rank_labels: { ...RANK_LABELS },
+    rank_labels_bn: { ...RANK_LABELS_BN },
+    rank_serials: { ...RANK_CATALOG_SERIALS },
     rank_forces: {
       DAD: ["Army", "Police"],
       ...Object.fromEntries(
@@ -688,7 +718,7 @@ export function createSeedState(): AppState {
     },
     rank_equivalents: {
       DAD: {
-        Army: ["OR", "L/Cpl"],
+        Army: ["Sainik", "L/Cpl"],
         Police: ["Insp"],
       },
     },

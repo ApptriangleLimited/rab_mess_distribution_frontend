@@ -21,7 +21,7 @@
 6. **Redis** — start with `REDIS_PASSWORD` set. Confirm `6379` is not published. Unauthenticated `PING` from another network must fail.
 7. **Build / deploy** — `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`.
 8. **Migrations** — entrypoint runs `alembic upgrade head`. Confirm `alembic current` is `0002_platform` (or later head).
-9. **Workers** — `rab-mess-worker` must be running. `/health/ready` should show postgres + redis up.
+9. **Workers** — `srb_worker` must be running. `/health/ready` should show postgres + redis up.
 10. **Nginx** — only `80`/`443` published. `/` → web, `/api/` → api, `/health*` → api.
 11. **HTTPS** — valid cert, hostname match, no mixed content.
 12. **Health** — `GET https://<host>/health/live` and `/health/ready` return 200.
@@ -30,7 +30,7 @@
 15. **Storage** — confirm `files_data` (or S3) survives `docker compose restart api`.
 16. **Backup** — `./scripts/backup-postgres.sh` and copy dumps off-box. Repeat `docs/RESTORE_DRILL.md` on this host once.
 17. **Traffic** — point users at HTTPS only.
-18. **Monitor** — `docker logs -f rab-mess-api` (JSON + `x-request-id`). See `docs/OBSERVABILITY.md`.
+18. **Monitor** — `docker logs -f srb_backend` (JSON + `x-request-id`). See `docs/OBSERVABILITY.md`.
 
 ## Rollback (staging or production)
 

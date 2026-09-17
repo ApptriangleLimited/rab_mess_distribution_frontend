@@ -110,8 +110,7 @@ export function isProtectedRateTag(tag: string) {
 }
 
 /**
- * Main SRB wings / branches (short form = stored value).
- * Admin rows have no short — store full name.
+ * Main SRB wings (short form = stored value). Order = official serial 1–10.
  */
 export const WINGS = [
   "Admin",
@@ -126,6 +125,9 @@ export const WINGS = [
   "Training School",
 ] as const;
 
+/** Former main-wing roots no longer on the official serial. */
+export const DROPPED_MAIN_WINGS = [] as const;
+
 /** Old Form 1 roots — dropped so the sheet matches the official list. */
 export const LEGACY_FORM1_WINGS = [
   "Admin (New)",
@@ -133,12 +135,15 @@ export const LEGACY_FORM1_WINGS = [
   "RFTS",
 ] as const;
 
-/** Admin sub-branches (short = stored value; parent = Admin only). */
+/**
+ * Admin & Finance Wing children (short = stored). Serial 1–15 from the
+ * official Admin list.
+ */
 export const ADMIN_SUB_WINGS = [
   "DG Office",
   "ADG (Ops) Office",
   "ADG (Admin) Office",
-  "Director (Admin) Office",
+  "Dir Office",
   "Sup Br",
   "Per Br",
   "Gen Br",
@@ -146,55 +151,68 @@ export const ADMIN_SUB_WINGS = [
   "Rec Br",
   "Fin Br",
   "Proc Br",
-  "Budget Br",
-  "Dev Br",
   "Proj Br",
+  "Dev Br",
   "Wksp Br",
-  "MT Br",
   "HQ Br",
-  "New / Temporary Attached",
 ] as const;
 
 /**
- * HQ Br children — same office/branch names and order as the official
- * এ্যাডমিন উইং / HQ daily strength sheet.
+ * Headquarters Branch children (short = stored). Serial 1–6 under HQ Br.
  */
 export const HQ_SUB_WINGS = [
-  "DG Office",
-  "ADG (Ops) Office",
-  "ADG (Admin) Office",
-  "Director (Admin) Office",
-  "Sup Br",
-  "Per Br",
-  "Gen Br",
-  "Med Br",
-  "Rec Br",
-  "Fin Br",
-  "Proc Br",
-  "Budget Br",
-  "Dev Br",
-  "Proj Br",
-  "Wksp Br",
+  "HQ Office",
+  "SY Br",
+  "Forces Mess",
+  "Fd Mess",
   "MT Br",
-  "New / Temporary Attached",
+  "New Temp Att",
 ] as const;
 
-/** Old HQ catalog names — keep parented under HQ Br if still in store. */
+/** Old HQ / Admin names — remapped or stripped so the paper list wins. */
 export const LEGACY_HQ_SUB_WINGS = [
   "Headquarters Branch",
   "Headquarters Office",
   "Security Branch",
   "Record Branch",
-  "Forces Mess",
   "Field Mess",
   "MT Branch",
+  "Director (Admin) Office",
+  "New / Temporary Attached",
 ] as const;
+
+/** Old stored short → official stored short. */
+export const WING_RENAMES: Record<string, string> = {
+  "director (admin) office": "Dir Office",
+  "new / temporary attached": "New Temp Att",
+  "newly temporary attach": "New Temp Att",
+  "new temporary attach": "New Temp Att",
+  "new temporary attached": "New Temp Att",
+  "headquarters office": "HQ Office",
+  "headquarters branch": "HQ Br",
+  "security branch": "SY Br",
+  "security branch - iec cell": "SY Br",
+  "iec cell": "SY Br",
+  "record branch": "Rec Br",
+  "field mess": "Fd Mess",
+  "mt branch": "MT Br",
+  "admin (new)": "Admin",
+  "admin (old)": "Admin",
+  rfts: "Training School",
+  "budget br": "Fin Br",
+  "rat br": "HQ Br",
+};
+
+export function canonicalWingName(label: string): string {
+  const next = label.trim().replace(/\s+/g, " ");
+  if (!next) return next;
+  return WING_RENAMES[next.toLowerCase()] ?? next;
+}
 
 /** Default child → parent links for catalog sub-wings. */
 export const DEFAULT_WING_PARENT: Record<string, string> = {
   ...Object.fromEntries(ADMIN_SUB_WINGS.map((wing) => [wing, "Admin"])),
   ...Object.fromEntries(HQ_SUB_WINGS.map((wing) => [wing, "HQ Br"])),
-  ...Object.fromEntries(LEGACY_HQ_SUB_WINGS.map((wing) => [wing, "HQ Br"])),
 };
 
 /** Full wing / branch names for short forms. */
@@ -207,30 +225,78 @@ export const WING_LABELS: Record<string, string> = {
   "Inv Wg": "Investigation & Forensic Wing",
   "Trg Wg": "Training & Orientation Wing",
   RFTS: "SRB Forces Training School",
-  "Training School": "Training School",
+  "Training School": "SRB Forces Training School",
   "R & D Cell": "Research & Development Cell",
-  Admin: "Admin",
+  Admin: "Admin & Finance Wing",
   "Admin (New)": "Admin (New)",
   "Admin (Old)": "Admin (Old)",
-  "DG Office": "Director General Office",
-  "ADG (Ops) Office": "Additional Director General (Operations) Office",
-  "ADG (Admin) Office": "Additional Director General (Admin) Office",
-  "Director (Admin) Office": "Director (Admin) Office",
-  "New / Temporary Attached": "New / Temporary Attached",
-  "Fin Br": "Finance Branch",
+  "DG Office": "DG Office",
+  "ADG (Ops) Office": "ADG (Ops) Office",
+  "ADG (Admin) Office": "ADG (Admin) Office",
+  "Dir Office": "Dir Office",
+  "Director (Admin) Office": "Dir Office",
+  "Sup Br": "Supply Branch",
   "Per Br": "Personnel Branch",
   "Gen Br": "General Branch",
-  "Sup Br": "Supply Branch",
-  "HQ Br": "Headquarters Branch",
   "Med Br": "Medical Branch",
   "Rec Br": "Record Branch",
+  "Fin Br": "Finance Branch",
   "Proc Br": "Procurement Branch",
-  "Budget Br": "Budget Branch",
+  "Proj Br": "Project Branch",
   "Dev Br": "Development Branch",
   "Wksp Br": "Central Workshop Branch",
+  "HQ Br": "Headquarters Branch",
+  "HQ Office": "Headquarters Office",
+  "SY Br": "Security Branch",
+  "Forces Mess": "Forces Mess",
+  "Fd Mess": "Field Mess",
   "MT Br": "MT Branch",
+  "New Temp Att": "Newly Temporary Attach",
+  "New / Temporary Attached": "Newly Temporary Attach",
+  "Budget Br": "Budget Branch",
   "Rat Br": "Ration Office",
-  "Proj Br": "Project Branch",
+};
+
+/** Bangla print / Settings names for official shorts. */
+export const WING_LABELS_BN: Record<string, string> = {
+  Admin: "প্রশাসন ও অর্থ উইং",
+  "Ops Wg": "অপস উইং",
+  "Int Wg": "ইন্ট উইং",
+  "Comm & MIS Wg": "যোগাযোগ উইং",
+  "Trg Wg": "ট্রেনিং উইং",
+  "L & M Wg": "লিঃ এন্ড মিডিঃ উইং",
+  "Inv Wg": "তদন্ত উইং",
+  "Air Wg": "এয়ার উইং",
+  "R & D Cell": "রিসার্চ অ্যান্ড ডেভেলপমেন্ট সেল",
+  "Training School": "এসআরবি ফোর্সেস ট্রেনিং স্কুল",
+  "DG Office": "ডিজি দপ্তর",
+  "ADG (Ops) Office": "এডিজি (অপস) দপ্তর",
+  "ADG (Admin) Office": "এডিজি (এ্যাডমিন) দপ্তর",
+  "Dir Office": "পরিচালক দপ্তর",
+  "Sup Br": "সরবরাহ শাখা",
+  "Per Br": "পার্সোনেল শাখা",
+  "Gen Br": "জেনারেল শাখা",
+  "Med Br": "চিকিৎসা শাখা",
+  "Rec Br": "রেকর্ড শাখা",
+  "Fin Br": "অর্থ শাখা",
+  "Proc Br": "প্রকিউরমেন্ট শাখা",
+  "Proj Br": "প্রকল্প শাখা",
+  "Dev Br": "উন্নয়ন শাখা",
+  "Wksp Br": "কেন্দ্রীয় ওয়ার্কশপ শাখা",
+  "HQ Br": "সদর দপ্তর শাখা",
+  "HQ Office": "সদর দপ্তর অফিস",
+  "SY Br": "নিরাপত্তা শাখা",
+  "Forces Mess": "ফোর্সেস মেস",
+  "Fd Mess": "ফিল্ড মেস",
+  "MT Br": "এমটি শাখা",
+  "New Temp Att": "নতুন অস্থায়ী সংযুক্ত",
+};
+
+/** Official serials: mains 1–10, Admin children 1–15, HQ children 1–6. */
+export const WING_CATALOG_SERIALS: Record<string, number> = {
+  ...Object.fromEntries(WINGS.map((wing, i) => [wing, i + 1])),
+  ...Object.fromEntries(ADMIN_SUB_WINGS.map((wing, i) => [wing, i + 1])),
+  ...Object.fromEntries(HQ_SUB_WINGS.map((wing, i) => [wing, i + 1])),
 };
 
 /** Bank names for member register form picklist. */
@@ -351,12 +417,57 @@ export const LEGACY_WINGS = [
   "Support",
 ] as const;
 
+/** Official main-wing serial (1-based). Stored serials win over catalog order. */
+export function wingOfficialSerial(
+  wing: string,
+  serials?: Record<string, number>,
+): number | null {
+  const stored = serials?.[wing];
+  if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
+    return Math.floor(stored);
+  }
+  const key = wing.trim().toLowerCase();
+  const match = Object.entries(serials ?? {}).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (match && typeof match[1] === "number" && match[1] > 0) {
+    return Math.floor(match[1]);
+  }
+  const catalog = WING_CATALOG_SERIALS[wing];
+  if (typeof catalog === "number" && catalog > 0) return catalog;
+  const catalogMatch = Object.entries(WING_CATALOG_SERIALS).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (catalogMatch) return catalogMatch[1];
+  const index = WINGS.findIndex((item) => item.toLowerCase() === key);
+  return index >= 0 ? index + 1 : null;
+}
+
+/** Official / catalog full name for a stored short wing. */
+export function wingOfficialName(
+  wing: string,
+  labelOverrides?: Record<string, string>,
+): string {
+  const catalog = WING_LABELS[wing];
+  const override = labelOverrides?.[wing]?.trim();
+  if (
+    override &&
+    override.toLowerCase() !== wing.toLowerCase() &&
+    override.toLowerCase() !== (catalog ?? "").toLowerCase() &&
+    override.toLowerCase() !== "admin wing" &&
+    override.toLowerCase() !== "training school"
+  ) {
+    return override;
+  }
+  return catalog || override || wing;
+}
+
 /** Display `SHORT — Full name` when elaborate form known. */
 export function wingDisplayLabel(
   short: string,
   labelOverrides?: Record<string, string>,
 ): string {
-  const long = labelOverrides?.[short] ?? WING_LABELS[short];
+  const long = wingOfficialName(short, labelOverrides);
   if (long && long.toLowerCase() !== short.toLowerCase()) {
     return `${short} — ${long}`;
   }
@@ -372,25 +483,208 @@ export const FORCES = [
   "Army",
   "Navy",
   "Air Force",
-  "BGB",
   "Police",
+  "BGB",
   "Ansar",
+  "Coast Guard",
   "Civilian",
 ] as const;
+
+export const FORCE_LABELS: Record<string, string> = {
+  Army: "Army",
+  Navy: "Navy",
+  "Air Force": "Air Force",
+  Police: "Police",
+  BGB: "Border Guard Bangladesh",
+  Ansar: "Ansar",
+  "Coast Guard": "Coast Guard",
+  Civilian: "Civilian",
+};
+
+export const FORCE_LABELS_BN: Record<string, string> = {
+  Army: "আর্মি",
+  Navy: "নৌবাহিনী",
+  "Air Force": "বিমানবাহিনী",
+  Police: "পুলিশ",
+  BGB: "বর্ডার গার্ড বাংলাদেশ",
+  Ansar: "আনসার",
+  "Coast Guard": "কোস্ট গার্ড",
+  Civilian: "সিভিলিয়ান",
+};
+
+export const FORCE_CATALOG_SERIALS: Record<string, number> = Object.fromEntries(
+  FORCES.map((force, i) => [force, i + 1]),
+);
+
+export function forceOfficialSerial(
+  force: string,
+  serials?: Record<string, number>,
+): number | null {
+  const stored = serials?.[force];
+  if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
+    return Math.floor(stored);
+  }
+  const key = force.trim().toLowerCase();
+  const match = Object.entries(serials ?? {}).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (match && typeof match[1] === "number" && match[1] > 0) {
+    return Math.floor(match[1]);
+  }
+  return FORCE_CATALOG_SERIALS[force] ?? null;
+}
+
+export function forceOfficialName(
+  force: string,
+  labelOverrides?: Record<string, string>,
+): string {
+  const catalog = FORCE_LABELS[force];
+  const override = labelOverrides?.[force]?.trim();
+  if (
+    override &&
+    override.toLowerCase() !== force.toLowerCase() &&
+    override.toLowerCase() !== (catalog ?? "").toLowerCase()
+  ) {
+    return override;
+  }
+  return catalog || override || force;
+}
+
+export function forceLabelBn(
+  force: string,
+  overrides?: Record<string, string>,
+): string {
+  const over = overrides?.[force]?.trim();
+  if (over) return over;
+  const key = force.trim().toLowerCase();
+  const match = Object.entries(overrides ?? {}).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (match?.[1]?.trim()) return match[1].trim();
+  return FORCE_LABELS_BN[force] ?? force;
+}
 
 /** SRB mess ranks only (Settings → Rank). Order = seniority. Short codes. */
 export const RANKS = [
   "DAD",
   "RT",
+  "SI",
   "ASI",
-  "AASI",
   "Naik",
   "Constable",
   "Cook",
-  "ANCE",
-  "Civill",
-  "Attached",
+  "NCE",
+  "Civil",
 ] as const;
+
+/** Full names for SRB short ranks. */
+export const RANK_LABELS: Record<string, string> = {
+  DAD: "Deputy Assistant Director",
+  RT: "Recruit Training",
+  SI: "Sub-Inspector",
+  ASI: "Assistant Sub-Inspector",
+  Naik: "Naik",
+  Constable: "Constable",
+  Cook: "Cook",
+  NCE: "Non-Combatant Employee",
+  Civil: "Civilian",
+  Attached: "Attached",
+};
+
+export const RANK_LABELS_BN: Record<string, string> = {
+  DAD: "ডিএডি",
+  RT: "আরটি",
+  SI: "এসআই",
+  ASI: "এএসআই",
+  AASI: "এএসআই",
+  Naik: "নায়েক",
+  Constable: "কনস্টেবল",
+  Cook: "পাচক",
+  NCE: "এনসি(ই)",
+  Civil: "সিভিল",
+  Attached: "সংযুক্ত",
+};
+
+export const RANK_CATALOG_SERIALS: Record<string, number> = Object.fromEntries(
+  RANKS.map((rank, i) => [rank, i + 1]),
+);
+
+export function isPreviousSrbRankCatalog(ranks?: string[]): boolean {
+  const set = new Set(
+    (ranks ?? []).map((rank) => rank.trim().toLowerCase()).filter(Boolean),
+  );
+  return (
+    set.has("aasi") ||
+    set.has("ance") ||
+    (set.has("asi") && !set.has("si"))
+  );
+}
+
+export function canonicalRankName(
+  label: string,
+  catalog?: string[],
+): string {
+  const key = label.trim().replace(/\s+/g, " ");
+  if (!key) return "";
+  const lower = key.toLowerCase();
+  if (lower === "civill" || lower === "civilian") return "Civil";
+  if (lower === "ance") return "NCE";
+  if (lower === "aasi") return "ASI";
+  if (lower === "attached") return "SI";
+  if (lower === "asi" && isPreviousSrbRankCatalog(catalog)) return "SI";
+  const match = RANKS.find((rank) => rank.toLowerCase() === lower);
+  return match ?? key;
+}
+
+export function rankOfficialSerial(
+  rank: string,
+  serials?: Record<string, number>,
+): number | null {
+  const stored = serials?.[rank];
+  if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
+    return Math.floor(stored);
+  }
+  const key = rank.trim().toLowerCase();
+  const match = Object.entries(serials ?? {}).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (match && typeof match[1] === "number" && match[1] > 0) {
+    return Math.floor(match[1]);
+  }
+  const canon = canonicalRankName(rank);
+  return RANK_CATALOG_SERIALS[canon] ?? RANK_CATALOG_SERIALS[rank] ?? null;
+}
+
+export function rankOfficialName(
+  rank: string,
+  labelOverrides?: Record<string, string>,
+): string {
+  const catalog = RANK_LABELS[canonicalRankName(rank)] ?? RANK_LABELS[rank];
+  const override = labelOverrides?.[rank]?.trim();
+  if (
+    override &&
+    override.toLowerCase() !== rank.toLowerCase() &&
+    override.toLowerCase() !== (catalog ?? "").toLowerCase()
+  ) {
+    return override;
+  }
+  return catalog || override || rank;
+}
+
+export function rankLabelBn(
+  rank: string,
+  overrides?: Record<string, string>,
+): string {
+  const over = overrides?.[rank]?.trim();
+  if (over) return over;
+  const key = rank.trim().toLowerCase();
+  const match = Object.entries(overrides ?? {}).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (match?.[1]?.trim()) return match[1].trim();
+  const canon = canonicalRankName(rank);
+  return RANK_LABELS_BN[canon] ?? RANK_LABELS_BN[rank] ?? rank;
+}
 
 /** Id slug for authorized row from English label. */
 export function authorizedIdForLabel(label: string): string {
@@ -438,7 +732,7 @@ export const DEFAULT_AUTHORIZED: AuthorizedStrength[] = [
     "Training School": 13,
   }),
   authRow("auth_rt", "RT", { Admin: 1 }),
-  authRow("auth_asi", "ASI", {
+  authRow("auth_asi", "SI", {
     Admin: 67,
     "Ops Wg": 31,
     "Int Wg": 64,
@@ -450,7 +744,7 @@ export const DEFAULT_AUTHORIZED: AuthorizedStrength[] = [
     "R & D Cell": 5,
     "Training School": 20,
   }),
-  authRow("auth_aasi", "AASI", {
+  authRow("auth_aasi", "ASI", {
     Admin: 42,
     "Ops Wg": 49,
     "Int Wg": 31,
@@ -481,14 +775,14 @@ export const DEFAULT_AUTHORIZED: AuthorizedStrength[] = [
     "Air Wg": 1,
     "Training School": 8,
   }),
-  authRow("auth_ance", "ANCE", {
+  authRow("auth_ance", "NCE", {
     Admin: 17,
     "Ops Wg": 2,
     "Inv Wg": 7,
     "Air Wg": 1,
     "Training School": 5,
   }),
-  authRow("auth_civill", "Civill", {
+  authRow("auth_civil", "Civil", {
     Admin: 11,
     "Int Wg": 2,
     "Inv Wg": 18,
@@ -498,19 +792,40 @@ export const DEFAULT_AUTHORIZED: AuthorizedStrength[] = [
   authRow("auth_attached", "Attached", {}),
 ];
 
-/** Full names for SRB short ranks. */
-export const RANK_LABELS: Record<string, string> = {
-  DAD: "Deputy Assistant Director",
-  RT: "Recruit Training",
-  ASI: "Assistant Sub-Inspector",
-  AASI: "Additional Assistant Sub-Inspector",
-  Naik: "Naik",
-  Constable: "Constable",
-  Cook: "Cook",
-  ANCE: "Ansar Non-Combatant Employee",
-  Civill: "Civilian",
-  Attached: "Attached",
-};
+const FORCE_CIVIL_TAIL = [
+  "CK",
+  "Msg",
+  "MW",
+  "Msl",
+  "Mali",
+  "LA",
+  "WB",
+  "Civ",
+] as const;
+
+const BGB_CIVIL_TAIL = [
+  "CK",
+  "MLSS",
+  "MW",
+  "Msl",
+  "Mali",
+  "LA",
+  "WB",
+  "Civ",
+] as const;
+
+const NAVY_CIVIL_TAIL = [
+  "OD",
+  "LCK/CK",
+  "NCE/Top",
+  "Msg",
+  "L/Std",
+  "Msl",
+  "Mali",
+  "LA",
+  "WB",
+  "Civ",
+] as const;
 
 /** Own rank ladder per parent force (Force expand). Not SRB ranks. */
 export const FORCE_DEFAULT_RANKS: Record<
@@ -518,162 +833,511 @@ export const FORCE_DEFAULT_RANKS: Record<
   readonly string[]
 > = {
   Army: [
+    "MWO",
     "SWO",
     "WO",
     "RT",
     "Sgt",
     "Cpl",
     "L/Cpl",
-    "OR",
-    "Cook",
-    "NCE",
-    "Messenger",
-    "Mess Waiter",
-    "Cook Assistant",
-    "Mali",
-    "Lab Asst",
-    "Ward Boy",
-    "Civil",
+    "Sainik",
+    ...FORCE_CIVIL_TAIL,
   ],
   Navy: [
+    "MCPO",
     "SCPO",
     "CPO",
+    "RT",
     "PO",
     "LS",
-    "LMA",
     "AB",
-    "MA-1",
-    "OD",
-    "LStwd",
-    "Cook",
-    "NCE",
-    "Top",
+    "Seaman",
+    ...NAVY_CIVIL_TAIL,
   ],
   "Air Force": [
+    "MWO",
     "SWO",
     "WO",
+    "RT",
     "Sgt",
     "Cpl",
     "LAC",
     "AC",
-    "Cook",
-    "NCE",
-    "Mess Waiter",
-    "Civil",
-  ],
-  BGB: [
-    "Sub",
-    "Nb Sub",
-    "Havildar",
-    "Naik",
-    "Lance Naik",
-    "Sepoy",
-    "Rifleman",
-    "Cook",
-    "NCE",
-    "Mali",
+    ...FORCE_CIVIL_TAIL,
   ],
   Police: [
+    "ASP",
     "Inspector",
+    "RT",
     "SI",
     "ASI",
     "Naik",
     "Constable",
+    ...FORCE_CIVIL_TAIL,
   ],
-  Ansar: [
-    "CA",
-    "PC",
-    "APC",
+  BGB: [
+    "SM",
+    "Sub",
+    "Nb Sub",
+    "RT",
     "Havildar",
     "Naik",
     "Lance Naik",
     "Sepoy",
-    "ML SS",
+    ...BGB_CIVIL_TAIL,
+  ],
+  Ansar: [
+    "CD",
+    "RT",
+    "PC",
+    "APC",
+    "Subedar",
+    "Nb Subedar",
+    "Havildar",
+    "Naik",
+    "Lance Naik",
+    "Sepoy",
+    ...FORCE_CIVIL_TAIL,
+  ],
+  "Coast Guard": [
+    "MCPO",
+    "SCPO",
+    "CPO",
+    "RT",
+    "PO",
+    "LS",
+    "AB",
+    "Seaman",
+    ...NAVY_CIVIL_TAIL,
   ],
   Civilian: ["S A EB"],
 };
+
+/** Map leftover force names onto the official 1–8 list. */
+export function canonicalForceName(
+  force: string,
+  rank = "",
+  memberType = "",
+): string {
+  if (memberType === "civilian") return "Civilian";
+  const key = force.trim().replace(/\s+/g, " ");
+  if (
+    !key ||
+    /^rab[- ]?(1|2|3|4|hq)$/i.test(key)
+  ) {
+    return rank === "Civil" ? "Civilian" : "Army";
+  }
+  const match = FORCES.find((f) => f.toLowerCase() === key.toLowerCase());
+  return match ?? key;
+}
+
+const SRB_TO_FORCE_RANK: Record<string, Partial<Record<(typeof FORCES)[number], string>>> = {
+  DAD: {
+    Army: "MWO",
+    Navy: "MCPO",
+    "Air Force": "MWO",
+    Police: "ASP",
+    BGB: "SM",
+    Ansar: "CD",
+    "Coast Guard": "MCPO",
+    Civilian: "S A EB",
+  },
+  RT: {
+    Army: "RT",
+    Navy: "RT",
+    "Air Force": "RT",
+    Police: "RT",
+    BGB: "RT",
+    Ansar: "RT",
+    "Coast Guard": "RT",
+    Civilian: "S A EB",
+  },
+  SI: {
+    Army: "Sgt",
+    Navy: "PO",
+    "Air Force": "Sgt",
+    Police: "SI",
+    BGB: "Havildar",
+    Ansar: "PC",
+    "Coast Guard": "PO",
+    Civilian: "S A EB",
+  },
+  ASI: {
+    Army: "Cpl",
+    Navy: "LS",
+    "Air Force": "Cpl",
+    Police: "ASI",
+    BGB: "Naik",
+    Ansar: "APC",
+    "Coast Guard": "LS",
+    Civilian: "S A EB",
+  },
+  Naik: {
+    Army: "L/Cpl",
+    Navy: "AB",
+    "Air Force": "LAC",
+    Police: "Naik",
+    BGB: "Naik",
+    Ansar: "Naik",
+    "Coast Guard": "AB",
+    Civilian: "S A EB",
+  },
+  Constable: {
+    Army: "Sainik",
+    Navy: "Seaman",
+    "Air Force": "AC",
+    Police: "Constable",
+    BGB: "Sepoy",
+    Ansar: "Sepoy",
+    "Coast Guard": "Seaman",
+    Civilian: "S A EB",
+  },
+  Cook: {
+    Army: "CK",
+    Navy: "LCK/CK",
+    "Air Force": "CK",
+    Police: "CK",
+    BGB: "CK",
+    Ansar: "CK",
+    "Coast Guard": "LCK/CK",
+    Civilian: "S A EB",
+  },
+  NCE: {
+    Army: "Civ",
+    Navy: "NCE/Top",
+    "Air Force": "Civ",
+    Police: "Civ",
+    BGB: "Civ",
+    Ansar: "Civ",
+    "Coast Guard": "NCE/Top",
+    Civilian: "S A EB",
+  },
+  Civil: {
+    Army: "Civ",
+    Navy: "Civ",
+    "Air Force": "Civ",
+    Police: "Civ",
+    BGB: "Civ",
+    Ansar: "Civ",
+    "Coast Guard": "Civ",
+    Civilian: "S A EB",
+  },
+};
+
+export function defaultForceRankForSrb(force: string, srbRank: string): string {
+  if (force === "Civilian") return "S A EB";
+  return (
+    SRB_TO_FORCE_RANK[srbRank]?.[force as (typeof FORCES)[number]] ?? ""
+  );
+}
+
+export const PINNED_FORCE_LADDERS = [
+  "Army",
+  "Navy",
+  "Air Force",
+  "Police",
+  "BGB",
+  "Ansar",
+  "Coast Guard",
+] as const;
+
+const FORCE_CIVIL_LABELS: Record<string, string> = {
+  CK: "Cook",
+  Msg: "Messenger",
+  MW: "Mess Waiter",
+  Msl: "Mosalchi",
+  Mali: "Mali",
+  LA: "Lab Assistant",
+  WB: "Ward Boy",
+  Civ: "Civil",
+  MLSS: "MLSS / Messenger",
+  OD: "Ordinary Seaman",
+  "LCK/CK": "LCK/CK Cook",
+  "NCE/Top": "NCE / Top",
+  "L/Std": "Leading Steward",
+};
+
+const FORCE_CIVIL_LABELS_BN: Record<string, string> = {
+  CK: "পাচক",
+  Msg: "বার্তাবাহক",
+  MW: "মেস ওয়েটার",
+  Msl: "মসালচি",
+  Mali: "মালি",
+  LA: "ল্যাব অ্যাসিস্ট্যান্ট",
+  WB: "ওয়ার্ড বয়",
+  Civ: "সিভিল",
+  MLSS: "এমএলএসএস / বার্তাবাহক",
+  OD: "ওডি",
+  "LCK/CK": "এলসিকে/সিকে কুক",
+  "NCE/Top": "এনসিই / টপ",
+  "L/Std": "এল স্টুয়ার্ড",
+};
+
+/** Old long force-rank labels → short codes (same style as MWO / SI / L/Cpl). */
+export const FORCE_RANK_SHORT_RENAMES: Record<string, string> = {
+  cook: "CK",
+  messenger: "Msg",
+  "mess waiter": "MW",
+  mosalchi: "Msl",
+  "lab assistant": "LA",
+  "lab asssistant": "LA",
+  "ward boy": "WB",
+  civil: "Civ",
+  "mlss/messenger": "MLSS",
+  "mlss / messenger": "MLSS",
+  "lck/ck cook": "LCK/CK",
+  "lck/ck": "LCK/CK",
+  "nce/top": "NCE/Top",
+  "l steward": "L/Std",
+  "leading steward": "L/Std",
+};
+
+export function canonicalForceServiceRank(label: string): string {
+  const key = label.trim().replace(/\s+/g, " ");
+  if (!key) return "";
+  const mapped = FORCE_RANK_SHORT_RENAMES[key.toLowerCase()];
+  return mapped ?? key;
+}
+
+/** Suggest a short code when the add form is given a known full name. */
+export function suggestForceRankShort(fullOrShort: string): string {
+  const key = fullOrShort.trim().replace(/\s+/g, " ");
+  if (!key) return "";
+  const canon = canonicalForceServiceRank(key);
+  if (canon && canon.toLowerCase() !== key.toLowerCase()) return canon;
+  const lower = key.toLowerCase();
+  for (const labels of Object.values(FORCE_RANK_LABELS)) {
+    for (const [short, long] of Object.entries(labels ?? {})) {
+      if (long.toLowerCase() === lower) return short;
+    }
+  }
+  return "";
+}
 
 /** Full names for force short ranks (Army first; others optional). */
 export const FORCE_RANK_LABELS: Partial<
   Record<(typeof FORCES)[number], Record<string, string>>
 > = {
   Army: {
+    MWO: "Master Warrant Officer",
     SWO: "Senior Warrant Officer",
     WO: "Warrant Officer",
     RT: "Recruit Training",
     Sgt: "Sergeant",
     Cpl: "Corporal",
     "L/Cpl": "Lance Corporal",
-    OR: "Soldier",
-    Cook: "Cook",
-    NCE: "Non-Combatant Employee",
-    Messenger: "Messenger",
-    "Mess Waiter": "Mess Waiter",
-    "Cook Assistant": "Cook Assistant",
-    Mali: "Mali (Gardener)",
-    "Lab Asst": "Laboratory Assistant",
-    "Ward Boy": "Ward Boy",
-    Civil: "Civilian",
+    Sainik: "Sainik",
+    OR: "Sainik",
+    ...FORCE_CIVIL_LABELS,
   },
   Navy: {
+    MCPO: "Master Chief Petty Officer",
     SCPO: "Senior Chief Petty Officer",
     CPO: "Chief Petty Officer",
+    RT: "Recruit Training",
     PO: "Petty Officer",
     LS: "Leading Seaman",
-    LMA: "Leading Mechanician Assistant",
     AB: "Able Seaman",
-    "MA-1": "Mechanician Assistant-1",
-    OD: "Ordinary Seaman",
-    LStwd: "Leading Steward",
-    Cook: "Steward Cook",
-    NCE: "Non-Combatant Employee",
-    Top: "Topas",
+    Seaman: "Seaman",
+    ...FORCE_CIVIL_LABELS,
   },
   "Air Force": {
+    MWO: "Master Warrant Officer",
     SWO: "Senior Warrant Officer",
     WO: "Warrant Officer",
+    RT: "Recruit Training",
     Sgt: "Sergeant",
     Cpl: "Corporal",
     LAC: "Leading Aircraftman",
     AC: "Aircraftman",
-    Cook: "Cook",
-    NCE: "Non-Combatant Employee",
-    "Mess Waiter": "Mess Waiter",
-    Civil: "Civilian",
-  },
-  BGB: {
-    Sub: "Subedar",
-    "Nb Sub": "Naib Subedar",
-    Havildar: "Havildar",
-    Naik: "Naik",
-    "Lance Naik": "Lance Naik",
-    Sepoy: "Sepoy",
-    Rifleman: "Rifleman",
-    Cook: "Cook",
-    NCE: "Non-Combatant Employee",
-    Mali: "Mali",
+    ...FORCE_CIVIL_LABELS,
   },
   Police: {
+    ASP: "Assistant Superintendent of Police",
     Inspector: "Inspector",
+    RT: "Recruit Training",
     SI: "Sub-Inspector",
     ASI: "Assistant Sub-Inspector",
     Naik: "Naik",
     Constable: "Constable",
+    ...FORCE_CIVIL_LABELS,
   },
-  Ansar: {
-    CA: "Circle Adjutant",
-    PC: "Platoon Commander",
-    APC: "Assistant Platoon Commander",
+  BGB: {
+    SM: "Subedar Major",
+    Sub: "Subedar",
+    "Nb Sub": "Naib Subedar",
+    RT: "Recruit Training",
     Havildar: "Havildar",
     Naik: "Naik",
     "Lance Naik": "Lance Naik",
     Sepoy: "Sepoy",
-    "ML SS": "ML SS",
+    ...FORCE_CIVIL_LABELS,
+  },
+  Ansar: {
+    CD: "Circle Adjutant",
+    RT: "Recruit Training",
+    PC: "Platoon Commander",
+    APC: "Assistant Platoon Commander",
+    Subedar: "Subedar",
+    "Nb Subedar": "Naib Subedar",
+    Havildar: "Havildar",
+    Naik: "Naik",
+    "Lance Naik": "Lance Naik",
+    Sepoy: "Sepoy",
+    ...FORCE_CIVIL_LABELS,
+  },
+  "Coast Guard": {
+    MCPO: "Master Chief Petty Officer",
+    SCPO: "Senior Chief Petty Officer",
+    CPO: "Chief Petty Officer",
+    RT: "Recruit Training",
+    PO: "Petty Officer",
+    LS: "Leading Seaman",
+    AB: "Able Seaman",
+    Seaman: "Seaman",
+    ...FORCE_CIVIL_LABELS,
   },
   Civilian: {
     "S A EB": "S A EB",
   },
 };
+
+export const FORCE_RANK_LABELS_BN: Partial<
+  Record<(typeof FORCES)[number], Record<string, string>>
+> = {
+  Army: {
+    MWO: "মাস্টার ওয়ারেন্ট অফিসার",
+    SWO: "সিনিয়র ওয়ারেন্ট অফিসার",
+    WO: "ওয়ারেন্ট অফিসার",
+    RT: "আরটি",
+    Sgt: "সার্জেন্ট",
+    Cpl: "কর্পোরাল",
+    "L/Cpl": "ল্যান্স কর্পোরাল",
+    Sainik: "সৈনিক",
+    ...FORCE_CIVIL_LABELS_BN,
+  },
+  Navy: {
+    MCPO: "মাস্টার চিফ পেটি অফিসার",
+    SCPO: "সিনিয়র চিফ পেটি অফিসার",
+    CPO: "চিফ পেটি অফিসার",
+    RT: "আরটি",
+    PO: "পেটি অফিসার",
+    LS: "লিডিং সিম্যান",
+    AB: "এবল সিম্যান",
+    Seaman: "সিম্যান",
+    ...FORCE_CIVIL_LABELS_BN,
+  },
+  "Air Force": {
+    MWO: "মাস্টার ওয়ারেন্ট অফিসার",
+    SWO: "সিনিয়র ওয়ারেন্ট অফিসার",
+    WO: "ওয়ারেন্ট অফিসার",
+    RT: "আরটি",
+    Sgt: "সার্জেন্ট",
+    Cpl: "কর্পোরাল",
+    LAC: "লিডিং এয়ারক্র্যাফটম্যান",
+    AC: "এয়ারক্র্যাফটম্যান",
+    ...FORCE_CIVIL_LABELS_BN,
+  },
+  Police: {
+    ASP: "সহকারী পুলিশ সুপার",
+    Inspector: "ইন্সপেক্টর",
+    RT: "আরটি",
+    SI: "সাব-ইন্সপেক্টর",
+    ASI: "সহকারী সাব-ইন্সপেক্টর",
+    Naik: "নায়েক",
+    Constable: "কনস্টেবল",
+    ...FORCE_CIVIL_LABELS_BN,
+  },
+  BGB: {
+    SM: "সুবেদার মেজর",
+    Sub: "সুবেদার",
+    "Nb Sub": "নায়েব সুবেদার",
+    RT: "আরটি",
+    Havildar: "হাবিলদার",
+    Naik: "নায়েক",
+    "Lance Naik": "ল্যান্স নায়েক",
+    Sepoy: "সিপাহি",
+    ...FORCE_CIVIL_LABELS_BN,
+  },
+  Ansar: {
+    CD: "সার্কেল অ্যাডজুটেন্ট",
+    RT: "আরটি",
+    PC: "প্লাটুন কমান্ডার",
+    APC: "সহকারী প্লাটুন কমান্ডার",
+    Subedar: "সুবেদার",
+    "Nb Subedar": "নায়েব সুবেদার",
+    Havildar: "হাবিলদার",
+    Naik: "নায়েক",
+    "Lance Naik": "ল্যান্স নায়েক",
+    Sepoy: "সিপাহি",
+    ...FORCE_CIVIL_LABELS_BN,
+  },
+  "Coast Guard": {
+    MCPO: "মাস্টার চিফ পেটি অফিসার",
+    SCPO: "সিনিয়র চিফ পেটি অফিসার",
+    CPO: "চিফ পেটি অফিসার",
+    RT: "আরটি",
+    PO: "পেটি অফিসার",
+    LS: "লিডিং সিম্যান",
+    AB: "এবল সিম্যান",
+    Seaman: "সিম্যান",
+    ...FORCE_CIVIL_LABELS_BN,
+  },
+  Civilian: {
+    "S A EB": "এস এ ইবি",
+  },
+};
+
+export const FORCE_RANK_SERIALS: Record<string, Record<string, number>> =
+  Object.fromEntries(
+    Object.entries(FORCE_DEFAULT_RANKS).map(([force, ranks]) => [
+      force,
+      Object.fromEntries(ranks.map((rank, i) => [rank, i + 1])),
+    ]),
+  );
+
+export function forceRankOfficialSerial(
+  force: string,
+  rank: string,
+  serials?: Record<string, Record<string, number>>,
+): number | null {
+  const canon = canonicalForceServiceRank(rank);
+  const stored = serials?.[force]?.[canon] ?? serials?.[force]?.[rank];
+  if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
+    return Math.floor(stored);
+  }
+  const byForce = serials?.[force] ?? {};
+  const key = canon.trim().toLowerCase();
+  const match = Object.entries(byForce).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (match && typeof match[1] === "number" && match[1] > 0) {
+    return Math.floor(match[1]);
+  }
+  return FORCE_RANK_SERIALS[force]?.[canon] ?? FORCE_RANK_SERIALS[force]?.[rank] ?? null;
+}
+
+export function forceRankLabelBn(
+  force: string,
+  rank: string,
+  overrides?: Record<string, Record<string, string>>,
+): string {
+  const canon = canonicalForceServiceRank(rank);
+  const over =
+    overrides?.[force]?.[canon]?.trim() || overrides?.[force]?.[rank]?.trim();
+  if (over) return over;
+  const byForce = overrides?.[force] ?? {};
+  const key = canon.trim().toLowerCase();
+  const match = Object.entries(byForce).find(
+    ([name]) => name.toLowerCase() === key,
+  );
+  if (match?.[1]?.trim()) return match[1].trim();
+  return (
+    FORCE_RANK_LABELS_BN[force as (typeof FORCES)[number]]?.[canon] ??
+    FORCE_RANK_LABELS_BN[force as (typeof FORCES)[number]]?.[rank] ??
+    rank
+  );
+}
 
 /** Old Army officer ladder — migrate localStorage once. */
 export const LEGACY_ARMY_RANKS = [
@@ -808,16 +1472,20 @@ export function rankDisplayLabel(
   force?: string,
   labelOverrides?: Record<string, string>,
 ): string {
+  const canon = force ? canonicalForceServiceRank(short) : short;
   const long =
+    labelOverrides?.[canon] ??
     labelOverrides?.[short] ??
     (force
-      ? FORCE_RANK_LABELS[force as (typeof FORCES)[number]]?.[short]
+      ? FORCE_RANK_LABELS[force as (typeof FORCES)[number]]?.[canon] ??
+        FORCE_RANK_LABELS[force as (typeof FORCES)[number]]?.[short]
       : undefined) ??
     RANK_LABELS[short];
-  if (long && long.toLowerCase() !== short.toLowerCase()) {
-    return `${short} — ${long}`;
+  const shown = force ? canon : short;
+  if (long && long.toLowerCase() !== shown.toLowerCase()) {
+    return `${shown} — ${long}`;
   }
-  return short;
+  return shown;
 }
 
 /** Rank choices under a Force expand (defaults − removed + user extras). */
@@ -861,7 +1529,7 @@ export function defaultForceRanks(
 
 /** Org header for Consume print bills (prototype defaults). */
 export const CONSUME_REPORT_META = {
-  orgName: "SRB-Special Response Battalion Headquarters",
+  orgName: "Special Response Battalion (SRB) Headquarters",
   orgNameBn: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর",
   station: "Kurmitola, Dhaka",
   stationBn: "কুর্মিটোলা, ঢাকা",
@@ -877,7 +1545,7 @@ export const FR_FUEL_RATE_PER_DAY =
 
 /** Org / letter defaults for Ration Accounts print & transfer export. */
 export const RATION_REPORT_META = {
-  orgName: "SRB-Special Response Battalion Headquarters",
+  orgName: "Special Response Battalion (SRB) Headquarters",
   orgNameBn: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর",
   govLine: "Government of the People's Republic of Bangladesh",
   policeLine: "Bangladesh Police",

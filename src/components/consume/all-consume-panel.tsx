@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { useStore } from "@/hooks/use-store";
 import { IconUsers } from "@tabler/icons-react";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { MonthNav } from "@/components/shared/month-nav";
@@ -12,12 +11,9 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { usePagination } from "@/hooks/use-pagination";
 
 import { formatBdt } from "@/lib/reports";
@@ -47,7 +43,6 @@ export function AllConsumePanel({
   tiles,
 }: Props) {
   const t = useT();
-  const { ranks, wings } = useStore();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
@@ -111,42 +106,18 @@ export function AllConsumePanel({
         tiles={tiles}
       >
         <MonthNav compact month={month} onChange={onMonthChange} />
-        <div className="w-[6.75rem] shrink">
-          <Select value={rank} onValueChange={setRank}>
-            <SelectTrigger
-              className={cn(fieldClass, "w-full")}
-              aria-label={t("cc.filterRank")}
-            >
-              <SelectValue placeholder={t("cc.selectRank")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("common.allRank")}</SelectItem>
-              {ranks.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {r}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-[6.5rem] shrink">
-          <Select value={wing} onValueChange={setWing}>
-            <SelectTrigger
-              className={cn(fieldClass, "w-full")}
-              aria-label={t("cc.filterWing")}
-            >
-              <SelectValue placeholder={t("cc.selectWing")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("common.allWing")}</SelectItem>
-              {wings.map((w) => (
-                <SelectItem key={w} value={w}>
-                  {w}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <SettingsRankFilter
+          value={rank}
+          onChange={setRank}
+          className="w-[7.25rem] shrink"
+          triggerClassName={cn(fieldClass, "w-full")}
+        />
+        <SettingsWingFilter
+          value={wing}
+          onChange={setWing}
+          className="w-[7.25rem] shrink"
+          triggerClassName={cn(fieldClass, "w-full")}
+        />
       </SearchFilterBar>
 
       {rows.length === 0 ? (

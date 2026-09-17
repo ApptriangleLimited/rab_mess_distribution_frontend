@@ -88,6 +88,7 @@ class MemberIn(BaseModel):
     rank: str = ""
     wing: str = ""
     force: str = ""
+    force_rank: str = ""
     religion: str = ""
     member_type: MemberType = "permanent"
     dropdown_no: str = ""
@@ -144,6 +145,7 @@ class MemberOut(BaseModel):
     rank: str
     wing: str
     force: str
+    force_rank: str = ""
     religion: str
     member_type: str
     dropdown_no: str
@@ -161,6 +163,7 @@ class MemberOut(BaseModel):
     branch_location: str
     joining_date: str | None
     out_date: str | None
+    duty_start: str | None = None
     default_tag: str
     emergency_contacts: list[dict[str, Any]]
     created_at: datetime

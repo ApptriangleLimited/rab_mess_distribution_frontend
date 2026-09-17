@@ -3,7 +3,7 @@ name: rab-mess
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: rab-mess-postgres
+    container_name: srb_database
     restart: unless-stopped
     environment:
       POSTGRES_USER: mess
@@ -19,7 +19,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: rab-mess-redis
+    container_name: srb_redis
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -48,7 +48,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: rab-mess-api
+    container_name: srb_backend
     restart: unless-stopped
     environment:
       POSTGRES_USER: mess
@@ -94,7 +94,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: rab-mess-worker
+    container_name: srb_worker
     restart: unless-stopped
     command: ["python", "worker.py"]
     environment:
@@ -131,7 +131,7 @@ services:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
         API_PROXY_URL: http://api:8000
         GIT_SHA: ${GIT_SHA:-dev}
-    container_name: rab-mess-web
+    container_name: srb_frontend
     restart: unless-stopped
     environment:
       API_PROXY_URL: http://api:8000

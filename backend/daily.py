@@ -77,18 +77,24 @@ def resolve_range(
     raise HTTPException(status_code=400, detail="from/to or month is required")
 
 
+def roster_start(member: Member) -> date | None:
+    """First day the member may receive Daily RR tags."""
+    starts = [d for d in (member.duty_start, member.joining_date) if d]
+    return max(starts) if starts else None
+
+
 def is_inactive_on(member: Member, day: date) -> bool:
-    join = member.joining_date
-    if join and day < join:
+    roster = roster_start(member)
+    if roster and day < roster:
         return True
     for span in member.inactive_spans or []:
         if not isinstance(span, dict) or not span.get("from"):
             continue
         try:
-            start = date.fromisoformat(str(span["from"])[:10])
+            span_from = date.fromisoformat(str(span["from"])[:10])
         except ValueError:
             continue
-        if day < start:
+        if day < span_from:
             continue
         raw_to = span.get("to")
         if raw_to:
@@ -112,6 +118,8 @@ def is_inactive_on(member: Member, day: date) -> bool:
 
 
 def can_assign(member: Member, day: date) -> bool:
+    if member.member_type in ("guest", "civilian"):
+        return False
     if is_inactive_on(member, day):
         return False
     if member.out_date and day > member.out_date:
@@ -146,6 +154,8 @@ def member_matches(
 ) -> bool:
     if member.approval_status != "approved":
         return False
+    if member.member_type in ("guest", "civilian"):
+        return False
     if rank and rank != "all" and member.rank != rank:
         return False
     if wing and wing != "all" and member.wing != wing:
@@ -179,6 +189,7 @@ def project_cell(
             "date": day.isoformat(),
             "tag": stored.tag,
             "source": "stored",
+            "trg_tone": stored.trg_tone,
             "updated_at": stored.updated_at.isoformat() if stored.updated_at else None,
             "updated_by": stored.updated_by,
         }
@@ -300,8 +311,9 @@ def freeze_prior_tags(db: Session, member: Member, before: date, staff: Staff) -
     if not default or before <= date.min:
         return
     window_start = before - timedelta(days=90)
-    if member.joining_date and member.joining_date > window_start:
-        window_start = member.joining_date
+    start = roster_start(member)
+    if start and start > window_start:
+        window_start = start
     if window_start >= before:
         return
     last = before - timedelta(days=1)
@@ -339,12 +351,22 @@ def freeze_prior_tags(db: Session, member: Member, before: date, staff: Staff) -
         )
 
 
+def infer_trg_tone(force: str | None, trg_tone: str | None = None) -> str:
+    if trg_tone in ("black", "red"):
+        return trg_tone
+    key = (force or "").strip().lower().replace("-", " ").replace("_", " ")
+    if key in {"army", "navy", "air force", "police", "ansar"}:
+        return "black"
+    return "red"
+
+
 def upsert_assignment(
     db: Session,
     member: Member,
     day: date,
     tag: str,
     staff: Staff,
+    trg_tone: str | None = None,
 ) -> Assignment:
     freeze_prior_tags(db, member, day, staff)
     row = (
@@ -353,8 +375,10 @@ def upsert_assignment(
         .first()
     )
     now = utcnow()
+    tone = infer_trg_tone(member.force, trg_tone) if tag == "TRG" else None
     if row:
         row.tag = tag
+        row.trg_tone = tone
         row.updated_by = staff.id
         row.updated_at = now
     else:
@@ -363,6 +387,7 @@ def upsert_assignment(
             user_id=member.id,
             date=day,
             tag=tag,
+            trg_tone=tone,
             updated_by=staff.id,
             updated_at=now,
         )
@@ -378,12 +403,14 @@ class AssignmentIn(BaseModel):
     member_id: str
     date: str
     tag: str
+    trg_tone: str | None = None
 
 
 class AssignmentRangeIn(BaseModel):
     member_id: str
     dates: list[str]
     tag: str = ""
+    trg_tone: str | None = None
 
 
 class BoroKhanaIn(BaseModel):
@@ -496,7 +523,7 @@ def put_assignment(
         raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if not can_write_tag(member, day, tag):
         raise HTTPException(status_code=409, detail="Cannot assign tag on this date")
-    row = upsert_assignment(db, member, day, tag, staff)
+    row = upsert_assignment(db, member, day, tag, staff, body.trg_tone)
     db.commit()
     db.refresh(row)
     bust_daily()
@@ -508,6 +535,7 @@ def put_assignment(
                     "date": row.date.isoformat(),
                     "tag": row.tag,
                     "source": "stored",
+                    "trg_tone": row.trg_tone,
                     "updated_at": row.updated_at.isoformat(),
                     "updated_by": row.updated_by,
                 }
@@ -586,13 +614,14 @@ def put_assignment_range(
         if tag:
             if not can_write_tag(member, day, tag):
                 continue
-            row = upsert_assignment(db, member, day, tag, staff)
+            row = upsert_assignment(db, member, day, tag, staff, body.trg_tone)
             items.append(
                 {
                     "member_id": row.user_id,
                     "date": row.date.isoformat(),
                     "tag": row.tag,
                     "source": "stored",
+                    "trg_tone": row.trg_tone,
                     "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
                     "updated_by": row.updated_by,
                 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconChevronDown,
   IconPencil,
@@ -14,13 +14,19 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/shared/toast-provider";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
-import { WING_LABELS, wingDisplayLabel } from "@/lib/constants";
-import { wingSettingsLabel } from "@/lib/rank-labels";
+import {
+  WING_LABELS,
+  wingDisplayLabel,
+  wingOfficialName,
+  wingOfficialSerial,
+} from "@/lib/constants";
+import { wingLabelBn } from "@/lib/rank-labels";
 import {
   addWing,
   listWingChildren,
   removeWing,
   renameWing,
+  repairOfficialHqBranch,
 } from "@/lib/store/org-options";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +50,15 @@ function WingNode({
   const childCount = children.length;
   const hasChildren = childCount > 0;
   const pad = 12 + depth * 16;
-  const display = wingSettingsLabel(label);
+  const serial = wingOfficialSerial(label, state.wing_serials);
+  const official = wingOfficialName(label, state.wing_labels);
+  const bn = wingLabelBn(label, state.wing_labels_bn);
+  const showBn =
+    bn &&
+    bn.toLowerCase() !== official.toLowerCase() &&
+    bn.toLowerCase() !== label.toLowerCase();
+  const showShort =
+    label.trim().toLowerCase() !== official.trim().toLowerCase();
 
   function toggleOpen() {
     if (!hasChildren) return;
@@ -82,21 +96,51 @@ function WingNode({
           ) : (
             <span className="inline-flex h-8 w-8 shrink-0" aria-hidden />
           )}
+          {serial != null ? (
+            <span
+              className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-neutral-900/10 px-1.5 font-mono text-[11px] font-semibold tabular-nums text-neutral-600 dark:bg-white/10 dark:text-neutral-300"
+              title={t("settings.wingSerial")}
+            >
+              {serial}
+            </span>
+          ) : (
+            <span className="inline-flex h-7 w-7 shrink-0" aria-hidden />
+          )}
           {hasChildren ? (
             <button
               type="button"
-              className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-neutral-900 hover:text-primary dark:text-white"
+              className="min-w-0 flex-1 truncate text-left"
               onClick={toggleOpen}
-              title={display}
+              title={`${official}${showBn ? ` (${bn})` : ""}${showShort ? ` · ${label}` : ""}`}
             >
-              {display}
+              <span className="block truncate text-sm font-semibold text-neutral-900 hover:text-primary dark:text-white">
+                {official}
+                {showBn ? (
+                  <span className="font-medium text-neutral-500"> ({bn})</span>
+                ) : null}
+              </span>
+              {showShort ? (
+                <span className="mt-0.5 block truncate text-[11px] font-medium text-neutral-500">
+                  {label}
+                </span>
+              ) : null}
             </button>
           ) : (
             <span
-              className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-900 dark:text-white"
-              title={display}
+              className="min-w-0 flex-1 truncate"
+              title={`${official}${showBn ? ` (${bn})` : ""}${showShort ? ` · ${label}` : ""}`}
             >
-              {display}
+              <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-white">
+                {official}
+                {showBn ? (
+                  <span className="font-medium text-neutral-500"> ({bn})</span>
+                ) : null}
+              </span>
+              {showShort ? (
+                <span className="mt-0.5 block truncate text-[11px] font-medium text-neutral-500">
+                  {label}
+                </span>
+              ) : null}
             </span>
           )}
           {hasChildren ? (
@@ -160,6 +204,9 @@ export function WingTreeList() {
   const t = useT();
   const { toast } = useToast();
   const state = useStore();
+  useEffect(() => {
+    repairOfficialHqBranch();
+  }, []);
   const roots = listWingChildren(null);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -167,6 +214,8 @@ export function WingTreeList() {
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const [formValue, setFormValue] = useState("");
   const [formFull, setFormFull] = useState("");
+  const [formBangla, setFormBangla] = useState("");
+  const [formSerial, setFormSerial] = useState("");
   const [deleteLabel, setDeleteLabel] = useState<string | null>(null);
 
   function startCreateRoot() {
@@ -174,6 +223,8 @@ export function WingTreeList() {
     setEditingLabel(null);
     setFormValue("");
     setFormFull("");
+    setFormBangla("");
+    setFormSerial("");
     setFormOpen(true);
   }
 
@@ -182,6 +233,8 @@ export function WingTreeList() {
     setEditingLabel(null);
     setFormValue("");
     setFormFull("");
+    setFormBangla("");
+    setFormSerial("");
     setFormOpen(true);
   }
 
@@ -192,6 +245,9 @@ export function WingTreeList() {
     setFormFull(
       state.wing_labels[label] ?? WING_LABELS[label] ?? "",
     );
+    setFormBangla(state.wing_labels_bn[label] ?? wingLabelBn(label));
+    const serial = wingOfficialSerial(label, state.wing_serials);
+    setFormSerial(serial != null ? String(serial) : "");
     setFormOpen(true);
   }
 
@@ -201,21 +257,37 @@ export function WingTreeList() {
     setEditingLabel(null);
     setFormValue("");
     setFormFull("");
+    setFormBangla("");
+    setFormSerial("");
+  }
+
+  function parsedSerial() {
+    const raw = formSerial.trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
   }
 
   function onSave() {
     const label = formValue.trim();
     const full = formFull.trim();
+    const bangla = formBangla.trim();
+    const serial = parsedSerial();
     if (!label) {
       toast(t("settings.orgLabelRequired"), "error");
       return;
     }
     if (editingLabel) {
-      if (label === editingLabel && full === (state.wing_labels[editingLabel] ?? WING_LABELS[editingLabel] ?? "")) {
+      if (
+        label === editingLabel &&
+        full === (state.wing_labels[editingLabel] ?? WING_LABELS[editingLabel] ?? "") &&
+        bangla === (state.wing_labels_bn[editingLabel] ?? wingLabelBn(editingLabel)) &&
+        serial === wingOfficialSerial(editingLabel, state.wing_serials)
+      ) {
         closeForm();
         return;
       }
-      if (!renameWing(editingLabel, label, full || undefined)) {
+      if (!renameWing(editingLabel, label, full || undefined, bangla, serial)) {
         toast(t("settings.orgLabelDuplicate"), "error");
         return;
       }
@@ -223,7 +295,7 @@ export function WingTreeList() {
       closeForm();
       return;
     }
-    const created = addWing(label, parentWing, full || undefined);
+    const created = addWing(label, parentWing, full || undefined, bangla, serial);
     if (!created) {
       toast(t("settings.orgLabelDuplicate"), "error");
       return;
@@ -246,6 +318,9 @@ export function WingTreeList() {
     <>
       <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-3 py-2 dark:border-neutral-800">
         <p className="text-[11px] text-neutral-500">
+          <span className="mr-2 font-semibold text-neutral-600 dark:text-neutral-300">
+            {t("settings.wingSerial")}
+          </span>
           {t("settings.wingsTreeHint")}
         </p>
         <Button
@@ -319,12 +394,15 @@ export function WingTreeList() {
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-[11px] text-neutral-500">
-              {t("settings.wingShortName")}
+              {t("settings.wingSerialField")}
             </Label>
             <Input
-              value={formValue}
-              onChange={(e) => setFormValue(e.target.value)}
-              placeholder={t("settings.wingPlaceholder")}
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={formSerial}
+              onChange={(e) => setFormSerial(e.target.value)}
+              placeholder={t("settings.wingSerialPlaceholder")}
               autoFocus
               className="h-9 rounded-lg text-sm"
               onKeyDown={(e) => {
@@ -343,6 +421,40 @@ export function WingTreeList() {
               value={formFull}
               onChange={(e) => setFormFull(e.target.value)}
               placeholder={t("settings.wingFullPlaceholder")}
+              className="h-9 rounded-lg text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSave();
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] text-neutral-500">
+              {t("settings.wingBanglaName")}
+            </Label>
+            <Input
+              value={formBangla}
+              onChange={(e) => setFormBangla(e.target.value)}
+              placeholder={t("settings.wingBanglaPlaceholder")}
+              className="h-9 rounded-lg text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSave();
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] text-neutral-500">
+              {t("settings.wingShortName")}
+            </Label>
+            <Input
+              value={formValue}
+              onChange={(e) => setFormValue(e.target.value)}
+              placeholder={t("settings.wingPlaceholder")}
               className="h-9 rounded-lg text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {

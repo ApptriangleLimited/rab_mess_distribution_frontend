@@ -6,7 +6,7 @@ Never point these commands at a production host. Never restore over the live app
 
 ```text
 RESTORE DRILL: PASS
-SOURCE: rab_mess (container rab-mess-postgres)
+SOURCE: rab_mess (container srb_database)
 ALTERNATE: rab_mess_restore_drill
 ALEMBIC: 0002_platform (source and restore match)
 LIVE API: left pointed at rab_mess (not switched)
@@ -31,10 +31,10 @@ Dump was written **inside** the Postgres container (`/tmp/rab_mess_restore_drill
 ## Commands used
 
 ```bash
-docker exec rab-mess-postgres psql -U mess -d rab_mess -c "SELECT version_num FROM alembic_version;"
-docker exec rab-mess-postgres pg_dump -U mess -d rab_mess -f /tmp/rab_mess_restore_drill.sql
-docker exec rab-mess-postgres psql -U mess -d postgres -c "CREATE DATABASE rab_mess_restore_drill;"
-docker exec rab-mess-postgres psql -U mess -d rab_mess_restore_drill -f /tmp/rab_mess_restore_drill.sql
+docker exec srb_database psql -U mess -d rab_mess -c "SELECT version_num FROM alembic_version;"
+docker exec srb_database pg_dump -U mess -d rab_mess -f /tmp/rab_mess_restore_drill.sql
+docker exec srb_database psql -U mess -d postgres -c "CREATE DATABASE rab_mess_restore_drill;"
+docker exec srb_database psql -U mess -d rab_mess_restore_drill -f /tmp/rab_mess_restore_drill.sql
 ```
 
 Application check (isolated process, live API unchanged):
@@ -51,7 +51,7 @@ Use `./scripts/backup-postgres.sh` then restore **only** into `rab_mess_restore_
 Drop the drill database when finished:
 
 ```bash
-docker exec rab-mess-postgres psql -U mess -d postgres -c "DROP DATABASE IF EXISTS rab_mess_restore_drill;"
+docker exec srb_database psql -U mess -d postgres -c "DROP DATABASE IF EXISTS rab_mess_restore_drill;"
 ```
 
 ## Common failures

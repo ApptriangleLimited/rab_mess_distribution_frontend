@@ -17,12 +17,9 @@ import { WingSummaryButton } from "@/components/consume/wing-summary-button";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 
@@ -38,7 +35,6 @@ function defaultRange() {
 export default function ConsumeLedgerClient() {
   const t = useT();
   const state = useStore();
-  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const initial = defaultRange();
 
@@ -178,36 +174,18 @@ export default function ConsumeLedgerClient() {
             onChange={({ from, to }) => applyDateRange(from, to)}
             label={t("common.dateRange")}
           />
-          <div className="w-[9.5rem] shrink-0">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {ranks.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[9rem] shrink-0">
-            <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {wings.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SettingsRankFilter
+            value={rank}
+            onChange={setRank}
+            className="w-[9.5rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <SettingsWingFilter
+            value={wing}
+            onChange={setWing}
+            className="w-[9rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
           <WingSummaryButton
             month={month}
             wing={wing}

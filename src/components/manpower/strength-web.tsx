@@ -8,6 +8,7 @@ import { useStore } from "@/hooks/use-store";
 import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import {
   STRENGTH_CATEGORIES,
+  strengthCategoryLabelBn,
   strengthMetricTotal,
   sumAbsenceRows,
   type StrengthAbsenceRow,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   report: StrengthReport;
+  readOnly?: boolean;
 };
 
 function formatCount(value: number, bn?: boolean) {
@@ -320,7 +322,7 @@ function RankHead({
           key={c.id}
           className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700"
         >
-          {c.labelBn}
+          {strengthCategoryLabelBn(c)}
         </th>
       ))}
       <th className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700">
@@ -596,7 +598,7 @@ function HqAbsenceSection({ report }: { report: StrengthReport }) {
 }
 
 /** Screen / tab panel view of Form 2/3 (not print letter). */
-export function StrengthWeb({ report }: Props) {
+export function StrengthWeb({ report, readOnly = false }: Props) {
   const isHq = report.formNo === 3;
   const form2 = report.formNo === 2;
   const bn = true;
@@ -658,7 +660,7 @@ export function StrengthWeb({ report }: Props) {
                     block={block}
                     date={report.date}
                     officerAuthorizedId={report.officerAuthorizedId}
-                    editableOfficer
+                    editableOfficer={!readOnly}
                     bn={bn}
                     form2={form2}
                   />

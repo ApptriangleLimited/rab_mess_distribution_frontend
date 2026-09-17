@@ -30,12 +30,14 @@ function newId() {
   return `tr_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** MS + MFR apply now. FR/CD → Ration. All other tags → Consume. */
+/** MS + MFR apply now. FR/CD → Ration. Red TRG → Ration. Black TRG applies now. */
 export function dutyTagQueue(
   tag: DailyTag | "",
+  trgTone?: TrgTone,
 ): "immediate" | "ration" | "consume" {
   if (!tag || tag === "MS" || tag === MFR_TAG) return "immediate";
   if (tag === "FR" || tag === "CD") return "ration";
+  if (tag === "TRG") return trgTone === "red" ? "ration" : "immediate";
   return "consume";
 }
 

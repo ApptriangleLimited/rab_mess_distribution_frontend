@@ -39,15 +39,26 @@ export function canWriteMfrLockedTag(tag: DailyTag | "" | undefined): boolean {
  * True for dates inside an inactive stretch (from deactivate until
  * the day before they are activated again).
  */
+/** First day this member may receive Daily RR tags. */
+export function rosterStart(
+  user: Pick<User, "joining_date"> & { duty_start?: string },
+): string {
+  const duty = (user.duty_start ?? "").trim();
+  const join = (user.joining_date ?? "").trim();
+  if (duty && join) return duty > join ? duty : join;
+  return duty || join;
+}
+
 export function isUserInactiveOnDate(
   user: Pick<User, "status" | "inactive_spans"> & {
     joining_date?: string;
+    duty_start?: string;
     jl_end_date?: string;
   },
   date: string,
 ): boolean {
-  const join = (user.joining_date ?? "").trim();
-  if (join && date < join) {
+  const start = rosterStart(user);
+  if (start && date < start) {
     return true;
   }
   const spans = user.inactive_spans ?? [];
@@ -74,11 +85,12 @@ export function isUserInactiveOnDate(
 export function canAssignOnDate(
   user: Pick<User, "out_date" | "status" | "inactive_spans"> & {
     joining_date?: string;
+    duty_start?: string;
   },
   date: string,
 ): boolean {
-  const join = (user.joining_date ?? "").trim();
-  if (join && date < join) return false;
+  const start = rosterStart(user);
+  if (start && date < start) return false;
   if (isUserInactiveOnDate(user, date)) return false;
   const out = (user.out_date ?? "").trim();
   if (out && date > out) return false;
@@ -94,24 +106,13 @@ export function applyStatusToSpans(
   const next = [...(spans ?? [])];
   if (status === "0") {
     if (!next.some((s) => !s.to)) {
-      const fromDate =
-        joiningDate && joiningDate < today ? joiningDate : today;
-      next.push({ from: fromDate, to: null });
+      next.push({ from: today, to: null });
     }
     return next;
   }
   const yesterday = previousISODate(today);
   const hasOpenSpan = next.some((s) => !s.to);
   if (!hasOpenSpan) {
-    const fromDate =
-      joiningDate && joiningDate <= yesterday
-        ? joiningDate
-        : next.length
-          ? yesterday
-          : "1970-01-01";
-    if (fromDate <= yesterday) {
-      next.push({ from: fromDate, to: yesterday });
-    }
     return next;
   }
   return next.flatMap((span) => {
@@ -164,7 +165,18 @@ export function listApprovedUsers(opts?: { includeInactive?: boolean }) {
 }
 
 export function approveUser(id: string) {
-  return patchUser(id, { approval_status: "approved", status: "1" });
+  const updated = patchUser(id, { approval_status: "approved", status: "1" });
+  if (!updated) return null;
+  const today = todayISO();
+  const withDuty: User = { ...updated, duty_start: today };
+  setState((prev) => ({
+    ...prev,
+    users: prev.users.map((u) => (u.id === id ? withDuty : u)),
+    assignments: prev.assignments.filter(
+      (a) => !(a.user_id === id && a.date < today),
+    ),
+  }));
+  return withDuty;
 }
 
 export function rejectUser(id: string) {

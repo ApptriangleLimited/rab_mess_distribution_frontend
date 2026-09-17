@@ -1,15 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import {
-  IconCircleCheck,
-  IconClockHour4,
-  IconPrinter,
-  IconUsers,
-  IconUserCheck,
-} from "@tabler/icons-react";
+import { IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { IconTip } from "@/components/shared/icon-tip";
@@ -31,7 +25,6 @@ import {
 } from "@/lib/store/users";
 import type { User } from "@/lib/types";
 import { useT } from "@/i18n/provider";
-import { cn } from "@/lib/utils";
 
 const emptyFilters: UserFilters = {
   q: "",
@@ -108,27 +101,6 @@ export default function RosterPage() {
 
   const users = apiOn ? apiUsers : demoUsers;
 
-  const demoStats = useMemo(() => {
-    const all = state.users;
-    return {
-      total: all.length,
-      active: all.filter((u) => u.status === "1").length,
-      pending: all.filter((u) => u.approval_status === "pending").length,
-      accepted: all.filter((u) => u.approval_status === "approved").length,
-    };
-  }, [state.users]);
-
-  const stats = apiOn
-    ? {
-        total:
-          filters.status === "all" && filters.approval === "all"
-            ? apiTotal
-            : undefined,
-        active: filters.status === "1" ? apiTotal : undefined,
-        pending: filters.approval === "pending" ? apiTotal : undefined,
-        accepted: filters.approval === "approved" ? apiTotal : undefined,
-      }
-    : demoStats;
   const subtitleCount = apiOn ? apiTotal : demoUsers.length;
   const printHref = `/daily/roster/print?${userFiltersToSearchParams(filters).toString()}`;
   const canPrint = apiOn ? apiTotal > 0 : demoUsers.length > 0;
@@ -137,61 +109,6 @@ export default function RosterPage() {
     setFilters(next);
     setPage(1);
   }
-
-  function toggleStatus(status: "1" | "all") {
-    setFiltersAndResetPage({
-      ...filters,
-      status: filters.status === status ? "all" : status,
-    });
-  }
-
-  function toggleApproval(approval: "pending" | "approved" | "all") {
-    setFiltersAndResetPage({
-      ...filters,
-      approval: filters.approval === approval ? "all" : approval,
-    });
-  }
-
-  const tiles = (
-    <>
-      <StatChip
-        label={t("consume.statMembers")}
-        value={stats.total}
-        icon={<IconUsers className="h-3.5 w-3.5" />}
-        tone="teal"
-        active={
-          filters.status === "all" &&
-          filters.approval === "all" &&
-          !filters.q
-        }
-        onClick={() => setFiltersAndResetPage(emptyFilters)}
-      />
-      <StatChip
-        label={t("cc.statusActive")}
-        value={stats.active}
-        icon={<IconUserCheck className="h-3.5 w-3.5" />}
-        tone="emerald"
-        active={filters.status === "1"}
-        onClick={() => toggleStatus("1")}
-      />
-      <StatChip
-        label={t("cc.approvalPending")}
-        value={stats.pending}
-        icon={<IconClockHour4 className="h-3.5 w-3.5" />}
-        tone="amber"
-        active={filters.approval === "pending"}
-        onClick={() => toggleApproval("pending")}
-      />
-      <StatChip
-        label={t("cc.approvalApproved")}
-        value={stats.accepted}
-        icon={<IconCircleCheck className="h-3.5 w-3.5" />}
-        tone="sky"
-        active={filters.approval === "approved"}
-        onClick={() => toggleApproval("approved")}
-      />
-    </>
-  );
 
   return (
     <PagePane>
@@ -257,7 +174,6 @@ export default function RosterPage() {
         <UserFiltersBar
           value={filters}
           onChange={setFiltersAndResetPage}
-          tiles={tiles}
         />
         {loading ? (
           <p className="py-10 text-center text-sm text-neutral-500">
@@ -288,58 +204,5 @@ export default function RosterPage() {
         )}
       </motion.div>
     </PagePane>
-  );
-}
-
-function StatChip({
-  label,
-  value,
-  icon,
-  tone,
-  active,
-  onClick,
-}: {
-  label: string;
-  value?: number;
-  icon: ReactNode;
-  tone: "teal" | "emerald" | "amber" | "sky";
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  const tones = {
-    teal: "border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100",
-    emerald:
-      "border-emerald-200/90 bg-emerald-50 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200",
-    amber:
-      "border-amber-200/90 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200",
-    sky: "border-sky-200/90 bg-sky-50 text-sky-900 dark:border-sky-800/50 dark:bg-sky-950/40 dark:text-sky-200",
-  }[tone];
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={label}
-      className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 shadow-sm transition",
-        tones,
-        active
-          ? "border-black ring-1 ring-black brightness-95 dark:border-white dark:ring-white dark:brightness-110"
-          : "hover:brightness-[0.97] dark:hover:brightness-110",
-      )}
-    >
-      <span className="shrink-0 opacity-90" aria-hidden>
-        {icon}
-      </span>
-      <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wide">
-        {label}
-      </span>
-      {value != null ? (
-        <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-px text-xs font-extrabold tabular-nums dark:bg-white/10">
-          {value}
-        </span>
-      ) : null}
-    </button>
   );
 }

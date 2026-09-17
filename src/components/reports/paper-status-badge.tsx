@@ -10,7 +10,7 @@ export function PaperStatusBadge({ status }: { status: PaperReportStatus }) {
     status === "approved"
       ? t("paperReports.approved")
       : status === "submitted"
-        ? t("paperReports.submitted")
+        ? t("paperReports.pendingVerification")
         : t("paperReports.draft");
   return (
     <Badge className={cn("border font-semibold", PAPER_STATUS_CLASS[status])}>

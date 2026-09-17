@@ -7,10 +7,12 @@ import {
   isMfrLocked,
   isMfrTag,
   isUserInactiveOnDate,
+  rosterStart,
   syncUsersAfterJl,
   FR_TAG,
   MFR_TAG,
 } from "@/lib/store/daily";
+import { isCockpitMember } from "@/lib/store/users";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
 
@@ -51,7 +53,7 @@ function canWriteTag(
 ): boolean {
   if (date < todayISO()) return false;
   const user = findUser(userId);
-  if (!user || !canAssignOnDate(user, date)) return false;
+  if (!user || !isCockpitMember(user) || !canAssignOnDate(user, date)) return false;
   if (isMfrLocked(user) && !isMfrTag(tag) && !canWriteMfrLockedTag(tag)) {
     return false;
   }
@@ -70,9 +72,9 @@ function freezePriorTags(
   const fill = user?.default_tag;
   if (!user || !fill) return assignments;
   const today = todayISO();
-  const start = user.joining_date && user.joining_date > addDays(before, -90)
-    ? user.joining_date
-    : addDays(before, -90);
+  const roster = rosterStart(user);
+  const start =
+    roster && roster > addDays(before, -90) ? roster : addDays(before, -90);
   if (!start || start >= before) return assignments;
   const have = new Set(
     assignments
@@ -535,7 +537,7 @@ export function autoApplyCarryForward(
 
   for (const userId of userIds) {
     const user = usersById.get(userId);
-    if (!user || !canAssignOnDate(user, date)) continue;
+    if (!user || !isCockpitMember(user) || !canAssignOnDate(user, date)) continue;
 
     const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
     if (idx >= 0) continue;

@@ -85,14 +85,15 @@ async function prepareUploadFile(file: File): Promise<File> {
 
 export async function uploadFile(
   file: File,
-  opts: { entity_type?: string; entity_id?: string } = {},
+  opts: { entity_type?: string; entity_id?: string; public?: boolean } = {},
 ) {
   const ready = await prepareUploadFile(file);
   const body = new FormData();
   body.append("upload", ready);
   body.append("entity_type", opts.entity_type ?? "");
   body.append("entity_id", opts.entity_id ?? "");
-  return apiJson<UploadedFile>(uploadPath(), { method: "POST", body });
+  const path = opts.public ? "/api/v1/public/files" : uploadPath();
+  return apiJson<UploadedFile>(path, { method: "POST", body });
 }
 
 export type DocumentKind = "image" | "pdf" | "file";

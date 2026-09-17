@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   report: ManpowerReport;
+  readOnly?: boolean;
 };
 
 function Cell({
@@ -515,7 +516,7 @@ function AbsenceTable({
 }
 
 /** Screen / tab panel view of Form 1 (not print letter). */
-export function ManpowerWeb({ report }: Props) {
+export function ManpowerWeb({ report, readOnly = false }: Props) {
   const { date, hq, wings, absence, grandTotal } = report;
   const categories = report.categories.filter((c) =>
     isForm1RankColumn(c.label),
@@ -572,7 +573,7 @@ export function ManpowerWeb({ report }: Props) {
                     present={block.present}
                     absent={block.absent}
                     categories={categories}
-                    editable
+                    editable={!readOnly}
                   />
                 ))}
                 <BlockRows

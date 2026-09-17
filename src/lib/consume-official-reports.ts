@@ -116,7 +116,10 @@ function totalOf(tagDays: Partial<Record<DailyTag, number>>) {
 }
 
 const IEC_WINGS = new Set(["security branch - iec cell"]);
-const ATTACHED_WINGS = new Set(["new / temporary attached"]);
+const ATTACHED_WINGS = new Set([
+  "new / temporary attached",
+  "new temp att",
+]);
 
 const WING_ALIASES: Record<string, string[]> = {
   admin: [

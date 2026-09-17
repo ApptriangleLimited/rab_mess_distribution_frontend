@@ -1,4 +1,5 @@
 import { ApiClientError, apiJson } from "@/lib/api/client";
+import { todayISO } from "@/lib/date";
 import {
   isApiFeatureMissing,
   isLegacyLiveApi,
@@ -38,6 +39,7 @@ export type MemberApiRow = {
   rank: string;
   wing: string;
   force?: string;
+  force_rank?: string;
   religion?: string;
   member_type: string;
   dropdown_no: string;
@@ -54,6 +56,7 @@ export type MemberApiRow = {
   branch_location: string;
   joining_date: string | null;
   out_date: string | null;
+  duty_start?: string | null;
   default_tag?: string;
   jl_end_date?: string;
   inactive_spans?: User["inactive_spans"];
@@ -98,6 +101,7 @@ export function memberToUser(row: MemberApiRow): User {
     rank: row.rank ?? "",
     wing: row.wing ?? "",
     force: row.force ?? "",
+    force_rank: row.force_rank ?? "",
     religion: row.religion ?? "",
     member_type: asMemberType(row.member_type),
     dropdown_no: row.dropdown_no ?? "",
@@ -116,6 +120,7 @@ export function memberToUser(row: MemberApiRow): User {
     branch: row.branch ?? "",
     branch_location: row.branch_location ?? "",
     joining_date: row.joining_date ?? "",
+    duty_start: row.duty_start ?? "",
     out_date: row.out_date ?? "",
     default_tag: ((row.default_tag || "").toUpperCase() || "") as DailyTag,
     jl_end_date:
@@ -127,7 +132,7 @@ export function memberToUser(row: MemberApiRow): User {
       ? (row as MemberApiRow & { inactive_spans: User["inactive_spans"] })
           .inactive_spans
       : row.status !== "1"
-        ? [{ from: row.joining_date || "2020-01-01", to: null }]
+        ? [{ from: todayISO(), to: null }]
         : [],
     emergency_contacts: row.emergency_contacts ?? [],
     created_at: row.created_at,

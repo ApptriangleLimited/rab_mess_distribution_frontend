@@ -63,6 +63,8 @@ export interface User {
   wing: string;
   /** Parent force (Army, Navy, …). */
   force: string;
+  /** Service rank under the selected force (MWO, SI, CK, …). */
+  force_rank: string;
   religion: string;
   /** new | attached | permanent | civilian */
   member_type: MemberType;
@@ -88,6 +90,8 @@ export interface User {
   branch_location: string;
   /** ISO `YYYY-MM-DD` — when member joined. */
   joining_date: string;
+  /** ISO `YYYY-MM-DD` — first Daily RR day (accept). Empty = use joining_date. */
+  duty_start: string;
   /** ISO `YYYY-MM-DD` — when member left; empty if still active. */
   out_date: string;
   /**
@@ -335,8 +339,18 @@ export interface AppState {
   wing_parent: Record<string, string>;
   /** Elaborate names for wings (`short` → full), overrides defaults. */
   wing_labels: Record<string, string>;
+  /** Bangla names for wings (`short` → Bangla). */
+  wing_labels_bn: Record<string, string>;
+  /** Official / Settings serial for each wing (`short` → 1-based number). */
+  wing_serials: Record<string, number>;
   /** Parent forces (Army, Navy, …) — editable in Settings. */
   forces: string[];
+  /** Elaborate names for forces (`short` → full). */
+  force_labels: Record<string, string>;
+  /** Bangla names for forces (`short` → Bangla). */
+  force_labels_bn: Record<string, string>;
+  /** Settings serial for each force (`short` → 1-based number). */
+  force_serials: Record<string, number>;
   /** Ranks assigned under each force (`force` → service rank labels). */
   force_ranks: Record<string, string[]>;
   /** User-added service ranks beyond defaults (`force` → short labels). */
@@ -345,8 +359,16 @@ export interface AppState {
   force_rank_removed: Record<string, string[]>;
   /** Elaborate names for force service ranks (`force` → short → full). */
   force_rank_labels: Record<string, Record<string, string>>;
+  /** Bangla names for force service ranks (`force` → short → Bangla). */
+  force_rank_labels_bn: Record<string, Record<string, string>>;
+  /** Settings serial for force service ranks (`force` → short → 1-based). */
+  force_rank_serials: Record<string, Record<string, number>>;
   /** Elaborate names for SRB ranks (`short` → full), overrides defaults. */
   rank_labels: Record<string, string>;
+  /** Bangla names for SRB ranks (`short` → Bangla). */
+  rank_labels_bn: Record<string, string>;
+  /** Settings serial for each SRB rank (`short` → 1-based number). */
+  rank_serials: Record<string, number>;
   /** Forces linked under each SRB rank (`rab rank` → force labels). */
   rank_forces: Record<string, string[]>;
   /**

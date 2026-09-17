@@ -72,6 +72,28 @@ export function isPaperApproved(
   return row?.status === "approved";
 }
 
+/** Admin verified the submitted paper. Stored status stays `approved`. */
+export function isPaperVerified(
+  kind: PaperReportKind,
+  ref: string,
+  form?: ManpowerFormId,
+) {
+  return isPaperApproved(kind, ref, form);
+}
+
+/** Daily may print after submit; verified papers also print. */
+export function isPaperPrintable(
+  kind: PaperReportKind,
+  ref: string,
+  form?: ManpowerFormId,
+) {
+  const row =
+    kind === "manpower" && form
+      ? getManpowerPaper(ref, form)
+      : getPritibhojPaper(ref);
+  return row?.status === "submitted" || row?.status === "approved";
+}
+
 function upsert(
   match: (row: PaperReportRequest) => boolean,
   patch: Omit<PaperReportRequest, "id"> & { id?: string },
@@ -101,8 +123,15 @@ export function saveManpowerPaper(
   title: string,
 ): PaperReportRequest {
   const existing = getManpowerPaper(date, form);
-  if (existing?.status === "submitted" || existing?.status === "approved") {
+  if (existing?.status === "approved") {
     return existing;
+  }
+  if (existing?.status === "submitted") {
+    return upsert((row) => row.id === existing.id, {
+      ...existing,
+      title,
+      status: "submitted",
+    });
   }
   return upsert((row) => row.id === existing?.id, {
     kind: "manpower",
@@ -179,6 +208,10 @@ export function submitPritibhojPaper(input: {
     reviewed_at: "",
     reviewed_by: "",
   });
+}
+
+export function verifyPaperReport(id: string): PaperReportRequest | null {
+  return approvePaperReport(id);
 }
 
 export function approvePaperReport(id: string): PaperReportRequest | null {

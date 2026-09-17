@@ -39,6 +39,9 @@ import {
   RELIGIONS,
   BRANCH_DISTRICTS,
   rankDisplayLabel,
+  rankLabelBn,
+  rankOfficialName,
+  wingDisplayLabel,
 } from "@/lib/constants";
 import { SearchableSelect } from "@/components/shared/searchable-select";
 import type { DailyTag, DocumentMeta, MemberType, User } from "@/lib/types";
@@ -54,10 +57,13 @@ import { ApiClientError } from "@/lib/api/client";
 import { uploadFile } from "@/lib/api/files";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import {
+  isAdminRootName,
+  isHqBranchName,
+  listForceServiceRanks,
   listForces,
   listRanks,
-  listWings,
-  wingPathLabel,
+  listWingChildren,
+  memberWingCascade,
 } from "@/lib/store/org-options";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
@@ -76,8 +82,9 @@ const emptyValues = (): UserFormValues => ({
   rab_id: "",
   rfid: "",
   rank: listRanks()[0] ?? "",
-  wing: listWings()[0] ?? "",
+  wing: listWingChildren(null)[0] ?? "",
   force: "",
+  force_rank: "",
   religion: "",
   member_type: "permanent",
   dropdown_no: "",
@@ -111,6 +118,7 @@ export function userToFormValues(user: User): UserFormValues {
     rank: user.rank,
     wing: user.wing,
     force: user.force ?? "",
+    force_rank: user.force_rank ?? "",
     religion: user.religion ?? "",
     member_type: user.member_type ?? "permanent",
     dropdown_no: user.dropdown_no,
@@ -175,13 +183,48 @@ export function UserForm({
   const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const store = useStore();
-  const { member_banks, rank_labels } = store;
-  const ranks = useMemo(() => listRanks(), [store.ranks]);
-  const wings = useMemo(() => listWings(), [store.wings]);
+  const {
+    member_banks,
+    rank_labels,
+    rank_labels_bn,
+    force_rank_labels,
+    wing_labels,
+  } = store;
+  const ranks = useMemo(
+    () => listRanks(),
+    [store.ranks, store.rank_serials, store.rank_labels],
+  );
+  const mainWings = useMemo(
+    () => listWingChildren(null),
+    [store.wings, store.wing_parent, store.wing_serials],
+  );
+  const adminSubWings = useMemo(
+    () => listWingChildren("Admin"),
+    [store.wings, store.wing_parent, store.wing_serials],
+  );
+  const hqSubWings = useMemo(
+    () => listWingChildren("HQ Br"),
+    [store.wings, store.wing_parent, store.wing_serials],
+  );
   const forces = useMemo(() => listForces(), [store.forces]);
   const [values, setValues] = useState<UserFormValues>(
     initial ?? emptyValues(),
   );
+  const forceRanks = useMemo(
+    () => listForceServiceRanks(values.force),
+    [
+      values.force,
+      store.force_ranks,
+      store.force_rank_extras,
+      store.force_rank_removed,
+      store.force_rank_serials,
+      store.force_rank_labels,
+    ],
+  );
+  const wingCascade = memberWingCascade(values.wing);
+  const showAdminSub = isAdminRootName(wingCascade.main);
+  const showHqSub =
+    isHqBranchName(wingCascade.sub) || isHqBranchName(values.wing);
   const [todayTag, setTodayTag] = useState<DailyTag>(initialTag);
   const [dragOver, setDragOver] = useState(false);
   const apiOn = isCcApiEnabled();
@@ -189,13 +232,28 @@ export function UserForm({
   const isGuest = values.member_type === "guest";
   const isPermanent = values.member_type === "permanent";
 
+  function settingsRankLabel(rank: string) {
+    const official = rankOfficialName(rank, rank_labels);
+    const bn = rankLabelBn(rank, rank_labels_bn);
+    const showOfficial =
+      Boolean(official) && official.toLowerCase() !== rank.toLowerCase();
+    const showBn =
+      Boolean(bn) &&
+      bn.toLowerCase() !== rank.toLowerCase() &&
+      bn.toLowerCase() !== official.toLowerCase();
+    if (showOfficial && showBn) return `${rank} — ${official} (${bn})`;
+    if (showOfficial) return `${rank} — ${official}`;
+    if (showBn) return `${rank} (${bn})`;
+    return rank;
+  }
+
   const rankField = (
-    <Field label={t("cc.fields.rank")} required>
+    <Field label={t("cc.fields.srbRank")} required>
       <SearchableSelect
         options={ranks}
         value={values.rank}
         onChange={(v) => patch("rank", v)}
-        getOptionLabel={(r) => rankDisplayLabel(r, values.force, rank_labels)}
+        getOptionLabel={settingsRankLabel}
         placeholder={t("cc.selectRank")}
         triggerClassName={selectTriggerClass}
       />
@@ -205,12 +263,60 @@ export function UserForm({
   const wingField = (
     <Field label={t("cc.fields.wing")} required>
       <SearchableSelect
-        options={wings}
-        value={values.wing}
-        onChange={(v) => patch("wing", v)}
-        getOptionLabel={wingPathLabel}
+        options={mainWings}
+        value={wingCascade.main}
+        onChange={(v) =>
+          setValues((prev) => ({
+            ...prev,
+            wing: isAdminRootName(v) ? "Admin" : v,
+          }))
+        }
+        getOptionLabel={(wing) => wingDisplayLabel(wing, wing_labels)}
         placeholder={t("cc.selectWing")}
         triggerClassName={selectTriggerClass}
+      />
+    </Field>
+  );
+
+  const adminSubWingField = showAdminSub ? (
+    <Field label={t("cc.fields.subWing")} required>
+      <SearchableSelect
+        options={adminSubWings}
+        value={wingCascade.sub}
+        onChange={(v) => setValues((prev) => ({ ...prev, wing: v }))}
+        getOptionLabel={(wing) => wing}
+        placeholder={t("cc.selectSubWing")}
+        triggerClassName={selectTriggerClass}
+      />
+    </Field>
+  ) : null;
+
+  const hqSubWingField = showHqSub ? (
+    <Field label={t("cc.fields.hqSubWing")} required>
+      <SearchableSelect
+        options={hqSubWings}
+        value={wingCascade.leaf}
+        onChange={(v) => setValues((prev) => ({ ...prev, wing: v }))}
+        getOptionLabel={(wing) => wing}
+        placeholder={t("cc.selectHqSubWing")}
+        triggerClassName={selectTriggerClass}
+      />
+    </Field>
+  ) : null;
+
+  const forceRankField = (
+    <Field label={t("cc.fields.forceRank")}>
+      <SearchableSelect
+        options={forceRanks}
+        value={values.force_rank}
+        onChange={(v) => patch("force_rank", v)}
+        getOptionLabel={(rank) =>
+          rankDisplayLabel(rank, values.force, force_rank_labels[values.force])
+        }
+        placeholder={t("cc.selectForceRank")}
+        emptyLabel={t("settings.forceRanksEmpty")}
+        triggerClassName={selectTriggerClass}
+        disabled={!values.force}
       />
     </Field>
   );
@@ -290,6 +396,7 @@ export function UserForm({
           rank: "",
           wing: "",
           force: "",
+          force_rank: "",
           religion: "",
           joining_date: "",
           out_date: "",
@@ -308,7 +415,8 @@ export function UserForm({
         ...prev,
         member_type: next,
         rank: prev.rank || ranks[0] || "",
-        wing: prev.wing || wings[0] || "",
+        wing: prev.wing || mainWings[0] || "",
+        force_rank: prev.force_rank || "",
         documents_verified:
           next === "civilian" ? prev.documents_verified : false,
       };
@@ -321,7 +429,7 @@ export function UserForm({
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
     const incoming = Array.from(files);
-    if (!apiOn || variant === "public") {
+    if (!apiOn) {
       setValues((prev) => ({
         ...prev,
         documents: [
@@ -334,7 +442,10 @@ export function UserForm({
     const uploaded: DocumentMeta[] = [];
     for (const file of incoming) {
       try {
-        const row = await uploadFile(file, { entity_type: "member" });
+        const row = await uploadFile(file, {
+          entity_type: variant === "public" ? "register" : "member",
+          public: variant === "public",
+        });
         uploaded.push({
           id: row.id || row.file_id,
           name: row.original_name || file.name,
@@ -411,11 +522,13 @@ export function UserForm({
     if (missing) {
       const messageKey = {
         personal_no: "cc.personalNoRequired",
-        card_number: "cc.cardNumberRequired",
         nid: "cc.nidRequired",
         name: "cc.nameRequired",
         rank: "cc.rankRequired",
         wing: "cc.wingRequired",
+        sub_wing: "cc.subWingRequired",
+        hq_wing: "cc.hqWingRequired",
+        force_rank: "cc.forceRankRequired",
         documents: "cc.documentsRequired",
         bank: "cc.bankRequired",
       }[missing] as "cc.personalNoRequired";
@@ -438,8 +551,8 @@ export function UserForm({
     if (variant === "daily" && mode === "create") {
       await onSubmit({
         ...payload,
-        today_tag: todayTag,
-        default_tag: todayTag,
+        today_tag: isCivilian ? undefined : todayTag,
+        default_tag: isCivilian ? "" : todayTag,
       });
       return;
     }
@@ -517,7 +630,7 @@ export function UserForm({
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {showDefaultTag ? (
+              {showDefaultTag && !isCivilian ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
@@ -567,6 +680,8 @@ export function UserForm({
                 />
               </Field>
               {wingField}
+              {adminSubWingField}
+              {hqSubWingField}
               <Field label={t("cc.fields.phone")}>
                 <FieldInput
                   icon={IconPhone}
@@ -582,9 +697,14 @@ export function UserForm({
               <Field label={t("cc.fields.force")}>
                 <Select
                   value={values.force || "__none__"}
-                  onValueChange={(v) =>
-                    patch("force", v === "__none__" ? "" : v)
-                  }
+                  onValueChange={(v) => {
+                    const next = v === "__none__" ? "" : v;
+                    setValues((prev) => ({
+                      ...prev,
+                      force: next,
+                      force_rank: next === prev.force ? prev.force_rank : "",
+                    }));
+                  }}
                 >
                   <SelectTrigger className={selectTriggerClass}>
                     <SelectValue placeholder={t("cc.selectForce")} />
@@ -599,6 +719,7 @@ export function UserForm({
                   </SelectContent>
                 </Select>
               </Field>
+              {forceRankField}
               <Field label={t("cc.fields.religion")}>
                 <Select
                   value={values.religion || "__none__"}
@@ -653,7 +774,7 @@ export function UserForm({
                   placeholder={t("cc.placeholders.rfid")}
                 />
               </Field>
-              {showDefaultTag ? (
+              {showDefaultTag && !isCivilian ? (
                 <Field label={t("daily.defaultTag")}>
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}

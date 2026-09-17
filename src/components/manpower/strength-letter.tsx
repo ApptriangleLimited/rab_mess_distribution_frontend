@@ -3,10 +3,12 @@
 import { forwardRef, type ReactNode } from "react";
 import { RankColumnHeader } from "@/components/manpower/rank-column-header";
 import { StrengthReportTitle } from "@/components/manpower/strength-title";
+import { ManpowerVerifiedByFooter } from "@/components/manpower/verified-by-footer";
 import { WingName } from "@/components/manpower/wing-name";
 import { toBnDigits } from "@/lib/consume-official-reports";
 import {
   STRENGTH_CATEGORIES,
+  strengthCategoryLabelBn,
   strengthMetricTotal,
   sumAbsenceRows,
   type StrengthAbsenceRow,
@@ -19,6 +21,7 @@ import { cn } from "@/lib/utils";
 type Props = {
   report: StrengthReport;
   locale?: string;
+  verified?: boolean;
 };
 
 function formatCount(value: number, bn?: boolean) {
@@ -202,7 +205,7 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
     return (
       <>
         <p className="mt-3 text-[10px] font-semibold">অনুপস্থিতির বিবরণ</p>
-        <table className="mt-1 w-full border-collapse text-[8px] leading-tight">
+        <table className="mt-1 w-full table-fixed border-collapse text-[7.5px] leading-tight">
           <thead>
             <tr className="bg-neutral-100">
               <th className="border border-neutral-800 px-1 py-1 text-left">
@@ -238,7 +241,7 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
   }
 
   return (
-    <table className="mt-3 w-full border-collapse text-[8px] leading-tight">
+    <table className="mt-3 w-full table-fixed border-collapse text-[7.5px] leading-tight">
         <thead>
           <tr className="bg-neutral-100">
             <th colSpan={6} className="border border-neutral-800" />
@@ -293,12 +296,12 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
 
 /** Form 2/3 letter — Admin Wing / HQ Br daily strength. */
 export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
-  function StrengthLetter({ report, locale = "bn-BD" }, ref) {
+  function StrengthLetter({ report, locale = "bn-BD", verified = false }, ref) {
     const bn = true;
     return (
       <div
         ref={ref}
-        className="strength-letter mx-auto w-full max-w-[297mm] bg-white p-3 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
+        className="strength-letter mx-auto w-full max-w-[210mm] min-h-[297mm] bg-white p-2.5 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
       >
         <StrengthReportTitle
           titleBn={report.titleBn}
@@ -309,7 +312,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
         />
 
         {/* Top summary */}
-        <table className="mt-3 w-full border-collapse text-[8px] leading-tight">
+        <table className="mt-3 w-full table-fixed border-collapse text-[7.5px] leading-tight">
           <thead>
             <tr className="bg-neutral-100">
               <th className="border border-neutral-800 px-1 py-1 text-left font-semibold">
@@ -318,7 +321,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
               {STRENGTH_CATEGORIES.map((c) => (
                 <RankColumnHeader
                   key={c.id}
-                  labelBn={c.labelBn}
+                  labelBn={strengthCategoryLabelBn(c)}
                 />
               ))}
               <th className="border border-neutral-800 px-0.5 py-1 font-semibold">
@@ -334,7 +337,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
         </table>
 
         {/* Branch breakdown */}
-        <table className="mt-3 w-full border-collapse text-[8px] leading-tight">
+        <table className="mt-3 w-full table-fixed border-collapse text-[7.5px] leading-tight">
           <thead>
             <tr className="bg-neutral-100">
               {report.formNo === 2 ? (
@@ -348,7 +351,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
               {STRENGTH_CATEGORIES.map((c) => (
                 <RankColumnHeader
                   key={c.id}
-                  labelBn={c.labelBn}
+                  labelBn={strengthCategoryLabelBn(c)}
                 />
               ))}
               <th className="border border-neutral-800 px-0.5 py-1 font-semibold">
@@ -419,6 +422,8 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
             {toBnDigits(report.movement.coming)}
           </p>
         ) : null}
+
+        <ManpowerVerifiedByFooter show={verified} />
       </div>
     );
   },

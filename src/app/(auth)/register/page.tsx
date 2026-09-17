@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { IconArrowLeft, IconCheck } from "@tabler/icons-react";
@@ -8,19 +8,36 @@ import { UserForm, type UserFormValues } from "@/components/users/user-form";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
-import { isApiEnabled } from "@/lib/api/mode";
-import { publicRegisterMember } from "@/lib/api/register";
+import { isCcApiEnabled } from "@/lib/api/mode";
+import { fetchPublicCatalog, publicRegisterMember } from "@/lib/api/register";
+import { applyApiSnapshot } from "@/lib/store";
 import { createUser, findUserByRabId } from "@/lib/store/users";
+import type { AppState } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
-/** Public member entry — personnel only. Not a login/signup. */
+/** Public member entry — same form as CC new member. Daily accepts. */
 export default function RegisterPage() {
   const t = useT();
   const { toast } = useToast();
   const reduceMotion = useReducedMotion();
-  const apiOn = isApiEnabled();
+  const apiOn = isCcApiEnabled();
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!apiOn) return;
+    let cancelled = false;
+    void fetchPublicCatalog()
+      .then((data) => {
+        if (!cancelled) applyApiSnapshot(data as Partial<AppState>);
+      })
+      .catch(() => {
+        /* Form still uses bundled Settings defaults. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn]);
 
   async function onSubmit(values: UserFormValues) {
     if (busy) return;
@@ -34,7 +51,7 @@ export default function RegisterPage() {
         toast(t("cc.rabIdDuplicate"), "error");
         return;
       }
-      createUser({ ...values, status: "0" }, { approval_status: "pending" });
+      createUser({ ...values, status: "1" }, { approval_status: "pending" });
       toast(t("register.success"), "success");
       setDone(true);
       return;

@@ -20,7 +20,7 @@ import { onCcDataChange } from "@/lib/api/cc-events";
 import { listTagRequests, requestToTagRequest } from "@/lib/api/tag-requests";
 import { useToast } from "@/components/shared/toast-provider";
 import { replaceQueueRequests } from "@/lib/store/tag-requests";
-import { compareUsers } from "@/lib/store/users";
+import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 
 /**
@@ -110,7 +110,12 @@ export function useDailyCockpit({
           page_size: 500,
         }).catch(() => null),
       ]);
-      setUsers(memberRes.items.map(memberToUser).sort(compareUsers));
+      setUsers(
+        memberRes.items
+          .map(memberToUser)
+          .filter(isCockpitMember)
+          .sort(compareUsers),
+      );
       setCells(assignRes.items);
       setTagCounts(summaryRes.by_tag);
       setBoroKhanaDates(bkRes.dates);
@@ -178,7 +183,12 @@ export function useDailyCockpit({
   );
 
   const onTagChange = useCallback(
-    async (userId: string, date: string, tag: DailyTag | "") => {
+    async (
+      userId: string,
+      date: string,
+      tag: DailyTag | "",
+      trgTone?: "black" | "red",
+    ) => {
       try {
         if (!tag) {
           const res = await deleteAssignment(userId, date);
@@ -190,7 +200,12 @@ export function useDailyCockpit({
             ),
           );
         } else {
-          const res = await putAssignment({ member_id: userId, date, tag });
+          const res = await putAssignment({
+            member_id: userId,
+            date,
+            tag,
+            trg_tone: trgTone,
+          });
           // Apply the server's canonical cell(s) right away — no loading flash.
           setCells((prev) => mergeUpdatedCells(prev, res.items));
         }
@@ -208,12 +223,18 @@ export function useDailyCockpit({
   );
 
   const onPaintRange = useCallback(
-    async (userId: string, dates: string[], tag: DailyTag | "") => {
+    async (
+      userId: string,
+      dates: string[],
+      tag: DailyTag | "",
+      trgTone?: "black" | "red",
+    ) => {
       try {
         const res = await putAssignmentRange({
           member_id: userId,
           dates,
           tag: tag || "",
+          trg_tone: trgTone,
         });
         // Merge all returned cells immediately so every day in the range
         // shows the new tag without waiting for the background reload.

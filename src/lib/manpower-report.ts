@@ -1,5 +1,6 @@
 import {
   ADMIN_SUB_WINGS,
+  canonicalRankName,
   DEFAULT_WING_PARENT,
   HQ_SUB_WINGS,
   WINGS,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/store/assignments";
 import { canAssignOnDate } from "@/lib/store/daily";
 import { isCockpitMember } from "@/lib/store/users";
+import { wingPrintOrder } from "@/lib/daily-register-wings";
 import {
   authorizedWingDisplayCount,
   isBannedWing,
@@ -158,12 +160,15 @@ const RANK_ALIASES: Record<string, string[]> = {
   ],
   dad: ["dad", "jco", "wo", "swo", "scpo", "cpo", "warrant"],
   rt: ["rt", "wrt", "others", "other", "misc", "recruit"],
-  asi: ["asi", "nco", "sgt", "po", "si", "havildar"],
-  aasi: ["aasi", "lnco", "l/cpl", "lcpl", "cpl", "ls", "lma"],
+  si: ["si", "s.i", "sub inspector"],
+  asi: ["asi", "aasi", "a.s.i", "assistant sub inspector"],
+  aasi: ["aasi"],
   naik: ["naik", "nayek", "naiek", "nayak"],
   constable: ["constable", "co", "or", "const", "ab", "od", "sepoy", "soldier"],
   cook: ["cook"],
+  nce: ["nce", "ance", "nc(e)", "nc (e)", "lp(e)", "lpe", "lp (e)"],
   ance: ["ance", "nc(e)", "nce", "lp(e)", "lpe", "lp (e)"],
+  civil: ["civil", "civill", "civilian"],
   civill: ["civill", "civil", "civilian"],
   attached: ["attached", "attach"],
 };
@@ -199,8 +204,15 @@ export function categoryIdForRank(
 ): string | null {
   const key = normalizeRank(rank);
   if (!key) return null;
+  const canon = canonicalRankName(rank).toLowerCase();
 
-  const exact = categories.find((c) => c.label.trim().toLowerCase() === key);
+  const exact = categories.find((c) => {
+    const labelKey = c.label.trim().toLowerCase();
+    return (
+      labelKey === key ||
+      canonicalRankName(c.label).toLowerCase() === canon
+    );
+  });
   if (exact) return exact.id;
 
   for (const cat of categories) {
@@ -246,7 +258,8 @@ function isAdminFamilyName(name: string): boolean {
 }
 
 function isHqBrName(name: string): boolean {
-  return name.trim().toLowerCase() === "hq br";
+  const key = name.trim().toLowerCase();
+  return key === "hq br" || key === "headquarters branch";
 }
 
 export function manpowerWingFamily(
@@ -276,9 +289,10 @@ export function manpowerWingFamily(
   return "main";
 }
 
-/** Form 1 tab — official daily sheet wings only, in paper order. */
+/** Form 1 tab — Settings wings in the serial the user stored. */
 function listForm1WingNames(): string[] {
-  return [...WINGS];
+  const ordered = wingPrintOrder();
+  return ordered.length ? ordered : [...WINGS];
 }
 
 function projectedTag(userId: string, date: string): DailyTag | "" {

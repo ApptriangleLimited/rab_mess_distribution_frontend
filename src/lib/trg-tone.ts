@@ -5,7 +5,7 @@ function normForce(force: string) {
   return force.trim().toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ");
 }
 
-/** Army / Navy / Air Force — TRG days are black. */
+/** Army / Navy / Air Force — TRG is always black (no money). */
 export function isBlackTrgForce(force: string): boolean {
   const key = normForce(force);
   return key === "army" || key === "navy" || key === "air force";
@@ -23,14 +23,28 @@ export function isBgbForce(force: string): boolean {
   return normForce(force) === "bgb";
 }
 
-/** Police still gets the Sarda checkbox on TRG. */
+/** Police TRG opens Sarda + Training. One of the two is required. */
 export function needsTrgSardaPrompt(force: string): boolean {
   return isPoliceForce(force);
 }
 
-/** Police / Ansar / BGB pick Training — checked = black TRG, else red. */
+/** Police + Ansar open a Training prompt. BGB does not. */
 export function needsTrgTrainingPrompt(force: string): boolean {
-  return isPoliceForce(force) || isAnsarForce(force) || isBgbForce(force);
+  return isPoliceForce(force) || isAnsarForce(force);
+}
+
+/** Daily RR / accept must ask before applying TRG. */
+export function needsTrgPrompt(force: string): boolean {
+  return needsTrgTrainingPrompt(force);
+}
+
+/** Police must pick Sarda or Training. Cancel applies no tag. */
+export function trgChoiceRequired(
+  force: string,
+  trainingChecked = false,
+  sardaChecked = false,
+): boolean {
+  return isPoliceForce(force) && !trainingChecked && !sardaChecked;
 }
 
 export function isTrgTag(tag?: DailyTag | "" | null): tag is "TRG" {
@@ -38,10 +52,11 @@ export function isTrgTag(tag?: DailyTag | "" | null): tag is "TRG" {
 }
 
 /**
- * Force check at write time.
- * Army / Navy / Air Force → black.
- * Police Sarda checked → black.
- * Police / Ansar / BGB + Training checked → black; otherwise red.
+ * TRG red = money (ration / consume counts). TRG black = no money.
+ * Army / Navy / Air Force → always black.
+ * BGB → always red.
+ * Police Sarda → black; Police Training → red. Unset stays black.
+ * Ansar Training checked → red; otherwise black.
  */
 export function resolveTrgTone(
   force: string,
@@ -49,8 +64,13 @@ export function resolveTrgTone(
   sardaChecked = false,
 ): TrgTone {
   if (isBlackTrgForce(force)) return "black";
-  if (needsTrgSardaPrompt(force) && sardaChecked) return "black";
-  if (needsTrgTrainingPrompt(force) && trainingChecked) return "black";
+  if (isBgbForce(force)) return "red";
+  if (isPoliceForce(force)) {
+    if (sardaChecked) return "black";
+    if (trainingChecked) return "red";
+    return "black";
+  }
+  if (isAnsarForce(force)) return trainingChecked ? "red" : "black";
   return "red";
 }
 

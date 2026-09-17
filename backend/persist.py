@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from auth import current_staff, require_roles
 from permissions import filter_snapshot_body, require_permission
@@ -33,22 +34,42 @@ from models import (
     SuppressedCarry,
     TagRequest,
 )
-from extra import rate_out, sender_out
 from cache import bust_members
 
 router = APIRouter()
+
+
+def _rate_out(row: Rate) -> dict:
+    from extra import rate_out
+
+    return rate_out(row)
+
+
+def _sender_out(row: Sender) -> dict:
+    from extra import sender_out
+
+    return sender_out(row)
 
 CATALOG_KEYS = (
     "ranks",
     "wings",
     "wing_parent",
     "wing_labels",
+    "wing_labels_bn",
+    "wing_serials",
     "forces",
+    "force_labels",
+    "force_labels_bn",
+    "force_serials",
     "force_ranks",
     "force_rank_extras",
     "force_rank_removed",
     "force_rank_labels",
+    "force_rank_labels_bn",
+    "force_rank_serials",
     "rank_labels",
+    "rank_labels_bn",
+    "rank_serials",
     "rank_forces",
     "rank_equivalents",
     "rank_force_wings",
@@ -386,8 +407,8 @@ def build_snapshot(db: Session) -> dict:
             .order_by(TagRequest.updated_at.desc(), TagRequest.requested_at.desc())
             .all()
         ],
-        "senders": [sender_out(row) for row in db.query(Sender).order_by(Sender.label).all()],
-        "rates": [rate_out(row) for row in db.query(Rate).order_by(Rate.tag).all()],
+        "senders": [_sender_out(row) for row in db.query(Sender).order_by(Sender.label).all()],
+        "rates": [_rate_out(row) for row in db.query(Rate).order_by(Rate.tag).all()],
         **{
             key: payload.get(
                 key,
@@ -438,6 +459,7 @@ def upsert_member(db: Session, raw: dict) -> None:
             "rank": raw.get("rank") or "",
             "wing": raw.get("wing") or "",
             "force": raw.get("force") or "",
+            "force_rank": raw.get("force_rank") or "",
             "religion": raw.get("religion") or "",
             "member_type": raw.get("member_type") or "permanent",
             "dropdown_no": raw.get("dropdown_no") or "",
@@ -451,6 +473,7 @@ def upsert_member(db: Session, raw: dict) -> None:
             "branch_location": raw.get("branch_location") or "",
             "joining_date": parse_day(raw.get("joining_date")),
             "out_date": parse_day(raw.get("out_date")),
+            "duty_start": parse_day(raw.get("duty_start")),
             "default_tag": raw.get("default_tag") or "",
             "documents": raw.get("documents") or [],
             "documents_verified": bool(raw.get("documents_verified")),
@@ -533,6 +556,7 @@ def apply_catalog(db: Session, body: dict) -> None:
             continue
         payload[key] = incoming
     row.payload = payload
+    flag_modified(row, "payload")
 
 
 def apply_authorized(db: Session, items: list) -> None:
@@ -751,6 +775,27 @@ def import_snapshot(
     return envelope(build_snapshot(db), "Imported")
 
 
+def _norm_force(force: str) -> str:
+    return (force or "").strip().lower().replace("-", " ").replace("_", " ")
+
+
+def trg_ration_payable(tone: str | None, force: str) -> bool:
+    """TRG red = money. TRG black = no money. Infer when tone is missing."""
+    key = (tone or "").strip().lower()
+    if key == "black":
+        return False
+    if key == "red":
+        return True
+    force_key = _norm_force(force)
+    if force_key in {"army", "navy", "air force"}:
+        return False
+    if force_key == "bgb":
+        return True
+    if force_key in {"police", "ansar"}:
+        return False
+    return True
+
+
 def month_bounds(month: str) -> tuple[date, date]:
     if len(month) != 7 or month[4] != "-":
         raise HTTPException(status_code=400, detail="Use YYYY-MM")
@@ -773,19 +818,15 @@ def consume_month_data(db: Session, month: str) -> dict:
         by_user.setdefault(row.user_id, {})
         by_user[row.user_id][row.tag] = by_user[row.user_id].get(row.tag, 0) + 1
     payable_trg = {}
+    force_by_user: dict[str, str] = {}
     for row in rows:
         if row.tag != "TRG":
             continue
-        tone = (row.trg_tone or "").strip().lower()
-        if tone == "black":
-            continue
-        if tone != "red":
-            force = ""
+        if row.user_id not in force_by_user:
             member = db.get(Member, row.user_id)
-            if member:
-                force = (member.force or "").strip().lower().replace("-", " ").replace("_", " ")
-            if force in {"army", "navy", "air force"}:
-                continue
+            force_by_user[row.user_id] = member.force if member else ""
+        if not trg_ration_payable(row.trg_tone, force_by_user[row.user_id]):
+            continue
         payable_trg[row.user_id] = payable_trg.get(row.user_id, 0) + 1
 
     items = []
@@ -831,7 +872,7 @@ def ration_month_report(
     db: Session = Depends(get_db),
 ):
     data = consume_month_data(db, month)
-    data["senders"] = [sender_out(row) for row in db.query(Sender).all()]
+    data["senders"] = [_sender_out(row) for row in db.query(Sender).all()]
     return envelope(data)
 
 
@@ -844,7 +885,7 @@ def manpower_day_data(db: Session, target: date) -> dict:
     for member in members:
         if member.status != "1":
             continue
-        if member.member_type == "guest":
+        if member.member_type in ("guest", "civilian"):
             continue
         if not can_assign(member, target):
             continue
@@ -937,8 +978,8 @@ def report_source_data(db: Session, start: date, end: date) -> dict:
         "to": end.isoformat(),
         "users": [member_payload(row) for row in members],
         "assignments": [assignment_out(row) for row in assignments],
-        "rates": [rate_out(row) for row in db.query(Rate).all()],
-        "senders": [sender_out(row) for row in db.query(Sender).all()],
+        "rates": [_rate_out(row) for row in db.query(Rate).all()],
+        "senders": [_sender_out(row) for row in db.query(Sender).all()],
         "suppressed_carries": [
             f"{row.user_id}|{row.date.isoformat()}" for row in suppressed
         ],

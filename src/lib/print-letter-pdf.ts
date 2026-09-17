@@ -197,6 +197,27 @@ function letterSheetCss() {
   .wing-summary-print th,
   .wing-summary-print td {
     font-size: 10px !important;
+  }
+  .manpower-letter,
+  .strength-letter {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .manpower-letter table,
+  .strength-letter table {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+  .manpower-letter th,
+  .manpower-letter td,
+  .strength-letter th,
+  .strength-letter td {
+    padding: 1px 1px !important;
+    font-size: 7.5px !important;
+    line-height: 1.15 !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
   }`;
 }
 

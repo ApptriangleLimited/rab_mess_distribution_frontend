@@ -25,6 +25,7 @@ export function toMemberEntryBody(values: UserFormValues) {
     rank: values.rank.trim(),
     wing: values.wing.trim(),
     force: values.force.trim(),
+    force_rank: values.force_rank.trim(),
     religion: values.religion.trim(),
     member_type: values.member_type,
     documents_verified: Boolean(values.documents_verified),
@@ -59,4 +60,9 @@ export function publicRegisterMember(values: UserFormValues) {
     method: "POST",
     body: JSON.stringify(toMemberEntryBody(values)),
   });
+}
+
+/** Settings catalogs for the QR member form (no login). */
+export function fetchPublicCatalog() {
+  return apiJson<Record<string, unknown>>("/api/v1/public/catalog");
 }

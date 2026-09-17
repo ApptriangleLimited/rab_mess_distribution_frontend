@@ -34,8 +34,11 @@ import { isCcApiEnabled } from "@/lib/api/mode";
 import { listMembers, memberToUser } from "@/lib/api/members";
 import { compareUsersNewestFirst } from "@/lib/store/users";
 
+import {
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { useT } from "@/i18n/provider";
-import { wingSettingsLabel } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
 import type { User } from "@/lib/types";
 
@@ -48,7 +51,6 @@ function hasBank(user: User) {
 export default function RationMembersPage() {
   const t = useT();
   const state = useStore();
-  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
@@ -204,36 +206,18 @@ export default function RationMembersPage() {
             </>
           }
         >
-          <div className="w-[9.5rem] shrink-0">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {ranks.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[9rem] shrink-0">
-            <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {wings.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {wingSettingsLabel(w)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SettingsRankFilter
+            value={rank}
+            onChange={setRank}
+            className="w-[9.5rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <SettingsWingFilter
+            value={wing}
+            onChange={setWing}
+            className="w-[9rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
           <div className="w-[9.5rem] shrink-0">
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className={cn(fieldClass, "w-full")}>

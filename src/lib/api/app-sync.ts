@@ -10,6 +10,7 @@ import { memberToUser, type MemberApiRow } from "@/lib/api/members";
 import { getAccessToken } from "@/lib/session";
 import {
   applyApiSnapshot,
+  getState,
   setPersistHook,
 } from "@/lib/store";
 import type {
@@ -30,12 +31,21 @@ const CATALOG_KEYS = [
   "wings",
   "wing_parent",
   "wing_labels",
+  "wing_labels_bn",
+  "wing_serials",
   "forces",
+  "force_labels",
+  "force_labels_bn",
+  "force_serials",
   "force_ranks",
   "force_rank_extras",
   "force_rank_removed",
   "force_rank_labels",
+  "force_rank_labels_bn",
+  "force_rank_serials",
   "rank_labels",
+  "rank_labels_bn",
+  "rank_serials",
   "rank_forces",
   "rank_equivalents",
   "rank_force_wings",
@@ -138,16 +148,37 @@ export async function syncStoreFromApi() {
   }
 }
 
+function canPersistSnapshot() {
+  return (
+    isCcApiEnabled() &&
+    Boolean(getAccessToken()) &&
+    !syncing &&
+    !isLegacyLiveApi() &&
+    !isApiFeatureMissing("snapshot")
+  );
+}
+
+function persistSnapshot(state: AppState) {
+  void saveAppSnapshot(state).catch((err) => {
+    if (rememberMissingRoute("snapshot", err)) return;
+    console.error("Failed to persist app state to Docker API", err);
+  });
+}
+
+/** Write catalog (wings, serials, labels) to Postgres now — not after the 2s debounce. */
+export function persistAppStateNow(state?: AppState) {
+  if (!canPersistSnapshot()) return;
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  persistSnapshot(state ?? getState());
+}
+
 function schedulePersist(state: AppState) {
-  if (!isCcApiEnabled() || !getAccessToken() || syncing) return;
-  if (isLegacyLiveApi() || isApiFeatureMissing("snapshot")) return;
+  if (!canPersistSnapshot()) return;
   if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = setTimeout(() => {
-    void saveAppSnapshot(state).catch((err) => {
-      if (rememberMissingRoute("snapshot", err)) return;
-      console.error("Failed to persist app state to Docker API", err);
-    });
-  }, 2000);
+  persistTimer = setTimeout(() => persistSnapshot(state), 2000);
 }
 
 setPersistHook(schedulePersist);

@@ -8,6 +8,7 @@ export type AssignmentCell = {
   date: string;
   tag: string | null;
   source: AssignmentSource;
+  trg_tone?: "black" | "red" | null;
   updated_at?: string;
   updated_by?: string;
 };
@@ -61,6 +62,7 @@ export function putAssignment(body: {
   member_id: string;
   date: string;
   tag: string;
+  trg_tone?: "black" | "red";
 }) {
   return apiJson<{ items: AssignmentCell[] }>("/api/v1/assignments", {
     method: "PUT",
@@ -79,6 +81,7 @@ export function putAssignmentRange(body: {
   member_id: string;
   dates: string[];
   tag: string;
+  trg_tone?: "black" | "red";
 }) {
   return apiJson<{ updated: number; items: AssignmentCell[] }>(
     "/api/v1/assignments/range",
@@ -98,6 +101,10 @@ export function cellsToAssignments(items: AssignmentCell[]): DailyAssignment[] {
       user_id: cell.member_id,
       date: cell.date,
       tag: cell.tag as DailyTag,
+      trg_tone:
+        cell.trg_tone === "black" || cell.trg_tone === "red"
+          ? cell.trg_tone
+          : undefined,
       updated_by: cell.updated_by ?? "daily",
       updated_at: cell.updated_at ?? new Date().toISOString(),
     }));

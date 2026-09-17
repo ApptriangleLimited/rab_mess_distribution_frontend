@@ -23,6 +23,7 @@ import {
   SearchFilterBar,
   searchFilterFieldClass,
 } from "@/components/shared/search-filter-bar";
+import { SettingsWingFilter } from "@/components/shared/settings-catalog-filters";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { MessPageTabs } from "@/components/layout/mess-tabs";
 import { MessReportsLetter } from "@/components/mess/mess-reports-letter";
@@ -191,7 +192,6 @@ export default function MessReportsClient() {
   const { locale } = useI18n();
   const { toast } = useToast();
   const state = useStore();
-  const { wings } = state;
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
   const zkOn = isZkDemoEnabled();
@@ -855,27 +855,15 @@ export default function MessReportsClient() {
             </Select>
           </div>
           {view === "missing" || audience !== "guest" ? (
-            <div className="w-[10rem] shrink-0">
-              <Select
-                value={wing}
-                onValueChange={(v) => {
-                  setWing(v);
-                  resetPage();
-                }}
-              >
-                <SelectTrigger className={cn(searchFilterFieldClass, "w-full")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                  {wings.map((w) => (
-                    <SelectItem key={w} value={w}>
-                      {w}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <SettingsWingFilter
+              value={wing}
+              onChange={(v) => {
+                setWing(v);
+                resetPage();
+              }}
+              className="w-[10rem] shrink-0"
+              triggerClassName={cn(searchFilterFieldClass, "w-full")}
+            />
           ) : null}
         </SearchFilterBar>
 

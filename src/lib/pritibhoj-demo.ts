@@ -70,7 +70,10 @@ export const PRITIBHOJ_ADMIN_WING_DEFS: readonly PritibhojWingDef[] = [
   { label: "ডিজি দপ্তর", wings: ["DG Office"] },
   { label: "এডিজি (অপস) দপ্তর", wings: ["ADG (Ops) Office"] },
   { label: "এডিজি (এ্যাডমিন) দপ্তর", wings: ["ADG (Admin) Office"] },
-  { label: "পরিচালক এ্যাডমিন দপ্তর", wings: ["Director (Admin) Office"] },
+  {
+    label: "পরিচালক এ্যাডমিন দপ্তর",
+    wings: ["Dir Office", "Director (Admin) Office"],
+  },
   { label: "জেনারেল শাখা", wings: ["Gen Br"] },
   {
     label: "পার্সোনাল শাখা",
@@ -111,15 +114,19 @@ export const PRITIBHOJ_ADMIN_WING_DEFS: readonly PritibhojWingDef[] = [
   },
   {
     label: "নিরাপত্তা শাখা",
-    wings: ["Security Branch", "Security Branch - IEC Cell"],
+    wings: ["SY Br", "Security Branch", "Security Branch - IEC Cell"],
   },
   {
     label: "সদর দপ্তর শাখা",
-    wings: ["HQ Br", "Headquarters Branch", "Headquarters Office"],
+    wings: ["HQ Br", "Headquarters Branch", "HQ Office", "Headquarters Office"],
     aliases: ["এইচকিউ শাখা"],
   },
+  { label: "ফিল্ড মেস", wings: ["Fd Mess", "Field Mess"] },
   { label: "এ্যাডমিন এমটি", wings: ["MT Br", "MT Branch"] },
-  { label: "নতুন সদস্য ও সংযুক্ত", wings: ["New / Temporary Attached"] },
+  {
+    label: "নতুন সদস্য ও সংযুক্ত",
+    wings: ["New Temp Att", "New / Temporary Attached"],
+  },
 ];
 
 const ALL_WING_DEFS = [

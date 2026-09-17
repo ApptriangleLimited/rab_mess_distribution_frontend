@@ -1,9 +1,9 @@
 # Production environment checklist
 
-Inspected 2026-09-13 (re-verified same day) against the **local Docker stack** (`rab-mess-*`).  
+Inspected 2026-09-13 (re-verified same day) against the **local Docker stack** (`srb_*`).  
 This is **not** a staging or production host. No secret values are recorded.
 
-Redis AUTH mechanism was proven on a throwaway `redis:7-alpine --requirepass` container on the same Docker network: unauthenticated `PING` → `NOAUTH`; authenticated `PING` → `PONG`. Password value was not logged. The long-lived `rab-mess-redis` on this workstation still has an empty password (allowed for local compose).
+Redis AUTH mechanism was proven on a throwaway `redis:7-alpine --requirepass` container on the same Docker network: unauthenticated `PING` → `NOAUTH`; authenticated `PING` → `PONG`. Password value was not logged. The long-lived `srb_redis` on this workstation still has an empty password (allowed for local compose).
 
 Statuses: `[PASS]` · `[FAIL]` · `[NOT REQUIRED]` · `[UNSET — required before go-live]`
 
@@ -29,10 +29,10 @@ Statuses: `[PASS]` · `[FAIL]` · `[NOT REQUIRED]` · `[UNSET — required befor
 
 | Service | Published to host | Verdict |
 | ------- | ----------------- | ------- |
-| `rab-mess-postgres` | No (`5432/tcp` unbound) | `[PASS]` private Docker network |
-| `rab-mess-redis` | No (`6379/tcp` unbound) | `[PASS]` private Docker network |
-| `rab-mess-api` | Yes `:8000` | Expected for local; production should publish only nginx 80/443 |
-| `rab-mess-web` | Yes `:3000` when started | Same as API — hide behind proxy in production |
+| `srb_database` | No (`5432/tcp` unbound) | `[PASS]` private Docker network |
+| `srb_redis` | No (`6379/tcp` unbound) | `[PASS]` private Docker network |
+| `srb_backend` | Yes `:8000` | Expected for local; production should publish only nginx 80/443 |
+| `srb_frontend` | Yes `:3000` when started | Same as API — hide behind proxy in production |
 
 Unrelated containers on this workstation publish `5432`/`6379`. Those are **not** the mess stack.
 

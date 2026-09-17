@@ -23,15 +23,14 @@ import {
   formatMonthLong,
   parseMonthInput,
 } from "@/lib/date";
-import {
-  downloadDailyRegisterPdf,
-  printDailyRegisterPdf,
-} from "@/lib/download-daily-register-pdf";
+import { wingPrintOrder } from "@/lib/daily-register-wings";
+import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
+import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   buildDailyRegisterDates,
   buildDailyRegisterFromCells,
 } from "@/lib/reports";
-import { compareUsers } from "@/lib/store/users";
+import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type { MemberType, UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
@@ -80,6 +79,7 @@ export default function DailyRegisterPrintClient() {
     return state.users
       .filter((u) => {
         if (u.approval_status !== "approved") return false;
+        if (!isCockpitMember(u)) return false;
         if (u.status !== memberStatus) return false;
         if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
@@ -138,11 +138,11 @@ export default function DailyRegisterPrintClient() {
     dayNumbers,
     rows: printRows,
     filename: `attendance-register-${month}.pdf`,
-    coverTitle: t("daily.registerCoverTitle"),
-    sheetTitle: t("daily.registerTitle", { month: monthLabel }),
-    pageOf: (page: number, total: number) =>
-      t("common.pageOf", { page, total }),
-    signLabel: t("daily.signDailySi"),
+    coverTitle: "Attendance Register",
+    sheetTitle: `Attendance Register — ${monthLabel}`,
+    pageOf: (page: number, total: number) => `Page ${page} of ${total}`,
+    signLabel: "Daily SI",
+    wingSerial: wingPrintOrder(),
   };
 
   function onDownload() {
@@ -151,10 +151,16 @@ export default function DailyRegisterPrintClient() {
   }
 
   async function onPrint() {
-    if (!canAct) return;
+    const el = printRef.current;
+    if (!el || !canAct) return;
     setPrinting(true);
     try {
-      await printDailyRegisterPdf(pdfArgs);
+      await printLetterElement(
+        el,
+        `attendance-register-${month}.pdf`,
+        "landscape",
+        { skipInlineStyles: true, preserveColors: true },
+      );
     } finally {
       setPrinting(false);
     }
@@ -215,13 +221,15 @@ export default function DailyRegisterPrintClient() {
       ) : !dayNumbers.length ? (
         <EmptyState title={t("common.noResults")} />
       ) : (
-        <MonthRegisterPrint
-          ref={printRef}
-          month={month}
-          dayNumbers={dayNumbers}
-          rows={printRows}
-          preview
-        />
+        <div className="overflow-x-auto">
+          <MonthRegisterPrint
+            ref={printRef}
+            month={month}
+            dayNumbers={dayNumbers}
+            rows={printRows}
+            preview
+          />
+        </div>
       )}
     </PagePane>
   );

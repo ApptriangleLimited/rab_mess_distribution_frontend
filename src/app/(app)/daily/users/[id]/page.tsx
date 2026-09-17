@@ -206,6 +206,7 @@ export default function DailyUserDetailPage() {
         {isApproved ? (
           <SectionCard>
             <div className="flex flex-col gap-4">
+              {user.member_type !== "civilian" ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-neutral-900 dark:text-white">
@@ -228,7 +229,8 @@ export default function DailyUserDetailPage() {
                   className="h-9 min-w-[12rem] rounded-lg"
                 />
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200/80 pt-3 dark:border-neutral-700">
+              ) : null}
+              <div className={user.member_type !== "civilian" ? "flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200/80 pt-3 dark:border-neutral-700" : "flex flex-wrap items-center justify-between gap-3"}>
                 <div>
                   <p className="text-sm font-semibold text-neutral-900 dark:text-white">
                     {t("cc.fields.status")}

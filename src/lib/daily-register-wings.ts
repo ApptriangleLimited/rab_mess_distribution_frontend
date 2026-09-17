@@ -1,13 +1,24 @@
-import { ADMIN_SUB_WINGS, WINGS } from "@/lib/constants";
+import {
+  ADMIN_SUB_WINGS,
+  HQ_SUB_WINGS,
+  WINGS,
+  wingOfficialSerial,
+} from "@/lib/constants";
 import type { LedgerRow } from "@/lib/reports";
+import { getState } from "@/lib/store";
+import { listWingChildrenFrom } from "@/lib/store/org-options";
+import { compareUsersByRankSerial } from "@/lib/store/users";
 
 /**
- * Daily cockpit register print order.
- * Replace this list when the official wing serial is provided.
+ * Fallback print order when Settings has no stored serials yet.
  */
 export const DAILY_REGISTER_WING_SERIAL: string[] = [...WINGS];
 
-const ADMIN_GROUP = new Set<string>(["Admin", ...ADMIN_SUB_WINGS]);
+const ADMIN_GROUP = new Set<string>([
+  "Admin",
+  ...ADMIN_SUB_WINGS,
+  ...HQ_SUB_WINGS,
+]);
 
 export type RegisterWingBlock = {
   key: string;
@@ -15,7 +26,7 @@ export type RegisterWingBlock = {
   rows: LedgerRow[];
 };
 
-/** Collapse Admin + admin sub-wings onto one Admin page until serial says otherwise. */
+/** Collapse Admin + admin sub-wings onto one Admin page. */
 export function registerWingGroup(wing: string): string {
   const key = wing.trim() || "—";
   if (ADMIN_GROUP.has(key)) return "Admin";
@@ -30,9 +41,33 @@ export function registerWingSignLabel(group: string): string {
   return group;
 }
 
+/** Root wings sorted by Settings serial — used for print and PDF. */
+export function wingPrintOrderFrom(
+  wings: string[],
+  wingParent: Record<string, string>,
+  serials: Record<string, number>,
+): string[] {
+  return [...listWingChildrenFrom(wings, wingParent, null)].sort((a, b) => {
+    const as = wingOfficialSerial(a, serials) ?? 10_000;
+    const bs = wingOfficialSerial(b, serials) ?? 10_000;
+    if (as !== bs) return as - bs;
+    return a.localeCompare(b);
+  });
+}
+
+export function wingPrintOrder(): string[] {
+  const { wings, wing_parent, wing_serials } = getState();
+  const ordered = wingPrintOrderFrom(
+    wings,
+    wing_parent,
+    wing_serials ?? {},
+  );
+  return ordered.length ? ordered : [...DAILY_REGISTER_WING_SERIAL];
+}
+
 export function groupRegisterRowsByWing(
   rows: LedgerRow[],
-  serial: string[] = DAILY_REGISTER_WING_SERIAL,
+  serial: string[] = wingPrintOrder(),
 ): RegisterWingBlock[] {
   const buckets = new Map<string, LedgerRow[]>();
   for (const row of rows) {
@@ -53,6 +88,8 @@ export function groupRegisterRowsByWing(
   return keys.map((key) => ({
     key,
     label: registerWingSignLabel(key),
-    rows: buckets.get(key) ?? [],
+    rows: [...(buckets.get(key) ?? [])].sort((a, b) =>
+      compareUsersByRankSerial(a.user, b.user),
+    ),
   }));
 }

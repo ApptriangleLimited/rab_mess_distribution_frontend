@@ -23,12 +23,9 @@ import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
 import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SettingsRankFilter,
+  SettingsWingFilter,
+} from "@/components/shared/settings-catalog-filters";
 import { useStore } from "@/hooks/use-store";
 import { ApiClientError } from "@/lib/api/client";
 import {
@@ -58,7 +55,6 @@ export default function MessLedgerClient() {
   const { toast } = useToast();
   const apiOn = isApiEnabled();
   const state = useStore();
-  const { ranks, wings } = state;
   const reduceMotion = useReducedMotion();
   const initial = defaultRange();
 
@@ -359,36 +355,18 @@ export default function MessLedgerClient() {
             label={t("common.dateRange")}
             triggerClassName="min-w-[10rem] w-[10rem] px-2 text-xs"
           />
-          <div className="w-[7.5rem] shrink-0">
-            <Select value={rank} onValueChange={setRank}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectRank")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allRank")}</SelectItem>
-                {ranks.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-[7rem] shrink-0">
-            <Select value={wing} onValueChange={setWing}>
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
-                <SelectValue placeholder={t("cc.selectWing")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allWing")}</SelectItem>
-                {wings.map((w) => (
-                  <SelectItem key={w} value={w}>
-                    {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SettingsRankFilter
+            value={rank}
+            onChange={setRank}
+            className="w-[7.5rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <SettingsWingFilter
+            value={wing}
+            onChange={setWing}
+            className="w-[7rem] shrink-0"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
         </SearchFilterBar>
 
         {loading ? (

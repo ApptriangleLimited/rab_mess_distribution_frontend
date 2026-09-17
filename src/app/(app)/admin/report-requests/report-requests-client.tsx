@@ -14,8 +14,8 @@ import { useStore } from "@/hooks/use-store";
 import { formatDateDisplay } from "@/lib/date";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
 import {
-  approvePaperReport,
   listPaperReports,
+  verifyPaperReport,
 } from "@/lib/store/paper-reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -43,8 +43,8 @@ export default function AdminReportRequestsClient() {
 
   const pending = rows.filter((row) => row.status === "submitted").length;
 
-  function onApprove(id: string) {
-    const next = approvePaperReport(id);
+  function onVerify(id: string) {
+    const next = verifyPaperReport(id);
     if (!next) return;
     notifyCcDataChange();
     toast(t("paperReports.approvedToast"), "success");
@@ -138,7 +138,7 @@ export default function AdminReportRequestsClient() {
                             type="button"
                             size="sm"
                             className="rounded-xl"
-                            onClick={() => onApprove(row.id)}
+                            onClick={() => onVerify(row.id)}
                           >
                             <IconCheck className="h-4 w-4" />
                             {t("paperReports.approve")}

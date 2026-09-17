@@ -1,6 +1,11 @@
+import { rankOfficialSerial } from "@/lib/constants";
 import { nowISO, todayISO } from "@/lib/date";
 import { digitsOnly, isValidBdPhone, normalizeBdPhone } from "@/lib/utils";
-import { listRanks, listMemberBanks } from "@/lib/store/org-options";
+import {
+  isAdminRootName,
+  isHqBranchName,
+  listMemberBanks,
+} from "@/lib/store/org-options";
 import { getState, setState } from "@/lib/store";
 import { applyStatusToSpans, isMfrLocked, isUserInactiveOnDate, FR_TAG, MFR_TAG } from "@/lib/store/daily";
 import type {
@@ -30,6 +35,7 @@ export type UserInput = {
   rank: string;
   wing: string;
   force: string;
+  force_rank: string;
   religion: string;
   member_type: MemberType;
   dropdown_no: string;
@@ -56,11 +62,13 @@ export function emptyEmergencyContact(): EmergencyContact {
 
 export type UserFormRequiredField =
   | "personal_no"
-  | "card_number"
   | "nid"
   | "name"
   | "rank"
   | "wing"
+  | "sub_wing"
+  | "hq_wing"
+  | "force_rank"
   | "documents"
   | "bank";
 
@@ -72,9 +80,10 @@ export function missingUserFormRequired(
     | "name"
     | "rank"
     | "wing"
+    | "force"
+    | "force_rank"
     | "documents"
     | "member_type"
-    | "dropdown_no"
     | "bank_name"
     | "account_name"
     | "account_number"
@@ -87,15 +96,14 @@ export function missingUserFormRequired(
     if (!input.name.trim()) return "name";
     return null;
   }
-  if (input.member_type === "civilian") {
-    if (!input.dropdown_no.trim()) return "card_number";
-    if (!input.personal_id.trim()) return "nid";
-  } else if (!input.personal_id.trim()) {
-    return "personal_no";
+  if (!input.personal_id.trim()) {
+    return input.member_type === "civilian" ? "nid" : "personal_no";
   }
   if (!input.name.trim()) return "name";
   if (!input.rank.trim()) return "rank";
   if (!input.wing.trim()) return "wing";
+  if (isAdminRootName(input.wing)) return "sub_wing";
+  if (isHqBranchName(input.wing)) return "hq_wing";
   if (!input.documents?.length) return "documents";
   if (input.member_type === "permanent") {
     if (
@@ -131,6 +139,7 @@ export function prepareUserFormSubmit(input: UserInput): UserInput {
       rank: "",
       wing: "",
       force: "",
+      force_rank: "",
       religion: "",
       joining_date: "",
       out_date: "",
@@ -175,9 +184,13 @@ export function isGuestMember(user: Pick<User, "member_type">): boolean {
   return user.member_type === "guest";
 }
 
-/** Guest members live in CC/members — not Daily cockpit grids. */
+export function isCivilianMember(user: Pick<User, "member_type">): boolean {
+  return user.member_type === "civilian";
+}
+
+/** Guest / civilian live in the member list — not Daily RR / cockpit grids. */
 export function isCockpitMember(user: Pick<User, "member_type">): boolean {
-  return !isGuestMember(user);
+  return !isGuestMember(user) && !isCivilianMember(user);
 }
 
 export function filterCockpitMembers<T extends Pick<User, "member_type">>(
@@ -186,19 +199,18 @@ export function filterCockpitMembers<T extends Pick<User, "member_type">>(
   return users.filter(isCockpitMember);
 }
 
-/** Duty / bill order: SRB ID → Rank → Name. */
-export function compareUsers(a: User, b: User) {
-  const id = a.rab_id.localeCompare(b.rab_id, undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-  if (id !== 0) return id;
-  const ranks = listRanks();
-  const ai = ranks.indexOf(a.rank);
-  const bi = ranks.indexOf(b.rank);
-  const rd = (ai === -1 ? ranks.length : ai) - (bi === -1 ? ranks.length : bi);
-  if (rd !== 0) return rd;
+/** Daily RR / print order: Settings SRB rank serial → name. */
+export function compareUsersByRankSerial(a: User, b: User) {
+  const serials = getState().rank_serials;
+  const as = rankOfficialSerial(a.rank, serials) ?? 10_000;
+  const bs = rankOfficialSerial(b.rank, serials) ?? 10_000;
+  if (as !== bs) return as - bs;
   return a.name.localeCompare(b.name);
+}
+
+/** Duty / bill order: SRB rank serial → Name. */
+export function compareUsers(a: User, b: User) {
+  return compareUsersByRankSerial(a, b);
 }
 
 /** Member / request lists: last created first. */
@@ -262,10 +274,12 @@ export function createUser(
     default_tag: (approval_status === "pending"
       ? ""
       : input.default_tag || "") as DailyTag,
+    duty_start:
+      approval_status === "approved" ? input.joining_date || todayISO() : "",
     jl_end_date: "",
     inactive_spans:
       input.status === "0"
-        ? [{ from: input.joining_date || "1970-01-01", to: null }]
+        ? [{ from: todayISO(), to: null }]
         : [],
     created_at: ts,
     updated_at: ts,

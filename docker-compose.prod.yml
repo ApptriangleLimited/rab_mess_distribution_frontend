@@ -67,7 +67,7 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
-    container_name: rab-mess-proxy
+    container_name: srb_proxy
     restart: always
     depends_on:
       api:

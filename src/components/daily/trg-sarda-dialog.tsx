@@ -54,6 +54,7 @@ export function TrgSardaDialog({
           : t("daily.trgPromptBody", { name })
       }
       confirmLabel={confirmLabel ?? t("daily.sardaConfirm")}
+      confirmDisabled={showSarda && !sardaChecked && !trainingChecked}
       onConfirm={onConfirm}
       onCancel={onCancel}
     >
@@ -63,27 +64,40 @@ export function TrgSardaDialog({
             <input
               type="checkbox"
               checked={sardaChecked}
-              onChange={(e) => onSardaChange?.(e.target.checked)}
+              onChange={(e) => {
+                const next = e.target.checked;
+                onSardaChange?.(next);
+                if (next) onTrainingChange(false);
+              }}
               className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
             />
             <span className="font-medium text-neutral-800 dark:text-neutral-100">
               {t("daily.sardaLabel")}
             </span>
-            <TrgToneHint black={sardaChecked} />
+            <TrgToneHint black />
           </label>
         ) : null}
         <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-neutral-200/90 bg-neutral-50/80 px-3 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-900/70">
           <input
             type="checkbox"
             checked={trainingChecked}
-            onChange={(e) => onTrainingChange(e.target.checked)}
+            onChange={(e) => {
+              const next = e.target.checked;
+              onTrainingChange(next);
+              if (next && showSarda) onSardaChange?.(false);
+            }}
             className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
           />
           <span className="font-medium text-neutral-800 dark:text-neutral-100">
             {t("daily.trainingLabel")}
           </span>
-          <TrgToneHint black={trainingChecked} />
+          <TrgToneHint black={false} />
         </label>
+        {showSarda && !sardaChecked && !trainingChecked ? (
+          <p className="text-sm font-medium text-red-700 dark:text-red-300">
+            {t("daily.trgChoiceRequired")}
+          </p>
+        ) : null}
       </div>
     </ConfirmDialog>
   );

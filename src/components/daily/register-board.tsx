@@ -54,15 +54,17 @@ import {
 import { setBoroKhana } from "@/lib/store/boro-khana";
 import { getProjectedTagMembers } from "@/lib/store/mess";
 import { listAllTags } from "@/lib/store/rates";
+import { countRegisterTags } from "@/lib/store/register-totals";
 import { compareUsers } from "@/lib/store/users";
 import { downloadDayMsCdPdf } from "@/lib/download-day-ms-cd-pdf";
 import { TAG_CELL, tagCellClass } from "@/lib/tag-colors";
 import { tagDisplayClass } from "@/lib/trg-tone";
 import {
   isTrgTag,
+  needsTrgPrompt,
   needsTrgSardaPrompt,
-  needsTrgTrainingPrompt,
   resolveTrgTone,
+  trgChoiceRequired,
 } from "@/lib/trg-tone";
 import { ColoredTagGrid } from "@/components/daily/colored-tag-grid";
 import { TrgSardaDialog } from "@/components/daily/trg-sarda-dialog";
@@ -147,8 +149,18 @@ export function RegisterBoard({
   todayISO: string;
   paintTag: DailyTag | "";
   onPaintTagChange: (tag: DailyTag | "") => void;
-  onTagChange: (userId: string, date: string, tag: DailyTag | "") => void;
-  onPaintRange: (userId: string, dates: string[], tag: DailyTag | "") => void;
+  onTagChange: (
+    userId: string,
+    date: string,
+    tag: DailyTag | "",
+    trgTone?: TrgTone,
+  ) => void;
+  onPaintRange: (
+    userId: string,
+    dates: string[],
+    tag: DailyTag | "",
+    trgTone?: TrgTone,
+  ) => void;
   priorByUser: Map<string, DailyTag>;
   suppressedCarries: string[];
   /** Inclusive ISO range — empty = show all month days. */
@@ -218,6 +230,17 @@ export function RegisterBoard({
   }, [columnDates]);
 
   const resultTags = useMemo(() => listAllTags(), [state.rates]);
+  const boardTotals = useMemo(
+    () =>
+      countRegisterTags(
+        users,
+        columnDates,
+        assignments,
+        suppressedCarries,
+        todayISO,
+      ),
+    [users, columnDates, assignments, suppressedCarries, todayISO],
+  );
 
   const suppressedSet = useMemo(
     () => new Set(suppressedCarries),
@@ -423,13 +446,13 @@ export function RegisterBoard({
     toDate: string,
     opts?: { sarda?: boolean; training?: boolean },
   ) {
-    const queue = dutyTagQueue(tag);
-    if (queue === "immediate") return false;
     const user = users.find((u) => u.id === userId);
     const force = user?.force ?? "";
     const trg_tone = isTrgTag(tag)
       ? resolveTrgTone(force, Boolean(opts?.training), Boolean(opts?.sarda))
       : undefined;
+    const queue = dutyTagQueue(tag, trg_tone);
+    if (queue === "immediate") return false;
     const trg_sarda =
       isTrgTag(tag) && needsTrgSardaPrompt(force)
         ? Boolean(opts?.sarda)
@@ -494,7 +517,7 @@ export function RegisterBoard({
     if (user && isMfrLocked(user) && !tag) return;
     const fromDate = dates[0]!;
     const toDate = dates[dates.length - 1]!;
-    if (isTrgTag(tag) && user && needsTrgTrainingPrompt(user.force)) {
+    if (isTrgTag(tag) && user && needsTrgPrompt(user.force)) {
       setSardaPrompt({
         userId: user.id,
         userName: user.name,
@@ -507,17 +530,37 @@ export function RegisterBoard({
       closeRangeMenu();
       return;
     }
-    if (tag && dutyTagQueue(tag) !== "immediate") {
+    const trgTone =
+      isTrgTag(tag) && user ? resolveTrgTone(user.force) : undefined;
+    if (tag && dutyTagQueue(tag, trgTone) !== "immediate") {
       void queuePaint(rangeMenu.userId, tag, fromDate, toDate);
       closeRangeMenu();
       return;
     }
     if (dates.length === 1) {
-      onTagChange(rangeMenu.userId, dates[0], tag);
+      onTagChange(rangeMenu.userId, dates[0], tag, trgTone);
     } else {
-      onPaintRange(rangeMenu.userId, dates, tag);
+      onPaintRange(rangeMenu.userId, dates, tag, trgTone);
     }
     closeRangeMenu();
+  }
+
+  function applyImmediateTrg(
+    userId: string,
+    fromDate: string,
+    toDate: string,
+    trgTone: TrgTone,
+  ) {
+    const user = users.find((u) => u.id === userId);
+    const dates = eachISODate(fromDate, toDate).filter(
+      (date) => date >= todayISO && (!user || canAssignOnDate(user, date)),
+    );
+    if (dates.length === 0) return;
+    if (dates.length === 1) {
+      onTagChange(userId, dates[0]!, "TRG", trgTone);
+    } else {
+      onPaintRange(userId, dates, "TRG", trgTone);
+    }
   }
 
   const rangeLabel = rangeMenu
@@ -891,6 +934,7 @@ export function RegisterBoard({
                           cell.stored ??
                           (!cell.afterOut && cell.ghost ? cell.ghost : undefined);
                         if (!shown) continue;
+                        if (!cell.stored && cell.date > todayISO) continue;
                         tagCounts[shown] = (tagCounts[shown] ?? 0) + 1;
                         totalDays += 1;
                       }
@@ -1018,6 +1062,52 @@ export function RegisterBoard({
                 );
               })}
             </tbody>
+            {showResultCols ? (
+              <tfoot>
+                <tr className="bg-emerald-100 dark:bg-emerald-950">
+                  <td
+                    className="sticky left-0 z-20 box-border border-t border-r border-neutral-300 bg-emerald-100 px-1.5 py-1.5 text-center font-mono text-[11px] font-bold dark:border-neutral-700 dark:bg-emerald-950"
+                    colSpan={4}
+                  >
+                    {t("mess.total")}
+                  </td>
+                  {resultTags.map((code, i) => {
+                    const n = boardTotals.counts[code] ?? 0;
+                    return (
+                      <td
+                        key={`res-total-${code}`}
+                        className={cn(
+                          "sticky z-20 box-border border-t border-neutral-300 bg-emerald-100 text-center font-mono text-[11px] font-bold tabular-nums text-emerald-900 dark:border-neutral-700 dark:bg-emerald-950 dark:text-emerald-200",
+                          showResultCols ? "border-r" : "border-r-0",
+                        )}
+                        style={resultColStyle(i)}
+                      >
+                        <span className="block truncate">{n || "—"}</span>
+                      </td>
+                    );
+                  })}
+                  <td
+                    className={cn(
+                      "sticky z-20 box-border border-t border-neutral-300 bg-emerald-100 text-center font-mono text-[11px] font-bold tabular-nums text-emerald-900 dark:border-neutral-700 dark:bg-emerald-950 dark:text-emerald-100",
+                      showResultCols
+                        ? "border-r shadow-[4px_0_8px_-2px_rgba(0,0,0,0.22)]"
+                        : "border-r-0 shadow-none",
+                    )}
+                    style={resultColStyle(resultTags.length)}
+                  >
+                    <span className="block truncate">
+                      {boardTotals.totalDays || "—"}
+                    </span>
+                  </td>
+                  {columnDates.map((date) => (
+                    <td
+                      key={`res-total-day-${date}`}
+                      className="border-t border-r border-neutral-300 bg-emerald-50 dark:border-neutral-700 dark:bg-emerald-950/60"
+                    />
+                  ))}
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
         </div>
         <ListPagination
@@ -1102,13 +1192,36 @@ export function RegisterBoard({
         }}
         onConfirm={() => {
           if (!sardaPrompt) return;
-          void queuePaint(
-            sardaPrompt.userId,
-            "TRG",
-            sardaPrompt.fromDate,
-            sardaPrompt.toDate,
-            { sarda: sardaChecked, training: trainingChecked },
+          if (
+            trgChoiceRequired(
+              sardaPrompt.force,
+              trainingChecked,
+              sardaChecked,
+            )
+          ) {
+            return;
+          }
+          const trgTone = resolveTrgTone(
+            sardaPrompt.force,
+            trainingChecked,
+            sardaChecked,
           );
+          if (dutyTagQueue("TRG", trgTone) === "immediate") {
+            applyImmediateTrg(
+              sardaPrompt.userId,
+              sardaPrompt.fromDate,
+              sardaPrompt.toDate,
+              trgTone,
+            );
+          } else {
+            void queuePaint(
+              sardaPrompt.userId,
+              "TRG",
+              sardaPrompt.fromDate,
+              sardaPrompt.toDate,
+              { sarda: sardaChecked, training: trainingChecked },
+            );
+          }
           setSardaPrompt(null);
           setSardaChecked(false);
           setTrainingChecked(false);
