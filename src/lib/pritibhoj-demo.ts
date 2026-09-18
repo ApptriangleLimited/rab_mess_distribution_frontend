@@ -122,7 +122,6 @@ export const PRITIBHOJ_ADMIN_WING_DEFS: readonly PritibhojWingDef[] = [
     aliases: ["এইচকিউ শাখা"],
   },
   { label: "ফিল্ড মেস", wings: ["Fd Mess", "Field Mess"] },
-  { label: "এ্যাডমিন এমটি", wings: ["MT Br", "MT Branch"] },
   {
     label: "নতুন সদস্য ও সংযুক্ত",
     wings: ["New Temp Att", "New / Temporary Attached"],
@@ -432,20 +431,6 @@ export const PRITIBHOJ_ADMIN_ROWS: PritibhojRow[] = [
     azadHallDist: 4,
     distribution2: 18,
     totalDistribution: 19,
-  },
-  {
-    wing: "এ্যাডমিন এমটি",
-    officer: 0,
-    dad: 0,
-    azadHall: 0,
-    distribution: 1,
-    others: 30,
-    civilian: 1,
-    nonMuslim: 1,
-    total: 32,
-    azadHallDist: 5,
-    distribution2: 27,
-    totalDistribution: 28,
   },
   {
     wing: "মেডিকেল শাখা",

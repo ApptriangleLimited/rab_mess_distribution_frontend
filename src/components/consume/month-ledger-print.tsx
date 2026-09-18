@@ -8,7 +8,7 @@ import type { LedgerRow } from "@/lib/reports";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { tagPrintClass, tagPrintCss, tagPrintFill } from "@/lib/tag-colors";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
-import { useI18n, useT } from "@/i18n/provider";
+import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -22,6 +22,8 @@ type Props = {
   columnDates?: string[];
   /** Show on screen for iframe print capture; default print-only. */
   preview?: boolean;
+  /** Consume report is English + landscape; mess keeps Bangla. */
+  reportLang?: "en" | "bn";
 };
 
 /** Landscape Forces Mess consume ledger — matches BN register print. */
@@ -35,11 +37,12 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
       visibleDays,
       columnDates,
       preview = false,
+      reportLang = "bn",
     },
     ref,
   ) {
     const t = useT();
-    const { locale } = useI18n();
+    const english = reportLang === "en";
     const rangeMode = Boolean(columnDates?.length);
     const columns = columnDates?.length
       ? columnDates.map((date) => ({
@@ -53,9 +56,8 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           date: `${month}-${String(dayNum).padStart(2, "0")}`,
           dayNum,
         }));
-    const monthBn = formatMonthLong(month, "bn-BD");
-    const monthEn = formatMonthLong(month);
-    const useBn = locale === "bn";
+    const monthEn = formatMonthLong(month, "en-US");
+    const campEn = `${CONSUME_REPORT_META.orgName} Camp, ${CONSUME_REPORT_META.station}`;
 
     const dayLabel = (d: number) => String(d);
     const serLabel = (n: number) => String(n);
@@ -73,48 +75,49 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         className={cn(
           "month-ledger-print text-black",
+          english &&
+            "box-border w-[297mm] max-w-[297mm] min-h-[210mm] overflow-hidden print:w-full print:max-w-none print:min-h-0",
           preview
-            ? "block overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
+            ? "mx-auto block rounded-xl border border-neutral-200 bg-white p-3 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
             : "hidden print:block",
         )}
       >
         <div className="letter-masthead mb-3 text-center">
           <p className="text-[11px] font-semibold">
-            {CONSUME_REPORT_META.wingBn}
+            {CONSUME_REPORT_META.wing}
           </p>
           <p className="mt-1 text-sm font-bold">
-            {t("consume.ledgerTitleBn", { month: monthBn })}
+            Forces Mess food consumption list — {monthEn}
           </p>
-          <p className="mt-0.5 text-[10px] text-neutral-700">
-            {CONSUME_REPORT_META.campBn}
-          </p>
-          {!useBn ? (
-            <p className="mt-1 text-[9px] text-neutral-500">
-              {t("consume.ledgerTitle", { month: monthEn })}
-            </p>
-          ) : null}
+          <p className="mt-0.5 text-[10px] text-neutral-700">{campEn}</p>
         </div>
 
         <style>{tagPrintCss()}</style>
-        <table className="w-full border-collapse text-[9px] leading-none">
+        <table className="w-full table-fixed border-collapse text-[8px] leading-none">
+          <colgroup>
+            <col style={{ width: "7mm" }} />
+            <col style={{ width: "26mm" }} />
+            <col style={{ width: "20mm" }} />
+            <col style={{ width: "30mm" }} />
+          </colgroup>
           <thead>
             <tr className="border border-black bg-neutral-100">
-              <th className="border border-black px-1 py-1">
+              <th className="border border-black px-0.5 py-1">
                 {t("consume.colSl")}
               </th>
-              <th className="border border-black px-1 py-1 text-left">
+              <th className="border border-black px-0.5 py-1 text-left">
                 {t("consume.colId")}
               </th>
-              <th className="border border-black px-1 py-1 text-left">
+              <th className="border border-black px-0.5 py-1 text-left">
                 {t("consume.colRank")}
               </th>
-              <th className="border border-black px-1 py-1 text-left">
+              <th className="border border-black px-0.5 py-1 text-left">
                 {t("consume.colName")}
               </th>
               {columns.map(({ date, dayNum }) => (
                 <th
                   key={date}
-                  className="min-w-[1.35rem] border border-black px-0.5 py-1"
+                  className="border border-black px-0 py-1"
                 >
                   {dayLabel(dayNum)}
                 </th>
@@ -132,16 +135,16 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           <tbody>
             {rows.map((row, i) => (
               <tr key={row.user.id}>
-                <td className="border border-black px-1 py-0.5 text-center tabular-nums">
+                <td className="border border-black px-0.5 py-0.5 text-center tabular-nums">
                   {serLabel(i + 1)}
                 </td>
-                <td className="border border-black px-1 py-0.5 font-mono whitespace-nowrap">
+                <td className="ledger-id overflow-hidden border border-black px-0.5 py-0.5 font-mono whitespace-nowrap">
                   {row.user.personal_id || "—"}
                 </td>
-                <td className="border border-black px-1 py-0.5 whitespace-nowrap">
+                <td className="ledger-rank overflow-hidden border border-black px-0.5 py-0.5 whitespace-nowrap">
                   {row.user.rank}
                 </td>
-                <td className="border border-black px-1 py-0.5 text-left whitespace-nowrap">
+                <td className="ledger-name overflow-hidden border border-black px-0.5 py-0.5 text-left whitespace-nowrap">
                   {row.user.name}
                 </td>
                 {columns.map(({ date, dayNum }, vi) => {
@@ -152,7 +155,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                     return (
                       <td
                         key={date}
-                        className="min-w-[1.35rem] border border-black px-0.5 py-0.5"
+                        className="border border-black px-0 py-0.5"
                       />
                     );
                   }
@@ -165,7 +168,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                       key={date}
                       className={cn(
                         tagPrintClass(cell, tone),
-                        "min-w-[1.35rem] border border-black px-0.5 py-0.5 text-center font-mono text-[8px] font-bold leading-none whitespace-nowrap",
+                        "border border-black px-0 py-0.5 text-center font-mono text-[7px] font-bold leading-none",
                       )}
                       style={{ backgroundColor: fill.bg, color: fill.fg }}
                     >
@@ -214,7 +217,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         </table>
 
         <ConsumeSignOff
-          className="gap-3 text-[9px]"
+          className="text-[9px]"
           labels={(
             [
               "consume.signDailySi",

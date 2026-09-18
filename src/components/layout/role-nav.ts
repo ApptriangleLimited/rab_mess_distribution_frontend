@@ -8,7 +8,6 @@ import {
   IconCashBanknote,
   IconFileReport,
   IconUsersGroup,
-  IconClockHour4,
   IconCake,
   IconSettings,
   type Icon,
@@ -68,12 +67,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.messLedger",
       icon: IconTags,
       chip: "teal",
-    },
-    {
-      href: "/mess/shifts",
-      labelKey: "nav.shifts",
-      icon: IconClockHour4,
-      chip: "purple",
     },
     {
       href: "/mess/pritibhoj",

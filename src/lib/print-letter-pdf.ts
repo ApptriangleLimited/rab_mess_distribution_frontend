@@ -137,6 +137,13 @@ function expandForPrintPage(
         node.style.minWidth = "0";
       }
     }
+    if (node.classList.contains("consume-sign-cell")) {
+      node.style.border = "none";
+      node.style.background = "transparent";
+      node.style.textAlign = "center";
+      node.style.verticalAlign = "top";
+      node.style.whiteSpace = "normal";
+    }
   });
 }
 
@@ -169,8 +176,16 @@ function letterSheetCss() {
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .month-ledger-print table {
-    table-layout: auto !important;
+  .month-ledger-print table:not(.consume-sign-off) {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+  .month-ledger-print .ledger-id,
+  .month-ledger-print .ledger-rank,
+  .month-ledger-print .ledger-name {
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
   }
   .month-ledger-print th,
   .month-ledger-print td {
@@ -185,6 +200,37 @@ function letterSheetCss() {
     font-size: 8px !important;
     font-weight: 700 !important;
     padding: 3px 2px !important;
+  }
+  .consume-sign-off {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border: none !important;
+    margin-top: 28px !important;
+  }
+  .consume-sign-off td,
+  .consume-sign-off .consume-sign-cell {
+    border: none !important;
+    background: transparent !important;
+    text-align: center !important;
+    vertical-align: top !important;
+    width: 16.66% !important;
+    padding: 24px 6px 0 !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    font-weight: 400 !important;
+  }
+  .consume-sign-off .consume-sign-line {
+    width: 72% !important;
+    max-width: 7.5rem !important;
+    height: 1px !important;
+    margin: 0 auto 6px !important;
+    background: #111 !important;
+  }
+  .consume-sign-off .consume-sign-label {
+    line-height: 1.25 !important;
+    text-align: center !important;
   }
   .transfer-sheet-print th,
   .transfer-sheet-print td {

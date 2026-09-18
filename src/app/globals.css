@@ -212,4 +212,9 @@ body {
   .force-rank-letter table.force-rank-footer > tbody > tr > td {
     border: none !important;
   }
+  .consume-sign-off,
+  .consume-sign-off td {
+    border: none !important;
+    background: transparent !important;
+  }
 }

@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import {
-  IconClockHour4,
   IconCake,
   IconTags,
 } from "@tabler/icons-react";
@@ -20,13 +19,6 @@ const TABS = [
       path === "/mess/ledger" || path.startsWith("/mess/ledger/"),
   },
   {
-    href: "/mess/shifts",
-    labelKey: "nav.shifts" as const,
-    icon: IconClockHour4,
-    match: (path: string) =>
-      path === "/mess/shifts" || path.startsWith("/mess/shifts/"),
-  },
-  {
     href: "/mess/pritibhoj",
     labelKey: "nav.pritibhoj" as const,
     icon: IconCake,
@@ -35,7 +27,7 @@ const TABS = [
   },
 ] as const;
 
-/** Ledger / Shifts / Pritibhoj — header strip. */
+/** Ledger / Pritibhoj — header strip. */
 export function MessTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -27,6 +27,48 @@ import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Shrink the letter into the pane so the preview never scrolls. */
+function FitPagePreview({ children }: { children: ReactNode }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const page = pageRef.current;
+    if (!frame || !page) return;
+
+    const apply = () => {
+      const prev = page.style.zoom;
+      page.style.zoom = "1";
+      const lw = page.offsetWidth;
+      const lh = page.offsetHeight;
+      page.style.zoom = prev;
+      const fw = frame.clientWidth - 16;
+      const fh = frame.clientHeight - 16;
+      if (!lw || !lh || fw <= 0 || fh <= 0) return;
+      const next = Math.min(fw / lw, fh / lh, 1);
+      setZoom((z) => (Math.abs(z - next) < 0.002 ? z : next));
+    };
+
+    apply();
+    const ro = new ResizeObserver(() => requestAnimationFrame(apply));
+    ro.observe(frame);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={frameRef}
+      className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
+    >
+      <div ref={pageRef} className="shrink-0" style={{ zoom }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function ConsumeLedgerPrintClient() {
   const t = useT();
@@ -144,7 +186,7 @@ export default function ConsumeLedgerPrintClient() {
   }
 
   return (
-    <PagePane className="gap-4">
+    <PagePane className="h-[calc(100dvh-3.75rem)] max-h-[calc(100dvh-3.75rem)] min-h-0 gap-3 overflow-hidden !overflow-hidden">
       <div className="no-print">
         <PageHeader
           title={t("pages.consumeLedgerPrint.title")}
@@ -197,7 +239,7 @@ export default function ConsumeLedgerPrintClient() {
       {!canAct ? (
         <EmptyState title={t("common.noResults")} />
       ) : (
-        <div className="overflow-x-auto">
+        <FitPagePreview>
           <MonthLedgerPrint
             ref={printRef}
             month={month}
@@ -206,8 +248,9 @@ export default function ConsumeLedgerPrintClient() {
             rows={rows}
             columnDates={ledger.columnDates}
             preview
+            reportLang="en"
           />
-        </div>
+        </FitPagePreview>
       )}
     </PagePane>
   );
