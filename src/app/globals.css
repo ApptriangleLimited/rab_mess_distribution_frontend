@@ -199,4 +199,17 @@ body {
     size: A4 landscape;
     margin: 8mm;
   }
+  .force-rank-letter {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .force-rank-letter table.force-rank-officer {
+    width: auto !important;
+  }
+  .force-rank-letter table.force-rank-footer > tbody > tr > td {
+    border: none !important;
+  }
 }

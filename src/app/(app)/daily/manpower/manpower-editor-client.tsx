@@ -12,6 +12,7 @@ import {
   IconPrinter,
   IconSend,
 } from "@tabler/icons-react";
+import { ForceRankWeb } from "@/components/manpower/force-rank-web";
 import { ManpowerWeb } from "@/components/manpower/manpower-web";
 import { StrengthWeb } from "@/components/manpower/strength-web";
 import { DailyTabs } from "@/components/layout/daily-tabs";
@@ -31,13 +32,14 @@ import {
   saveManpowerPaper,
   submitManpowerPaper,
 } from "@/lib/store/paper-reports";
+import { buildForceRankReport } from "@/lib/force-rank-report";
 import { buildStrengthReport } from "@/lib/strength-report";
 import { useI18n, useT } from "@/i18n/provider";
 
-type FormId = "1" | "2" | "3";
+type FormId = "1" | "2" | "3" | "4";
 
 function parseForm(raw: string | null): FormId {
-  if (raw === "2" || raw === "3") return raw;
+  if (raw === "2" || raw === "3" || raw === "4") return raw;
   return "1";
 }
 
@@ -81,6 +83,11 @@ export default function ManpowerEditorClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [date, state, reportSnapshot],
   );
+  const form4 = useMemo(
+    () => buildForceRankReport(date, snapshot ?? undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [date, state, snapshot],
+  );
 
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   const printHref = `/daily/manpower/print?date=${encodeURIComponent(date)}&form=${form}`;
@@ -91,7 +98,9 @@ export default function ManpowerEditorClient() {
       ? t("manpower.form1Title")
       : form === "2"
         ? t("manpower.form2Title")
-        : t("manpower.form3Title");
+        : form === "3"
+          ? t("manpower.form3Title")
+          : t("manpower.form4Title");
   const paper = getManpowerPaper(date, form);
   const verified = paper?.status === "approved";
   const submitted = paper?.status === "submitted";
@@ -223,6 +232,9 @@ export default function ManpowerEditorClient() {
           ) : null}
           {form === "3" && showReport ? (
             <StrengthWeb report={form3} readOnly={fieldsLocked} />
+          ) : null}
+          {form === "4" && showReport ? (
+            <ForceRankWeb report={form4} readOnly={fieldsLocked} />
           ) : null}
         </div>
 

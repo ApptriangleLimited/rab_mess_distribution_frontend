@@ -129,8 +129,13 @@ function expandForPrintPage(
     node.style.maxWidth = "none";
     if (keepFill) node.style.position = "static";
     if (node.tagName === "TABLE" || node.tagName === "SECTION") {
-      node.style.width = "100%";
-      node.style.minWidth = "0";
+      if (node.classList.contains("force-rank-officer")) {
+        node.style.width = "auto";
+        node.style.maxWidth = "none";
+      } else {
+        node.style.width = "100%";
+        node.style.minWidth = "0";
+      }
     }
   });
 }
@@ -218,6 +223,49 @@ function letterSheetCss() {
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
     white-space: normal !important;
+  }
+  .force-rank-letter {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .force-rank-letter .force-rank-header {
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: start !important;
+    gap: 8px !important;
+    margin-bottom: 6px !important;
+  }
+  .force-rank-letter .force-rank-titles {
+    text-align: center !important;
+  }
+  .force-rank-letter .force-rank-date {
+    text-align: right !important;
+    white-space: nowrap !important;
+  }
+  .force-rank-letter table.force-rank-main {
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+  .force-rank-letter table.force-rank-officer {
+    width: auto !important;
+    max-width: none !important;
+  }
+  .force-rank-letter table.force-rank-footer {
+    width: 100% !important;
+    border: none !important;
+    margin-top: 8px !important;
+  }
+  .force-rank-letter table.force-rank-footer > tbody > tr > td {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  .force-rank-letter .force-rank-grand {
+    border: none !important;
+    text-align: right !important;
+    vertical-align: bottom !important;
+    white-space: nowrap !important;
+    font-weight: 700 !important;
   }`;
 }
 
@@ -392,6 +440,7 @@ function previewMatchCss() {
   }
   ${colorSheetCss()}
   ${tagPrintCss()}
+  ${letterSheetCss()}
   `;
 }
 
@@ -555,6 +604,7 @@ const LARGE_LETTER_SELECTOR = [
   ".official-consume-letter",
   ".manpower-letter",
   ".strength-letter",
+  ".force-rank-letter",
 ].join(", ");
 
 function shouldSkipInlineStyles(el: HTMLElement, options: PrintLetterOptions) {

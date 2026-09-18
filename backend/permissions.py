@@ -136,6 +136,7 @@ CATALOG_SLICE = {
     "manpower_absent",
     "manpower_present",
     "manpower_absence_detail",
+    "force_rank_officer",
     "paper_report_requests",
 }
 

@@ -1916,6 +1916,26 @@ export function setManpowerOfficerAbsent(
   return true;
 }
 
+export function setForceRankOfficer(
+  date: string,
+  field: "held" | "total",
+  count: number,
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const safe =
+    Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
+  setState((prev) => {
+    const current = prev.force_rank_officer?.[date] ?? { held: 0, total: 0 };
+    const next = { ...current, [field]: safe };
+    const force_rank_officer = { ...(prev.force_rank_officer ?? {}) };
+    if (!next.held && !next.total) delete force_rank_officer[date];
+    else force_rank_officer[date] = next;
+    return { ...prev, force_rank_officer };
+  });
+  persistAppStateNow();
+  return true;
+}
+
 export function removeAuthorized(id: string) {
   setState((prev) => ({
     ...prev,

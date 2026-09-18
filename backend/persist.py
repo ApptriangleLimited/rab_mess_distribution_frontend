@@ -78,6 +78,7 @@ CATALOG_KEYS = (
     "manpower_absent",
     "manpower_present",
     "manpower_absence_detail",
+    "force_rank_officer",
     "paper_report_requests",
 )
 
@@ -910,6 +911,8 @@ def manpower_day_data(db: Session, target: date) -> dict:
                 "name": member.name,
                 "rank": member.rank,
                 "wing": member.wing,
+                "force": member.force or "",
+                "force_rank": member.force_rank or "",
                 "member_type": member.member_type,
                 "status": member.status,
                 "approval_status": member.approval_status,

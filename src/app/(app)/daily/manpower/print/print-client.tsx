@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { IconArrowLeft, IconPrinter } from "@tabler/icons-react";
+import { ForceRankLetter } from "@/components/manpower/force-rank-letter";
 import { ManpowerLetter } from "@/components/manpower/manpower-letter";
 import { StrengthLetter } from "@/components/manpower/strength-letter";
 import { PageHeader } from "@/components/shared/page-header";
@@ -18,14 +19,15 @@ import {
   isPaperVerified,
 } from "@/lib/store/paper-reports";
 import { buildManpowerReport } from "@/lib/manpower-report";
+import { buildForceRankReport } from "@/lib/force-rank-report";
 import { buildStrengthReport } from "@/lib/strength-report";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { useI18n, useT } from "@/i18n/provider";
 
-type FormId = "1" | "2" | "3";
+type FormId = "1" | "2" | "3" | "4";
 
 function parseForm(raw: string | null): FormId {
-  if (raw === "2" || raw === "3") return raw;
+  if (raw === "2" || raw === "3" || raw === "4") return raw;
   return "1";
 }
 
@@ -70,6 +72,11 @@ export function ManpowerPrintClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [date, state, reportSnapshot],
   );
+  const form4 = useMemo(
+    () => buildForceRankReport(date, snapshot ?? undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [date, state, snapshot],
+  );
 
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
 
@@ -78,7 +85,9 @@ export function ManpowerPrintClient() {
       ? "manpower.form1Title"
       : form === "2"
         ? "manpower.form2Title"
-        : "manpower.form3Title";
+        : form === "3"
+          ? "manpower.form3Title"
+          : "manpower.form4Title";
 
   async function onPrint() {
     const el = printRef.current;
@@ -88,7 +97,7 @@ export function ManpowerPrintClient() {
       await printLetterElement(
         el,
         `manpower-form${form}-${date}.pdf`,
-        "portrait",
+        form === "4" ? "landscape" : "portrait",
       );
     } finally {
       setPrinting(false);
@@ -160,6 +169,15 @@ export function ManpowerPrintClient() {
           locale={dateLocale}
           verified={verified}
         />
+      ) : null}
+      {printable && form === "4" && !loading ? (
+        <div className="overflow-x-auto">
+          <ForceRankLetter
+            ref={printRef}
+            report={form4}
+            verified={verified}
+          />
+        </div>
       ) : null}
     </PagePane>
   );

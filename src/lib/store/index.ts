@@ -125,7 +125,8 @@ export function applyApiSnapshot(partial: Partial<AppState>) {
       (key === "manpower_held" ||
         key === "manpower_absent" ||
         key === "manpower_present" ||
-        key === "manpower_absence_detail") &&
+        key === "manpower_absence_detail" ||
+        key === "force_rank_officer") &&
       value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
@@ -220,6 +221,25 @@ function ensureDayWingCatMap(
   return out;
 }
 
+function ensureForceRankOfficer(
+  raw: unknown,
+): Record<string, { held: number; total: number }> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, { held: number; total: number }> = {};
+  for (const [date, row] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (!row || typeof row !== "object") continue;
+    const held = Number((row as { held?: unknown }).held);
+    const total = Number((row as { total?: unknown }).total);
+    const nextHeld =
+      Number.isFinite(held) && held > 0 ? Math.floor(held) : 0;
+    const nextTotal =
+      Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
+    if (nextHeld || nextTotal) out[date] = { held: nextHeld, total: nextTotal };
+  }
+  return out;
+}
+
 function sanitizePritibhojEvent(raw: unknown): PritibhojEvent | null {
   return normalizePritibhojEvent(raw);
 }
@@ -262,7 +282,13 @@ function ensurePaperReports(raw: unknown): PaperReportRequest[] {
       id,
       kind,
       ref,
-      form: row.form === "2" || row.form === "3" || row.form === "1" ? row.form : undefined,
+      form:
+        row.form === "1" ||
+        row.form === "2" ||
+        row.form === "3" ||
+        row.form === "4"
+          ? row.form
+          : undefined,
       title: String(row.title ?? ""),
       date: String(row.date ?? ""),
       status,
@@ -1847,6 +1873,13 @@ export function getState(): AppState {
   ) {
     seeded.manpower_absence_detail = fromDisk.manpower_absence_detail;
   }
+  if (
+    fromDisk &&
+    fromDisk.force_rank_officer &&
+    typeof fromDisk.force_rank_officer === "object"
+  ) {
+    seeded.force_rank_officer = fromDisk.force_rank_officer;
+  }
   catalogHealed = true;
   memory = seeded;
   writeStorage(seeded);
@@ -2155,6 +2188,9 @@ function normalizeState(state: AppState): AppState {
       (state as AppState & { manpower_absence_detail?: unknown })
         .manpower_absence_detail,
     ),
+    force_rank_officer: ensureForceRankOfficer(
+      (state as AppState & { force_rank_officer?: unknown }).force_rank_officer,
+    ),
     senders: (() => {
       const raw = (state.senders ?? []).map((s) => ({
         ...s,
@@ -2249,6 +2285,7 @@ const EMPTY_SERVER_SNAPSHOT: AppState = {
   manpower_absent: {},
   manpower_present: {},
   manpower_absence_detail: {},
+  force_rank_officer: {},
   approved_dates: [],
   suppressed_carries: [],
   boro_khana_dates: [],

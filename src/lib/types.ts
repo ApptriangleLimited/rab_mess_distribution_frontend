@@ -307,7 +307,7 @@ export type PritibhojEvent = {
 
 export type PaperReportKind = "manpower" | "pritibhoj";
 export type PaperReportStatus = "draft" | "submitted" | "approved";
-export type ManpowerFormId = "1" | "2" | "3";
+export type ManpowerFormId = "1" | "2" | "3" | "4";
 
 export type PaperReportRequest = {
   id: string;
@@ -409,6 +409,8 @@ export interface AppState {
    * (`YYYY-MM-DD` → wing → cl/pl/… → count). Air Wg / Training School only.
    */
   manpower_absence_detail: Record<string, Record<string, Record<string, number>>>;
+  /** Form 4 অফিসার প্রাপ্ত/মোট (`YYYY-MM-DD` → held/total). */
+  force_rank_officer: Record<string, { held: number; total: number }>;
   /** ISO dates Daily has confirmed (carry + edits locked as approved). */
   approved_dates: string[];
   /** `${userId}|${date}` — hide carry ghost until Approve restores or new tag set. */

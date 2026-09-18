@@ -23,6 +23,7 @@ export function useManpowerDay(date: string) {
   const apiOn = isApiEnabled() && !isOldPublicApiHost();
   const { toast } = useToast();
   const assignments = useStore().assignments;
+  const storeUsers = useStore().users;
   const [data, setData] = useState<ManpowerDayData | null>(null);
   const [cells, setCells] = useState<AssignmentCell[]>([]);
   const [loading, setLoading] = useState(apiOn);
@@ -83,8 +84,19 @@ export function useManpowerDay(date: string) {
         ),
       );
     }
+    const byId = new Map(storeUsers.map((row) => [row.id, row]));
     return {
-      users: data.members.map(manpowerMemberToUser),
+      users: data.members.map((row) => {
+        const user = manpowerMemberToUser(row);
+        const stored = byId.get(row.id);
+        return {
+          ...user,
+          force: user.force || stored?.force || "",
+          force_rank: user.force_rank || stored?.force_rank || "",
+          rank: user.rank || stored?.rank || "",
+          member_type: user.member_type || stored?.member_type || "permanent",
+        };
+      }),
       tagFor: (userId) => tags.get(userId) ?? "",
       wingParent: data.wing_parent,
       authorized: data.authorized,
@@ -93,7 +105,7 @@ export function useManpowerDay(date: string) {
       wings: data.wings,
       prefiltered: true,
     };
-  }, [apiOn, data, cells]);
+  }, [apiOn, data, cells, storeUsers]);
 
   return { apiOn, loading: apiOn && loading, snapshot, data };
 }

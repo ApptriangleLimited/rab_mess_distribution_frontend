@@ -7,6 +7,8 @@ export type ManpowerDayMember = {
   name: string;
   rank: string;
   wing: string;
+  force?: string;
+  force_rank?: string;
   member_type: string;
   status: string;
   approval_status: string;
@@ -66,8 +68,8 @@ export function manpowerMemberToUser(row: ManpowerDayMember): User {
     rfid: "",
     rank: row.rank,
     wing: row.wing,
-    force: "",
-    force_rank: "",
+    force: row.force ?? "",
+    force_rank: row.force_rank ?? "",
     religion: "",
     member_type: asMemberType(row.member_type),
     dropdown_no: "",

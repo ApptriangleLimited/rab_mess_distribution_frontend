@@ -26,10 +26,10 @@ import { listPaperReports } from "@/lib/store/paper-reports";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n/provider";
 
-type FormId = "1" | "2" | "3";
+type FormId = "1" | "2" | "3" | "4";
 
 function parseForm(raw: string | null): FormId {
-  if (raw === "2" || raw === "3") return raw;
+  if (raw === "2" || raw === "3" || raw === "4") return raw;
   return "1";
 }
 
@@ -51,7 +51,8 @@ export default function ManpowerClient() {
     hintKey:
       | "manpower.form1Hint"
       | "manpower.form2Hint"
-      | "manpower.form3Hint";
+      | "manpower.form3Hint"
+      | "manpower.form4Hint";
   }[] = [
     {
       id: "1",
@@ -67,6 +68,11 @@ export default function ManpowerClient() {
       id: "3",
       short: t("manpower.form3Short"),
       hintKey: "manpower.form3Hint",
+    },
+    {
+      id: "4",
+      short: t("manpower.form4Short"),
+      hintKey: "manpower.form4Hint",
     },
   ];
 
@@ -210,7 +216,9 @@ export default function ManpowerClient() {
                   ? t("manpower.form1Title")
                   : form === "2"
                     ? t("manpower.form2Title")
-                    : t("manpower.form3Title")}
+                    : form === "3"
+                      ? t("manpower.form3Title")
+                      : t("manpower.form4Title")}
               </h2>
             </div>
             <div className="overflow-x-auto">
