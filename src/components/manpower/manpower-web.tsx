@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import {
+  ABSENCE_DETAIL_FIELDS,
   formatManpowerCell,
+  isManualPresentWing,
   manpowerRowTotalFor,
   type ManpowerAbsenceRow,
   type ManpowerCounts,
@@ -16,9 +18,12 @@ import {
   type ManpowerWingGroup,
 } from "@/lib/manpower-report";
 import {
+  setManpowerAbsenceDetail,
   setManpowerAbsentCount,
   setManpowerHeld,
+  setManpowerPresentCount,
 } from "@/lib/store/org-options";
+import { useStore } from "@/hooks/use-store";
 import { form1RankLabelBn, isForm1RankColumn } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
 
@@ -51,13 +56,15 @@ function Cell({
 function WingNameCell({
   children,
   emphasize,
+  rowSpan = 4,
 }: {
   children: ReactNode;
   emphasize?: boolean;
+  rowSpan?: number;
 }) {
   return (
     <td
-      rowSpan={5}
+      rowSpan={rowSpan}
       className={cn(
         "sticky left-0 z-[2] w-36 border border-neutral-200 px-3 py-1.5 text-left text-sm font-semibold align-middle dark:border-neutral-700",
         emphasize
@@ -175,15 +182,28 @@ function InputMetricRow({
   wing,
   kind,
   withWing,
+  emphasize,
 }: {
   label: string;
   counts: ManpowerCounts;
   categories: ManpowerReport["categories"];
   date: string;
   wing: string;
-  kind: "held" | "absent";
+  kind: "held" | "absent" | "present";
   withWing?: boolean;
+  emphasize?: boolean;
 }) {
+  if (!isManualPresentWing(wing)) {
+    return (
+      <MetricRow
+        label={label}
+        counts={counts}
+        categories={categories}
+        emphasize={emphasize}
+        withWing={withWing}
+      />
+    );
+  }
   return (
     <tr>
       <td
@@ -201,7 +221,12 @@ function InputMetricRow({
           ariaLabel={`${form1RankLabelBn(cat.label)} ${label} — ${wing}`}
           onCommit={(n) => {
             if (kind === "held") setManpowerHeld(date, wing, cat.id, n);
-            else setManpowerAbsentCount(date, wing, cat.id, n);
+            else if (kind === "present") setManpowerPresentCount(date, wing, cat.id, n);
+            else
+              setManpowerAbsentCount(date, wing, cat.id, n, {
+                ...counts,
+                [cat.id]: n,
+              });
           }}
         />
       ))}
@@ -222,10 +247,11 @@ function BlockRows({
   categories,
   editable,
   emphasize,
+  showShortfall = false,
 }: {
   date: string;
   wing: string;
-  /** Paper: wing name spans the five field rows. */
+  /** Paper: wing name spans the field rows. */
   wingLabel?: ReactNode;
   authorized: ManpowerCounts;
   held: ManpowerCounts;
@@ -235,8 +261,44 @@ function BlockRows({
   categories: ManpowerReport["categories"];
   editable?: boolean;
   emphasize?: boolean;
+  /** বৃদ্ধি/হ্রাস only on the HQ summary, not per-wing rows. */
+  showShortfall?: boolean;
 }) {
   const withWing = wingLabel != null;
+  const manual = Boolean(editable && isManualPresentWing(wing));
+
+  function dutyRow(
+    label: string,
+    counts: ManpowerCounts,
+    kind: "held" | "present" | "absent",
+    signed?: boolean,
+  ) {
+    if (!manual) {
+      return (
+        <MetricRow
+          label={label}
+          counts={counts}
+          categories={categories}
+          emphasize={emphasize}
+          signed={signed}
+          withWing={withWing}
+        />
+      );
+    }
+    return (
+      <InputMetricRow
+        label={label}
+        counts={counts}
+        categories={categories}
+        date={date}
+        wing={wing}
+        kind={kind}
+        withWing={withWing}
+        emphasize={emphasize}
+      />
+    );
+  }
+
   return (
     <>
       <MetricRow
@@ -247,63 +309,28 @@ function BlockRows({
         withWing={withWing}
         wingCell={
           withWing ? (
-            <WingNameCell emphasize={emphasize}>{wingLabel}</WingNameCell>
+            <WingNameCell
+              emphasize={emphasize}
+              rowSpan={showShortfall ? 5 : 4}
+            >
+              {wingLabel}
+            </WingNameCell>
           ) : undefined
         }
       />
-      {editable ? (
-        <InputMetricRow
-          label="প্রাপ্ত"
-          counts={held}
-          categories={categories}
-          date={date}
-          wing={wing}
-          kind="held"
-          withWing={withWing}
-        />
-      ) : (
+      {dutyRow("প্রাপ্ত", held, "held")}
+      {showShortfall ? (
         <MetricRow
-          label="প্রাপ্ত"
-          counts={held}
+          label="বৃদ্ধি/হ্রাস"
+          counts={shortfall}
           categories={categories}
           emphasize={emphasize}
+          signed
           withWing={withWing}
         />
-      )}
-      <MetricRow
-        label="বৃদ্ধি/হ্রাস"
-        counts={shortfall}
-        categories={categories}
-        emphasize={emphasize}
-        signed
-        withWing={withWing}
-      />
-      <MetricRow
-        label="উপস্থিত"
-        counts={present}
-        categories={categories}
-        emphasize={emphasize}
-        withWing={withWing}
-      />
-      {editable ? (
-        <InputMetricRow
-          label="অনুপস্থিত"
-          counts={absent}
-          categories={categories}
-          date={date}
-          wing={wing}
-          kind="absent"
-          withWing={withWing}
-        />
-      ) : (
-        <MetricRow
-          label="অনুপস্থিত"
-          counts={absent}
-          categories={categories}
-          emphasize={emphasize}
-          withWing={withWing}
-        />
-      )}
+      ) : null}
+      {dutyRow("উপস্থিত", present, "present")}
+      {dutyRow("অনুপস্থিত", absent, "absent")}
     </>
   );
 }
@@ -315,6 +342,8 @@ function RankHead({
   categories: ManpowerReport["categories"];
   withWing?: boolean;
 }) {
+  const state = useStore();
+  const cols = categories.filter((cat) => isForm1RankColumn(cat.label));
   return (
     <tr className="bg-neutral-100 dark:bg-neutral-800">
       {withWing ? (
@@ -330,12 +359,12 @@ function RankHead({
       >
         বিবরণ
       </th>
-      {categories.map((cat) => (
+      {cols.map((cat) => (
         <th
           key={cat.id}
           className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700"
         >
-          {form1RankLabelBn(cat.label)}
+          {form1RankLabelBn(cat.label, state.rank_labels_bn)}
         </th>
       ))}
       <th className="border border-neutral-200 px-2 py-2 text-xs font-semibold dark:border-neutral-700">
@@ -376,9 +405,13 @@ function fallbackGroups(
 function AbsenceTable({
   title,
   rows,
+  date,
+  editable,
 }: {
   title: string;
   rows: ManpowerAbsenceRow[];
+  date: string;
+  editable?: boolean;
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
@@ -466,25 +499,47 @@ function AbsenceTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.wing}>
-                <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
-                  <WingName wing={row.wing} />
-                </td>
-                <Cell value={row.cl} />
-                <Cell value={row.pl} />
-                <Cell value={row.rl} />
-                <Cell value={row.ml} />
-                <Cell value={row.maternity} />
-                <Cell value={row.training} />
-                <Cell value={row.witness} />
-                <Cell value={row.exam} />
-                <Cell value={row.other} />
-                <Cell value={row.hospital} />
-                <Cell value={row.avgPresent} className="font-semibold" />
-                <Cell value={row.total} className="font-semibold" />
-              </tr>
-            ))}
+            {rows.map((row) => {
+              const manual = Boolean(editable && isManualPresentWing(row.wing));
+              return (
+                <tr key={row.wing}>
+                  <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
+                    <WingName wing={row.wing} />
+                  </td>
+                  {ABSENCE_DETAIL_FIELDS.map((field) =>
+                    manual ? (
+                      <CountInput
+                        key={`${date}-${row.wing}-${field}`}
+                        value={row[field]}
+                        ariaLabel={`${field} — ${row.wing}`}
+                        onCommit={(n) => {
+                          const next: Record<string, number> = {};
+                          for (const key of ABSENCE_DETAIL_FIELDS) {
+                            next[key] = key === field ? n : row[key];
+                          }
+                          setManpowerAbsenceDetail(
+                            date,
+                            row.wing,
+                            field,
+                            n,
+                            next,
+                          );
+                        }}
+                      />
+                    ) : (
+                      <Cell
+                        key={field}
+                        value={row[field]}
+                        className={
+                          field === "avgPresent" ? "font-semibold" : undefined
+                        }
+                      />
+                    ),
+                  )}
+                  <Cell value={row.total} className="font-semibold" />
+                </tr>
+              );
+            })}
             <tr className="bg-neutral-50 font-semibold dark:bg-neutral-800/50">
               <td className="sticky left-0 z-[1] border border-neutral-200 bg-neutral-50 px-3 py-1.5 dark:border-neutral-700 dark:bg-neutral-800/50">
                 সর্বমোট
@@ -546,6 +601,7 @@ export function ManpowerWeb({ report, readOnly = false }: Props) {
                 present={hq.present}
                 absent={hq.absent}
                 categories={categories}
+                showShortfall
               />
             </tbody>
           </table>
@@ -600,6 +656,8 @@ export function ManpowerWeb({ report, readOnly = false }: Props) {
             key={`abs-${group.id}`}
             title={`অনুপস্থিতির বিবরণ · ${group.titleBn}`}
             rows={group.absence}
+            date={date}
+            editable={!readOnly}
           />
         ),
       )}

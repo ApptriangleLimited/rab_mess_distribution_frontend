@@ -11,15 +11,13 @@ import { useStore } from "@/hooks/use-store";
 import {
   authorizedWingDisplayCount,
   listAuthorizedRootWings,
-  setAuthorizedHeldWingCount,
   setAuthorizedWingCount,
 } from "@/lib/store/org-options";
-import { isOfficerCategory } from "@/lib/manpower-report";
-import { wingSettingsLabel } from "@/lib/rank-labels";
+import { authorizedLabelBn, wingLabelBn } from "@/lib/rank-labels";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
-/** Authorized strength — wing প্রাধিকৃত; Officer also per-wing প্রাপ্ত. */
+/** Authorized strength — প্রাধিকৃত per Settings wing only. */
 export function AuthorizedSection({
   static: staticPanel = false,
 }: {
@@ -29,7 +27,7 @@ export function AuthorizedSection({
   const state = useStore();
   const [sectionOpen, setSectionOpen] = useState(staticPanel);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  /** Empty string while typing. Key = `${kind}::${authId}::${wing}`. */
+  /** Empty string while typing. Key = `${authId}::${wing}`. */
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   const rows = state.authorized ?? [];
@@ -49,37 +47,25 @@ export function AuthorizedSection({
     [rows, rootWings],
   );
 
-  function draftKey(kind: "auth" | "held", authId: string, wing: string) {
-    return `${kind}::${authId}::${wing}`;
+  function draftKey(authId: string, wing: string) {
+    return `${authId}::${wing}`;
   }
 
-  function inputValue(
-    kind: "auth" | "held",
-    authId: string,
-    wing: string,
-  ): string {
-    const key = draftKey(kind, authId, wing);
+  function inputValue(authId: string, wing: string): string {
+    const key = draftKey(authId, wing);
     if (Object.prototype.hasOwnProperty.call(drafts, key)) {
       return drafts[key]!;
     }
     const row = rows.find((r) => r.id === authId);
-    const map = kind === "auth" ? row?.wings : row?.held_wings;
-    return String(authorizedWingDisplayCount(map, wing));
+    return String(authorizedWingDisplayCount(row?.wings, wing));
   }
 
-  function onCount(
-    kind: "auth" | "held",
-    authId: string,
-    wing: string,
-    raw: string,
-  ) {
+  function onCount(authId: string, wing: string, raw: string) {
     const digits = raw.replace(/[^\d]/g, "");
-    const key = draftKey(kind, authId, wing);
-    const save =
-      kind === "auth" ? setAuthorizedWingCount : setAuthorizedHeldWingCount;
+    const key = draftKey(authId, wing);
     if (digits === "") {
       setDrafts((prev) => ({ ...prev, [key]: "" }));
-      save(authId, wing, 0);
+      setAuthorizedWingCount(authId, wing, 0);
       return;
     }
     const n = Number(digits);
@@ -90,11 +76,11 @@ export function AuthorizedSection({
       delete next[key];
       return next;
     });
-    save(authId, wing, Math.floor(n));
+    setAuthorizedWingCount(authId, wing, Math.floor(n));
   }
 
-  function onBlur(kind: "auth" | "held", authId: string, wing: string) {
-    const key = draftKey(kind, authId, wing);
+  function onBlur(authId: string, wing: string) {
+    const key = draftKey(authId, wing);
     setDrafts((prev) => {
       if (!(key in prev)) return prev;
       const next = { ...prev };
@@ -134,18 +120,10 @@ export function AuthorizedSection({
             <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {rows.map((row) => {
                 const open = expandedId === row.id;
-                const officer = isOfficerCategory(row);
                 const wingSum = rootWings.reduce(
                   (s, w) => s + authorizedWingDisplayCount(row.wings, w),
                   0,
                 );
-                const heldSum = officer
-                  ? rootWings.reduce(
-                      (s, w) =>
-                        s + authorizedWingDisplayCount(row.held_wings, w),
-                      0,
-                    )
-                  : 0;
                 return (
                   <li key={row.id} className="group">
                     <div className="flex items-start gap-2 px-3 py-2.5 transition hover:bg-primary/[0.03] dark:hover:bg-primary/[0.06]">
@@ -162,25 +140,20 @@ export function AuthorizedSection({
                               open ? "rotate-0" : "-rotate-90",
                             )}
                           />
-                          <span className="w-[5.5rem] shrink-0 truncate text-sm font-semibold text-neutral-900 dark:text-white sm:w-28">
-                            {row.label}
+                          <span
+                            className="w-[6.5rem] shrink-0 truncate text-sm font-semibold text-neutral-900 dark:text-white sm:w-36"
+                            title={row.label}
+                          >
+                            {authorizedLabelBn(row.label, state.rank_labels_bn)}
                           </span>
                           <span className="font-mono text-sm font-semibold tabular-nums text-neutral-600 dark:text-neutral-300">
                             {wingSum.toLocaleString()}
                           </span>
-                          {officer ? (
-                            <span className="font-mono text-xs tabular-nums text-neutral-500">
-                              · {t("settings.authorizedHeld")}{" "}
-                              {heldSum.toLocaleString()}
-                            </span>
-                          ) : null}
                         </button>
                         {open ? (
                           <div className="mt-2 border-t border-neutral-100 pt-2 dark:border-neutral-800">
                             <p className="mb-2 text-[11px] text-neutral-500">
-                              {officer
-                                ? t("settings.authorizedOfficerNote")
-                                : t("settings.authorizedWingHint")}
+                              {t("settings.authorizedWingHint")}
                             </p>
                             {rootWings.length === 0 ? (
                               <p className="py-2 text-xs text-neutral-500">
@@ -188,96 +161,38 @@ export function AuthorizedSection({
                               </p>
                             ) : (
                               <ul className="space-y-1.5 pl-7">
-                                {officer ? (
-                                  <li className="grid max-w-lg grid-cols-[minmax(0,1fr)_3.5rem_3.5rem] items-center gap-x-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-                                    <span />
-                                    <span className="text-center">
-                                      {t("settings.authorizedPradhikrito")}
-                                    </span>
-                                    <span className="text-center">
-                                      {t("settings.authorizedHeld")}
-                                    </span>
-                                  </li>
-                                ) : null}
                                 {rootWings.map((wing) => (
                                   <li
                                     key={wing}
-                                    className={cn(
-                                      "grid max-w-lg items-center gap-x-2",
-                                      officer
-                                        ? "grid-cols-[minmax(0,1fr)_3.5rem_3.5rem]"
-                                        : "grid-cols-[minmax(0,1fr)_4rem]",
-                                    )}
+                                    className="grid max-w-lg grid-cols-[minmax(0,1fr)_4rem] items-center gap-x-2"
                                   >
                                     <span
                                       className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200"
-                                      title={wingSettingsLabel(wing)}
+                                      title={`${wingLabelBn(wing, state.wing_labels_bn)} · ${wing}`}
                                     >
-                                      {wingSettingsLabel(wing)}
+                                      {wingLabelBn(wing, state.wing_labels_bn)}
                                     </span>
                                     <Input
-                                      value={inputValue("auth", row.id, wing)}
+                                      value={inputValue(row.id, wing)}
                                       onChange={(e) =>
-                                        onCount(
-                                          "auth",
-                                          row.id,
-                                          wing,
-                                          e.target.value,
-                                        )
+                                        onCount(row.id, wing, e.target.value)
                                       }
-                                      onBlur={() =>
-                                        onBlur("auth", row.id, wing)
-                                      }
+                                      onBlur={() => onBlur(row.id, wing)}
                                       inputMode="numeric"
                                       aria-label={`${t("settings.authorizedPradhikrito")} — ${wing}`}
                                       className="h-8 w-full rounded-md font-mono text-xs tabular-nums"
                                     />
-                                    {officer ? (
-                                      <Input
-                                        value={inputValue(
-                                          "held",
-                                          row.id,
-                                          wing,
-                                        )}
-                                        onChange={(e) =>
-                                          onCount(
-                                            "held",
-                                            row.id,
-                                            wing,
-                                            e.target.value,
-                                          )
-                                        }
-                                        onBlur={() =>
-                                          onBlur("held", row.id, wing)
-                                        }
-                                        inputMode="numeric"
-                                        aria-label={`${t("settings.authorizedHeld")} — ${wing}`}
-                                        className="h-8 w-full rounded-md font-mono text-xs tabular-nums"
-                                      />
-                                    ) : null}
                                   </li>
                                 ))}
                               </ul>
                             )}
-                            <div
-                              className={cn(
-                                "mt-2 grid max-w-lg items-center gap-x-2 border-t border-dashed border-neutral-200 pt-2 pl-7 text-xs dark:border-neutral-700",
-                                officer
-                                  ? "grid-cols-[minmax(0,1fr)_3.5rem_3.5rem]"
-                                  : "grid-cols-[minmax(0,1fr)_4rem]",
-                              )}
-                            >
+                            <div className="mt-2 grid max-w-lg grid-cols-[minmax(0,1fr)_4rem] items-center gap-x-2 border-t border-dashed border-neutral-200 pt-2 pl-7 text-xs dark:border-neutral-700">
                               <span className="font-medium text-neutral-600 dark:text-neutral-300">
                                 {t("settings.authorizedWingSum")}
                               </span>
                               <span className="text-center font-mono font-semibold tabular-nums text-neutral-900 dark:text-white">
                                 {wingSum.toLocaleString()}
                               </span>
-                              {officer ? (
-                                <span className="text-center font-mono font-semibold tabular-nums text-neutral-900 dark:text-white">
-                                  {heldSum.toLocaleString()}
-                                </span>
-                              ) : null}
                             </div>
                           </div>
                         ) : null}

@@ -134,6 +134,8 @@ CATALOG_SLICE = {
     "manpower_officer_absent",
     "manpower_held",
     "manpower_absent",
+    "manpower_present",
+    "manpower_absence_detail",
     "paper_report_requests",
 }
 

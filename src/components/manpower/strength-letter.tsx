@@ -46,10 +46,7 @@ function CountCell({
 }
 
 function AdminWingName({ wing }: { wing: string }) {
-  const key = wing.trim().toLowerCase();
   if (wing === "সর্বমোট") return <>সর্বমোট</>;
-  if (key === "mt br" || key === "mt branch") return <>এমটি</>;
-  if (key === "new / temporary attached") return <>নতুন / অস্থায়ী সংযুক্ত</>;
   return <WingName wing={wing} />;
 }
 

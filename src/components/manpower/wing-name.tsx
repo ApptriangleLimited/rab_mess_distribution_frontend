@@ -1,7 +1,8 @@
+import { useStore } from "@/hooks/use-store";
 import { wingLabelBn } from "@/lib/rank-labels";
 import { cn } from "@/lib/utils";
 
-/** Show Bangla wing; `title` keeps English link for hover / a11y. */
+/** Show Settings Bangla wing; `title` keeps English short for hover / a11y. */
 export function WingName({
   wing,
   className,
@@ -10,7 +11,8 @@ export function WingName({
   wing: string;
   className?: string;
 }) {
-  const bn = wingLabelBn(wing);
+  const state = useStore();
+  const bn = wingLabelBn(wing, state.wing_labels_bn);
   return (
     <span title={wing !== bn ? `${bn} · ${wing}` : wing} className={cn(className)}>
       {bn}

@@ -764,16 +764,16 @@ export const en = {
     forceDeleted: "Force deleted",
     authorizedTitle: "Authorized strength",
     authorizedHint:
-      "Categories = Officer + Settings ranks. Expand any row → set প্রাধিকৃত per root wing (from Wings). Manpower Form 1 uses these counts.",
+      "Categories = Officer + Settings ranks (Bangla, same as Daily manpower). Expand any row → set প্রাধিকৃত per Settings wing. Form 1 uses these counts. প্রাপ্ত is not set here.",
     authorizedWingHint:
-      "প্রাধিকৃত for short wing list (Admin = one row). Category total = wing sum.",
+      "প্রাধিকৃত per Settings wing (same names as manpower). Category total = wing sum. প্রাপ্ত comes from Daily members.",
     authorizedWingEmpty: "No root wings yet — add wings under Settings → Wings.",
     authorizedWingSum: "Wing sum (প্রাধিকৃত)",
     authorizedPradhikrito: "প্রাধিকৃত",
     authorizedHeld: "প্রাপ্ত",
     authorizedHeldHint: "Per-wing Officer প্রাপ্ত — shows on Form 1.",
     authorizedOfficerNote:
-      "Per-wing প্রাধিকৃত + প্রাপ্ত. Form 1 wing rows show Officer প্রাপ্ত; উপস্থিত/অনুপস্থিত stay blank.",
+      "Per-wing প্রাধিকৃত only. প্রাপ্ত comes from Daily members on the manpower report.",
     authorizedFormBody: "Category name only. Set প্রাধিকৃত per wing after expand.",
     authorizedEmpty: "No ranks yet — add ranks under Settings → Rank.",
     authorizedLabel: "Category",

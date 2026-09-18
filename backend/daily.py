@@ -117,8 +117,19 @@ def is_inactive_on(member: Member, day: date) -> bool:
     return False
 
 
+def roster_start(member: Member) -> date | None:
+    duty = member.duty_start
+    join = member.joining_date
+    if duty and join:
+        return duty if duty > join else join
+    return duty or join
+
+
 def can_assign(member: Member, day: date) -> bool:
     if member.member_type in ("guest", "civilian"):
+        return False
+    start = roster_start(member)
+    if start and day < start:
         return False
     if is_inactive_on(member, day):
         return False

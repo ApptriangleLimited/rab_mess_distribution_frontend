@@ -52,6 +52,8 @@ const CATALOG_KEYS = [
   "member_banks",
   "manpower_held",
   "manpower_absent",
+  "manpower_present",
+  "manpower_absence_detail",
   "paper_report_requests",
 ] as const;
 
@@ -89,6 +91,8 @@ function stateToPayload(state: AppState) {
     manpower_officer_absent: state.manpower_officer_absent,
     manpower_held: state.manpower_held,
     manpower_absent: state.manpower_absent,
+    manpower_present: state.manpower_present,
+    manpower_absence_detail: state.manpower_absence_detail,
     approved_dates: state.approved_dates,
     suppressed_carries: state.suppressed_carries,
     boro_khana_dates: state.boro_khana_dates,

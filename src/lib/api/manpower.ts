@@ -10,6 +10,10 @@ export type ManpowerDayMember = {
   member_type: string;
   status: string;
   approval_status: string;
+  joining_date?: string;
+  duty_start?: string;
+  out_date?: string;
+  inactive_spans?: User["inactive_spans"];
   default_tag: string;
   tag: string;
   source: string;
@@ -72,7 +76,7 @@ export function manpowerMemberToUser(row: ManpowerDayMember): User {
     documents: [],
     documents_verified: false,
     status: row.status === "0" ? "0" : "1",
-    inactive_spans: [],
+    inactive_spans: row.inactive_spans ?? [],
     approval_status:
       row.approval_status === "approved" ? "approved" : "pending",
     bank_name: "",
@@ -81,9 +85,9 @@ export function manpowerMemberToUser(row: ManpowerDayMember): User {
     routing: "",
     branch: "",
     branch_location: "",
-    joining_date: "",
-    duty_start: "",
-    out_date: "",
+    joining_date: row.joining_date ?? "",
+    duty_start: row.duty_start ?? "",
+    out_date: row.out_date ?? "",
     default_tag: (row.default_tag || "MS").toUpperCase() as DailyTag,
     jl_end_date: "",
     emergency_contacts: [],

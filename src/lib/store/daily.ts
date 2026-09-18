@@ -41,7 +41,7 @@ export function canWriteMfrLockedTag(tag: DailyTag | "" | undefined): boolean {
  */
 /** First day this member may receive Daily RR tags. */
 export function rosterStart(
-  user: Pick<User, "joining_date"> & { duty_start?: string },
+  user: { joining_date?: string; duty_start?: string },
 ): string {
   const duty = (user.duty_start ?? "").trim();
   const join = (user.joining_date ?? "").trim();

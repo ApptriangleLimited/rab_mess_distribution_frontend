@@ -76,6 +76,8 @@ CATALOG_KEYS = (
     "member_banks",
     "manpower_held",
     "manpower_absent",
+    "manpower_present",
+    "manpower_absence_detail",
     "paper_report_requests",
 )
 
@@ -885,7 +887,7 @@ def manpower_day_data(db: Session, target: date) -> dict:
     for member in members:
         if member.status != "1":
             continue
-        if member.member_type in ("guest", "civilian"):
+        if member.member_type != "permanent":
             continue
         if not can_assign(member, target):
             continue
@@ -911,6 +913,14 @@ def manpower_day_data(db: Session, target: date) -> dict:
                 "member_type": member.member_type,
                 "status": member.status,
                 "approval_status": member.approval_status,
+                "joining_date": member.joining_date.isoformat()
+                if member.joining_date
+                else "",
+                "duty_start": member.duty_start.isoformat()
+                if member.duty_start
+                else "",
+                "out_date": member.out_date.isoformat() if member.out_date else "",
+                "inactive_spans": member.inactive_spans or [],
                 "default_tag": default,
                 "tag": tag,
                 "source": source,

@@ -122,7 +122,10 @@ export function applyApiSnapshot(partial: Partial<AppState>) {
       continue;
     }
     if (
-      (key === "manpower_held" || key === "manpower_absent") &&
+      (key === "manpower_held" ||
+        key === "manpower_absent" ||
+        key === "manpower_present" ||
+        key === "manpower_absence_detail") &&
       value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
@@ -1830,6 +1833,20 @@ export function getState(): AppState {
   ) {
     seeded.manpower_absent = fromDisk.manpower_absent;
   }
+  if (
+    fromDisk &&
+    fromDisk.manpower_present &&
+    typeof fromDisk.manpower_present === "object"
+  ) {
+    seeded.manpower_present = fromDisk.manpower_present;
+  }
+  if (
+    fromDisk &&
+    fromDisk.manpower_absence_detail &&
+    typeof fromDisk.manpower_absence_detail === "object"
+  ) {
+    seeded.manpower_absence_detail = fromDisk.manpower_absence_detail;
+  }
   catalogHealed = true;
   memory = seeded;
   writeStorage(seeded);
@@ -2131,6 +2148,13 @@ function normalizeState(state: AppState): AppState {
     manpower_absent: ensureDayWingCatMap(
       (state as AppState & { manpower_absent?: unknown }).manpower_absent,
     ),
+    manpower_present: ensureDayWingCatMap(
+      (state as AppState & { manpower_present?: unknown }).manpower_present,
+    ),
+    manpower_absence_detail: ensureDayWingCatMap(
+      (state as AppState & { manpower_absence_detail?: unknown })
+        .manpower_absence_detail,
+    ),
     senders: (() => {
       const raw = (state.senders ?? []).map((s) => ({
         ...s,
@@ -2223,6 +2247,8 @@ const EMPTY_SERVER_SNAPSHOT: AppState = {
   manpower_officer_absent: {},
   manpower_held: {},
   manpower_absent: {},
+  manpower_present: {},
+  manpower_absence_detail: {},
   approved_dates: [],
   suppressed_carries: [],
   boro_khana_dates: [],

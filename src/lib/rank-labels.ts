@@ -68,8 +68,14 @@ export function manpowerRankLabelBn(label: string): string {
 }
 
 /** Bangla header for Settings authorized English label. Fallback = English. */
-export function authorizedLabelBn(englishLabel: string): string {
+export function authorizedLabelBn(
+  englishLabel: string,
+  overrides?: Record<string, string>,
+): string {
   const key = normalizeKey(englishLabel);
+  if (key === "officer") return "অফিসার";
+  const fromSettings = form1RankLabelBn(englishLabel, overrides);
+  if (fromSettings && fromSettings !== englishLabel) return fromSettings;
   return AUTHORIZED_LABEL_BN[key] ?? englishLabel;
 }
 

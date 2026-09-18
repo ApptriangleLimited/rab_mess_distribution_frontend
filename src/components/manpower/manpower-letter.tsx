@@ -146,7 +146,6 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
                   wing={block.wing}
                   authorized={block.authorized}
                   held={block.held}
-                  shortfall={block.shortfall}
                   present={block.present}
                   absent={block.absent}
                   categories={categories}
@@ -156,7 +155,6 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
                 wing={grandTotal.wing}
                 authorized={grandTotal.authorized}
                 held={grandTotal.held}
-                shortfall={grandTotal.shortfall}
                 present={grandTotal.present}
                 absent={grandTotal.absent}
                 categories={categories}
@@ -343,7 +341,6 @@ function WingGroup({
   wing,
   authorized,
   held,
-  shortfall,
   present,
   absent,
   categories,
@@ -352,7 +349,6 @@ function WingGroup({
   wing: string;
   authorized: ManpowerCounts;
   held: ManpowerCounts;
-  shortfall: ManpowerCounts;
   present: ManpowerCounts;
   absent: ManpowerCounts;
   categories: ManpowerReport["categories"];
@@ -368,7 +364,7 @@ function WingGroup({
         emphasize={emphasize}
         wingCell={
           <td
-            rowSpan={5}
+            rowSpan={4}
             className={cn(
               "border border-neutral-800 px-0.5 py-0.5 text-left align-middle text-[8px] font-bold leading-tight",
               emphasize ? "bg-neutral-50" : undefined,
@@ -383,13 +379,6 @@ function WingGroup({
         counts={held}
         categories={categories}
         emphasize={emphasize}
-      />
-      <MetricRow
-        label="বৃদ্ধি/হ্রাস"
-        counts={shortfall}
-        categories={categories}
-        emphasize={emphasize}
-        signed
       />
       <MetricRow
         label="উপস্থিত"

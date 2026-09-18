@@ -1,8 +1,11 @@
 import {
   ADMIN_SUB_WINGS,
   canonicalRankName,
+  canonicalWingName,
   DEFAULT_WING_PARENT,
   HQ_SUB_WINGS,
+  WING_LABELS,
+  WING_LABELS_BN,
   WINGS,
 } from "@/lib/constants";
 import { getState } from "@/lib/store";
@@ -12,8 +15,8 @@ import {
   isCarrySuppressed,
 } from "@/lib/store/assignments";
 import { canAssignOnDate } from "@/lib/store/daily";
-import { isCockpitMember } from "@/lib/store/users";
-import { wingPrintOrder } from "@/lib/daily-register-wings";
+import { wingPrintOrder, wingPrintOrderFrom } from "@/lib/daily-register-wings";
+import { isForm1RankColumn } from "@/lib/rank-labels";
 import {
   authorizedWingDisplayCount,
   isBannedWing,
@@ -46,9 +49,9 @@ export function cockpitTagForMember(
   manpowerTag?: string,
   manpowerSource?: string,
 ): DailyTag | "" {
-  const source = cell?.source || manpowerSource || "";
+  const source = manpowerSource || cell?.source || "";
   if (source === "suppressed") return "";
-  const painted = (cell?.tag || manpowerTag || "").toUpperCase();
+  const painted = (manpowerTag || cell?.tag || "").toUpperCase();
   return (painted || defaultTag || "") as DailyTag | "";
 }
 
@@ -130,22 +133,103 @@ export const MANPOWER_WING_GROUPS: {
   titleBn: string;
 }[] = [{ id: "main", titleBn: "উইং" }];
 
-const ABSENT_TAGS = new Set<string>([
-  "CL",
-  "PL",
-  "RL",
-  "ML",
-  "MOL",
-  "TRG",
-  "WIT",
-  "PE",
-  "LNK",
-  "CMH",
-  "RBH",
-  "BGH",
-  "AWL",
-  "OSL",
+/** Daily cockpit tags that count as উপস্থিত (all tabs). */
+export const MANPOWER_PRESENT_TAGS = new Set<string>([
+  "MS",
+  "FR",
+  "MFR",
+  "CD",
 ]);
+
+export function isManpowerPresentTag(tag: string | "" | undefined): boolean {
+  return MANPOWER_PRESENT_TAGS.has((tag ?? "").toUpperCase());
+}
+
+/** অনুপস্থিত = cockpit tags that are not MS / FR / MFR / CD. */
+export function isManpowerDutyAbsentTag(tag: string | "" | undefined): boolean {
+  return !isManpowerPresentTag(tag);
+}
+
+/** All three manpower tabs count স্থায়ী / permanent members only. */
+export function isManpowerCountableMember(
+  user: Pick<User, "member_type">,
+): boolean {
+  return user.member_type === "permanent";
+}
+
+export const ABSENCE_DETAIL_FIELDS = [
+  "cl",
+  "pl",
+  "rl",
+  "ml",
+  "maternity",
+  "training",
+  "witness",
+  "exam",
+  "other",
+  "hospital",
+  "avgPresent",
+] as const;
+
+export type AbsenceDetailField = (typeof ABSENCE_DETAIL_FIELDS)[number];
+
+/** Daily RR absent tags → অনুপস্থিতির বিবরণ columns. */
+export function absenceFieldForTag(
+  tag: string | "" | undefined,
+): AbsenceDetailField | null {
+  switch ((tag ?? "").toUpperCase()) {
+    case "CL":
+      return "cl";
+    case "PL":
+      return "pl";
+    case "RL":
+      return "rl";
+    case "ML":
+      return "ml";
+    case "MOL":
+      return "maternity";
+    case "TRG":
+      return "training";
+    case "WIT":
+      return "witness";
+    case "PE":
+      return "exam";
+    case "LNK":
+      return "other";
+    case "MED":
+    case "CMH":
+    case "RBH":
+    case "BGH":
+      return "hospital";
+    case "AWL":
+    case "OSL":
+      return "avgPresent";
+    default:
+      return null;
+  }
+}
+
+export function emptyAbsenceDetail(): Omit<ManpowerAbsenceRow, "wing" | "total"> {
+  return {
+    cl: 0,
+    pl: 0,
+    rl: 0,
+    ml: 0,
+    maternity: 0,
+    training: 0,
+    witness: 0,
+    exam: 0,
+    other: 0,
+    hospital: 0,
+    avgPresent: 0,
+  };
+}
+
+export function absenceDetailTotal(
+  row: Omit<ManpowerAbsenceRow, "wing" | "total">,
+): number {
+  return ABSENCE_DETAIL_FIELDS.reduce((sum, key) => sum + (row[key] ?? 0), 0);
+}
 
 const RANK_ALIASES: Record<string, string[]> = {
   officer: [
@@ -229,9 +313,26 @@ export function categoryIdForRank(
   );
 }
 
-function exactWing(wings: string[], name: string): string | null {
-  const key = name.trim().toLowerCase();
-  return wings.find((w) => w.toLowerCase() === key) ?? null;
+/** Match Daily RR wing onto a Settings / paper row (short, full, Bangla). */
+export function matchWingInList(
+  name: string,
+  wings: string[],
+  labels: Record<string, string> = {},
+): string | null {
+  const raw = name.trim();
+  if (!raw) return null;
+  const canon = canonicalWingName(raw).toLowerCase();
+  const compact = canon.replace(/[^a-z0-9]+/g, "");
+  for (const w of wings) {
+    const wc = canonicalWingName(w).toLowerCase();
+    if (w.toLowerCase() === raw.toLowerCase() || wc === canon) return w;
+    if (compact && wc.replace(/[^a-z0-9]+/g, "") === compact) return w;
+    const full = (WING_LABELS[w] || labels[w] || "").toLowerCase();
+    if (full && (full === canon || full === raw.toLowerCase())) return w;
+    const bn = (WING_LABELS_BN[w] || "").trim();
+    if (bn && bn === raw) return w;
+  }
+  return null;
 }
 
 function mergeParentMap(
@@ -289,10 +390,50 @@ export function manpowerWingFamily(
   return "main";
 }
 
+const MANUAL_PRESENT_WINGS = new Set([
+  "air wg",
+  "air wing",
+  "training school",
+  "rfts",
+  "এয়ার উইং",
+  "এসআরবি ফোর্সেস ট্রেনিং স্কুল",
+  "srb forces training school",
+]);
+
+/** Air Wg + Training School only — type প্রাপ্ত / উপস্থিত / অনুপস্থিত. */
+export function isManualPresentWing(wing: string): boolean {
+  const key = wing.trim().toLowerCase();
+  if (MANUAL_PRESENT_WINGS.has(key)) return true;
+  const compact = key.replace(/[^a-z0-9\u0980-\u09ff]+/g, " ").trim();
+  return (
+    compact === "air wg" ||
+    compact === "air wing" ||
+    compact === "training school" ||
+    compact === "rfts"
+  );
+}
+
+/** Form 2/3 — নতুন অস্থায়ী সংযুক্ত is typed like Air / Training. */
+export function isManualAttachedWing(wing: string): boolean {
+  const key = wing.trim().toLowerCase();
+  const compact = key.replace(/[^a-z0-9\u0980-\u09ff]+/g, " ").trim();
+  return (
+    compact === "new temp att" ||
+    compact === "new temporary attached" ||
+    compact === "newly temporary attach" ||
+    key.includes("temporary attach") ||
+    key.includes("নতুন অস্থায়ী") ||
+    key.includes("নতুন / অস্থায়ী")
+  );
+}
+
 /** Form 1 tab — Settings wings in the serial the user stored. */
-function listForm1WingNames(): string[] {
-  const ordered = wingPrintOrder();
-  return ordered.length ? ordered : [...WINGS];
+function listForm1WingNames(snapshot?: ManpowerSnapshot): string[] {
+  const state = getState();
+  const wings = snapshot?.wings?.length ? snapshot.wings : state.wings;
+  const parents = snapshot?.wingParent ?? state.wing_parent;
+  const ordered = wingPrintOrderFrom(wings, parents, state.wing_serials ?? {});
+  return ordered.length ? ordered : wingPrintOrder().length ? wingPrintOrder() : [...WINGS];
 }
 
 function projectedTag(userId: string, date: string): DailyTag | "" {
@@ -303,7 +444,7 @@ function projectedTag(userId: string, date: string): DailyTag | "" {
 }
 
 function isAbsentTag(tag: DailyTag | ""): boolean {
-  return !!tag && ABSENT_TAGS.has(tag);
+  return isManpowerDutyAbsentTag(tag);
 }
 
 function addCounts(
@@ -369,50 +510,65 @@ function lookupDayWingCat(
 }
 
 /**
- * Daily Manpower Report for `date`.
+ * Daily Manpower Report for `date` (all tabs).
  * প্রাধিকৃত = Settings → Authorized.
- * প্রাপ্ত = Daily Cockpit members (optional per-cell override).
- * অনুপস্থিত = cockpit tags, then optional per-cell input.
- * অনুপস্থিতির বিবরণ = cockpit tags (CL/PL/RL/ML/MOL/TRG/WIT/PE/LNK/CMH|RBH|BGH/AWL|OSL).
- * বৃদ্ধি/হ্রাস = প্রাধিকৃত − প্রাপ্ত; উপস্থিত = প্রাপ্ত − অনুপস্থিত.
+ * প্রাপ্ত = Daily Cockpit members of that wing + rank (all tags).
+ * উপস্থিত = MS + FR + MFR + CD (or প্রাপ্ত − অনুপস্থিত).
+ * অনুপস্থিত = all other cockpit tags for that wing + rank.
+ * অনুপস্থিতির বিবরণ = leave/hospital tag split.
+ * বৃদ্ধি/হ্রাস = প্রাধিকৃত − প্রাপ্ত.
  */
 export function buildManpowerReport(
   date: string,
   snapshot?: ManpowerSnapshot,
 ): ManpowerReport {
   const state = getState();
-  const categories = snapshot?.authorized?.length
-    ? snapshot.authorized
-    : listAuthorized();
+  const categories = (
+    snapshot?.authorized?.length ? snapshot.authorized : listAuthorized()
+  ).filter((cat) => isForm1RankColumn(cat.label));
   const officerCategoryId = officerIdOf(categories);
   const tagFor =
     snapshot?.tagFor ?? ((userId: string) => projectedTag(userId, date));
   const sourceUsers = snapshot?.users ?? state.users;
 
   const hqAuth = emptyCounts(categories);
-  for (const cat of categories) {
-    hqAuth[cat.id] = cat.count;
-  }
 
   const hqHeld = emptyCounts(categories);
   const hqAbsent = emptyCounts(categories);
 
   const parents = mergeParentMap(snapshot?.wingParent ?? state.wing_parent);
-  const form1Wings = listForm1WingNames();
+  const form1Wings = listForm1WingNames(snapshot);
   const authWings = [...form1Wings];
+  const wingLabels = state.wing_labels ?? {};
+  for (const cat of categories) {
+    hqAuth[cat.id] = form1Wings.reduce(
+      (sum, wing) => sum + authorizedWingDisplayCount(cat.wings, wing),
+      0,
+    );
+  }
 
   function toCockpitWing(userWing: string): string | null {
-    const raw = userWing.trim();
+    const raw = canonicalWingName(userWing.trim());
     if (!raw || raw === "—") return null;
+    if (isBannedWing(raw)) return null;
     const family = manpowerWingFamily(raw, parents);
     if (family === "admin" || family === "hq") {
-      return exactWing(authWings, "Admin") ?? "Admin";
+      return matchWingInList("Admin", authWings, wingLabels) ?? "Admin";
     }
-    if (raw.toLowerCase() === "rfts") {
-      return exactWing(authWings, "Training School") ?? "Training School";
+    let cur = raw;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.toLowerCase())) {
+      seen.add(cur.toLowerCase());
+      const hit = matchWingInList(cur, authWings, wingLabels);
+      if (hit) return hit;
+      const parent = lookupParent(cur, parents);
+      if (!parent) break;
+      if (isAdminFamilyName(parent) || isHqBrName(parent)) {
+        return matchWingInList("Admin", authWings, wingLabels) ?? "Admin";
+      }
+      cur = parent;
     }
-    if (isBannedWing(raw)) return null;
-    return exactWing(authWings, raw);
+    return null;
   }
 
   const wingMap = new Map<string, WingBucket>();
@@ -422,19 +578,7 @@ export function buildManpowerReport(
       held: emptyCounts(categories),
       present: emptyCounts(categories),
       absent: emptyCounts(categories),
-      absence: {
-        cl: 0,
-        pl: 0,
-        rl: 0,
-        ml: 0,
-        maternity: 0,
-        training: 0,
-        witness: 0,
-        exam: 0,
-        other: 0,
-        hospital: 0,
-        avgPresent: 0,
-      },
+      absence: emptyAbsenceDetail(),
     };
   }
 
@@ -450,9 +594,9 @@ export function buildManpowerReport(
   }
 
   const active: User[] = sourceUsers.filter((u) => {
-    if (u.status !== "1" || !isCockpitMember(u)) return false;
+    if (!isManpowerCountableMember(u)) return false;
+    if (u.status !== "1") return false;
     if (u.approval_status && u.approval_status !== "approved") return false;
-    if (snapshot?.prefiltered) return true;
     return canAssignOnDate(u, date);
   });
 
@@ -464,6 +608,7 @@ export function buildManpowerReport(
     const tag = (
       snapshot ? resolved : resolved || user.default_tag || ""
     ) as DailyTag | "";
+    if (!tag) continue;
     const authWing = toCockpitWing(user.wing);
 
     hqHeld[catId] = (hqHeld[catId] ?? 0) + 1;
@@ -474,70 +619,65 @@ export function buildManpowerReport(
       wing.held[catId] = (wing.held[catId] ?? 0) + 1;
     }
 
-    if (!isAbsentTag(tag)) continue;
+    const field = absenceFieldForTag(tag);
+    if (!field) continue;
 
     hqAbsent[catId] = (hqAbsent[catId] ?? 0) + 1;
     if (!wing) continue;
 
     wing.absent[catId] = (wing.absent[catId] ?? 0) + 1;
-
-    switch (tag) {
-      case "CL":
-        wing.absence.cl += 1;
-        break;
-      case "PL":
-        wing.absence.pl += 1;
-        break;
-      case "RL":
-        wing.absence.rl += 1;
-        break;
-      case "ML":
-        wing.absence.ml += 1;
-        break;
-      case "MOL":
-        wing.absence.maternity += 1;
-        break;
-      case "TRG":
-        wing.absence.training += 1;
-        break;
-      case "WIT":
-        wing.absence.witness += 1;
-        break;
-      case "PE":
-        wing.absence.exam += 1;
-        break;
-      case "LNK":
-        wing.absence.other += 1;
-        break;
-      case "CMH":
-      case "RBH":
-      case "BGH":
-        wing.absence.hospital += 1;
-        break;
-      case "AWL":
-      case "OSL":
-        wing.absence.avgPresent += 1;
-        break;
-      default:
-        break;
-    }
+    wing.absence[field] += 1;
   }
 
   const heldDay = state.manpower_held?.[date] ?? {};
   const absentDay = state.manpower_absent?.[date] ?? {};
+  const presentDay = state.manpower_present?.[date] ?? {};
+  const absenceDay = state.manpower_absence_detail?.[date] ?? {};
   for (const wingName of [...wingMap.keys()]) {
     const bucket = wingMap.get(wingName);
     if (!bucket) continue;
+    if (!isManualPresentWing(wingName)) continue;
     for (const cat of categories) {
       const heldOverride = lookupDayWingCat(heldDay, wingName, cat.id);
       if (heldOverride !== undefined) bucket.held[cat.id] = heldOverride;
       const absOverride = lookupDayWingCat(absentDay, wingName, cat.id);
       if (absOverride !== undefined) bucket.absent[cat.id] = absOverride;
     }
+    const detail = { ...bucket.absence };
+    let hasDetailOverride = false;
+    for (const field of ABSENCE_DETAIL_FIELDS) {
+      const override = lookupDayWingCat(absenceDay, wingName, field);
+      if (override === undefined) continue;
+      detail[field] = override;
+      hasDetailOverride = true;
+    }
+    bucket.absence = detail;
+    const detailTotal = absenceDetailTotal(detail);
+    const rankTotal = manpowerRowTotalFor(bucket.absent, categories);
+    if (detailTotal !== rankTotal) {
+      const prefer =
+        officerCategoryId ?? categories[0]?.id ?? null;
+      if (prefer) {
+        if (hasDetailOverride) {
+          bucket.absent[prefer] = Math.max(
+            0,
+            (bucket.absent[prefer] ?? 0) + (detailTotal - rankTotal),
+          );
+        } else {
+          const delta = rankTotal - detailTotal;
+          bucket.absence.other = Math.max(0, bucket.absence.other + delta);
+        }
+      }
+    }
   }
 
-  for (const block of wingMap.values()) {
+  for (const [wingName, block] of wingMap.entries()) {
     block.present = presentFromHeldAbsent(block.held, block.absent, categories);
+    if (!isManualPresentWing(wingName)) continue;
+    for (const cat of categories) {
+      const presentOverride = lookupDayWingCat(presentDay, wingName, cat.id);
+      if (presentOverride !== undefined) block.present[cat.id] = presentOverride;
+    }
   }
 
   const extraWingsInMap = [...wingMap.keys()].filter(
@@ -566,22 +706,11 @@ export function buildManpowerReport(
 
   function toAbsenceRow(wing: string): ManpowerAbsenceRow {
     const block = wingMap.get(wing) ?? makeBucket();
-    const absentTotal =
-      block.absence.cl +
-      block.absence.pl +
-      block.absence.rl +
-      block.absence.ml +
-      block.absence.maternity +
-      block.absence.training +
-      block.absence.witness +
-      block.absence.exam +
-      block.absence.other +
-      block.absence.hospital +
-      block.absence.avgPresent;
+    const detail = { ...block.absence };
     return {
       wing,
-      ...block.absence,
-      total: absentTotal,
+      ...detail,
+      total: absenceDetailTotal(detail),
     };
   }
 

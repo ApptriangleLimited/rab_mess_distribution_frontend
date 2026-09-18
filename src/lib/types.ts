@@ -399,6 +399,16 @@ export interface AppState {
    * Missing key = use cockpit absent tags (Officer falls back to manpower_officer_absent).
    */
   manpower_absent: Record<string, Record<string, Record<string, number>>>;
+  /**
+   * Form 1 উপস্থিত overrides (`YYYY-MM-DD` → wing → category id → count).
+   * Used for Air Wg / Training School; missing key = প্রাপ্ত − অনুপস্থিত.
+   */
+  manpower_present: Record<string, Record<string, Record<string, number>>>;
+  /**
+   * Form 1 অনুপস্থিতির বিবরণ overrides
+   * (`YYYY-MM-DD` → wing → cl/pl/… → count). Air Wg / Training School only.
+   */
+  manpower_absence_detail: Record<string, Record<string, Record<string, number>>>;
   /** ISO dates Daily has confirmed (carry + edits locked as approved). */
   approved_dates: string[];
   /** `${userId}|${date}` — hide carry ghost until Approve restores or new tag set. */

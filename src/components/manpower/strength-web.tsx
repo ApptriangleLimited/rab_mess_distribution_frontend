@@ -4,8 +4,8 @@ import { useState, type ReactNode } from "react";
 import { StrengthReportTitle } from "@/components/manpower/strength-title";
 import { WingName } from "@/components/manpower/wing-name";
 import { Input } from "@/components/ui/input";
-import { useStore } from "@/hooks/use-store";
 import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
+import { ABSENCE_DETAIL_FIELDS, isManualAttachedWing } from "@/lib/manpower-report";
 import {
   STRENGTH_CATEGORIES,
   strengthCategoryLabelBn,
@@ -17,9 +17,10 @@ import {
   type StrengthReport,
 } from "@/lib/strength-report";
 import {
-  authorizedWingDisplayCount,
-  setAuthorizedHeldWingCount,
-  setManpowerOfficerAbsent,
+  setManpowerAbsenceDetail,
+  setManpowerAbsentCount,
+  setManpowerHeld,
+  setManpowerPresentCount,
 } from "@/lib/store/org-options";
 import { cn } from "@/lib/utils";
 
@@ -31,15 +32,6 @@ type Props = {
 function formatCount(value: number, bn?: boolean) {
   const n = Math.abs(value);
   return bn ? toBnDigits(n) : String(n);
-}
-
-function asciiDigits(raw: string) {
-  return fromBnDigits(raw).replace(/[^\d]/g, "");
-}
-
-function inputCount(raw: string | null, stored: number, bn?: boolean) {
-  const ascii = raw !== null ? raw : String(stored);
-  return bn ? toBnDigits(ascii) : ascii;
 }
 
 function CountCell({
@@ -116,183 +108,56 @@ function MetricRow({
   );
 }
 
-function OfficerHeldRow({
-  date,
-  wing,
-  counts,
-  officerAuthorizedId,
-  wingCell,
-  bn,
-}: {
-  date: string;
-  wing: string;
-  counts: StrengthCounts;
-  officerAuthorizedId: string;
-  wingCell?: ReactNode;
-  bn?: boolean;
-}) {
-  const state = useStore();
-  const row = state.authorized.find((r) => r.id === officerAuthorizedId);
-  const stored = authorizedWingDisplayCount(row?.held_wings, wing);
-  const [draft, setDraft] = useState<string | null>(null);
-
-  function applyHeld(heldN: number) {
-    setAuthorizedHeldWingCount(officerAuthorizedId, wing, heldN);
-    const abs = authorizedWingDisplayCount(
-      state.manpower_officer_absent?.[date],
-      wing,
-    );
-    if (abs > heldN) setManpowerOfficerAbsent(date, wing, heldN);
-  }
-
-  function commit(raw: string) {
-    const digits = asciiDigits(raw);
-    if (digits === "") {
-      setDraft("");
-      applyHeld(0);
-      return;
-    }
-    const n = Number(digits);
-    if (!Number.isFinite(n) || n < 0) return;
-    setDraft(null);
-    applyHeld(Math.floor(n));
-  }
-
-  return (
-    <tr>
-      {wingCell}
-      <td className="sticky left-36 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
-        প্রাপ্ত
-      </td>
-      {STRENGTH_CATEGORIES.map((cat) => {
-        if (cat.id === "officer") {
-          return (
-            <td
-              key={cat.id}
-              className="border border-neutral-200 px-1 py-1 text-center dark:border-neutral-700"
-            >
-              <Input
-                value={inputCount(draft, stored, bn)}
-                onChange={(e) => {
-                  const digits = asciiDigits(e.target.value);
-                  setDraft(digits);
-                  if (digits !== "") {
-                    const n = Number(digits);
-                    if (Number.isFinite(n) && n >= 0) applyHeld(Math.floor(n));
-                  } else {
-                    applyHeld(0);
-                  }
-                }}
-                onBlur={() => {
-                  if (draft !== null) commit(draft);
-                  setDraft(null);
-                }}
-                inputMode="numeric"
-                aria-label={`অফিসার প্রাপ্ত — ${wing}`}
-                className="mx-auto h-8 w-14 rounded-md border-sky-300 bg-sky-50 text-center font-mono text-sm tabular-nums dark:border-sky-700 dark:bg-sky-950/40"
-              />
-            </td>
-          );
-        }
-        return <CountCell key={cat.id} value={counts[cat.id] ?? 0} bn={bn} />;
-      })}
-      <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
-        {formatCount(strengthMetricTotal(counts), bn)}
-      </td>
-    </tr>
-  );
-}
-
-function OfficerAbsentRow({
-  date,
-  wing,
-  counts,
-  held,
-  bn,
-}: {
-  date: string;
-  wing: string;
-  counts: StrengthCounts;
-  held: StrengthCounts;
-  bn?: boolean;
-}) {
-  const state = useStore();
-  const stored = authorizedWingDisplayCount(
-    state.manpower_officer_absent?.[date],
-    wing,
-  );
-  const [draft, setDraft] = useState<string | null>(null);
-  const heldN = held.officer ?? 0;
-
-  function commit(raw: string) {
-    const digits = asciiDigits(raw);
-    if (digits === "") {
-      setDraft("");
-      setManpowerOfficerAbsent(date, wing, 0);
-      return;
-    }
-    const n = Number(digits);
-    if (!Number.isFinite(n) || n < 0) return;
-    setDraft(null);
-    setManpowerOfficerAbsent(date, wing, Math.min(Math.floor(n), heldN));
-  }
-
-  return (
-    <tr>
-      <td className="sticky left-36 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
-        অনুপস্থিত
-      </td>
-      {STRENGTH_CATEGORIES.map((cat) => {
-        if (cat.id === "officer") {
-          return (
-            <td
-              key={cat.id}
-              className="border border-neutral-200 px-1 py-1 text-center dark:border-neutral-700"
-            >
-              <Input
-                value={inputCount(draft, stored, bn)}
-                onChange={(e) => {
-                  const digits = asciiDigits(e.target.value);
-                  setDraft(digits);
-                  if (digits !== "") {
-                    const n = Number(digits);
-                    if (Number.isFinite(n) && n >= 0) {
-                      setManpowerOfficerAbsent(
-                        date,
-                        wing,
-                        Math.min(Math.floor(n), heldN),
-                      );
-                    }
-                  } else {
-                    setManpowerOfficerAbsent(date, wing, 0);
-                  }
-                }}
-                onBlur={() => {
-                  if (draft !== null) commit(draft);
-                  setDraft(null);
-                }}
-                inputMode="numeric"
-                aria-label={`অফিসার অনুপস্থিত — ${wing}`}
-                className="mx-auto h-8 w-14 rounded-md border-amber-300 bg-amber-50 text-center font-mono text-sm tabular-nums dark:border-amber-700 dark:bg-amber-950/40"
-              />
-            </td>
-          );
-        }
-        return <CountCell key={cat.id} value={counts[cat.id] ?? 0} bn={bn} />;
-      })}
-      <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
-        {formatCount(strengthMetricTotal(counts), bn)}
-      </td>
-    </tr>
-  );
-}
-
 function AdminWingName({ wing }: { wing: string }) {
-  const key = wing.trim().toLowerCase();
   if (wing === "সর্বমোট") return <>সর্বমোট</>;
-  if (key === "mt br" || key === "mt branch") return <>এমটি</>;
-  if (key === "new / temporary attached") return <>নতুন / অস্থায়ী সংযুক্ত</>;
   return <WingName wing={wing} />;
+}
+
+function asciiDigits(raw: string) {
+  return fromBnDigits(raw).replace(/[^\d]/g, "");
+}
+
+function CountInput({
+  value,
+  ariaLabel,
+  onCommit,
+}: {
+  value: number;
+  ariaLabel: string;
+  onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  function commit(raw: string) {
+    const digits = asciiDigits(raw);
+    const n = digits === "" ? 0 : Number(digits);
+    if (!Number.isFinite(n) || n < 0) return;
+    onCommit(Math.floor(n));
+    setDraft(null);
+  }
+  return (
+    <td className="border border-neutral-200 px-1 py-1 text-center dark:border-neutral-700">
+      <Input
+        value={toBnDigits(draft !== null ? draft : String(value))}
+        onChange={(e) => {
+          const digits = asciiDigits(e.target.value);
+          setDraft(digits);
+          if (digits === "") {
+            onCommit(0);
+            return;
+          }
+          const n = Number(digits);
+          if (Number.isFinite(n) && n >= 0) onCommit(Math.floor(n));
+        }}
+        onBlur={() => {
+          if (draft !== null) commit(draft);
+          setDraft(null);
+        }}
+        inputMode="numeric"
+        aria-label={ariaLabel}
+        className="mx-auto h-8 w-14 rounded-md border-amber-300 bg-amber-50 text-center font-mono text-sm tabular-nums dark:border-amber-700 dark:bg-amber-950/40"
+      />
+    </td>
+  );
 }
 
 function RankHead({
@@ -347,7 +212,9 @@ function BranchRows({
   bn?: boolean;
   form2?: boolean;
 }) {
-  const canEdit = editableOfficer && Boolean(officerAuthorizedId) && !block.withoutRecord;
+  const manual = Boolean(
+    editableOfficer && isManualAttachedWing(block.wing),
+  );
   const wingCell = (
     <WingNameCell>
       {form2 ? <AdminWingName wing={block.wing} /> : <WingName wing={block.wing} />}
@@ -359,51 +226,58 @@ function BranchRows({
     </WingNameCell>
   );
 
+  function dutyRow(
+    label: string,
+    counts: StrengthCounts,
+    kind: "held" | "present" | "absent",
+    wingCellNode?: ReactNode,
+  ) {
+    if (!manual) {
+      return (
+        <MetricRow
+          label={label}
+          counts={counts}
+          blankOfficer={block.withoutRecord}
+          withWing
+          wingCell={wingCellNode}
+          bn={bn}
+        />
+      );
+    }
+    return (
+      <tr>
+        {wingCellNode}
+        <td className="sticky left-36 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
+          {label}
+        </td>
+        {STRENGTH_CATEGORIES.map((cat) => (
+          <CountInput
+            key={`${date}-${block.wing}-${cat.id}-${kind}`}
+            value={counts[cat.id] ?? 0}
+            ariaLabel={`${cat.labelBn} ${label} — ${block.wing}`}
+            onCommit={(n) => {
+              const seed = { ...counts, [cat.id]: n };
+              if (kind === "held") setManpowerHeld(date, block.wing, cat.id, n);
+              else if (kind === "present") {
+                setManpowerPresentCount(date, block.wing, cat.id, n);
+              } else {
+                setManpowerAbsentCount(date, block.wing, cat.id, n, seed);
+              }
+            }}
+          />
+        ))}
+        <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
+          {formatCount(strengthMetricTotal(counts), bn)}
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <>
-      {canEdit && officerAuthorizedId ? (
-        <OfficerHeldRow
-          date={date}
-          wing={block.wing}
-          counts={block.held}
-          officerAuthorizedId={officerAuthorizedId}
-          wingCell={wingCell}
-          bn={bn}
-        />
-      ) : (
-        <MetricRow
-          label="প্রাপ্ত"
-          counts={block.held}
-          blankOfficer={block.withoutRecord}
-          withWing
-          wingCell={wingCell}
-          bn={bn}
-        />
-      )}
-      <MetricRow
-        label="উপস্থিত"
-        counts={block.present}
-        blankOfficer={block.withoutRecord}
-        withWing
-        bn={bn}
-      />
-      {canEdit ? (
-        <OfficerAbsentRow
-          date={date}
-          wing={block.wing}
-          counts={block.absent}
-          held={block.held}
-          bn={bn}
-        />
-      ) : (
-        <MetricRow
-          label="অনুপস্থিত"
-          counts={block.absent}
-          blankOfficer={block.withoutRecord}
-          withWing
-          bn={bn}
-        />
-      )}
+      {dutyRow("প্রাপ্ত", block.held, "held", wingCell)}
+      {dutyRow("উপস্থিত", block.present, "present")}
+      {dutyRow("অনুপস্থিত", block.absent, "absent")}
     </>
   );
 }
@@ -433,7 +307,27 @@ function AbsenceCells({
   );
 }
 
-function HqAbsenceSection({ report }: { report: StrengthReport }) {
+const STRENGTH_ABSENCE_FIELDS = [
+  "cl",
+  "pl",
+  "rl",
+  "ml",
+  "maternity",
+  "training",
+  "remaining",
+  "exam",
+  "other",
+  "hospital",
+  "avgPresent",
+] as const;
+
+function HqAbsenceSection({
+  report,
+  readOnly,
+}: {
+  report: StrengthReport;
+  readOnly?: boolean;
+}) {
   const isHq = report.formNo === 3;
   const form2 = report.formNo === 2;
   const total = sumAbsenceRows(
@@ -572,18 +466,53 @@ function HqAbsenceSection({ report }: { report: StrengthReport }) {
             </tr>
           </thead>
           <tbody>
-            {report.absence.map((row) => (
-              <tr key={row.wing}>
-                <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
-                  {form2 ? (
-                    <AdminWingName wing={row.wing} />
-                  ) : (
-                    <WingName wing={row.wing} />
-                  )}
-                </td>
-                <AbsenceCells row={row} bn />
-              </tr>
-            ))}
+            {report.absence.map((row) => {
+              const manual = Boolean(
+                !readOnly && isManualAttachedWing(row.wing),
+              );
+              return (
+                <tr key={row.wing}>
+                  <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
+                    {form2 ? (
+                      <AdminWingName wing={row.wing} />
+                    ) : (
+                      <WingName wing={row.wing} />
+                    )}
+                  </td>
+                  {manual
+                    ? STRENGTH_ABSENCE_FIELDS.map((field) => (
+                        <CountInput
+                          key={`${report.date}-${row.wing}-${field}`}
+                          value={row[field]}
+                          ariaLabel={`${field} — ${row.wing}`}
+                          onCommit={(n) => {
+                            const next: Record<string, number> = {};
+                            for (const key of ABSENCE_DETAIL_FIELDS) {
+                              if (key === "witness") next[key] = row.remaining;
+                              else next[key] = row[key];
+                            }
+                            next[field === "remaining" ? "witness" : field] = n;
+                            setManpowerAbsenceDetail(
+                              report.date,
+                              row.wing,
+                              field === "remaining" ? "witness" : field,
+                              n,
+                              next,
+                            );
+                          }}
+                        />
+                      ))
+                    : (
+                      <AbsenceCells row={row} bn />
+                    )}
+                  {manual ? (
+                    <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
+                      {formatCount(row.total, true)}
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
             <tr className="bg-neutral-100 font-semibold dark:bg-neutral-800/80">
               <td className="sticky left-0 z-[1] border border-neutral-200 bg-neutral-100 px-3 py-1.5 text-left text-sm dark:border-neutral-700 dark:bg-neutral-800">
                 সর্বমোট
@@ -684,7 +613,7 @@ export function StrengthWeb({ report, readOnly = false }: Props) {
         <h3 className="px-1 text-sm font-bold">* অন্যান্য কর্তব্য</h3>
       ) : null}
 
-      <HqAbsenceSection report={report} />
+      <HqAbsenceSection report={report} readOnly={readOnly} />
     </div>
   );
 }

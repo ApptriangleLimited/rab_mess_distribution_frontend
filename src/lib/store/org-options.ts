@@ -267,39 +267,35 @@ export function isAdminAuthorizedRoot(wing: string): boolean {
 }
 
 /**
- * Fixed short wing ladder for Settings → Authorized only.
- * Same order as Form 1 / official daily sheet; Admin stands for Admin family.
- */
-const AUTHORIZED_ROOT_WINGS = WINGS;
-
-/**
- * Root wings for Settings → Authorized wing প্রাধিকৃত.
- * Short fixed list (not full Wings catalog). Other tabs unchanged.
+ * Root wings for Settings → Authorized প্রাধিকৃত.
+ * Same Settings serial order as Daily manpower Form 1.
  */
 export function listAuthorizedRootWingsFrom(wings: string[]): string[] {
-  const live = new Set(
-    wings
-      .filter((w) => !BANNED_WINGS.has(w.toLowerCase()))
-      .map((w) => w.toLowerCase()),
-  );
-  // Admin always offered when any Admin* root exists or Admin in catalog.
-  const hasAdmin = [...live].some((k) => ADMIN_AUTH_ROOTS.has(k));
-  const out: string[] = [];
-  for (const w of AUTHORIZED_ROOT_WINGS) {
-    if (w === "Admin") {
-      if (hasAdmin || live.has("admin")) out.push("Admin");
-      continue;
-    }
-    if (live.has(w.toLowerCase())) out.push(w);
-  }
-  return out;
+  const { wing_parent, wing_serials } = getState();
+  const roots = listWingChildrenFrom(wings, wing_parent, null)
+    .filter((w) => !BANNED_WINGS.has(w.toLowerCase()))
+    .sort((a, b) => {
+      const as = wingOfficialSerial(a, wing_serials) ?? 10_000;
+      const bs = wingOfficialSerial(b, wing_serials) ?? 10_000;
+      if (as !== bs) return as - bs;
+      return a.localeCompare(b);
+    });
+  if (roots.length) return roots;
+  return WINGS.filter((w) => !BANNED_WINGS.has(w.toLowerCase()));
 }
 
 export function listAuthorizedRootWings(): string[] {
   return listAuthorizedRootWingsFrom(listWings());
 }
 
-/** Count for Authorized UI row (Admin = sum of Admin family keys). */
+function authorizedWingKeyMatch(stored: string, wanted: string): boolean {
+  const a = stored.trim().toLowerCase();
+  const b = wanted.trim().toLowerCase();
+  if (a === b) return true;
+  return canonicalWingName(stored).toLowerCase() === canonicalWingName(wanted).toLowerCase();
+}
+
+/** Count for Authorized / Form 1 প্রাধিকৃত (Admin = sum of Admin family keys). */
 export function authorizedWingDisplayCount(
   wings: Record<string, number> | undefined,
   wing: string,
@@ -312,7 +308,15 @@ export function authorizedWingDisplayCount(
     }
     return sum;
   }
-  return map[wing] ?? 0;
+  if (typeof map[wing] === "number") return map[wing] ?? 0;
+  let sum = 0;
+  let found = false;
+  for (const [k, n] of Object.entries(map)) {
+    if (!authorizedWingKeyMatch(k, wing)) continue;
+    sum += n || 0;
+    found = true;
+  }
+  return found ? sum : 0;
 }
 
 export function isBannedWing(label: string): boolean {
@@ -1027,6 +1031,10 @@ export function renameWing(
       manpower_officer_absent,
       manpower_held: renameDayWingCat(prev.manpower_held ?? {}),
       manpower_absent: renameDayWingCat(prev.manpower_absent ?? {}),
+      manpower_present: renameDayWingCat(prev.manpower_present ?? {}),
+      manpower_absence_detail: renameDayWingCat(
+        prev.manpower_absence_detail ?? {},
+      ),
       users: prev.users.map((u) =>
         u.wing === from ? { ...u, wing: next } : u,
       ),
@@ -1633,6 +1641,65 @@ export function setAuthorizedHeldWingCount(
   return true;
 }
 
+const ABSENCE_SYNC_FIELDS = [
+  "cl",
+  "pl",
+  "rl",
+  "ml",
+  "maternity",
+  "training",
+  "witness",
+  "exam",
+  "other",
+  "hospital",
+  "avgPresent",
+] as const;
+
+function officerPreferId(
+  authorized: { id: string; label: string }[],
+): string {
+  const officer = authorized.find((c) => {
+    const key = c.label.trim().toLowerCase();
+    return key === "officer" || key.startsWith("officer");
+  });
+  return officer?.id ?? authorized[0]?.id ?? "officer";
+}
+
+function wingCatMap(
+  day: Record<string, Record<string, number>> | undefined,
+  wingLabel: string,
+): Record<string, number> {
+  if (!day) return {};
+  if (day[wingLabel]) return { ...day[wingLabel] };
+  const key = wingLabel.toLowerCase();
+  for (const [k, v] of Object.entries(day)) {
+    if (k.toLowerCase() === key) return { ...v };
+  }
+  return {};
+}
+
+function sumRecord(map: Record<string, number> | undefined): number {
+  let n = 0;
+  for (const v of Object.values(map ?? {})) {
+    const num = Number(v);
+    if (Number.isFinite(num) && num > 0) n += Math.floor(num);
+  }
+  return n;
+}
+
+function setDayWingMap(
+  prev: Record<string, Record<string, Record<string, number>>>,
+  date: string,
+  wingLabel: string,
+  values: Record<string, number>,
+): Record<string, Record<string, Record<string, number>>> {
+  let next = prev;
+  for (const [key, value] of Object.entries(values)) {
+    next = setDayWingCat(next, date, wingLabel, key, value);
+  }
+  return next;
+}
+
 function setDayWingCat(
   prev: Record<string, Record<string, Record<string, number>>>,
   date: string,
@@ -1685,17 +1752,33 @@ export function setManpowerAbsentCount(
   wing: string,
   categoryId: string,
   count: number,
+  rankCounts?: Record<string, number>,
 ): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !categoryId.trim()) return false;
   const wingLabel = normalizeLabel(wing);
   if (!wingLabel || BANNED_WINGS.has(wingLabel.toLowerCase())) return false;
   setState((prev) => {
-    const manpower_absent = setDayWingCat(
+    const ranks = { ...(rankCounts ?? {}) };
+    ranks[categoryId] = count;
+    const manpower_absent = setDayWingMap(
       prev.manpower_absent ?? {},
       date,
       wingLabel,
-      categoryId,
-      count,
+      ranks,
+    );
+    const rankTotal = sumRecord(ranks);
+    const detail = wingCatMap(prev.manpower_absence_detail?.[date], wingLabel);
+    let rest = 0;
+    for (const field of ABSENCE_SYNC_FIELDS) {
+      if (field === "other") continue;
+      rest += Number(detail[field] ?? 0) || 0;
+    }
+    const manpower_absence_detail = setDayWingCat(
+      prev.manpower_absence_detail ?? {},
+      date,
+      wingLabel,
+      "other",
+      Math.max(0, rankTotal - rest),
     );
     const officer = prev.authorized.find((c) => {
       const key = c.label.trim().toLowerCase();
@@ -1704,7 +1787,9 @@ export function setManpowerAbsentCount(
         (key === "officer" || key.startsWith("officer"))
       );
     });
-    if (!officer) return { ...prev, manpower_absent };
+    if (!officer) {
+      return { ...prev, manpower_absent, manpower_absence_detail };
+    }
 
     const safe =
       Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
@@ -1724,7 +1809,76 @@ export function setManpowerAbsentCount(
     const manpower_officer_absent = { ...prev.manpower_officer_absent };
     if (Object.keys(day).length === 0) delete manpower_officer_absent[date];
     else manpower_officer_absent[date] = day;
-    return { ...prev, manpower_absent, manpower_officer_absent };
+    return {
+      ...prev,
+      manpower_absent,
+      manpower_absence_detail,
+      manpower_officer_absent,
+    };
+  });
+  return true;
+}
+
+/** Form 1 — উপস্থিত for Air Wg / Training School (one wing + rank on a date). */
+export function setManpowerPresentCount(
+  date: string,
+  wing: string,
+  categoryId: string,
+  count: number,
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !categoryId.trim()) return false;
+  const wingLabel = normalizeLabel(wing);
+  if (!wingLabel || BANNED_WINGS.has(wingLabel.toLowerCase())) return false;
+  setState((prev) => ({
+    ...prev,
+    manpower_present: setDayWingCat(
+      prev.manpower_present ?? {},
+      date,
+      wingLabel,
+      categoryId,
+      count,
+    ),
+  }));
+  return true;
+}
+
+/** Form 1 — অনুপস্থিতির বিবরণ for Air Wg / Training School. */
+export function setManpowerAbsenceDetail(
+  date: string,
+  wing: string,
+  field: string,
+  count: number,
+  row?: Record<string, number>,
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !field.trim()) return false;
+  const wingLabel = normalizeLabel(wing);
+  if (!wingLabel || BANNED_WINGS.has(wingLabel.toLowerCase())) return false;
+  setState((prev) => {
+    const nextRow: Record<string, number> = { ...(row ?? {}) };
+    nextRow[field] = count;
+    const seeded: Record<string, number> = {};
+    for (const key of ABSENCE_SYNC_FIELDS) {
+      const n = Number(nextRow[key] ?? 0);
+      seeded[key] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    }
+    const manpower_absence_detail = setDayWingMap(
+      prev.manpower_absence_detail ?? {},
+      date,
+      wingLabel,
+      seeded,
+    );
+    const detailTotal = sumRecord(seeded);
+    const ranks = wingCatMap(prev.manpower_absent?.[date], wingLabel);
+    const prefer = officerPreferId(prev.authorized);
+    const rankTotal = sumRecord(ranks);
+    ranks[prefer] = Math.max(0, (ranks[prefer] ?? 0) + (detailTotal - rankTotal));
+    const manpower_absent = setDayWingMap(
+      prev.manpower_absent ?? {},
+      date,
+      wingLabel,
+      ranks,
+    );
+    return { ...prev, manpower_absence_detail, manpower_absent };
   });
   return true;
 }

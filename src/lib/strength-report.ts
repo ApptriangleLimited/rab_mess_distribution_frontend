@@ -1,7 +1,20 @@
-import { canonicalRankName, DEFAULT_WING_PARENT, rankLabelBn } from "@/lib/constants";
+import {
+  canonicalRankName,
+  canonicalWingName,
+  DEFAULT_WING_PARENT,
+  HQ_SUB_WINGS,
+  rankLabelBn,
+  wingOfficialSerial,
+} from "@/lib/constants";
 import { manpowerRankLabelBn } from "@/lib/rank-labels";
 import {
+  ABSENCE_DETAIL_FIELDS,
+  absenceFieldForTag,
+  isManualAttachedWing,
+  isManpowerCountableMember,
+  isManpowerDutyAbsentTag,
   manpowerWingFamily,
+  matchWingInList,
   type ManpowerSnapshot,
 } from "@/lib/manpower-report";
 import { getState } from "@/lib/store";
@@ -12,18 +25,20 @@ import {
 } from "@/lib/store/assignments";
 import { canAssignOnDate } from "@/lib/store/daily";
 import {
-  authorizedWingDisplayCount,
   isBannedWing,
+  isHqBranchName,
+  listWingChildrenFrom,
 } from "@/lib/store/org-options";
-import { isCockpitMember } from "@/lib/store/users";
 import type { DailyTag, User } from "@/lib/types";
 
 /**
  * Form 2/3 — Admin Wing daily strength.
  * Form 2 = official এ্যাডমিন উইং sheet (HQ Br / mess / MT).
  * Form 3 = HQ Br office children. Do not mix the two lists.
- * প্রাপ্ত = members; অনুপস্থিত = cockpit absent tags; উপস্থিত = প্রাপ্ত − অনুপস্থিত.
- * Officer: প্রাপ্ত = Settings held_wings; অনুপস্থিত = date overrides; উপস্থিত = প্রাপ্ত − অনুপস্থিত.
+ * প্রাপ্ত = Daily cockpit (all tags); উপস্থিত = MS+FR+MFR+CD;
+ * অনুপস্থিত = remaining tags; উপস্থিত can also be প্রাপ্ত − অনুপস্থিত.
+ * Counts স্থায়ী / permanent members only (same as Form 1).
+ * Officer প্রাপ্ত = Daily members (same as other ranks), not Settings.
  */
 
 export type StrengthScope = "admin" | "hq";
@@ -149,23 +164,6 @@ export type StrengthReport = {
   movement: { going: number; coming: number };
 };
 
-const ABSENT_TAGS = new Set<string>([
-  "CL",
-  "PL",
-  "RL",
-  "ML",
-  "MOL",
-  "TRG",
-  "WIT",
-  "PE",
-  "LNK",
-  "CMH",
-  "RBH",
-  "BGH",
-  "AWL",
-  "OSL",
-]);
-
 function emptyCounts(): StrengthCounts {
   return {
     officer: 0,
@@ -236,10 +234,8 @@ function fillForm3Sadar(map: Map<string, Bucket>) {
   let present = emptyCounts();
   let absent = emptyCounts();
   let absence = emptyAbsence();
-  for (const wing of FORM3_ADMIN_WINGS) {
-    if (wing === FORM3_SADAR || wing === FORM3_ATTACHED) continue;
-    const row = map.get(wing);
-    if (!row) continue;
+  for (const [wing, row] of map.entries()) {
+    if (isSadarWing(wing) || isManualAttachedWing(wing)) continue;
     held = addCounts(held, row.held);
     present = addCounts(present, row.present);
     absent = addCounts(absent, row.absent);
@@ -365,7 +361,7 @@ function projectedTag(userId: string, date: string): DailyTag | "" {
 }
 
 function isAbsentTag(tag: DailyTag | ""): boolean {
-  return !!tag && ABSENT_TAGS.has(tag);
+  return isManpowerDutyAbsentTag(tag);
 }
 
 function isSadarWing(name: string): boolean {
@@ -378,46 +374,10 @@ function bumpAbsence(
   row: Omit<StrengthAbsenceRow, "wing" | "total">,
   tag: DailyTag | "",
 ) {
-  switch (tag) {
-    case "CL":
-      row.cl += 1;
-      break;
-    case "PL":
-      row.pl += 1;
-      break;
-    case "RL":
-      row.rl += 1;
-      break;
-    case "ML":
-      row.ml += 1;
-      break;
-    case "MOL":
-      row.maternity += 1;
-      break;
-    case "TRG":
-      row.training += 1;
-      break;
-    case "PE":
-      row.exam += 1;
-      break;
-    case "LNK":
-      row.other += 1;
-      break;
-    case "CMH":
-    case "RBH":
-    case "BGH":
-      row.hospital += 1;
-      break;
-    case "WIT":
-      row.remaining += 1;
-      break;
-    case "AWL":
-    case "OSL":
-      row.avgPresent += 1;
-      break;
-    default:
-      break;
-  }
+  const field = absenceFieldForTag(tag);
+  if (!field) return;
+  if (field === "witness") row.remaining += 1;
+  else row[field] += 1;
 }
 
 function absenceTotal(
@@ -480,7 +440,6 @@ const FORM3_ADMIN_WINGS = [
 ] as const;
 
 const FORM3_SADAR = "সদর";
-const FORM3_ATTACHED = "New Temp Att";
 
 const FORM2_WING_ALIASES: Record<string, string> = {
   "hq br": "HQ Br",
@@ -499,7 +458,12 @@ const FORM2_WING_ALIASES: Record<string, string> = {
 };
 
 function resolveForm2Branch(wing: string): string | null {
-  return FORM2_WING_ALIASES[normalize(wing)] ?? null;
+  const canon = canonicalWingName(wing);
+  return (
+    FORM2_WING_ALIASES[normalize(canon)] ??
+    FORM2_WING_ALIASES[normalize(wing)] ??
+    matchWingInList(canon, [...FORM2_ADMIN_BRANCHES])
+  );
 }
 
 const FORM3_WING_ALIASES: Record<string, string> = {
@@ -510,11 +474,136 @@ const FORM3_WING_ALIASES: Record<string, string> = {
 };
 
 function resolveForm3Branch(wing: string): string | null {
-  return FORM3_WING_ALIASES[normalize(wing)] ?? null;
+  const canon = canonicalWingName(wing);
+  return (
+    FORM3_WING_ALIASES[normalize(canon)] ??
+    FORM3_WING_ALIASES[normalize(wing)] ??
+    matchWingInList(canon, [...FORM3_ADMIN_WINGS])
+  );
+}
+
+function listForm2Branches(snapshot?: ManpowerSnapshot): string[] {
+  const state = getState();
+  const wings = snapshot?.wings?.length ? snapshot.wings : state.wings;
+  const parents = {
+    ...DEFAULT_WING_PARENT,
+    ...(snapshot?.wingParent ?? state.wing_parent),
+  };
+  const kids = [
+    ...listWingChildrenFrom(wings, parents, "HQ Br"),
+    ...listWingChildrenFrom(wings, parents, "Headquarters Branch"),
+  ];
+  const official = FORM2_ADMIN_BRANCHES.map((w) => w.toLowerCase());
+  const seen = new Set<string>();
+  const out: string[] = [];
+  function push(name: string) {
+    const canon = canonicalWingName(name);
+    if (!canon || isBannedWing(canon)) return;
+    const key = canon.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(canon);
+  }
+  push("HQ Br");
+  const rest = [
+    ...FORM2_ADMIN_BRANCHES.filter((w) => w !== "HQ Br"),
+    ...kids,
+  ].sort((a, b) => {
+    const ai = official.indexOf(canonicalWingName(a).toLowerCase());
+    const bi = official.indexOf(canonicalWingName(b).toLowerCase());
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return (
+      (wingOfficialSerial(a, state.wing_serials) ?? 10_000) -
+      (wingOfficialSerial(b, state.wing_serials) ?? 10_000)
+    );
+  });
+  for (const w of rest) push(w);
+  if (!out.some((w) => isManualAttachedWing(w))) push("New Temp Att");
+  return out.length ? out : [...FORM2_ADMIN_BRANCHES];
+}
+
+function listForm3Branches(snapshot?: ManpowerSnapshot): string[] {
+  const state = getState();
+  const wings = snapshot?.wings?.length ? snapshot.wings : state.wings;
+  const parents = {
+    ...DEFAULT_WING_PARENT,
+    ...(snapshot?.wingParent ?? state.wing_parent),
+  };
+  const kids = listWingChildrenFrom(wings, parents, "Admin");
+  const hqKids = new Set(HQ_SUB_WINGS.map((w) => w.toLowerCase()));
+  const official = FORM3_ADMIN_WINGS.map((w) => w.toLowerCase());
+  const seen = new Set<string>();
+  const out: string[] = [];
+  function push(name: string) {
+    const canon = name === "সদর" ? "সদর" : canonicalWingName(name);
+    if (!canon || isBannedWing(canon)) return;
+    const key = canon.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(canon);
+  }
+  const offices = FORM3_ADMIN_WINGS.filter(
+    (w) => w !== "সদর" && w !== "New Temp Att",
+  );
+  for (const w of offices) push(w);
+  const extra = kids
+    .filter((w) => {
+      const canon = canonicalWingName(w);
+      return (
+        !isManualAttachedWing(canon) &&
+        !isSadarWing(canon) &&
+        !isHqBranchName(canon) &&
+        !hqKids.has(canon.toLowerCase())
+      );
+    })
+    .sort((a, b) => {
+      const ai = official.indexOf(canonicalWingName(a).toLowerCase());
+      const bi = official.indexOf(canonicalWingName(b).toLowerCase());
+      if (ai >= 0 && bi >= 0) return ai - bi;
+      if (ai >= 0) return -1;
+      if (bi >= 0) return 1;
+      return (
+        (wingOfficialSerial(a, state.wing_serials) ?? 10_000) -
+        (wingOfficialSerial(b, state.wing_serials) ?? 10_000)
+      );
+    });
+  for (const w of extra) push(w);
+  push("সদর");
+  const attached = [
+    ...kids,
+    ...HQ_SUB_WINGS,
+    ...wings,
+  ].filter((w) => isManualAttachedWing(w));
+  if (attached.length) {
+    for (const w of attached) push(w);
+  } else {
+    push("New Temp Att");
+  }
+  return out.length ? out : [...FORM3_ADMIN_WINGS];
+}
+
+function lookupDayWingCat(
+  day: Record<string, Record<string, number>> | undefined,
+  wingName: string,
+  categoryId: string,
+): number | undefined {
+  if (!day) return undefined;
+  const exact = day[wingName]?.[categoryId];
+  if (typeof exact === "number" && Number.isFinite(exact)) return exact;
+  const key = wingName.trim().toLowerCase();
+  for (const [k, cats] of Object.entries(day)) {
+    if (k.trim().toLowerCase() !== key) continue;
+    const n = cats?.[categoryId];
+    if (typeof n === "number" && Number.isFinite(n)) return n;
+  }
+  return undefined;
 }
 
 function branchesForScope(
   scope: StrengthScope,
+  snapshot?: ManpowerSnapshot,
 ): {
   branches: string[];
   roots: string[];
@@ -523,12 +612,9 @@ function branchesForScope(
   wingLabel: string;
 } {
   if (scope === "hq") {
-    const roots = ["HQ Br"];
-    const listed = [...FORM3_ADMIN_WINGS];
-    const branches = listed.filter((w) => !isBannedWing(w));
     return {
-      branches,
-      roots,
+      branches: listForm3Branches(snapshot),
+      roots: ["HQ Br"],
       skipSadarFill: false,
       formNo: 3,
       wingLabel: "এ্যাডমিন উইং",
@@ -536,7 +622,7 @@ function branchesForScope(
   }
 
   return {
-    branches: [...FORM2_ADMIN_BRANCHES],
+    branches: listForm2Branches(snapshot),
     roots: ["Admin", "Admin (New)", "Admin (Old)"],
     skipSadarFill: false,
     formNo: 2,
@@ -551,7 +637,7 @@ export function buildStrengthReport(
   snapshot?: ManpowerSnapshot,
 ): StrengthReport {
   const state = getState();
-  const cfg = branchesForScope(scope);
+  const cfg = branchesForScope(scope, snapshot);
   const { branches } = cfg;
   const branchSet = new Set(branches);
   const wingParent = {
@@ -575,15 +661,42 @@ export function buildStrengthReport(
     });
   }
 
-  const active: User[] = snapshot?.prefiltered
-    ? sourceUsers
-    : sourceUsers.filter(
-        (u) =>
-          u.approval_status === "approved" &&
-          u.status === "1" &&
-          isCockpitMember(u) &&
-          canAssignOnDate(u, date),
-      );
+  const active: User[] = sourceUsers.filter((u) => {
+    if (!isManpowerCountableMember(u)) return false;
+    if (u.status !== "1") return false;
+    if (u.approval_status && u.approval_status !== "approved") return false;
+    return canAssignOnDate(u, date);
+  });
+
+  function listedBranch(rawWing: string): string | null {
+    let cur = canonicalWingName(rawWing.trim());
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.toLowerCase())) {
+      seen.add(cur.toLowerCase());
+      const resolved =
+        scope === "admin"
+          ? resolveForm2Branch(cur)
+          : resolveForm3Branch(cur);
+      if (resolved && map.has(resolved)) return resolved;
+      const exact = matchWingInList(cur, [...branchSet]);
+      if (exact && map.has(exact)) return exact;
+      const parent = wingParent[cur] || "";
+      if (!parent) {
+        const key = cur.toLowerCase();
+        for (const [child, p] of Object.entries(wingParent)) {
+          if (child.trim().toLowerCase() === key && p) {
+            cur = p;
+            break;
+          }
+        }
+        if (cur.toLowerCase() === key) break;
+        continue;
+      }
+      if (isSadarWing(parent)) break;
+      cur = parent;
+    }
+    return null;
+  }
 
   for (const user of active) {
     const cat = strengthCategoryForRank(user.rank);
@@ -592,17 +705,9 @@ export function buildStrengthReport(
     const rawWing = user.wing.trim();
     const family = manpowerWingFamily(rawWing, wingParent);
     if (scope === "hq" && family !== "hq" && family !== "admin") continue;
-
-    const form2 = scope === "admin" ? resolveForm2Branch(rawWing) : null;
-    const form3 = scope === "hq" ? resolveForm3Branch(rawWing) : null;
-    if (scope === "admin" && !form2) continue;
     if (scope === "hq" && isSadarWing(rawWing)) continue;
 
-    const exact = [...branchSet].find(
-      (b) =>
-        b.toLowerCase() === (form2 ?? form3 ?? rawWing).toLowerCase(),
-    );
-    const branch = form2 ?? form3 ?? exact ?? rawWing;
+    const branch = listedBranch(rawWing);
     if (!branch || !map.has(branch)) continue;
     if (cfg.skipSadarFill && isSadarWing(branch)) continue;
 
@@ -613,49 +718,83 @@ export function buildStrengthReport(
     const tag = (
       snapshot ? resolved : resolved || user.default_tag || ""
     ) as DailyTag | "";
+    if (!tag) continue;
 
     bucket.held[cat] += 1;
-    if (isAbsentTag(tag)) {
+    const field = absenceFieldForTag(tag);
+    if (field) {
       bucket.absent[cat] += 1;
       bumpAbsence(bucket.absence, tag);
+    }
+  }
+
+  const heldDay = state.manpower_held?.[date] ?? {};
+  const absentDay = state.manpower_absent?.[date] ?? {};
+  const presentDay = state.manpower_present?.[date] ?? {};
+  const absenceDay = state.manpower_absence_detail?.[date] ?? {};
+  for (const [wingName, bucket] of map.entries()) {
+    if (!isManualAttachedWing(wingName)) continue;
+    for (const cat of STRENGTH_CATEGORIES) {
+      const heldOverride = lookupDayWingCat(heldDay, wingName, cat.id);
+      if (heldOverride !== undefined) bucket.held[cat.id] = heldOverride;
+      const absOverride = lookupDayWingCat(absentDay, wingName, cat.id);
+      if (absOverride !== undefined) bucket.absent[cat.id] = absOverride;
+    }
+    let hasDetail = false;
+    for (const field of ABSENCE_DETAIL_FIELDS) {
+      const storeKey = field === "witness" ? "witness" : field;
+      const override = lookupDayWingCat(absenceDay, wingName, storeKey);
+      if (override === undefined) continue;
+      hasDetail = true;
+      if (field === "witness") bucket.absence.remaining = override;
+      else bucket.absence[field] = override;
+    }
+    const detailTotal =
+      bucket.absence.cl +
+      bucket.absence.pl +
+      bucket.absence.rl +
+      bucket.absence.ml +
+      bucket.absence.maternity +
+      bucket.absence.training +
+      bucket.absence.remaining +
+      bucket.absence.exam +
+      bucket.absence.other +
+      bucket.absence.hospital +
+      bucket.absence.avgPresent;
+    const rankTotal = STRENGTH_CATEGORIES.reduce(
+      (s, c) => s + (bucket.absent[c.id] ?? 0),
+      0,
+    );
+    if (detailTotal !== rankTotal) {
+      if (hasDetail) {
+        bucket.absent.officer = Math.max(
+          0,
+          (bucket.absent.officer ?? 0) + (detailTotal - rankTotal),
+        );
+      } else {
+        bucket.absence.other = Math.max(
+          0,
+          bucket.absence.other + (rankTotal - detailTotal),
+        );
+      }
     }
   }
 
   for (const [wing, b] of map.entries()) {
     if (scope === "hq" && isSadarWing(wing)) continue;
     b.present = presentFromHeldAbsent(b.held, b.absent);
+    if (!isManualAttachedWing(wing)) continue;
+    for (const cat of STRENGTH_CATEGORIES) {
+      const presentOverride = lookupDayWingCat(presentDay, wing, cat.id);
+      if (presentOverride !== undefined) b.present[cat.id] = presentOverride;
+    }
   }
 
-  // Officer প্রাপ্ত = Settings held_wings; অনুপস্থিত = date overrides; উপস্থিত = প্রাপ্ত − অনুপস্থিত.
   const officerRow = authorizedRows.find((r) => {
     const key = r.label.trim().toLowerCase();
     return key === "officer" || key.startsWith("officer");
   });
   const officerAuthorizedId = officerRow?.id ?? null;
-  const officerAbsentDay =
-    snapshot?.officerAbsent ?? state.manpower_officer_absent?.[date] ?? {};
-  if (officerRow) {
-    for (const wing of branches) {
-      if (cfg.skipSadarFill && isSadarWing(wing)) continue;
-      if (scope === "hq" && isSadarWing(wing)) continue;
-      const bucket = map.get(wing);
-      if (!bucket) continue;
-      const heldN = authorizedWingDisplayCount(officerRow.held_wings, wing);
-      const absN = Math.min(
-        authorizedWingDisplayCount(officerAbsentDay, wing),
-        heldN,
-      );
-      bucket.held.officer = heldN;
-      bucket.absent.officer = absN;
-      bucket.present.officer = Math.max(0, heldN - absN);
-    }
-  } else {
-    for (const bucket of map.values()) {
-      bucket.held.officer = 0;
-      bucket.absent.officer = 0;
-      bucket.present.officer = 0;
-    }
-  }
 
   if (scope === "hq") fillForm3Sadar(map);
 
