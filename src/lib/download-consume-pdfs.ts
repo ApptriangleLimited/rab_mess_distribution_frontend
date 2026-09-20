@@ -100,7 +100,7 @@ function consumeTableColumns(doc: jsPDF): {
   }
 
   const raw = table?.columns;
-  if (!raw?.length) return null;
+  if (!table || !raw?.length) return null;
 
   const lastBody = table.body?.[table.body.length - 1];
   const lastHead = table.head?.[table.head.length - 1];
