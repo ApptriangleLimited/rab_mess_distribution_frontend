@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS staff (
     display_name VARCHAR(255) NOT NULL,
     role VARCHAR(32) NOT NULL,
     password_hash TEXT NOT NULL,
+    password_vault TEXT,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -16,11 +16,24 @@ import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import { loadLiveReportSource } from "@/lib/api/report-source";
 import { parseMonthInput } from "@/lib/date";
-import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
+import { FUEL_RATE_TAG } from "@/lib/constants";
 import { sendersForReportTag } from "@/lib/store/senders";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
+
+const REPORT_DIALOG_TAGS: DailyTag[] = [
+  "FR",
+  FUEL_RATE_TAG,
+  "MS",
+  "CL",
+  "PL",
+  "CD",
+  "TRG",
+  "WIT",
+  "MED",
+  "BGH",
+];
 
 type Props = {
   open: boolean;
@@ -109,7 +122,7 @@ export function GenerateReportDialog({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("common.all")}</SelectItem>
-              {CONSUME_LEDGER_TAGS.map((code) => (
+              {REPORT_DIALOG_TAGS.map((code) => (
                 <SelectItem key={code} value={code}>
                   {tagLabel(code, locale)}
                 </SelectItem>

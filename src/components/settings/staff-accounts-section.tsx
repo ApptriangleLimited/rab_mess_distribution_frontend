@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { IconPlus, IconUsers } from "@tabler/icons-react";
+import {
+  IconCopy,
+  IconEye,
+  IconEyeOff,
+  IconKey,
+  IconPlus,
+  IconUsers,
+} from "@tabler/icons-react";
 import { CollapsibleSection } from "@/components/shared/collapsible-section";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -20,10 +27,15 @@ import { isCcApiEnabled } from "@/lib/api/mode";
 import {
   createStaffAccount,
   listStaffAccounts,
+  revealStaffPassword,
   updateStaffAccount,
   type StaffAccount,
 } from "@/lib/api/staff";
 import { ROLE_KEYS } from "@/lib/constants";
+import {
+  recalledStaffPassword,
+  rememberStaffPassword,
+} from "@/lib/staff-password-vault";
 import { useSession } from "@/hooks/use-session";
 import type { Role } from "@/lib/types";
 import { roleLabel } from "@/i18n";
@@ -32,16 +44,22 @@ import { cn } from "@/lib/utils";
 
 const EMPTY_FORM = {
   name: "",
-  username: "",
+  email: "",
   password: "",
   confirmPassword: "",
   role: "cc" as Role,
 };
 
+function looksLikeEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || value.includes("@");
+}
+
 export function StaffAccountsSection({
   static: staticPanel = false,
+  layout = "section",
 }: {
   static?: boolean;
+  layout?: "section" | "page";
 } = {}) {
   const t = useT();
   const { locale } = useI18n();
@@ -55,6 +73,15 @@ export function StaffAccountsSection({
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
   const [toggleRow, setToggleRow] = useState<StaffAccount | null>(null);
+  const [showFormPassword, setShowFormPassword] = useState(false);
+  const [viewRow, setViewRow] = useState<StaffAccount | null>(null);
+  const [viewPassword, setViewPassword] = useState("");
+  const [viewMissing, setViewMissing] = useState(false);
+  const [viewRevealed, setViewRevealed] = useState(false);
+  const [passwordRow, setPasswordRow] = useState<StaffAccount | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const grouped = useMemo(() => {
     return ROLE_KEYS.map((role) => ({
@@ -86,6 +113,7 @@ export function StaffAccountsSection({
   function openCreate() {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setShowFormPassword(false);
     setFormOpen(true);
   }
 
@@ -93,11 +121,12 @@ export function StaffAccountsSection({
     setEditing(row);
     setForm({
       name: row.display_name,
-      username: row.email,
+      email: row.email,
       password: "",
       confirmPassword: "",
       role: row.role,
     });
+    setShowFormPassword(false);
     setFormOpen(true);
   }
 
@@ -105,17 +134,18 @@ export function StaffAccountsSection({
     setFormOpen(false);
     setEditing(null);
     setForm(EMPTY_FORM);
+    setShowFormPassword(false);
   }
 
   async function saveForm() {
     const name = form.name.trim();
-    const username = form.username.trim();
+    const email = form.email.trim().toLowerCase();
     if (name.length < 2) {
       toast(t("profile.nameRequired"), "error");
       return;
     }
-    if (username.length < 2) {
-      toast(t("profile.usernameRequired"), "error");
+    if (!looksLikeEmail(email)) {
+      toast(t("settings.staffEmailRequired"), "error");
       return;
     }
     if (!editing && !form.password) {
@@ -131,19 +161,21 @@ export function StaffAccountsSection({
       if (editing) {
         const updated = await updateStaffAccount(editing.id, {
           display_name: name,
-          username,
+          email,
           role: form.role,
           password: form.password || undefined,
         });
+        if (form.password) rememberStaffPassword(updated.id, form.password);
         setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
         toast(t("settings.staffUpdated"), "success");
       } else {
         const created = await createStaffAccount({
           display_name: name,
-          username,
+          email,
           password: form.password,
           role: form.role,
         });
+        rememberStaffPassword(created.id, form.password);
         setRows((prev) => [...prev, created]);
         toast(t("settings.staffAdded"), "success");
       }
@@ -178,110 +210,174 @@ export function StaffAccountsSection({
     }
   }
 
-  return (
-    <>
-      <CollapsibleSection
-        static={staticPanel}
-        title={t("settings.staffTitle")}
-        hint={t("settings.staffHint")}
-        icon={IconUsers}
-        badge={rows.length ? String(rows.length) : undefined}
-        headerActions={
-          apiOn ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="cta"
-              className="h-8 rounded-xl"
-              onClick={openCreate}
-            >
-              <IconPlus className="h-3.5 w-3.5" />
-              {t("settings.staffAdd")}
-            </Button>
-          ) : null
-        }
-      >
-        {!apiOn ? (
-          <p className="px-1 py-6 text-sm text-neutral-500">{t("settings.staffApiOff")}</p>
-        ) : loading && rows.length === 0 ? (
-          <p className="px-1 py-6 text-sm text-neutral-500">{t("common.loading")}</p>
-        ) : rows.length === 0 ? (
-          <p className="px-1 py-6 text-sm text-neutral-500">{t("settings.staffEmpty")}</p>
-        ) : (
-          <div className="space-y-5">
-            {grouped.map((group) =>
-              group.items.length === 0 ? null : (
-                <section key={group.role}>
-                  <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                    {roleLabel(group.role, locale)}
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                      {group.items.length}
-                    </span>
-                  </h3>
-                  <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
-                    {group.items.map((row) => {
-                      const mine = session?.username?.toLowerCase() === row.email.toLowerCase();
-                      return (
-                        <li
-                          key={row.id}
-                          className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                              {row.display_name}
-                              {mine ? (
-                                <span className="ml-2 text-[11px] font-semibold text-primary">
-                                  {t("settings.staffSelf")}
-                                </span>
-                              ) : null}
-                            </p>
-                            <p className="truncate text-xs text-neutral-500">{row.email}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                row.active
-                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                  : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800",
-                              )}
-                            >
-                              {row.active ? t("settings.staffActive") : t("settings.staffInactive")}
-                            </span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 rounded-xl"
-                              onClick={() => openEdit(row)}
-                            >
-                              {t("common.edit")}
-                            </Button>
-                            {!mine ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={row.active ? "outline" : "cta"}
-                                className="h-8 rounded-xl"
-                                onClick={() => setToggleRow(row)}
-                              >
-                                {row.active
-                                  ? t("settings.staffDeactivate")
-                                  : t("settings.staffActivate")}
-                              </Button>
-                            ) : null}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              ),
-            )}
-          </div>
-        )}
-      </CollapsibleSection>
+  async function openViewPassword(row: StaffAccount) {
+    setViewRow(row);
+    setViewPassword("");
+    setViewMissing(false);
+    setViewRevealed(false);
+    const local = recalledStaffPassword(row.id);
+    try {
+      const data = await revealStaffPassword(row.id);
+      setViewPassword(data.password);
+      rememberStaffPassword(row.id, data.password);
+    } catch {
+      if (local) setViewPassword(local);
+      else setViewMissing(true);
+    }
+  }
 
+  async function saveNewPassword() {
+    if (!passwordRow) return;
+    if (!newPassword) {
+      toast(t("settings.staffPasswordRequired"), "error");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast(t("profile.passwordMismatch"), "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await updateStaffAccount(passwordRow.id, {
+        password: newPassword,
+      });
+      rememberStaffPassword(updated.id, newPassword);
+      setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      toast(t("profile.passwordChanged"), "success");
+      setPasswordRow(null);
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("settings.staffSaveFail"),
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const addButton = apiOn ? (
+    <Button
+      type="button"
+      size="sm"
+      variant="cta"
+      className="h-8 rounded-xl"
+      onClick={openCreate}
+    >
+      <IconPlus className="h-3.5 w-3.5" />
+      {t("settings.staffAdd")}
+    </Button>
+  ) : null;
+
+  const list = !apiOn ? (
+    <p className="px-1 py-6 text-sm text-neutral-500">{t("settings.staffApiOff")}</p>
+  ) : loading && rows.length === 0 ? (
+    <p className="px-1 py-6 text-sm text-neutral-500">{t("common.loading")}</p>
+  ) : rows.length === 0 ? (
+    <p className="px-1 py-6 text-sm text-neutral-500">{t("settings.staffEmpty")}</p>
+  ) : (
+    <div className="space-y-5">
+      {grouped.map((group) => (
+        <section key={group.role}>
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+            {roleLabel(group.role, locale)}
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+              {group.items.length}
+            </span>
+          </h3>
+          <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+            {group.items.map((row) => {
+              const mine =
+                session?.username?.toLowerCase() === row.email.toLowerCase();
+              return (
+                <li
+                  key={row.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                      {row.display_name}
+                      {mine ? (
+                        <span className="ml-2 text-[11px] font-semibold text-primary">
+                          {t("settings.staffSelf")}
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="truncate text-xs text-neutral-500">{row.email}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        row.active
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800",
+                      )}
+                    >
+                      {row.active
+                        ? t("settings.staffActive")
+                        : t("settings.staffInactive")}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 rounded-xl"
+                      onClick={() => void openViewPassword(row)}
+                    >
+                      <IconEye className="h-3.5 w-3.5" />
+                      {t("settings.staffViewPassword")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 rounded-xl"
+                      onClick={() => {
+                        setPasswordRow(row);
+                        setNewPassword("");
+                        setConfirmNewPassword("");
+                        setShowNewPassword(false);
+                      }}
+                    >
+                      <IconKey className="h-3.5 w-3.5" />
+                      {t("settings.staffChangePassword")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 rounded-xl"
+                      onClick={() => openEdit(row)}
+                    >
+                      {t("common.edit")}
+                    </Button>
+                    {!mine ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={row.active ? "outline" : "cta"}
+                        className="h-8 rounded-xl"
+                        onClick={() => setToggleRow(row)}
+                      >
+                        {row.active
+                          ? t("settings.staffDeactivate")
+                          : t("settings.staffActivate")}
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+
+  const dialogs = (
+    <>
       <ConfirmDialog
         open={formOpen}
         title={editing ? t("settings.staffEditTitle") : t("settings.staffAddTitle")}
@@ -302,14 +398,16 @@ export function StaffAccountsSection({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="staff-username">{t("profile.username")}</Label>
+            <Label htmlFor="staff-email">{t("settings.staffEmail")}</Label>
             <Input
-              id="staff-username"
-              value={form.username}
+              id="staff-email"
+              type="email"
+              value={form.email}
               maxLength={120}
               autoComplete="off"
-              onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
             />
+            <p className="text-xs text-neutral-500">{t("settings.staffEmailHint")}</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="staff-role">{t("profile.role")}</Label>
@@ -328,16 +426,36 @@ export function StaffAccountsSection({
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-neutral-500">{t("settings.staffRoleAccess")}</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="staff-password">{t("profile.password")}</Label>
-            <Input
-              id="staff-password"
-              type="password"
-              value={form.password}
-              autoComplete="new-password"
-              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-            />
+            <div className="relative">
+              <Input
+                id="staff-password"
+                type={showFormPassword ? "text" : "password"}
+                value={form.password}
+                autoComplete="new-password"
+                className="pr-10"
+                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 grid w-10 place-items-center text-neutral-500"
+                onClick={() => setShowFormPassword((prev) => !prev)}
+                aria-label={
+                  showFormPassword
+                    ? t("settings.staffHidePassword")
+                    : t("settings.staffViewPassword")
+                }
+              >
+                {showFormPassword ? (
+                  <IconEyeOff className="h-4 w-4" />
+                ) : (
+                  <IconEye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
             <p className="text-xs text-neutral-500">
               {editing ? t("profile.passwordHint") : t("settings.staffPasswordHint")}
             </p>
@@ -346,12 +464,120 @@ export function StaffAccountsSection({
             <Label htmlFor="staff-password-confirm">{t("profile.confirmPassword")}</Label>
             <Input
               id="staff-password-confirm"
-              type="password"
+              type={showFormPassword ? "text" : "password"}
               value={form.confirmPassword}
               autoComplete="new-password"
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))
               }
+            />
+          </div>
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={!!viewRow}
+        title={t("settings.staffPasswordTitle")}
+        body={viewRow ? `${viewRow.display_name} · ${viewRow.email}` : ""}
+        confirmLabel={t("common.done")}
+        onCancel={() => setViewRow(null)}
+        onConfirm={() => setViewRow(null)}
+      >
+        {viewMissing ? (
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">
+            {t("settings.staffPasswordMissing")}
+          </p>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={viewPassword}
+              type={viewRevealed ? "text" : "password"}
+              className="font-mono"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 shrink-0 rounded-xl"
+              onClick={() => setViewRevealed((prev) => !prev)}
+            >
+              {viewRevealed ? (
+                <IconEyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <IconEye className="h-3.5 w-3.5" />
+              )}
+              {viewRevealed
+                ? t("settings.staffHidePassword")
+                : t("settings.staffViewPassword")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 shrink-0 rounded-xl"
+              onClick={() => {
+                if (!viewPassword) return;
+                void navigator.clipboard.writeText(viewPassword);
+                toast(t("settings.staffPasswordCopied"), "success");
+              }}
+            >
+              <IconCopy className="h-3.5 w-3.5" />
+              {t("settings.staffCopyPassword")}
+            </Button>
+          </div>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={!!passwordRow}
+        title={t("profile.titlePassword")}
+        body={
+          passwordRow
+            ? t("profile.bodyPassword")
+            : ""
+        }
+        confirmLabel={busy ? t("common.saving") : t("common.save")}
+        busy={busy}
+        onCancel={() => setPasswordRow(null)}
+        onConfirm={() => void saveNewPassword()}
+      >
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="staff-new-password">{t("profile.newPassword")}</Label>
+            <div className="relative">
+              <Input
+                id="staff-new-password"
+                type={showNewPassword ? "text" : "password"}
+                value={newPassword}
+                autoComplete="new-password"
+                className="pr-10"
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 grid w-10 place-items-center text-neutral-500"
+                onClick={() => setShowNewPassword((prev) => !prev)}
+              >
+                {showNewPassword ? (
+                  <IconEyeOff className="h-4 w-4" />
+                ) : (
+                  <IconEye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-neutral-500">{t("settings.staffPasswordHint")}</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="staff-new-password-confirm">
+              {t("profile.confirmPassword")}
+            </Label>
+            <Input
+              id="staff-new-password-confirm"
+              type={showNewPassword ? "text" : "password"}
+              value={confirmNewPassword}
+              autoComplete="new-password"
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
             />
           </div>
         </div>
@@ -377,6 +603,37 @@ export function StaffAccountsSection({
         onCancel={() => setToggleRow(null)}
         onConfirm={() => void confirmToggle()}
       />
+    </>
+  );
+
+  if (layout === "page") {
+    return (
+      <>
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-neutral-500">{t("settings.staffHint")}</p>
+            {addButton}
+          </div>
+          {list}
+        </div>
+        {dialogs}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <CollapsibleSection
+        static={staticPanel}
+        title={t("settings.staffTitle")}
+        hint={t("settings.staffHint")}
+        icon={IconUsers}
+        badge={rows.length ? String(rows.length) : undefined}
+        headerActions={addButton}
+      >
+        {list}
+      </CollapsibleSection>
+      {dialogs}
     </>
   );
 }

@@ -15,6 +15,7 @@ class Staff(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    password_vault: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     mfa_secret: Mapped[str | None] = mapped_column(Text, nullable=True)

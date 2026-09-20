@@ -84,7 +84,7 @@ export const TransferSheetPrint = forwardRef<HTMLDivElement, Props>(
 
             <table className="w-full border-collapse text-[8px] leading-tight">
               <thead>
-                <tr className="border border-black bg-neutral-100">
+                <tr className="border border-black bg-white text-black">
                   <th className="border border-black px-0.5 py-1">
                     {t("ration.colSer")}
                   </th>

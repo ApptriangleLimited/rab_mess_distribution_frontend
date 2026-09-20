@@ -270,64 +270,64 @@ const EXCEL_REPORT_STYLES = `
     </Style>
     <Style ss:ID="Head">
       <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
-      <Font ss:Bold="1" ss:Size="8"/>
-      <Interior ss:Color="#EBEBEB" ss:Pattern="Solid"/>
+      <Font ss:Bold="1" ss:Size="8" ss:Color="#000000"/>
+      <Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/>
       <Borders>
-        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
       </Borders>
     </Style>
     <Style ss:ID="HeadCenter">
       <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="0"/>
-      <Font ss:Bold="1" ss:Size="9"/>
-      <Interior ss:Color="#EBEBEB" ss:Pattern="Solid"/>
+      <Font ss:Bold="1" ss:Size="9" ss:Color="#000000"/>
+      <Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/>
       <Borders>
-        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#000000"/>
       </Borders>
     </Style>
     <Style ss:ID="Data">
       <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
-      <Font ss:Size="8"/>
+      <Font ss:Size="8" ss:Color="#000000"/>
       <Borders>
-        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
       </Borders>
     </Style>
     <Style ss:ID="Center">
       <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="0"/>
-      <Font ss:Size="9"/>
+      <Font ss:Size="9" ss:Color="#000000"/>
       <Borders>
-        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
       </Borders>
     </Style>
     <Style ss:ID="Money">
       <Alignment ss:Horizontal="Right" ss:Vertical="Center" ss:WrapText="0"/>
-      <Font ss:Size="8"/>
+      <Font ss:Size="8" ss:Color="#000000"/>
       <Borders>
-        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
       </Borders>
     </Style>
     <Style ss:ID="Total">
       <Alignment ss:Horizontal="Right" ss:Vertical="Center" ss:WrapText="0"/>
-      <Font ss:Bold="1" ss:Size="9"/>
+      <Font ss:Bold="1" ss:Size="9" ss:Color="#000000"/>
       <Borders>
-        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
-        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
       </Borders>
     </Style>
     <Style ss:ID="Plain">

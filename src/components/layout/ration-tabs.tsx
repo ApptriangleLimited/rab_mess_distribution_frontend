@@ -9,6 +9,7 @@ import {
   IconSend,
   IconSettings,
   IconTags,
+  IconUserPlus,
   IconUsers,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
@@ -39,6 +40,13 @@ const REPORT_REQUESTS_TAB: Tab = {
   labelKey: "nav.reportRequests",
   icon: IconFileReport,
   match: (path) => path.startsWith("/admin/report-requests"),
+};
+
+const USERS_TAB: Tab = {
+  href: "/admin/users",
+  labelKey: "nav.adminUsers",
+  icon: IconUserPlus,
+  match: (path) => path.startsWith("/admin/users"),
 };
 
 const BASE_TABS: Tab[] = [
@@ -114,6 +122,7 @@ export function RationTabs({
     ? [
         DASHBOARD_TAB,
         REPORT_REQUESTS_TAB,
+        USERS_TAB,
         ...BASE_TABS,
         SETTINGS_TAB,
       ]

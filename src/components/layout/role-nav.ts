@@ -148,6 +148,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "amber",
     },
     {
+      href: "/admin/users",
+      labelKey: "nav.adminUsers",
+      icon: IconUsersGroup,
+      chip: "violet",
+    },
+    {
       href: "/ration/monthly",
       labelKey: "nav.monthlyRation",
       icon: IconCashBanknote,

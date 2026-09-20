@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from account import catalog_payload, file_out
 from auth import current_staff, hash_password, require_roles
-from security import validate_password
+from security import decrypt_secret, encrypt_secret, validate_password
 from rate_limit import enforce_register_limit
 from database import SessionLocal, get_db
 from models import Assignment, BoroKhanaDay, FileObject, Member, Rate, Sender, Staff
@@ -278,12 +278,25 @@ def staff_out(row: Staff) -> dict:
         "display_name": row.display_name,
         "role": row.role,
         "active": bool(row.active),
+        "has_password": bool(getattr(row, "password_vault", None)),
     }
+
+
+def _staff_login_id(body: object) -> str:
+    email = str(getattr(body, "email", "") or "").strip()
+    username = str(getattr(body, "username", "") or "").strip()
+    return (email or username).lower()
+
+
+def _set_staff_password(row: Staff, password: str) -> None:
+    row.password_hash = hash_password(password)
+    row.password_vault = encrypt_secret(password)
 
 
 class StaffCreateIn(BaseModel):
     display_name: str = Field(min_length=2, max_length=255)
-    username: str = Field(min_length=2, max_length=255)
+    username: str = ""
+    email: str = ""
     password: str = Field(min_length=1, max_length=255)
     role: str
 
@@ -291,6 +304,7 @@ class StaffCreateIn(BaseModel):
 class StaffUpdateIn(BaseModel):
     display_name: str = ""
     username: str = ""
+    email: str = ""
     password: str = ""
     role: str = ""
     active: bool | None = None
@@ -319,12 +333,12 @@ def create_staff(
     db: Session = Depends(get_db),
 ):
     name = body.display_name.strip()
-    username = body.username.strip().lower()
+    username = _staff_login_id(body)
     role = body.role.strip().lower()
     if len(name) < 2:
         raise HTTPException(status_code=400, detail="Name is too short")
-    if len(username) < 2:
-        raise HTTPException(status_code=400, detail="Username is required")
+    if len(username) < 2 or "@" not in username:
+        raise HTTPException(status_code=400, detail="Email is required")
     if role not in STAFF_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
     if _staff_username_taken(db, username):
@@ -338,6 +352,7 @@ def create_staff(
         display_name=name,
         role=role,
         password_hash=hash_password(body.password),
+        password_vault=encrypt_secret(body.password),
         active=True,
     )
     db.add(row)
@@ -365,7 +380,7 @@ def update_staff(
         if len(name) < 2:
             raise HTTPException(status_code=400, detail="Name is too short")
         row.display_name = name
-    username = (body.username or "").strip().lower()
+    username = _staff_login_id(body)
     if username:
         if _staff_username_taken(db, username, row.id):
             raise HTTPException(status_code=409, detail="Username is already in use")
@@ -382,7 +397,7 @@ def update_staff(
         error = validate_password(password, username or row.email)
         if error:
             raise HTTPException(status_code=400, detail=error)
-        row.password_hash = hash_password(password)
+        _set_staff_password(row, password)
     if body.active is not None:
         if row.id == actor.id and not body.active:
             raise HTTPException(status_code=400, detail="You cannot deactivate your own account")
@@ -402,6 +417,31 @@ def update_staff(
         raise HTTPException(status_code=409, detail="Username is already in use") from exc
     db.refresh(row)
     return envelope(staff_out(row), "Updated")
+
+
+@router.get("/api/v1/staff/{staff_id}/password")
+def reveal_staff_password(
+    staff_id: str,
+    _actor: Staff = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    row = db.get(Staff, staff_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Staff not found")
+    vault = getattr(row, "password_vault", None)
+    if not vault:
+        raise HTTPException(
+            status_code=404,
+            detail="Password is not stored for viewing. Set a new password.",
+        )
+    try:
+        password = decrypt_secret(vault)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Password is not stored for viewing. Set a new password.",
+        ) from exc
+    return envelope({"password": password})
 
 
 @router.get("/api/v1/settings/rates")

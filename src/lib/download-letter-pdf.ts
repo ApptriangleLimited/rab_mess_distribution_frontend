@@ -56,6 +56,37 @@ function transferColumnStyles(headers: readonly string[]) {
   );
 }
 
+const INK: [number, number, number] = [0, 0, 0];
+const PAPER: [number, number, number] = [255, 255, 255];
+
+function reportTableChrome() {
+  return {
+    textColor: INK,
+    lineColor: INK,
+    lineWidth: 0.35,
+  };
+}
+
+function reportHeadChrome() {
+  return {
+    fillColor: PAPER,
+    textColor: INK,
+    fontStyle: "bold" as const,
+    lineColor: INK,
+    lineWidth: 0.45,
+  };
+}
+
+function reportFootChrome() {
+  return {
+    fillColor: PAPER,
+    textColor: INK,
+    fontStyle: "bold" as const,
+    lineColor: INK,
+    lineWidth: 0.35,
+  };
+}
+
 function amt(n: number) {
   return n.toLocaleString("en-BD", {
     minimumFractionDigits: 2,
@@ -143,15 +174,14 @@ function writeTrustBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
       overflow: "linebreak",
       halign: "left",
       valign: "middle",
+      ...reportTableChrome(),
     },
     headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: 20,
-      fontStyle: "bold",
+      ...reportHeadChrome(),
       overflow: "linebreak",
       halign: "left",
     },
-    footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    footStyles: reportFootChrome(),
     columnStyles: transferColumnStyles(TRUST_BANK_COLUMNS),
     showHead: "firstPage",
     theme: "grid",
@@ -236,15 +266,14 @@ function writeCommunityBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
       overflow: "linebreak",
       halign: "left",
       valign: "middle",
+      ...reportTableChrome(),
     },
     headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: 20,
-      fontStyle: "bold",
+      ...reportHeadChrome(),
       overflow: "linebreak",
       halign: "left",
     },
-    footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    footStyles: reportFootChrome(),
     columnStyles: transferColumnStyles(COMMUNITY_BANK_COLUMNS),
     showHead: "firstPage",
     theme: "grid",
@@ -329,15 +358,14 @@ function writeSonaliBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
       overflow: "linebreak",
       halign: "left",
       valign: "middle",
+      ...reportTableChrome(),
     },
     headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: 20,
-      fontStyle: "bold",
+      ...reportHeadChrome(),
       overflow: "linebreak",
       halign: "left",
     },
-    footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    footStyles: reportFootChrome(),
     columnStyles: transferColumnStyles(SONALI_BANK_COLUMNS),
     showHead: "firstPage",
     theme: "grid",
@@ -483,15 +511,14 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
       overflow: "linebreak",
       halign: "left",
       valign: "middle",
+      ...reportTableChrome(),
     },
     headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: 20,
-      fontStyle: "bold",
+      ...reportHeadChrome(),
       overflow: "linebreak",
       halign: "left",
     },
-    footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    footStyles: reportFootChrome(),
     columnStyles: {
       9: { halign: "right" },
     },
@@ -614,12 +641,8 @@ function writeCommunityFuelLetter(doc: jsPDF, sheet: RationStaffSheet) {
     startY: y,
     head: [COMMUNITY_FUEL_COLUMNS as unknown as string[]],
     body: sheet.lines.map((row) => communityFuelCells(row)),
-    styles: { fontSize: 7, cellPadding: 1.2 },
-    headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: 20,
-      fontStyle: "bold",
-    },
+    styles: { fontSize: 7, cellPadding: 1.2, ...reportTableChrome() },
+    headStyles: reportHeadChrome(),
     columnStyles: {
       5: { halign: "right" },
     },
@@ -681,13 +704,9 @@ function writeSonaliFuelLetter(doc: jsPDF, sheet: RationStaffSheet) {
     foot: [
       ["", "", "", "", "", "", "G/Total:", trustBankMoney(sheet.total), ""],
     ],
-    styles: { fontSize: 7, cellPadding: 1.2 },
-    headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: 20,
-      fontStyle: "bold",
-    },
-    footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    styles: { fontSize: 7, cellPadding: 1.2, ...reportTableChrome() },
+    headStyles: reportHeadChrome(),
+    footStyles: reportFootChrome(),
     columnStyles: {
       7: { halign: "right" },
     },
@@ -788,12 +807,8 @@ function writeStaffPayoutLetter(
       amt(row.amount),
       "",
     ]),
-    styles: { fontSize: 7, cellPadding: 1.2 },
-    headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: 20,
-      fontStyle: "bold",
-    },
+    styles: { fontSize: 7, cellPadding: 1.2, ...reportTableChrome() },
+    headStyles: reportHeadChrome(),
     columnStyles: {
       7: { halign: "right" },
     },

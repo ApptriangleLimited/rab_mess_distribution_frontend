@@ -161,7 +161,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (apiOn) {
       if (!email.trim()) {
-        toast(t("login.usernameRequired"), "error");
+        toast(t(apiOn ? "login.emailRequired" : "login.usernameRequired"), "error");
         return;
       }
       if (!password.trim()) {
@@ -311,14 +311,14 @@ export default function LoginPage() {
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="identity" className="text-neutral-700 dark:text-neutral-300">
-                {t("login.username")}
+                {t(apiOn ? "login.email" : "login.username")}
               </Label>
               <Input
                 id="identity"
-                type="text"
+                type={apiOn ? "email" : "text"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t("login.usernamePlaceholder")}
+                placeholder={t(apiOn ? "login.emailPlaceholder" : "login.usernamePlaceholder")}
                 className="h-11 rounded-xl border-neutral-200 bg-neutral-50 px-3.5 text-base shadow-none focus-visible:ring-primary dark:border-neutral-700 dark:bg-neutral-900"
                 autoComplete="username"
                 disabled={busy}

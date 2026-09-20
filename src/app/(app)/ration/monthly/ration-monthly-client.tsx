@@ -233,6 +233,7 @@ export default function RationMonthlyClient() {
             tagCodes={ledger.tagCodes}
             rows={rows}
             columnDates={ledger.columnDates}
+            showSrbNo
           />
         )}
       </motion.div>

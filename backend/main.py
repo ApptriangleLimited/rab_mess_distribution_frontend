@@ -43,7 +43,7 @@ from persist import router as persist_router, seed_persist
 from account import router as account_router
 from headers import SecurityHeadersMiddleware
 from permissions import seed_permissions
-from security import verify_login_mfa
+from security import encrypt_secret, verify_login_mfa
 from audit import write_audit
 from config import settings
 from database import Base, SessionLocal, engine, get_db
@@ -355,6 +355,7 @@ def seed_staff() -> None:
                     display_name=role.upper(),
                     role=role,
                     password_hash=hash_password(password),
+                    password_vault=encrypt_secret(password),
                     active=True,
                 )
             )

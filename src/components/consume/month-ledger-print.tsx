@@ -24,6 +24,8 @@ type Props = {
   preview?: boolean;
   /** Consume report is English + landscape; mess keeps Bangla. */
   reportLang?: "en" | "bn";
+  /** Show SRB No beside personal number (ration ledger). */
+  showSrbNo?: boolean;
 };
 
 /** Landscape Forces Mess consume ledger — matches BN register print. */
@@ -38,6 +40,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
       columnDates,
       preview = false,
       reportLang = "bn",
+      showSrbNo = false,
     },
     ref,
   ) {
@@ -72,7 +75,14 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
 
     /** A4 landscape content width — identity + days + tags + total must fit. */
     const pageMm = 291;
-    const identityMm = english ? [6, 17, 13, 20] : [7, 22, 16, 26];
+    const identityMm = showSrbNo
+      ? english
+        ? [6, 14, 14, 12, 16]
+        : [7, 16, 16, 14, 20]
+      : english
+        ? [6, 17, 13, 20]
+        : [7, 22, 16, 26];
+    const identityColCount = identityMm.length;
     const tagColMm = english ? 6.4 : 7;
     const totalColMm = english ? 8 : 10;
     const reservedMm =
@@ -130,6 +140,11 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               <th className="border border-black px-0.5 py-1 text-left">
                 {t("consume.colId")}
               </th>
+              {showSrbNo ? (
+                <th className="border border-black px-0.5 py-1 text-left">
+                  {t("consume.colSrbNo")}
+                </th>
+              ) : null}
               <th className="border border-black px-0.5 py-1 text-left">
                 {t("consume.colRank")}
               </th>
@@ -166,6 +181,11 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="ledger-id overflow-hidden border border-black px-0.5 py-0.5 font-mono whitespace-nowrap">
                   {row.user.personal_id || "—"}
                 </td>
+                {showSrbNo ? (
+                  <td className="ledger-id overflow-hidden border border-black px-0.5 py-0.5 font-mono whitespace-nowrap">
+                    {row.user.rab_id || "—"}
+                  </td>
+                ) : null}
                 <td className="ledger-rank overflow-hidden border border-black px-0.5 py-0.5 whitespace-nowrap">
                   {row.user.rank}
                 </td>
@@ -218,7 +238,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           <tfoot>
             <tr className="border border-black font-semibold">
               <td
-                colSpan={4}
+                colSpan={identityColCount}
                 className="border border-black px-1 py-1 text-right"
               >
                 {t("consume.colGrandTotal")}

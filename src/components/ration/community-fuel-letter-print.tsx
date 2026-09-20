@@ -78,7 +78,7 @@ export const CommunityFuelLetterPrint = forwardRef<HTMLDivElement, Props>(
 
           <table className="w-full border-collapse text-[10px]">
             <thead>
-              <tr className="border border-black bg-neutral-100">
+              <tr className="border border-black bg-white text-black">
                 {COMMUNITY_FUEL_COLUMNS.map((col) => (
                   <th
                     key={col}

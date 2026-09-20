@@ -191,16 +191,17 @@ function letterSheetCss() {
     border-collapse: collapse !important;
   }
   th, td {
-    border: 1px solid #111 !important;
+    border: 1.5px solid #000 !important;
     padding: 3px 4px !important;
-    color: #111 !important;
+    color: #000 !important;
     vertical-align: middle;
     word-wrap: break-word;
     overflow-wrap: anywhere;
   }
   thead th, tfoot th, tfoot td {
-    font-weight: 600;
-    background: #f4f4f4 !important;
+    font-weight: 800;
+    color: #000 !important;
+    background: #fff !important;
   }
   tr {
     page-break-inside: avoid;
@@ -965,7 +966,8 @@ function bankLetterPrintCss() {
   }
   thead { display: table-row-group !important; }
   th, td {
-    border: 1px solid #000 !important;
+    border: 1.5px solid #000 !important;
+    color: #000 !important;
     padding: 3px 4px !important;
     font-size: 7px !important;
     line-height: 1.25 !important;
@@ -977,8 +979,10 @@ function bankLetterPrintCss() {
     background: #fff !important;
   }
   thead th {
-    background: #f2f2f2 !important;
-    font-weight: 700 !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-weight: 800 !important;
+    border: 1.5px solid #000 !important;
   }
   .text-right { text-align: right !important; }
   `;

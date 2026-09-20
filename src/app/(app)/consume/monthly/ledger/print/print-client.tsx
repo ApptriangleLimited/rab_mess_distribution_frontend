@@ -257,6 +257,7 @@ export default function ConsumeLedgerPrintClient() {
             columnDates={ledger.columnDates}
             preview
             reportLang="en"
+            showSrbNo
           />
         </FitPagePreview>
       )}

@@ -236,6 +236,7 @@ export default function ConsumeLedgerClient() {
             tagCodes={ledger.tagCodes}
             rows={rows}
             columnDates={ledger.columnDates}
+            showSrbNo
           />
         )}
       </motion.div>

@@ -109,7 +109,7 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
 
               <table className="w-full border-collapse text-[10px]">
                 <thead>
-                  <tr className="border border-black bg-neutral-100">
+                  <tr className="border border-black bg-white text-black">
                     <th className="border border-black px-1 py-1">
                       {t("ration.colSer")}
                     </th>

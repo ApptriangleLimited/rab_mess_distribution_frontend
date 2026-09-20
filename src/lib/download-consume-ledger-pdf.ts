@@ -69,6 +69,7 @@ export function downloadConsumeLedgerPdf({
   const head = [
     "Ser",
     "Pers No",
+    "SRB No",
     "Rank",
     "Name",
     ...dayHeaders.map(String),
@@ -79,6 +80,7 @@ export function downloadConsumeLedgerPdf({
   const body = rows.map((row, i) => [
     String(i + 1),
     row.user.personal_id || "—",
+    row.user.rab_id || "—",
     row.user.rank,
     row.user.name,
     ...(rangeMode
@@ -98,6 +100,7 @@ export function downloadConsumeLedgerPdf({
     "",
     "",
     "",
+    "",
     "Grand total",
     ...dayHeaders.map(() => ""),
     ...tagTotals,
@@ -114,36 +117,41 @@ export function downloadConsumeLedgerPdf({
       cellPadding: 0.8,
       halign: "center",
       valign: "middle",
-      lineWidth: 0.1,
+      lineWidth: 0.35,
       lineColor: 0,
-      textColor: 20,
+      textColor: 0,
       overflow: "visible",
       minCellWidth: 4.2,
     },
     headStyles: {
-      fillColor: [235, 235, 235],
-      textColor: 20,
+      fillColor: [255, 255, 255],
+      textColor: 0,
       fontStyle: "bold",
       fontSize: 6.5,
+      lineColor: 0,
+      lineWidth: 0.45,
     },
     footStyles: {
       fillColor: [255, 255, 255],
-      textColor: 20,
+      textColor: 0,
       fontStyle: "bold",
       fontSize: 6.5,
+      lineColor: 0,
+      lineWidth: 0.35,
     },
     columnStyles: {
       0: { cellWidth: 7 },
-      1: { cellWidth: 14, halign: "left" },
-      2: { cellWidth: 14, halign: "left" },
-      3: { cellWidth: 24, halign: "left" },
+      1: { cellWidth: 13, halign: "left" },
+      2: { cellWidth: 13, halign: "left" },
+      3: { cellWidth: 13, halign: "left" },
+      4: { cellWidth: 22, halign: "left" },
     },
     theme: "grid",
     margin: { left: 6, right: 6 },
     tableWidth: "auto",
     didParseCell: (data) => {
-      if (data.section !== "body" || data.column.index < 4) return;
-      if (data.column.index >= 4 + dayHeaders.length) return;
+      if (data.section !== "body" || data.column.index < 5) return;
+      if (data.column.index >= 5 + dayHeaders.length) return;
       const row = rows[data.row.index];
       const tag = String(data.cell.raw ?? "").trim();
       if (!row || !tag) return;

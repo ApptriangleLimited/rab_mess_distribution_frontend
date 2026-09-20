@@ -29,6 +29,8 @@ type Props = {
   hideMonthMeta?: boolean;
   /** Hide ID / Rank / Name sticky cols (keep Ser). */
   hideUserDetails?: boolean;
+  /** Show SRB No beside personal number (ration ledger). */
+  showSrbNo?: boolean;
   /** Hide per-tag day-count result cols. */
   hideTagResults?: boolean;
   /** Extra sticky col after tags: All = totalDays. */
@@ -47,6 +49,7 @@ const DENSITY = {
   default: {
     ser: 44,
     id: 132,
+    srb: 100,
     rank: 108,
     name: 176,
     tag: 40,
@@ -63,6 +66,7 @@ const DENSITY = {
   medium: {
     ser: 42,
     id: 104,
+    srb: 88,
     rank: 108,
     name: 168,
     tag: 48,
@@ -79,6 +83,7 @@ const DENSITY = {
   comfortable: {
     ser: 48,
     id: 120,
+    srb: 110,
     rank: 120,
     name: 200,
     tag: 56,
@@ -103,6 +108,7 @@ export function MonthLedgerBoard({
   columnDates,
   hideMonthMeta = false,
   hideUserDetails = false,
+  showSrbNo = false,
   hideTagResults = false,
   showAllColumn = false,
   hideDayColumns = false,
@@ -145,10 +151,13 @@ export function MonthLedgerBoard({
 
   const SER_W = d.ser;
   const ID_W = d.id;
+  const SRB_W = showSrbNo ? d.srb : 0;
   const RANK_W = d.rank;
   const NAME_W = d.name;
   const TAG_W = d.tag;
-  const NAME_LEFT = SER_W + ID_W + RANK_W;
+  const SRB_LEFT = SER_W + ID_W;
+  const RANK_LEFT = SRB_LEFT + SRB_W;
+  const NAME_LEFT = RANK_LEFT + RANK_W;
   const TAG_LEFT0 = hideUserDetails ? SER_W : NAME_LEFT + NAME_W;
   const visibleTags = hideTagResults ? [] : tagCodes;
   const resultColCount = visibleTags.length + (showAllColumn ? 1 : 0);
@@ -237,9 +246,17 @@ export function MonthLedgerBoard({
                   >
                     {t("daily.colId")}
                   </th>
+                  {showSrbNo ? (
+                    <th
+                      className="sticky z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
+                      style={{ left: SRB_LEFT, width: SRB_W, minWidth: SRB_W, padding: cellPad }}
+                    >
+                      {t("consume.colSrbNo")}
+                    </th>
+                  ) : null}
                   <th
                     className="sticky z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
-                    style={{ left: SER_W + ID_W, width: RANK_W, minWidth: RANK_W, padding: cellPad }}
+                    style={{ left: RANK_LEFT, width: RANK_W, minWidth: RANK_W, padding: cellPad }}
                   >
                     {t("cc.fields.rank")}
                   </th>
@@ -370,6 +387,23 @@ export function MonthLedgerBoard({
                       >
                         {row.user.personal_id || "—"}
                       </td>
+                      {showSrbNo ? (
+                        <td
+                          className={cn(
+                            "sticky z-30 box-border overflow-hidden border-b border-r border-neutral-200 font-mono text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
+                            d.bodyMono,
+                            stickyBg,
+                          )}
+                          style={{
+                            left: SRB_LEFT,
+                            width: SRB_W,
+                            minWidth: SRB_W,
+                            padding: cellPad,
+                          }}
+                        >
+                          {row.user.rab_id || "—"}
+                        </td>
+                      ) : null}
                       <td
                         className={cn(
                           "sticky z-30 box-border truncate overflow-hidden border-b border-r border-neutral-200 text-neutral-700 dark:border-neutral-800 dark:text-neutral-300",
@@ -377,7 +411,7 @@ export function MonthLedgerBoard({
                           stickyBg,
                         )}
                         style={{
-                          left: SER_W + ID_W,
+                          left: RANK_LEFT,
                           width: RANK_W,
                           minWidth: RANK_W,
                           maxWidth: RANK_W,
