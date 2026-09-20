@@ -45,11 +45,13 @@ export function sendersForReportTag(
   if (!tag) return active;
   if (tag === "all") return active.filter((s) => !isFrFuelSender(s));
   if (isFrFuelTag(tag)) return active.filter(isFrFuelSender);
-  return active.filter(
+  const mapped = active.filter(
     (s) =>
       !isFrFuelSender(s) &&
       s.mapped_tags.some((t) => t.toLowerCase() === tag.toLowerCase()),
   );
+  if (mapped.length) return mapped;
+  return active.filter((s) => !isFrFuelSender(s));
 }
 
 function newId() {

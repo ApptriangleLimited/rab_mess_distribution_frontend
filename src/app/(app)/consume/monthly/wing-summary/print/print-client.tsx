@@ -35,9 +35,19 @@ export default function ConsumeWingSummaryPrintClient() {
   const table = useMemo(
     () =>
       wing
-        ? withReportSource(source, () => buildWingFoodList(month, wing))
+        ? withReportSource(source, () =>
+            buildWingFoodList(month, wing, state.wing_labels),
+          )
         : null,
-    [state.assignments, state.users, state.rates, month, wing, source],
+    [
+      state.assignments,
+      state.users,
+      state.rates,
+      state.wing_labels,
+      month,
+      wing,
+      source,
+    ],
   );
 
   async function onPrint() {

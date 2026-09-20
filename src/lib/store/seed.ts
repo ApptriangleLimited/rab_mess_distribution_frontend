@@ -163,7 +163,7 @@ type MemberPlan = {
   user_id: string;
   base: DailyTag;
   spans?: { tag: DailyTag; from: number; to: number }[];
-};
+  };
 
 /** Full tag history only for first N roster members (mess/consume demos). */
 const SEED_FULL_HISTORY_ROSTER = 25;
@@ -266,14 +266,14 @@ function userFromSeedRow(row: SeedRow, i: number): User {
       id: row.id,
       name: row.name,
       personal_id,
-      rab_id,
+        rab_id,
       rfid: isCivilian ? `CIV-RF-${String(n).padStart(4, "0")}` : `RFID-${3100 + n}`,
       rank: isCivilian ? "Civil" : row.rank,
       wing: row.wing,
       force: row.force,
       religion: RELIGIONS[i % RELIGIONS.length]!,
       member_type: row.member_type,
-      dropdown_no: cardNo,
+        dropdown_no: cardNo,
       phone: `01711${String(200000 + n).slice(-6)}`,
       blood_group: BLOOD_GROUPS[i % BLOOD_GROUPS.length]!,
       status: row.status,
@@ -281,9 +281,9 @@ function userFromSeedRow(row: SeedRow, i: number): User {
       bank_name: bank,
       account_name: row.name,
       account_number: `${row.approval_status === "pending" ? "11" : "22"}02${String(3100 + n).padStart(6, "0")}`,
-      routing: `20027${String(n).padStart(4, "0")}`,
+        routing: `20027${String(n).padStart(4, "0")}`,
       branch: BANK_BRANCHES[i % BANK_BRANCHES.length]!,
-      branch_location: BRANCH_DISTRICTS[i % BRANCH_DISTRICTS.length]!,
+        branch_location: BRANCH_DISTRICTS[i % BRANCH_DISTRICTS.length]!,
       documents: seedDocuments(n, isCivilian ? "nid" : isGuest ? "guest" : "posting"),
       documents_verified: isCivilian && row.approval_status === "approved",
       joining_date: dateInMonth(shiftMonthKey(monthKey(), -((n % 4) + 1)), 2 + (n % 20)),

@@ -51,7 +51,7 @@ export const TransferSheetPrint = forwardRef<HTMLDivElement, Props>(
               "mb-8",
             )}
           >
-            <header className="mb-3 text-center">
+            <header className="mb-8 text-center">
               <p className="text-[9px] text-neutral-700">
                 {RATION_REPORT_META.govLine}
               </p>

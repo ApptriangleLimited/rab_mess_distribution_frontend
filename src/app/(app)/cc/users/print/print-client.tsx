@@ -24,6 +24,7 @@ import { formatDateDisplay, todayISO } from "@/lib/date";
 import {
   downloadMemberListExcel,
   downloadMemberListPdf,
+  reportFileStem,
 } from "@/lib/download-member-list";
 import {
   memberListFilterChips,
@@ -103,6 +104,9 @@ export default function CcUsersPrintClient({
   const users = apiOn ? apiUsers : filterUsers(state.users, filters);
   const backHref = `${listHref}?${userFiltersToSearchParams(filters).toString()}`;
   const canAct = users.length > 0;
+  const reportTitle = listHref.startsWith("/daily")
+    ? t("cc.dailyMemberListReportTitle")
+    : t("cc.memberListReportTitle");
 
   function reportPayload() {
     const useBn = locale === "bn";
@@ -113,7 +117,7 @@ export default function CcUsersPrintClient({
       station: useBn
         ? CONSUME_REPORT_META.stationBn
         : CONSUME_REPORT_META.station,
-      title: t("cc.memberListReportTitle"),
+      title: reportTitle,
       countLabel: `${t("cc.memberListReportCount", { count: users.length })} · ${formatDateDisplay(todayISO())}`,
       chips: memberListFilterChips(filters, t, wingLabel),
       headers: memberListTableHeaders(t),
@@ -125,7 +129,7 @@ export default function CcUsersPrintClient({
     if (!canAct) return;
     downloadMemberListPdf({
       ...reportPayload(),
-      filename: "member-list.pdf",
+      filename: `${reportFileStem(reportTitle)}.pdf`,
     });
   }
 
@@ -133,7 +137,7 @@ export default function CcUsersPrintClient({
     if (!canAct) return;
     downloadMemberListExcel({
       ...reportPayload(),
-      filename: "member-list.xls",
+      filename: `${reportFileStem(reportTitle)}.xls`,
     });
   }
 
@@ -142,7 +146,7 @@ export default function CcUsersPrintClient({
     if (!el || !canAct) return;
     setPrinting(true);
     try {
-      await printLetterElement(el, "member-list.pdf", "portrait", {
+      await printLetterElement(el, `${reportFileStem(reportTitle)}.pdf`, "portrait", {
         skipInlineStyles: true,
       });
     } finally {
@@ -220,6 +224,7 @@ export default function CcUsersPrintClient({
           users={users}
           filters={filters}
           wingLabels={state.wing_labels}
+          title={reportTitle}
         />
       )}
     </PagePane>

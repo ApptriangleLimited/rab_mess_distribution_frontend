@@ -39,7 +39,7 @@ export const SonaliFuelLetterPrint = forwardRef<HTMLDivElement, Props>(
         )}
       >
         <section>
-          <div className="letter-masthead mb-4 text-center">
+          <div className="letter-masthead mb-8 text-center">
             <p className="text-[10px] text-neutral-700">
               {RATION_REPORT_META.govLine}
             </p>
@@ -54,10 +54,7 @@ export const SonaliFuelLetterPrint = forwardRef<HTMLDivElement, Props>(
             </p>
           </div>
 
-          <div className="mb-3 flex items-start justify-between gap-4 text-[11px]">
-            <p className="text-left">
-              {RATION_REPORT_META.refPrefix}/{sheet.month}
-            </p>
+          <div className="mb-3 flex items-start justify-end text-[11px]">
             <p className="shrink-0 text-right font-medium">DT: {monthLabel}</p>
           </div>
 
@@ -87,8 +84,8 @@ export const SonaliFuelLetterPrint = forwardRef<HTMLDivElement, Props>(
                   <th
                     key={col}
                     className={cn(
-                      "border border-black px-1 py-1",
-                      (col === "Name" || col === "Bank Name") && "text-left",
+                      "border border-black px-1 py-1 text-left",
+                      col === "Amount" && "text-right",
                     )}
                   >
                     {col}
@@ -104,13 +101,9 @@ export const SonaliFuelLetterPrint = forwardRef<HTMLDivElement, Props>(
                       key={`${row.user.id}-${i}`}
                       className={cn(
                         "border border-black px-1 py-0.5",
-                        i === 0 || i === 2
-                          ? "text-center"
-                          : i === 7
-                            ? "text-right tabular-nums"
-                            : i === 3 || i === 6
-                              ? "text-left"
-                              : "font-mono",
+                        i === 7
+                          ? "text-right tabular-nums"
+                          : "text-left",
                       )}
                     >
                       {cell}
@@ -136,7 +129,9 @@ export const SonaliFuelLetterPrint = forwardRef<HTMLDivElement, Props>(
           </table>
 
           <p className="mt-3 text-[11px]">
-            <span className="font-semibold">Amount in word:</span>{" "}
+            <span className="whitespace-nowrap font-semibold">
+              Amount in word:
+            </span>{" "}
             {amountToWordsEn(sheet.total)}
           </p>
           <p className="mt-1 text-[11px]">

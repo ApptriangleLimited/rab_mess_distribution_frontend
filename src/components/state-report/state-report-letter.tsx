@@ -30,7 +30,7 @@ export const StateReportLetter = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         className="mx-auto w-full max-w-[210mm] bg-white p-8 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
       >
-        <header className="border-b border-neutral-300 pb-4 text-center">
+        <header className="mb-8 border-b border-neutral-300 pb-4 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-wide">
             {CONSUME_REPORT_META.wing}
           </p>

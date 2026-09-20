@@ -17,14 +17,29 @@ export function ConsumeSignOff({ labels, className }: Props) {
     >
       <tbody>
         <tr>
-          {labels.map((label, i) => (
+          {labels.map((label, i) => {
+            const left = i >= labels.length - 2;
+            return (
             <td
               key={`${i}-${label}`}
-              className="consume-sign-cell border-0 bg-transparent px-1.5 pt-8 text-center align-top"
+              className={cn(
+                "consume-sign-cell border-0 bg-transparent px-1.5 pt-8 align-top",
+                left ? "consume-sign-left text-left" : "text-center",
+              )}
               style={{ width: colPct }}
             >
-              <div className="consume-sign-line mx-auto mb-1.5 h-px w-[72%] max-w-[7.5rem] bg-black" />
-              <div className="consume-sign-label leading-tight">
+              <div
+                className={cn(
+                  "consume-sign-line mb-1.5 w-[72%] max-w-[7.5rem] border-t border-black",
+                  left ? "mr-auto" : "mx-auto",
+                )}
+              />
+              <div
+                className={cn(
+                  "consume-sign-label leading-tight",
+                  left ? "text-left" : "text-center",
+                )}
+              >
                 {label.split("\n").map((line) => (
                   <p key={line} className="m-0">
                     {line}
@@ -32,7 +47,8 @@ export function ConsumeSignOff({ labels, className }: Props) {
                 ))}
               </div>
             </td>
-          ))}
+            );
+          })}
         </tr>
       </tbody>
     </table>

@@ -107,6 +107,13 @@ function keepPrintFill(
   );
 }
 
+const BANK_LETTER_SELECTOR = [
+  ".trust-bank-letter",
+  ".community-bank-letter",
+  ".sonali-bank-letter",
+  ".fr-transfer-letter",
+].join(", ");
+
 function expandForPrintPage(
   root: HTMLElement,
   preserveColors: boolean,
@@ -124,6 +131,13 @@ function expandForPrintPage(
   root.style.display = "block";
 
   root.querySelectorAll<HTMLElement>("*").forEach((node) => {
+    if (node.closest(BANK_LETTER_SELECTOR)) {
+      if (node.tagName === "TABLE") {
+        node.style.width = "100%";
+        node.style.maxWidth = "100%";
+      }
+      return;
+    }
     const keepFill = keepPrintFill(node, preserveColors, skipInlineStyles);
     flattenPrintSurface(node, !keepFill);
     node.style.maxWidth = "none";
@@ -153,6 +167,22 @@ function pageCssSize(orientation: "portrait" | "landscape") {
     : { w: "210mm", h: "297mm", page: "A4 portrait" };
 }
 
+function consumePrintRoot(node: HTMLElement) {
+  return Boolean(
+    node.closest(
+      [
+        ".official-consume-letter",
+        ".official-consume-page",
+        ".tag-bill-print",
+        ".leave-med-bill-print",
+        ".wing-food-list-print",
+        ".wing-summary-print",
+        ".month-ledger-print",
+      ].join(", "),
+    ),
+  );
+}
+
 function letterSheetCss() {
   return `
   table {
@@ -176,6 +206,146 @@ function letterSheetCss() {
     page-break-inside: avoid;
     break-inside: avoid;
   }
+  .letter-masthead {
+    margin-bottom: 24px !important;
+  }
+  .letter-masthead p {
+    white-space: normal !important;
+    word-spacing: normal !important;
+    letter-spacing: normal !important;
+  }
+  .trust-bank-letter,
+  .community-bank-letter,
+  .sonali-bank-letter,
+  .fr-transfer-letter {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 4mm 0 !important;
+    overflow: visible !important;
+  }
+  .trust-bank-letter p,
+  .community-bank-letter p,
+  .sonali-bank-letter p,
+  .fr-transfer-letter p {
+    white-space: normal !important;
+    word-spacing: normal !important;
+    letter-spacing: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .trust-bank-letter table,
+  .community-bank-letter table,
+  .sonali-bank-letter table,
+  .fr-transfer-letter table {
+    table-layout: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .trust-bank-letter thead,
+  .community-bank-letter thead,
+  .sonali-bank-letter thead,
+  .fr-transfer-letter thead {
+    display: table-row-group !important;
+  }
+  .trust-bank-letter th,
+  .trust-bank-letter td,
+  .community-bank-letter th,
+  .community-bank-letter td,
+  .sonali-bank-letter th,
+  .sonali-bank-letter td,
+  .fr-transfer-letter th,
+  .fr-transfer-letter td {
+    font-size: 6.5px !important;
+    line-height: 1.2 !important;
+    padding: 2px 3px !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    word-wrap: break-word !important;
+    text-align: left !important;
+    vertical-align: top !important;
+  }
+  .trust-bank-letter .text-right,
+  .community-bank-letter .text-right,
+  .sonali-bank-letter .text-right,
+  .fr-transfer-letter .text-right {
+    text-align: right !important;
+  }
+  .month-ledger-print .letter-masthead {
+    margin-bottom: 24px !important;
+  }
+  .tag-bill-print .letter-masthead,
+  .leave-med-bill-print .letter-masthead,
+  .month-register-print .letter-masthead {
+    margin-bottom: 24px !important;
+  }
+  .official-consume-letter .official-consume-page,
+  .official-consume-letter .print-page {
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  .official-consume-letter .official-consume-page:last-child,
+  .official-consume-letter .print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  .tag-bill-print,
+  .leave-med-bill-print,
+  .wing-food-list-print,
+  .wing-summary-print,
+  .month-ledger-print {
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  .official-consume-letter > header,
+  .wing-food-list-print > header,
+  .wing-food-list-print .letter-masthead,
+  .wing-summary-print > header,
+  .mess-reports-letter > header,
+  .transfer-sheet-print header,
+  .member-list-letter > header,
+  .state-report-letter header {
+    margin-bottom: 22px !important;
+  }
+  .month-ledger-print .letter-masthead p {
+    margin: 0 !important;
+    white-space: normal !important;
+    word-spacing: normal !important;
+  }
+  .month-ledger-print .letter-masthead p + p {
+    margin-top: 8px !important;
+  }
+  .wing-food-list-print .wing-food-title {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: #111 !important;
+  }
+  .wing-food-list-print .wing-food-report-title {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #111 !important;
+    margin-top: 6px !important;
+  }
+  .wing-food-list-print .wing-food-hq {
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    color: #9ca3af !important;
+    margin-top: 6px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   .month-ledger-print table:not(.consume-sign-off) {
     table-layout: fixed !important;
     width: 100% !important;
@@ -189,8 +359,9 @@ function letterSheetCss() {
   }
   .month-ledger-print th,
   .month-ledger-print td {
-    padding: 3px 3px !important;
-    font-size: 9px !important;
+    padding: 2px 1px !important;
+    font-size: 8px !important;
+    overflow: hidden !important;
     overflow-wrap: normal !important;
     word-wrap: normal !important;
     word-break: keep-all !important;
@@ -224,13 +395,25 @@ function letterSheetCss() {
   .consume-sign-off .consume-sign-line {
     width: 72% !important;
     max-width: 7.5rem !important;
-    height: 1px !important;
+    height: 0 !important;
     margin: 0 auto 6px !important;
-    background: #111 !important;
+    background: none !important;
+    border: none !important;
+    border-top: 1px solid #111 !important;
   }
   .consume-sign-off .consume-sign-label {
     line-height: 1.25 !important;
     text-align: center !important;
+  }
+  .consume-sign-off td.consume-sign-left,
+  .consume-sign-off .consume-sign-left,
+  .consume-sign-off .consume-sign-left .consume-sign-label,
+  .consume-sign-off .consume-sign-left .consume-sign-label p {
+    text-align: left !important;
+  }
+  .consume-sign-off .consume-sign-left .consume-sign-line {
+    margin-left: 0 !important;
+    margin-right: auto !important;
   }
   .transfer-sheet-print th,
   .transfer-sheet-print td {
@@ -239,6 +422,8 @@ function letterSheetCss() {
   }
   .tag-bill-print th,
   .tag-bill-print td,
+  .leave-med-bill-print th,
+  .leave-med-bill-print td,
   .staff-payout-print th,
   .staff-payout-print td,
   .mess-reports-letter th,
@@ -248,6 +433,13 @@ function letterSheetCss() {
   .wing-summary-print th,
   .wing-summary-print td {
     font-size: 10px !important;
+  }
+  .tag-bill-print th,
+  .tag-bill-print td,
+  .leave-med-bill-print th,
+  .leave-med-bill-print td {
+    text-align: center !important;
+    vertical-align: middle !important;
   }
   .manpower-letter,
   .strength-letter {
@@ -553,7 +745,8 @@ function buildPrintHtml(
   .print-page {
     width: 100%;
     max-width: 100%;
-    min-height: calc(${h} - 16mm);
+    min-height: 0;
+    height: auto;
     box-sizing: border-box;
     padding: 0;
     margin: 0;
@@ -601,17 +794,19 @@ function prepareClone(
     pages.forEach((kid, i) => {
       if (!(kid instanceof HTMLElement)) return;
       kid.classList.add("print-page");
-      const keepFill = keepPrintFill(kid, preserveColors);
-      flattenPrintSurface(kid, !keepFill);
+      flattenPrintSurface(kid, true);
       const last = i === pages.length - 1;
       const allowFlow =
         kid.classList.contains("register-sheet") ||
         Boolean(kid.querySelector("table"));
       kid.style.width = "100%";
       kid.style.maxWidth = "100%";
-      kid.style.minHeight = `calc(${h} - 16mm)`;
+      kid.style.height = "auto";
+      kid.style.minHeight = "0";
       kid.style.boxSizing = "border-box";
-      kid.style.padding = "0";
+      kid.style.padding = kid.matches(BANK_LETTER_SELECTOR) ? "4mm 0" : "0";
+      kid.style.border = "none";
+      kid.style.boxShadow = "none";
       kid.style.pageBreakAfter = last ? "auto" : "always";
       kid.style.breakAfter = last ? "auto" : "page";
       kid.style.pageBreakInside = allowFlow ? "auto" : "avoid";
@@ -629,9 +824,12 @@ function prepareClone(
     flattenPrintSurface(clone, !(preserveColors || skipInlineStyles));
     clone.style.width = "100%";
     clone.style.maxWidth = "100%";
-    clone.style.minHeight = `calc(${h} - 16mm)`;
+    clone.style.height = "auto";
+    clone.style.minHeight = consumePrintRoot(clone) ? "0" : `calc(${h} - 16mm)`;
     clone.style.boxSizing = "border-box";
     clone.style.padding = "0";
+    clone.style.border = "none";
+    clone.style.boxShadow = "none";
   }
 
   return clone;
@@ -642,8 +840,13 @@ const LARGE_LETTER_SELECTOR = [
   ".register-cover",
   ".month-ledger-print",
   ".tag-bill-print",
+  ".leave-med-bill-print",
   ".wing-summary-print",
   ".staff-payout-print",
+  ".trust-bank-letter",
+  ".community-bank-letter",
+  ".sonali-bank-letter",
+  ".fr-transfer-letter",
   ".transfer-sheet-print",
   ".mess-reports-letter",
   ".member-list-letter",
@@ -661,12 +864,208 @@ function shouldSkipInlineStyles(el: HTMLElement, options: PrintLetterOptions) {
   );
 }
 
+function isBankLetterSurface(el: HTMLElement) {
+  return (
+    el.matches(BANK_LETTER_SELECTOR) ||
+    Boolean(el.querySelector(BANK_LETTER_SELECTOR))
+  );
+}
+
+function bankLetterPrintCss() {
+  return `
+  @page { size: A4 landscape; margin: 10mm 8mm; }
+  html { color-scheme: light; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: #000;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
+    word-spacing: normal;
+    letter-spacing: 0;
+    width: 100%;
+  }
+  html, body, body * {
+    font-family: Arial, Helvetica, sans-serif !important;
+    color: #000 !important;
+    word-spacing: normal !important;
+    letter-spacing: 0 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    transform: none !important;
+  }
+  .no-print { display: none !important; }
+  .trust-bank-letter,
+  .community-bank-letter,
+  .sonali-bank-letter,
+  .fr-transfer-letter,
+  .staff-payout-print {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 0 10mm 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+    page-break-after: always;
+    break-after: page;
+  }
+  .trust-bank-letter:last-child,
+  .community-bank-letter:last-child,
+  .sonali-bank-letter:last-child,
+  .fr-transfer-letter:last-child,
+  .staff-payout-print:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  .letter-masthead {
+    display: block !important;
+    text-align: center !important;
+    margin: 0 0 14px 0 !important;
+    padding: 0 !important;
+  }
+  .letter-masthead p {
+    display: block !important;
+    margin: 0 0 2px 0 !important;
+    padding: 0 !important;
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+    white-space: normal !important;
+  }
+  .letter-masthead .font-semibold,
+  .letter-masthead p.font-semibold {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    margin-top: 4px !important;
+  }
+  .justify-end {
+    display: block !important;
+    text-align: right !important;
+    margin: 0 0 10px 0 !important;
+  }
+  p {
+    white-space: normal !important;
+    margin: 0 0 6px 0 !important;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+  }
+  .font-bold, .font-semibold { font-weight: 700 !important; }
+  .underline { text-decoration: underline !important; }
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    margin: 8px 0 10px 0 !important;
+  }
+  thead { display: table-row-group !important; }
+  th, td {
+    border: 1px solid #000 !important;
+    padding: 3px 4px !important;
+    font-size: 7px !important;
+    line-height: 1.25 !important;
+    text-align: left !important;
+    vertical-align: top !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    background: #fff !important;
+  }
+  thead th {
+    background: #f2f2f2 !important;
+    font-weight: 700 !important;
+  }
+  .text-right { text-align: right !important; }
+  `;
+}
+
+async function printBankLetterElement(el: HTMLElement) {
+  const prevMax = el.style.maxHeight;
+  const prevOverflow = el.style.overflow;
+  el.style.maxHeight = "none";
+  el.style.overflow = "visible";
+
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll(".no-print").forEach((node) => node.remove());
+  clone.classList.remove("hidden");
+  clone.style.display = "block";
+  clone.style.width = "100%";
+  clone.style.maxWidth = "100%";
+  clone.style.height = "auto";
+  clone.style.minHeight = "0";
+  clone.style.gap = "12mm";
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<meta name="color-scheme" content="light"/>
+<title>Print</title>
+<style>${bankLetterPrintCss()}</style>
+</head><body></body></html>`;
+
+  const printWin = window.open("", "mess-print", "width=1100,height=800");
+  try {
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(html);
+      printWin.document.close();
+      printWin.document.body.appendChild(
+        printWin.document.importNode(clone, true),
+      );
+      await waitForPaint(printWin);
+      await printAndWait(printWin);
+      try {
+        printWin.close();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    Object.assign(iframe.style, {
+      position: "fixed",
+      left: "0",
+      top: "0",
+      width: "297mm",
+      height: "210mm",
+      border: "0",
+      opacity: "0",
+      pointerEvents: "none",
+      zIndex: "-1",
+    });
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
+    if (!doc || !win) throw new Error("Print frame unavailable");
+    doc.open();
+    doc.write(html);
+    doc.close();
+    doc.body.appendChild(doc.importNode(clone, true));
+    await waitForPaint(win);
+    await printAndWait(win);
+    iframe.remove();
+  } finally {
+    el.style.maxHeight = prevMax;
+    el.style.overflow = prevOverflow;
+  }
+}
+
 export async function printLetterElement(
   el: HTMLElement,
   _filename = "letter.pdf",
   orientation: "portrait" | "landscape" = "landscape",
   options: PrintLetterOptions = {},
 ) {
+  if (isBankLetterSurface(el)) {
+    await printBankLetterElement(el);
+    return;
+  }
+
   const preserveColors = options.preserveColors !== false;
   const skipInlineStyles = shouldSkipInlineStyles(el, options);
   const prevMax = el.style.maxHeight;

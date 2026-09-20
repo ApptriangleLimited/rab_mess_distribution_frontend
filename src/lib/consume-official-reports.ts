@@ -2,8 +2,9 @@ import {
   ADMIN_SUB_WINGS,
   CONSUME_REPORT_META,
   HQ_SUB_WINGS,
+  wingOfficialName,
 } from "@/lib/constants";
-import { formatMonthDash } from "@/lib/date";
+import { countedDaysInMonth, formatMonthDash } from "@/lib/date";
 import { buildConsumeMonth } from "@/lib/reports";
 import { compareUsers } from "@/lib/store/users";
 import type { DailyTag, MemberType, User } from "@/lib/types";
@@ -23,6 +24,8 @@ export type OfficialConsumeRow = {
   label: string;
   pageNo: string;
   manpower: number;
+  /** Calendar days in the report month through today (e.g. 20 on 20 Sep). */
+  days?: number;
   tagDays: Partial<Record<DailyTag, number>>;
   totalDays: number;
 };
@@ -76,22 +79,57 @@ export function fromBnDigits(value: string) {
   return value.replace(/[০-৯]/g, (d) => String("০১২৩৪৫৬৭৮৯".indexOf(d)));
 }
 
-/** সাক্ষী column — leave besides CL / PL (not WR; WR is রেশন বিহীন). */
-const LEAVE_TAGS: DailyTag[] = ["RL", "JL", "OSL", "AWL", "MOL"];
-const HOSPITAL_TAGS: DailyTag[] = ["MED", "CMH", "RBH"];
-
-export function officialLeaveDays(tagDays: Partial<Record<DailyTag, number>>) {
-  return sumTags(tagDays, LEAVE_TAGS);
+export function officialMsDays(tagDays: Partial<Record<DailyTag, number>>) {
+  return tagDays.MS ?? 0;
 }
 
-export function officialHospitalDays(
-  tagDays: Partial<Record<DailyTag, number>>,
-) {
-  return sumTags(tagDays, HOSPITAL_TAGS);
+/** Consume ledger FR column — FR + MFR from Daily RR. */
+export function officialFrDays(tagDays: Partial<Record<DailyTag, number>>) {
+  return (tagDays.FR ?? 0) + (tagDays.MFR ?? 0);
+}
+
+export function officialWitDays(tagDays: Partial<Record<DailyTag, number>>) {
+  return tagDays.WIT ?? 0;
+}
+
+export function officialMedDays(tagDays: Partial<Record<DailyTag, number>>) {
+  return tagDays.MED ?? 0;
 }
 
 export function officialBghDays(tagDays: Partial<Record<DailyTag, number>>) {
   return tagDays.BGH ?? 0;
+}
+
+export function officialWrDays(tagDays: Partial<Record<DailyTag, number>>) {
+  return tagDays.WR ?? 0;
+}
+
+/** Visible monthly-consume columns from Daily RR / consume ledger. */
+export function officialConsumeTotal(tagDays: Partial<Record<DailyTag, number>>) {
+  return (
+    officialMsDays(tagDays) +
+    officialFrDays(tagDays) +
+    (tagDays.CL ?? 0) +
+    (tagDays.PL ?? 0) +
+    (tagDays.CD ?? 0) +
+    (tagDays.TRG ?? 0) +
+    officialWitDays(tagDays) +
+    officialMedDays(tagDays) +
+    officialBghDays(tagDays) +
+    officialWrDays(tagDays)
+  );
+}
+
+/** @deprecated Use officialWitDays — kept for older leave sheets. */
+export function officialLeaveDays(tagDays: Partial<Record<DailyTag, number>>) {
+  return officialWitDays(tagDays);
+}
+
+/** @deprecated Use officialMedDays. */
+export function officialHospitalDays(
+  tagDays: Partial<Record<DailyTag, number>>,
+) {
+  return officialMedDays(tagDays);
 }
 
 function sumTags(
@@ -112,7 +150,7 @@ function addTagDays(
 }
 
 function totalOf(tagDays: Partial<Record<DailyTag, number>>) {
-  return Object.values(tagDays).reduce<number>((s, n) => s + (n ?? 0), 0);
+  return officialConsumeTotal(tagDays);
 }
 
 const IEC_WINGS = new Set(["security branch - iec cell"]);
@@ -155,18 +193,18 @@ const WING_ALIASES: Record<string, string[]> = {
 };
 
 const WING_DEFS: { id: string; label: string }[] = [
-  { id: "admin", label: "প্রশাসন ও অর্থ উইং" },
-  { id: "ops", label: "অপস উইং" },
-  { id: "int", label: "ইন্টেলিজেন্স উইং" },
-  { id: "inv", label: "তদন্ত উইং" },
-  { id: "trg", label: "ট্রেনিং উইং" },
-  { id: "iec", label: "আইইসি সেল" },
-  { id: "lm", label: "লিগ্যাল এন্ড মিডিয়া উইং" },
-  { id: "comm", label: "যোগাযোগ উইং" },
-  { id: "rd", label: "আরএন্ডডি সেল" },
-  { id: "air", label: "এয়ার উইং" },
-  { id: "new", label: "নতুন সদস্য" },
-  { id: "attached", label: "সংযুক্ত সদস্য" },
+  { id: "admin", label: "Admin & Finance Wing" },
+  { id: "ops", label: "Operations Wing" },
+  { id: "int", label: "Intelligence Wing" },
+  { id: "inv", label: "Investigation & Forensic Wing" },
+  { id: "trg", label: "Training & Orientation Wing" },
+  { id: "iec", label: "IEC Cell" },
+  { id: "lm", label: "Legal & Media Wing" },
+  { id: "comm", label: "Communication & MIS Wing" },
+  { id: "rd", label: "Research & Development Cell" },
+  { id: "air", label: "Air Wing" },
+  { id: "new", label: "New members" },
+  { id: "attached", label: "Attached members" },
 ];
 
 const WING_LOOKUP = new Map<string, string>();
@@ -222,7 +260,7 @@ function rowFromBucket(
   };
 }
 
-function totalsRow(rows: OfficialConsumeRow[], label = "মোট ="): OfficialConsumeRow {
+function totalsRow(rows: OfficialConsumeRow[], label = "Total"): OfficialConsumeRow {
   const tagDays: Partial<Record<DailyTag, number>> = {};
   let manpower = 0;
   let totalDays = 0;
@@ -284,12 +322,21 @@ function registerPages(memberCount: number) {
 }
 
 export function pageRangeBn(pages: number) {
+  return pageRangeEn(pages);
+}
+
+export function pageRangeEn(pages: number) {
   if (!pages) return "-";
-  return `1 হতে ${pages}`;
+  if (pages === 1) return "1";
+  return `1 to ${pages}`;
 }
 
 function orgLine() {
-  return `${CONSUME_REPORT_META.orgNameBn}, ${CONSUME_REPORT_META.stationBn}`;
+  return `${CONSUME_REPORT_META.orgName}, ${CONSUME_REPORT_META.station}`;
+}
+
+function monthLabelEn(month: string) {
+  return formatMonthDash(month);
 }
 
 export function buildOfficialWingConsume(month: string): OfficialConsumeReport {
@@ -300,13 +347,13 @@ export function buildOfficialWingConsume(month: string): OfficialConsumeReport {
       def,
       i + 1,
       buckets.get(def.id) ?? emptyBucket(),
-      pageRangeBn(registerPages(byWing.get(def.id)?.length ?? 0)),
+      pageRangeEn(registerPages(byWing.get(def.id)?.length ?? 0)),
     ),
   );
   return {
     month,
     monthLabelBn: officialMonthLabelBn(month),
-    title: `সকল উইং এর অনুযায়ী কনজিউম হিসাবের সারাংশ ${officialMonthLabelBn(month)}`,
+    title: `Consume summary by wing — ${monthLabelEn(month)}`,
     rows,
     totals: totalsRow(rows),
   };
@@ -317,13 +364,13 @@ export function buildOfficialCampConsume(month: string): OfficialConsumeReport {
   const hq = wings.rows.filter((r) => r.id === "admin");
   const ashkona = wings.rows.filter((r) => r.id !== "admin");
   const rows: OfficialConsumeRow[] = [
-    { ...totalsRow(hq, "এসআরবি সদর ক্যাম্প"), id: "hq", sl: 1, pageNo: "" },
-    { ...totalsRow(ashkona, "আশকোনা ক্যাম্প"), id: "ashkona", sl: 2, pageNo: "" },
+    { ...totalsRow(hq, "SRB HQ Camp"), id: "hq", sl: 1, pageNo: "" },
+    { ...totalsRow(ashkona, "Ashkona Camp"), id: "ashkona", sl: 2, pageNo: "" },
   ];
   return {
     month,
     monthLabelBn: officialMonthLabelBn(month),
-    title: `মাসিক কনজিউম সারাংশ ${officialMonthLabelBn(month)}`,
+    title: `Monthly consume summary — ${monthLabelEn(month)}`,
     rows,
     totals: { ...totalsRow(rows), sl: 3, pageNo: "" },
   };
@@ -333,7 +380,7 @@ export function buildOfficialFrBill(month: string): OfficialConsumeReport {
   const wings = buildOfficialWingConsume(month);
   return {
     ...wings,
-    title: `সকল উইং এর এফআর বিলের সারাংশ ${officialMonthLabelBn(month)}`,
+    title: `FR bill summary by wing — ${monthLabelEn(month)}`,
   };
 }
 
@@ -341,7 +388,7 @@ export function buildOfficialCdBill(month: string): OfficialConsumeReport {
   const wings = buildOfficialWingConsume(month);
   return {
     ...wings,
-    title: `সকল উইং এর সিডি বিলের সারাংশ ${officialMonthLabelBn(month)}`,
+    title: `CD bill summary by wing — ${monthLabelEn(month)}`,
   };
 }
 
@@ -349,7 +396,7 @@ export function buildOfficialLeaveBill(month: string): OfficialConsumeReport {
   const wings = buildOfficialWingConsume(month);
   return {
     ...wings,
-    title: `সকল উইং এর সিএল, পিএল, ট্রেনিং, সাক্ষী ও হাসপাতাল ও বিজিএইচ বিলের সারাংশ ${officialMonthLabelBn(month)}`,
+    title: `CL, PL, Training, WT, MED and BGH bill summary by wing — ${monthLabelEn(month)}`,
   };
 }
 
@@ -368,14 +415,14 @@ export function officialLeaveTotal(tagDays: Partial<Record<DailyTag, number>>) {
     (tagDays.CL ?? 0) +
     (tagDays.PL ?? 0) +
     (tagDays.TRG ?? 0) +
-    officialLeaveDays(tagDays) +
-    officialHospitalDays(tagDays) +
+    officialWitDays(tagDays) +
+    officialMedDays(tagDays) +
     officialBghDays(tagDays)
   );
 }
 
-function pageLabel(n: number) {
-  return `পাতা নং-${n}`;
+function pageLabel(n: number, english = false) {
+  return english ? String(n) : `পাতা নং-${n}`;
 }
 
 export function officialWingIdForName(wing: string) {
@@ -384,41 +431,67 @@ export function officialWingIdForName(wing: string) {
   return WING_LOOKUP.get(key) ?? "admin";
 }
 
+function settingsWingTitle(
+  wing: string,
+  overrides?: Record<string, string>,
+) {
+  const named = wingOfficialName(wing, overrides);
+  if (named && named.toLowerCase() !== wing.toLowerCase()) return named;
+  const match = Object.keys(overrides ?? {}).find(
+    (k) => k.toLowerCase() === wing.trim().toLowerCase(),
+  );
+  return match ? wingOfficialName(match, overrides) : named || wing;
+}
+
 /** Page-wise food list for one consume wing filter (paper Admin Wing sheet). */
 export function buildWingFoodList(
   month: string,
   wingName: string,
+  labelOverrides?: Record<string, string>,
 ): OfficialConsumeTable {
   const consume = buildConsumeMonth(month);
   const members = consume.rows
     .filter((row) => row.user.wing === wingName)
     .sort((a, b) => compareUsers(a.user, b.user));
+  const monthDays = countedDaysInMonth(month);
   const rows = members.length
-    ? wingPageRows(norm(wingName).replace(/\s+/g, "-") || "wing", members)
+    ? wingPageRows(norm(wingName).replace(/\s+/g, "-") || "wing", members, {
+        monthDays,
+        english: true,
+      })
     : [];
-  const monthLabelBn = officialMonthLabelBn(month);
+  const monthLabel = formatMonthDash(month);
   return consumeTable(
-    wingName,
+    settingsWingTitle(wingName, labelOverrides),
     [
-      `${monthLabelBn} মাসের ফোর্সেস মেসের খাদ্য ভোগের তালিকা`,
-      CONSUME_REPORT_META.campBn,
+      `Forces Mess food consumption list — ${monthLabel}`,
+      `${CONSUME_REPORT_META.orgName}, ${CONSUME_REPORT_META.station}`,
     ],
     rows,
-    { kind: "consume-pages", showPageNo: false, remarks: false },
+    {
+      kind: "consume-pages",
+      showPageNo: false,
+      remarks: false,
+      totals: { ...totalsRow(rows, "Total"), days: monthDays },
+    },
   );
 }
 
 function wingPageRows(
   wingId: string,
   members: ReturnType<typeof buildConsumeMonth>["rows"],
+  extras?: { monthDays?: number; english?: boolean },
 ): OfficialConsumeRow[] {
+  const english = extras?.english ?? false;
+  const monthDays = extras?.monthDays;
   if (!members.length) {
     return Array.from({ length: EMPTY_TEMPLATE_PAGES }, (_, i) => ({
       id: `${wingId}-p${i + 1}`,
       sl: i + 1,
-      label: pageLabel(i + 1),
+      label: pageLabel(i + 1, english),
       pageNo: "",
       manpower: 0,
+      days: monthDays,
       tagDays: {},
       totalDays: 0,
     }));
@@ -435,9 +508,10 @@ function wingPageRows(
     rows.push({
       id: `${wingId}-p${i + 1}`,
       sl: i + 1,
-      label: pageLabel(i + 1),
-      pageNo: "",
+      label: pageLabel(i + 1, english),
+      pageNo: String(i + 1),
       manpower: chunk.length,
+      days: monthDays,
       tagDays,
       totalDays: totalOf(tagDays),
     });
@@ -464,25 +538,21 @@ function consumeTable(
   };
 }
 
-function pairPages(
+function oneTablePages(
   prefix: string,
   tables: OfficialConsumeTable[],
 ): OfficialConsumePage[] {
-  const pages: OfficialConsumePage[] = [];
-  for (let i = 0; i < tables.length; i += 2) {
-    pages.push({
-      id: `${prefix}-${i / 2 + 1}`,
-      tables: tables.slice(i, i + 2),
-    });
-  }
-  return pages;
+  return tables.map((table, i) => ({
+    id: `${prefix}-${i + 1}`,
+    tables: [table],
+  }));
 }
 
 function wingCampLine(wingId: string) {
   if (wingId === "admin") {
-    return "এসআরবি সদর ক্যাম্প, স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর";
+    return `SRB HQ Camp, ${CONSUME_REPORT_META.orgName}`;
   }
-  return "আশকোনা ক্যাম্প, স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর";
+  return `Ashkona Camp, ${CONSUME_REPORT_META.orgName}`;
 }
 
 export function buildOfficialConsumePack(
@@ -490,19 +560,19 @@ export function buildOfficialConsumePack(
   sheet: ConsumeOfficialSheet,
 ): OfficialConsumePack {
   const monthLabelBn = officialMonthLabelBn(month);
+  const monthLabel = monthLabelEn(month);
   const org = orgLine();
   const wings = buildOfficialWingConsume(month);
   const byWing = membersByWing(month);
 
   if (sheet === "fr" || sheet === "cd") {
-    const tag = sheet === "fr" ? "FR" : "CD";
-    const tagLabel = sheet === "fr" ? "সর্বমোট এফআর" : "সর্বমোট সিডি";
-    const word = sheet === "fr" ? "এফআর" : "সিডি";
+    const tagLabel = sheet === "fr" ? "Total FR" : "Total CD";
+    const word = sheet === "fr" ? "FR" : "CD";
     const summary = sheet === "fr" ? buildOfficialFrBill(month) : buildOfficialCdBill(month);
     const perWing = WING_DEFS.map((def) => {
       const row = wings.rows.find((r) => r.id === def.id) ?? rowFromBucket(def, 1, emptyBucket());
       return consumeTable(
-        `উইং অনুযায়ী ${word} বিলের সারাংশ ${monthLabelBn}`,
+        `${word} bill — ${def.label} — ${monthLabel}`,
         [org],
         [{ ...row, sl: 1 }],
         {
@@ -510,7 +580,7 @@ export function buildOfficialConsumePack(
           showPageNo: true,
           remarks: true,
           tagLabel,
-          totals: { ...row, id: "total", sl: 0, label: "মোট =", pageNo: "" },
+          totals: { ...row, id: "total", sl: 0, label: "Total", pageNo: "" },
         },
       );
     });
@@ -528,11 +598,11 @@ export function buildOfficialConsumePack(
               showPageNo: true,
               remarks: true,
               tagLabel,
-              totals: { ...summary.totals, label: "মোট =" },
+              totals: { ...summary.totals, label: "Total" },
             }),
           ],
         },
-        ...pairPages(sheet, perWing),
+        ...oneTablePages(sheet, perWing),
       ],
     };
   }
@@ -542,7 +612,7 @@ export function buildOfficialConsumePack(
     const perWing = WING_DEFS.map((def) => {
       const row = wings.rows.find((r) => r.id === def.id) ?? rowFromBucket(def, 1, emptyBucket());
       return consumeTable(
-        `উইং অনুযায়ী সিএল, পিএল, ট্রেনিং, সাক্ষী ও হাসপাতাল ও বিজিএইচ বিলের সারাংশ ${monthLabelBn}`,
+        `CL, PL, Training, WT, MED and BGH bill — ${def.label} — ${monthLabel}`,
         [org],
         [{ ...row, sl: 1 }],
         {
@@ -550,7 +620,7 @@ export function buildOfficialConsumePack(
           showPageNo: true,
           showManpower: true,
           remarks: true,
-          totals: { ...row, id: "total", sl: 0, label: "মোট =", pageNo: "" },
+          totals: { ...row, id: "total", sl: 0, label: "Total", pageNo: "" },
         },
       );
     });
@@ -568,11 +638,11 @@ export function buildOfficialConsumePack(
               showPageNo: true,
               showManpower: false,
               remarks: true,
-              totals: { ...summary.totals, label: "সর্বমোট =" },
+              totals: { ...summary.totals, label: "Total" },
             }),
           ],
         },
-        ...pairPages("leave", perWing),
+        ...oneTablePages("leave", perWing),
       ],
     };
   }
@@ -591,7 +661,7 @@ export function buildOfficialConsumePack(
         consumeTable(wings.title, [org], wings.rows, {
           showPageNo: true,
           remarks: false,
-          totals: { ...wings.totals, label: "মোট =" },
+          totals: { ...wings.totals, label: "Total" },
         }),
       ],
     },
@@ -601,14 +671,14 @@ export function buildOfficialConsumePack(
         consumeTable(camp.title, [org], camp.rows, {
           showPageNo: false,
           remarks: true,
-          totals: { ...camp.totals, label: "মোট =" },
+          totals: { ...camp.totals, label: "Total" },
         }),
       ],
     },
     {
       id: "monthly-hq",
       tables: [
-        consumeTable(`উইং অনুযায়ী কনজিউম হিসাব ${monthLabelBn}`, [org, "এসআরবি সদর দপ্তর ক্যাম্প"], hqRows, {
+        consumeTable(`Consume account by wing — ${monthLabel}`, [org, "SRB HQ Camp"], hqRows, {
           showPageNo: false,
           remarks: true,
         }),
@@ -618,23 +688,30 @@ export function buildOfficialConsumePack(
       id: "monthly-ashkona",
       tables: [
         consumeTable(
-          `উইং অনুযায়ী কনজিউম হিসাব ${monthLabelBn}`,
-          [org, "আশকোনা ক্যাম্প"],
+          `Consume account by wing — ${monthLabel}`,
+          [org, "Ashkona Camp"],
           ashkona.map((row, i) => ({ ...row, sl: i + 1, pageNo: "" })),
           { showPageNo: false, remarks: true },
         ),
       ],
     },
     ...WING_DEFS.map((def) => {
-      const rows = wingPageRows(def.id, byWing.get(def.id) ?? []);
+      const rows = wingPageRows(def.id, byWing.get(def.id) ?? [], {
+        english: true,
+      });
       return {
         id: `monthly-pages-${def.id}`,
         tables: [
           consumeTable(
-            `উইং অনুযায়ী কনজিউম হিসাব ${monthLabelBn} (${def.label})`,
+            `Consume account by wing — ${monthLabel} (${def.label})`,
             [wingCampLine(def.id)],
             rows,
-            { kind: "consume-pages", showPageNo: false, remarks: true },
+            {
+              kind: "consume-pages",
+              showPageNo: false,
+              remarks: true,
+              totals: { ...totalsRow(rows), label: "Total" },
+            },
           ),
         ],
       };

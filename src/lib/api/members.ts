@@ -140,6 +140,29 @@ export function memberToUser(row: MemberApiRow): User {
   };
 }
 
+/** Every approved member, paging past the first 500. Default: active only. */
+export async function listAllApprovedMembers(opts?: { status?: string }) {
+  const pageSize = 500;
+  const query = {
+    approval: "approved" as const,
+    status: opts?.status ?? "1",
+    page_size: pageSize,
+  };
+  const first = await listMembers({ ...query, page: 1 });
+  const items = [...(first.items ?? [])];
+  const total = first.total ?? items.length;
+  const pages = Math.min(50, Math.ceil(total / pageSize) || 1);
+  if (pages <= 1) return items;
+
+  const rest = await Promise.all(
+    Array.from({ length: pages - 1 }, (_, i) =>
+      listMembers({ ...query, page: i + 2 }),
+    ),
+  );
+  for (const data of rest) items.push(...(data.items ?? []));
+  return items;
+}
+
 export function listMembers(params: MemberListParams = {}) {
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

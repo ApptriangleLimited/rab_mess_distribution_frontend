@@ -48,7 +48,7 @@ export const MessReportsLetter = forwardRef<HTMLDivElement, Props>(
 
     return (
       <div ref={ref} className={cn("mess-reports-letter hidden text-black")}>
-        <header className="mb-3 text-center">
+        <header className="mb-8 text-center">
           <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgNameBn}</p>
           <p className="text-xs">{CONSUME_REPORT_META.stationBn}</p>
           <p className="mt-2 text-base font-bold">

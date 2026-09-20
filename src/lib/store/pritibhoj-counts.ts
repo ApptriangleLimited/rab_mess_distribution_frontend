@@ -1,5 +1,8 @@
+import { canonicalWingName } from "@/lib/constants";
 import {
   finalizePritibhojRow,
+  isPritibhojAdminMainRow,
+  pritibhojAdminLookupWings,
   pritibhojLookupWings,
   pritibhojWingDef,
 } from "@/lib/pritibhoj-demo";
@@ -81,8 +84,15 @@ function matchesPritibhojWing(user: User, date: string, sheetWing: string, ctx: 
   if (def?.tag) {
     return projectedCockpitTag(user, date, ctx) === def.tag;
   }
-  const keys = new Set(pritibhojLookupWings(sheetWing));
-  return keys.has(user.wing);
+  const keys = new Set<string>();
+  const labels = isPritibhojAdminMainRow(sheetWing)
+    ? pritibhojAdminLookupWings()
+    : pritibhojLookupWings(sheetWing);
+  for (const raw of labels) {
+    keys.add(raw);
+    keys.add(canonicalWingName(raw));
+  }
+  return keys.has(user.wing) || keys.has(canonicalWingName(user.wing));
 }
 
 export function pritibhojWingCounts(

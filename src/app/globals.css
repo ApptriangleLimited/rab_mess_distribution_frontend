@@ -157,6 +157,8 @@ body {
     break-inside: avoid;
   }
   .tag-bill-print,
+  .leave-med-bill-print,
+  .wing-food-list-print,
   .wing-summary-print,
   .month-ledger-print {
     display: block !important;
@@ -216,5 +218,53 @@ body {
   .consume-sign-off td {
     border: none !important;
     background: transparent !important;
+  }
+  .consume-sign-off .consume-sign-line {
+    height: 0 !important;
+    background: none !important;
+    border: none !important;
+    border-top: 1px solid #111 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .official-consume-letter .official-consume-page {
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: auto;
+  }
+  .official-consume-letter .official-consume-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  .official-consume-letter .letter-masthead p + p,
+  .wing-food-list-print .wing-food-hq {
+    color: #9ca3af !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .trust-bank-letter,
+  .community-bank-letter,
+  .sonali-bank-letter,
+  .fr-transfer-letter,
+  .trust-bank-letter *,
+  .community-bank-letter *,
+  .sonali-bank-letter *,
+  .fr-transfer-letter * {
+    font-family: Arial, Helvetica, sans-serif !important;
+    color: #000 !important;
+    word-spacing: normal !important;
+    letter-spacing: 0 !important;
+  }
+  .trust-bank-letter .letter-masthead,
+  .community-bank-letter .letter-masthead,
+  .sonali-bank-letter .letter-masthead,
+  .fr-transfer-letter .letter-masthead {
+    display: block !important;
+    text-align: center !important;
   }
 }

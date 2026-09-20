@@ -213,8 +213,9 @@ export function UserTable({
     <div className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-[0_1px_2px_rgba(6,121,87,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)] dark:border-neutral-700 dark:bg-neutral-950 dark:shadow-none">
       {/* Mobile cards */}
       <ul className="divide-y divide-neutral-100 dark:divide-neutral-800 md:hidden">
-        {pageItems.map((user) => {
+        {pageItems.map((user, index) => {
           const href = detailHref(user.id);
+          const sl = from + index;
           return (
             <li key={user.id} className="px-4 py-3.5">
               <button
@@ -222,6 +223,9 @@ export function UserTable({
                 onClick={() => openRow(user.id)}
                 className="flex w-full items-start gap-3 text-left transition hover:opacity-90 focus-visible:outline-none"
               >
+                <span className="w-6 shrink-0 pt-1 text-center text-xs font-semibold tabular-nums text-neutral-500">
+                  {sl}
+                </span>
                 <UserAvatar
                   name={user.name}
                   muted={user.status !== "1"}
@@ -294,6 +298,9 @@ export function UserTable({
         <table className="min-w-full text-left text-sm">
           <thead className="sticky top-0 z-[1] bg-gradient-to-r from-primary/[0.09] via-sky-50/80 to-teal-50/70 text-[11px] uppercase tracking-[0.12em] text-neutral-600 dark:from-primary/15 dark:via-neutral-900 dark:to-neutral-900 dark:text-neutral-400">
             <tr>
+              <th className="w-12 px-3 py-3.5 font-semibold">
+                {t("cc.fields.sl")}
+              </th>
               <th className="px-4 py-3.5 font-semibold">
                 {t("cc.fields.rabId")}
               </th>
@@ -338,6 +345,7 @@ export function UserTable({
           <tbody>
             {pageItems.map((user, index) => {
               const href = detailHref(user.id);
+              const sl = from + index;
               return (
                 <tr
                   key={user.id}
@@ -356,6 +364,9 @@ export function UserTable({
                     "hover:bg-primary/[0.05] focus-visible:bg-primary/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 dark:hover:bg-primary/[0.1]",
                   )}
                 >
+                  <td className="px-3 py-3 text-center text-xs font-semibold tabular-nums text-neutral-600 dark:text-neutral-400">
+                    {sl}
+                  </td>
                   <td className="px-4 py-3">
                     <span className="rounded-md bg-neutral-100/90 px-1.5 py-0.5 font-mono text-[11px] font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                       {user.rab_id}

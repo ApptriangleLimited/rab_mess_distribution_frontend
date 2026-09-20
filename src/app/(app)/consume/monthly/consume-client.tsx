@@ -236,9 +236,8 @@ export default function ConsumeMonthlyClient() {
 
           <div className="p-4 sm:p-5">
             {loading ? (
-              <p className="mb-3 text-sm text-neutral-500">{t("common.loading")}</p>
-            ) : null}
-            {filter === "leave-med" ? (
+              <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+            ) : filter === "leave-med" ? (
               <LeaveMedBillPanel
                 key={`${month}-leave-med`}
                 month={month}

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { IconPrinter } from "@tabler/icons-react";
+import { IconFileAnalytics, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
@@ -15,14 +15,17 @@ import {
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
 import { WingSummaryButton } from "@/components/consume/wing-summary-button";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
+import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
 import { Button } from "@/components/ui/button";
 import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
 import { useReportSource } from "@/hooks/use-report-source";
+import { useSession } from "@/hooks/use-session";
 import { useStore } from "@/hooks/use-store";
 
+import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
 import { monthDateBounds } from "@/lib/date";
 import { buildRangeLedger, withReportSource } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
@@ -35,12 +38,16 @@ function defaultRange() {
 export default function ConsumeLedgerClient() {
   const t = useT();
   const state = useStore();
+  const { session } = useSession();
   const reduceMotion = useReducedMotion();
   const initial = defaultRange();
+  const canGenerateReport =
+    session?.role === "ration" || session?.role === "admin";
 
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
+  const [reportOpen, setReportOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
 
@@ -70,7 +77,7 @@ export default function ConsumeLedgerClient() {
 
   const ledger = useMemo(() => {
     const range = withReportSource(source, () =>
-      buildRangeLedger(rangeBounds.from, rangeBounds.to, undefined, {
+      buildRangeLedger(rangeBounds.from, rangeBounds.to, CONSUME_LEDGER_TAGS, {
         carry: true,
       }),
     );
@@ -153,6 +160,14 @@ export default function ConsumeLedgerClient() {
           center={<ConsumePanelTabs />}
         />
 
+        {canGenerateReport ? (
+          <GenerateReportDialog
+            open={reportOpen}
+            defaultMonth={month}
+            onClose={() => setReportOpen(false)}
+          />
+        ) : null}
+
         <SearchFilterBar
           flat
           search={q}
@@ -165,7 +180,23 @@ export default function ConsumeLedgerClient() {
               accent
             />
           }
-          trailing={printBtn}
+          trailing={
+            <div className="flex shrink-0 items-center gap-2">
+              {printBtn}
+              {canGenerateReport ? (
+                <Button
+                  type="button"
+                  variant="cta"
+                  size="sm"
+                  className="h-10 shrink-0 rounded-xl px-3"
+                  onClick={() => setReportOpen(true)}
+                >
+                  <IconFileAnalytics className="h-4 w-4" />
+                  {t("ration.openReport")}
+                </Button>
+              ) : null}
+            </div>
+          }
         >
           <DateRangePicker
             from={dateFrom}

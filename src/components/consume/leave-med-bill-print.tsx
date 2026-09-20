@@ -1,12 +1,13 @@
 "use client";
 
 import { forwardRef } from "react";
-import { CONSUME_REPORT_META } from "@/lib/constants";
+import { ConsumeReportMasthead } from "@/components/consume/consume-report-masthead";
 import { formatMonthDash } from "@/lib/date";
 import { formatBdtAmount } from "@/lib/money";
 import type { LeaveMedBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
+import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -46,6 +47,7 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
     },
     ref,
   ) {
+    const t = useT();
     const monthLabel = formatMonthDash(month);
 
     return (
@@ -58,25 +60,17 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
             : "hidden print:block",
         )}
       >
-        <header className="mb-3 text-center">
-          <p className="text-[10px]">{CONSUME_REPORT_META.formNo}</p>
-          <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgName}</p>
-          <p className="text-[11px]">
-            {CONSUME_REPORT_META.orgName} Camp, {CONSUME_REPORT_META.station}
-          </p>
-          <p className="mt-2 text-sm font-bold">
-            Fresh money bill — {monthLabel} (CL, PL, Training, Witness, Doctor
-            and BGH bill)
-          </p>
-        </header>
+        <ConsumeReportMasthead
+          title={t("consume.leaveMedBillTitle", { month: monthLabel })}
+        />
 
-        <table className="w-full border-collapse text-[10px] text-black">
+        <table className="w-full border-collapse text-center text-[10px] text-black">
           <thead>
             <tr className="border border-black bg-neutral-100">
               <th className="border border-black px-1 py-1">Sl</th>
               <th className="border border-black px-1 py-1">No</th>
               <th className="border border-black px-1 py-1">Rank</th>
-              <th className="border border-black px-1 py-1 text-left">Name</th>
+              <th className="border border-black px-1 py-1">Name</th>
               {tags.map((code) => (
                 <th key={code} className="border border-black px-1 py-1">
                   {code}
@@ -92,28 +86,28 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
           <tbody>
             {rows.map((row) => (
               <tr key={row.user.id}>
-                <td className="border border-black px-1 py-0.5 text-center tabular-nums">
+                <td className="border border-black px-1 py-0.5 tabular-nums">
                   {row.sl}
                 </td>
                 <td className="border border-black px-1 py-0.5 font-mono">
                   {row.user.personal_id || "—"}
                 </td>
                 <td className="border border-black px-1 py-0.5">{row.user.rank}</td>
-                <td className="border border-black px-1 py-0.5 text-left">
+                <td className="border border-black px-1 py-0.5">
                   {row.user.name}
                 </td>
                 {tags.map((code) => (
                   <td
                     key={code}
-                    className="border border-black px-1 py-0.5 text-center tabular-nums"
+                    className="border border-black px-1 py-0.5 tabular-nums"
                   >
                     {cell(row.tagDays[code] ?? 0)}
                   </td>
                 ))}
-                <td className="border border-black px-1 py-0.5 text-center tabular-nums">
+                <td className="border border-black px-1 py-0.5 tabular-nums">
                   {cell(row.totalDays)}
                 </td>
-                <td className="border border-black px-1 py-0.5 text-right tabular-nums">
+                <td className="border border-black px-1 py-0.5 tabular-nums">
                   {formatBdtAmount(row.amount)}
                 </td>
                 <td className="border border-black px-1 py-0.5">{row.remarks}</td>
@@ -124,22 +118,22 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
             <tr className="border border-black font-semibold">
               <td
                 colSpan={4}
-                className="border border-black px-1 py-1 text-right"
+                className="border border-black px-1 py-1 text-center"
               >
                 Total
               </td>
               {tags.map((code) => (
                 <td
                   key={code}
-                  className="border border-black px-1 py-1 text-center tabular-nums"
+                  className="border border-black px-1 py-1 tabular-nums"
                 >
                   {cell(tagTotals[code] ?? 0)}
                 </td>
               ))}
-              <td className="border border-black px-1 py-1 text-center tabular-nums">
+              <td className="border border-black px-1 py-1 tabular-nums">
                 {cell(totalDays)}
               </td>
-              <td className="border border-black px-1 py-1 text-right tabular-nums">
+              <td className="border border-black px-1 py-1 tabular-nums">
                 {formatBdtAmount(totalAmount)}
               </td>
               <td className="border border-black px-1 py-1" />

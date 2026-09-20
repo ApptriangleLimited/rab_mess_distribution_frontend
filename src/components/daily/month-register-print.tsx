@@ -73,7 +73,7 @@ export const MonthRegisterPrint = forwardRef<HTMLDivElement, Props>(
           key={block.key}
           className="register-sheet mb-6 box-border min-h-[210mm] w-[297mm] bg-white p-4 print:mb-0 print:w-full print:p-0 last:mb-0"
         >
-        <div className="letter-masthead mb-3 text-center">
+        <div className="letter-masthead mb-8 text-center">
           <p className="text-sm font-bold">{block.label}</p>
           <p className="mt-0.5 text-[11px] font-semibold">
             SRB Forces Headquarters

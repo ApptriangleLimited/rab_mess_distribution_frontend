@@ -38,7 +38,7 @@ export const WingSummaryPrint = forwardRef<HTMLDivElement, Props>(
           : "hidden print:block",
       )}
     >
-      <header className="mb-4 text-center text-black">
+      <header className="mb-8 text-center text-black">
         <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgNameBn}</p>
         <p className="text-xs">{CONSUME_REPORT_META.stationBn}</p>
         <p className="mt-2 text-base font-bold">

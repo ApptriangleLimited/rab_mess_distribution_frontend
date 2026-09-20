@@ -44,10 +44,12 @@ const REPORT_REQUESTS_TAB: Tab = {
 const BASE_TABS: Tab[] = [
   {
     href: "/ration/monthly",
-    labelKey: "nav.rationDashboard",
+    labelKey: "nav.consumeLedger",
     icon: IconTags,
     match: (path) =>
-      path.startsWith("/ration/monthly") || path.startsWith("/ration/report"),
+      path.startsWith("/ration/monthly") ||
+      path.startsWith("/ration/report") ||
+      path.startsWith("/consume/monthly/ledger"),
   },
   {
     href: "/ration/requests",

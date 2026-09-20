@@ -60,14 +60,14 @@ export default function ManpowerClient() {
       hintKey: "manpower.form1Hint",
     },
     {
-      id: "2",
-      short: t("manpower.form2Short"),
-      hintKey: "manpower.form2Hint",
-    },
-    {
       id: "3",
       short: t("manpower.form3Short"),
       hintKey: "manpower.form3Hint",
+    },
+    {
+      id: "2",
+      short: t("manpower.form2Short"),
+      hintKey: "manpower.form2Hint",
     },
     {
       id: "4",

@@ -1,7 +1,10 @@
 "use client";
 
 import { forwardRef } from "react";
-import type { OfficialConsumeTable } from "@/lib/consume-official-reports";
+import {
+  officialFrDays,
+  type OfficialConsumeTable,
+} from "@/lib/consume-official-reports";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { cn } from "@/lib/utils";
 
@@ -11,12 +14,12 @@ type Props = {
 };
 
 const SIGNS = [
-  "ডেইলি এসআই",
-  "কনজিউম এসআই",
-  "মেস সি কিউ এসআই",
-  "সিনিয়র ডিএডি (প্রশাসন)",
-  "সভাপতি\nমেস কমিটি, ফোর্সেস মেস",
-  "মেজর\nউপ-পরিচালক (সদর দপ্তর)\nএসআরবি ফোর্সেস সদর দপ্তর",
+  "Daily SI",
+  "Consume SI",
+  "Mess CQ SI",
+  "Senior DAD (Admin)",
+  "President\nMess Committee, Forces Mess",
+  "Major\nDeputy Director (HQ)\nSRB Forces Headquarters",
 ] as const;
 
 function cell(n: number) {
@@ -25,7 +28,7 @@ function cell(n: number) {
 
 export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
   function WingFoodListPrint({ table, preview = false }, ref) {
-    const all = [...table.rows, { ...table.totals, label: "মোট" }];
+    const all = [...table.rows, { ...table.totals, label: "Total" }];
 
     return (
       <div
@@ -37,34 +40,39 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
             : "hidden print:block",
         )}
       >
-        <header className="mb-3 text-center">
-          <p className="text-[13px] font-bold">{table.title}</p>
-          {table.lines.map((line) => (
-            <p key={line} className="text-[11px] font-semibold">
-              {line}
+        <header className="letter-masthead mb-10 text-center">
+          <p className="wing-food-title text-[20px] font-bold leading-tight">
+            {table.title}
+          </p>
+          {table.lines[0] ? (
+            <p className="wing-food-report-title mt-1.5 text-[16px] font-bold leading-snug">
+              {table.lines[0]}
             </p>
-          ))}
+          ) : null}
+          {table.lines[1] ? (
+            <p className="wing-food-hq mt-1.5 text-[9px] font-normal leading-snug text-neutral-400">
+              {table.lines[1]}
+            </p>
+          ) : null}
         </header>
 
         <table className="w-full border-collapse text-[10px] text-black">
           <thead>
             <tr className="border border-black bg-neutral-100">
-              <th className="border border-black px-1 py-1">ক্রমিক</th>
-              <th className="border border-black px-1 py-1">পাতা নং</th>
-              <th className="border border-black px-1 py-1">জনবল</th>
-              <th className="border border-black px-1 py-1">দিন</th>
+              <th className="border border-black px-1 py-1">SL</th>
+              <th className="border border-black px-1 py-1">Page no</th>
+              <th className="border border-black px-1 py-1">Manpower</th>
+              <th className="border border-black px-1 py-1">MS</th>
               <th className="border border-black px-1 py-1">FR</th>
               <th className="border border-black px-1 py-1">CL</th>
               <th className="border border-black px-1 py-1">PL</th>
               <th className="border border-black px-1 py-1">CD</th>
               <th className="border border-black px-1 py-1">TRG</th>
-              <th className="border border-black px-1 py-1">Witness</th>
+              <th className="border border-black px-1 py-1">WT</th>
               <th className="border border-black px-1 py-1">MED</th>
               <th className="border border-black px-1 py-1">BGH</th>
-              <th className="border border-black px-1 py-1 leading-tight">
-                রেশন বিহীন
-              </th>
-              <th className="border border-black px-1 py-1">মোট দিন</th>
+              <th className="border border-black px-1 py-1">WR</th>
+              <th className="border border-black px-1 py-1">Total days</th>
             </tr>
           </thead>
           <tbody>
@@ -73,12 +81,23 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
                 key={row.id}
                 className={cn(row.id === "total" && "font-semibold")}
               >
-                <td className="border border-black px-1 py-0.5 text-center">
-                  {row.sl || ""}
-                </td>
-                <td className="border border-black px-1 py-0.5 text-left">
-                  {row.label}
-                </td>
+                {row.id === "total" ? (
+                  <td
+                    colSpan={2}
+                    className="border border-black px-1 py-0.5 text-left"
+                  >
+                    Total
+                  </td>
+                ) : (
+                  <>
+                    <td className="border border-black px-1 py-0.5 text-center">
+                      {row.sl || ""}
+                    </td>
+                    <td className="border border-black px-1 py-0.5 text-center">
+                      {row.label}
+                    </td>
+                  </>
+                )}
                 <td className="border border-black px-1 py-0.5 text-center tabular-nums">
                   {cell(row.manpower)}
                 </td>
@@ -86,7 +105,7 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
                   {cell(row.tagDays.MS ?? 0)}
                 </td>
                 <td className="border border-black px-1 py-0.5 text-center tabular-nums">
-                  {cell(row.tagDays.FR ?? 0)}
+                  {cell(officialFrDays(row.tagDays))}
                 </td>
                 <td className="border border-black px-1 py-0.5 text-center tabular-nums">
                   {cell(row.tagDays.CL ?? 0)}

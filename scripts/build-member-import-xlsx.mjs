@@ -270,8 +270,8 @@ const COLUMNS = [
   { key: "rank", header: "SRB rank *", width: 14 },
   { key: "name", header: "Name *", width: 22 },
   { key: "wing", header: "Wing *", width: 16 },
-  { key: "sub_wing", header: "Sub wing (if Admin)", width: 20 },
-  { key: "hq_wing", header: "HQ sub wing (if HQ Br)", width: 22 },
+  { key: "sub_wing", header: "Br", width: 16 },
+  { key: "hq_wing", header: "Sub Br", width: 16 },
   { key: "phone", header: "Phone", width: 16 },
   { key: "blood_group", header: "Blood group", width: 13 },
   { key: "force", header: "Force", width: 14 },
@@ -361,8 +361,8 @@ function addNamedList(name, header, values) {
 addNamedList("MemberTypes", "Member type", MEMBER_TYPES);
 addNamedList("SrbRanks", "SRB rank", RANKS);
 addNamedList("MainWings", "Wing", WINGS);
-addNamedList("AdminSubs", "Sub wing", ADMIN_SUB_WINGS);
-addNamedList("HqSubs", "HQ sub wing", HQ_SUB_WINGS);
+addNamedList("AdminSubs", "Br", ADMIN_SUB_WINGS);
+addNamedList("HqSubs", "Sub Br", HQ_SUB_WINGS);
 addNamedList("Forces", "Force", FORCES);
 addNamedList("BloodGroups", "Blood group", BLOOD_GROUPS);
 addNamedList("Religions", "Religion", RELIGIONS);
@@ -391,7 +391,7 @@ const notes = [
   "2. Grey columns have dropdowns — click the cell, then the arrow, and pick a value. Do not type a different spelling.",
   "3. Member type must be one of: new / attached / permanent / guest / civilian.",
   "4. Starred columns are required for a normal member: Member type, Personal no, SRB rank, Name, Wing.",
-  "5. Wing is the main wing. If Wing = Admin, also pick Sub wing. If Sub wing = HQ Br, also pick HQ sub wing.",
+  "5. Wing is the main wing. If Wing = Admin, also pick Br. If Br = HQ Br, also pick Sub Br.",
   "6. Force rank dropdown fills after Force is picked (Army → Army ranks, Navy → Navy ranks, and so on).",
   "7. Dates must be YYYY-MM-DD, e.g. 2026-03-15.",
   "8. Phone: Bangladesh number, e.g. 017XXXXXXXX.",

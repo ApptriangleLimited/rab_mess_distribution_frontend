@@ -123,6 +123,11 @@ export const PRITIBHOJ_ADMIN_WING_DEFS: readonly PritibhojWingDef[] = [
   },
   { label: "ফিল্ড মেস", wings: ["Fd Mess", "Field Mess"] },
   {
+    label: "এ্যাডমিন এমটি",
+    wings: ["MT Br", "MT Branch"],
+    aliases: ["এমটি শাখা"],
+  },
+  {
     label: "নতুন সদস্য ও সংযুক্ত",
     wings: ["New Temp Att", "New / Temporary Attached"],
   },
@@ -148,6 +153,25 @@ export function pritibhojLookupWings(label: string): string[] {
   const def = pritibhojWingDef(key);
   if (!def) return key ? [key] : [];
   return wingKeys(def);
+}
+
+/** Main-sheet Admin wing = every Admin & Finance branch, including এ্যাডমিন এমটি. */
+export function isPritibhojAdminMainRow(label: string): boolean {
+  const def = pritibhojWingDef(label);
+  return Boolean(def && def.wings.includes("Admin") && !def.tag);
+}
+
+export function pritibhojAdminLookupWings(): string[] {
+  const keys = new Set<string>();
+  for (const def of PRITIBHOJ_MAIN_WING_DEFS) {
+    if (def.wings.includes("Admin") && !def.tag) {
+      for (const key of wingKeys(def)) keys.add(key);
+    }
+  }
+  for (const def of PRITIBHOJ_ADMIN_WING_DEFS) {
+    for (const key of wingKeys(def)) keys.add(key);
+  }
+  return [...keys];
 }
 
 export function lockPritibhojRows(
@@ -431,6 +455,20 @@ export const PRITIBHOJ_ADMIN_ROWS: PritibhojRow[] = [
     azadHallDist: 4,
     distribution2: 18,
     totalDistribution: 19,
+  },
+  {
+    wing: "এ্যাডমিন এমটি",
+    officer: 0,
+    dad: 0,
+    azadHall: 0,
+    distribution: 1,
+    others: 30,
+    civilian: 1,
+    nonMuslim: 1,
+    total: 32,
+    azadHallDist: 5,
+    distribution2: 27,
+    totalDistribution: 28,
   },
   {
     wing: "মেডিকেল শাখা",

@@ -49,6 +49,19 @@ export function isRationFamily(role?: Role | null) {
 /** Tags visible on Mess Distributioner ledger. */
 export const MESS_LEDGER_TAGS: DailyTag[] = ["MS", "CD"];
 
+/** Tags visible on Consume monthly ledger + print. */
+export const CONSUME_LEDGER_TAGS: DailyTag[] = [
+  "FR",
+  "MFR",
+  "CL",
+  "PL",
+  "CD",
+  "TRG",
+  "WIT",
+  "MED",
+  "BGH",
+];
+
 export const DAILY_TAGS: {
   code: BuiltInDailyTag;
   labelKey: MessageKey;

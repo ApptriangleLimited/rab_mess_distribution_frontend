@@ -3,6 +3,8 @@
 import { forwardRef } from "react";
 import { RATION_REPORT_META } from "@/lib/constants";
 import { formatMonthLong } from "@/lib/date";
+import { amountToWordsEn } from "@/lib/money-words";
+import { isFrFuelSender } from "@/lib/official-senders";
 import type { RationStaffSheet } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -58,7 +60,7 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
                 "mb-8 last:mb-0",
               )}
             >
-              <div className="letter-masthead mb-4 text-center">
+              <div className="letter-masthead mb-8 text-center">
                 <p className="text-[10px] text-neutral-700">
                   {RATION_REPORT_META.govLine}
                 </p>
@@ -76,10 +78,7 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
                 </p>
               </div>
 
-              <div className="mb-3 flex items-start justify-between gap-4 text-[11px]">
-                <p className="text-left">
-                  {RATION_REPORT_META.refPrefix}/{sheet.month}
-                </p>
+              <div className="mb-3 flex items-start justify-end text-[11px]">
                 <p className="shrink-0 text-right font-medium">
                   DT: {monthLabel}
                 </p>
@@ -123,7 +122,7 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
                     <th className="border border-black px-1 py-1 text-left">
                       {t("ration.colName")}
                     </th>
-                    <th className="border border-black px-1 py-1">
+                    <th className="border border-black px-1 py-1 text-left">
                       {t("ration.colAcct")}
                     </th>
                     <th className="border border-black px-1 py-1">
@@ -143,20 +142,20 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
                 <tbody>
                   {sheet.lines.map((row) => (
                     <tr key={`${sheet.sender.id}-${row.user.id}`}>
-                      <td className="border border-black px-1 py-0.5 text-center tabular-nums">
+                      <td className="border border-black px-1 py-0.5 text-left tabular-nums">
                         {row.ser}
                       </td>
                       <td className="border border-black px-1 py-0.5 font-mono">
                         {row.user.personal_id || row.user.rab_id}
                       </td>
-                      <td className="border border-black px-1 py-0.5 text-center">
+                      <td className="border border-black px-1 py-0.5 text-left">
                         {row.user.rank}
                       </td>
                       <td className="border border-black px-1 py-0.5 text-left">
                         {row.user.name}
                       </td>
-                      <td className="border border-black px-1 py-0.5 font-mono">
-                        {row.user.account_number || "—"}
+                      <td className="border border-black px-1 py-0.5 text-left font-mono">
+                        {row.user.account_number?.trim() || "—"}
                       </td>
                       <td className="border border-black px-1 py-0.5 font-mono">
                         {row.user.routing || "—"}
@@ -170,14 +169,19 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
                           maximumFractionDigits: 2,
                         })}
                       </td>
-                      <td className="border border-black px-1 py-0.5">
-                        {row.remarks ||
-                          (row.missingBank ? t("ration.missingBank") : "")}
-                      </td>
+                      <td className="border border-black px-1 py-0.5" />
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {isFrFuelSender(sheet.sender) ? (
+                <p className="mt-3 text-[11px]">
+                  <span className="whitespace-nowrap font-semibold">
+                    Amount in word:
+                  </span>{" "}
+                  {amountToWordsEn(sheet.total)}
+                </p>
+              ) : null}
             </section>
           );
         })}

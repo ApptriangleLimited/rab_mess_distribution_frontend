@@ -33,7 +33,7 @@ export default function ConsumeSummaryPrintClient() {
   const month = rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : monthKey();
   const sheet = parseOfficialSheet(searchParams.get("sheet"));
 
-  const { source } = useReportSource({ month });
+  const { source, loading } = useReportSource({ month });
   const pack = useMemo(
     () =>
       withReportSource(source, () => buildOfficialConsumePack(month, sheet)),
@@ -85,7 +85,7 @@ export default function ConsumeSummaryPrintClient() {
               size="sm"
               variant="cta"
               className="rounded-lg"
-              disabled={printing}
+              disabled={printing || loading}
               onClick={() => void onPrint()}
             >
               <IconPrinter className="h-3.5 w-3.5" />
@@ -95,7 +95,11 @@ export default function ConsumeSummaryPrintClient() {
         />
       </div>
 
-      <OfficialConsumeLetter ref={printRef} pack={pack} preview />
+      {loading ? (
+        <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+      ) : (
+        <OfficialConsumeLetter ref={printRef} pack={pack} preview />
+      )}
     </PagePane>
   );
 }

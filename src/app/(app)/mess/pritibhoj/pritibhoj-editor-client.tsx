@@ -70,7 +70,9 @@ export default function MessPritibhojEditorClient({
     event ? eventToInput(event) : null,
   );
   const [saving, setSaving] = useState(false);
-  const { ctx } = usePritibhojCountCtx(value?.date ?? todayISO());
+  const { ctx, loading: countsLoading } = usePritibhojCountCtx(
+    value?.date ?? todayISO(),
+  );
 
   useEffect(() => {
     if (value) return;
@@ -110,18 +112,22 @@ export default function MessPritibhojEditorClient({
       toast(error, "error");
       return;
     }
+    const payload = ctx
+      ? applyPritibhojInputLookups(lockPritibhojSheets(value), ctx)
+      : lockPritibhojSheets(value);
+    setValue(payload);
     setSaving(true);
     try {
       let saved;
       if (isCcApiEnabled() && !isOldPublicApiHost()) {
         saved = event
-          ? await updatePritibhojEventApi(event.id, value)
-          : await createPritibhojEventApi(value);
+          ? await updatePritibhojEventApi(event.id, payload)
+          : await createPritibhojEventApi(payload);
         upsertLocalPritibhojEvent(saved);
       } else {
         saved = event
-          ? updatePritibhojEvent(event.id, value)
-          : createPritibhojEvent(value);
+          ? updatePritibhojEvent(event.id, payload)
+          : createPritibhojEvent(payload);
       }
       if (!saved) {
         toast(t("mess.pritibhoj.missing"), "error");
@@ -183,7 +189,7 @@ export default function MessPritibhojEditorClient({
                   variant="cta"
                   size="sm"
                   className="h-10 rounded-xl shadow-sm shadow-primary/20"
-                  disabled={saving || !value}
+                  disabled={saving || !value || countsLoading || !ctx}
                   onClick={() => void onSave()}
                 >
                   {saving ? t("common.loading") : t("mess.pritibhoj.savePreview")}
@@ -194,7 +200,12 @@ export default function MessPritibhojEditorClient({
         </div>
 
         {value ? (
-          <PritibhojForm value={value} onChange={handleChange} />
+          <>
+            {countsLoading ? (
+              <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+            ) : null}
+            <PritibhojForm value={value} onChange={handleChange} />
+          </>
         ) : (
           <div className="flex flex-col gap-3">
             <Skeleton className="h-36 w-full" />

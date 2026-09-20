@@ -179,6 +179,15 @@ export function daysInMonth(month: string) {
   return new Date(y, m, 0).getDate();
 }
 
+/** Counted days in `YYYY-MM`: full month if past, through today if current, 0 if future. */
+export function countedDaysInMonth(month: string, today = todayISO()) {
+  const todayMonth = today.slice(0, 7);
+  if (month > todayMonth) return 0;
+  const dayCount = daysInMonth(month);
+  if (month < todayMonth) return dayCount;
+  return Math.min(dayCount, Number(today.slice(8, 10)));
+}
+
 /** ISO date `YYYY-MM-DD` for day-of-month within `YYYY-MM`. */
 export function dateInMonth(month: string, day: number) {
   return `${month}-${String(day).padStart(2, "0")}`;

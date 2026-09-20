@@ -2,7 +2,7 @@
 
 import { forwardRef } from "react";
 import { RATION_REPORT_META } from "@/lib/constants";
-import { formatDateOrdinal } from "@/lib/date";
+import { formatDateOrdinal, todayISO } from "@/lib/date";
 import { amountToWordsEn } from "@/lib/money-words";
 import type { RationTransferSheet } from "@/lib/reports";
 import {
@@ -40,27 +40,24 @@ export const CommunityBankLetterPrint = forwardRef<HTMLDivElement, Props>(
         )}
       >
         <section>
-          <div className="letter-masthead mb-4 text-center">
-            <p className="text-[10px] text-neutral-700">
+          <div className="letter-masthead mb-8 text-center text-black">
+            <p className="text-[10px] text-black">
               {RATION_REPORT_META.govLine}
             </p>
-            <p className="text-[10px] text-neutral-700">
+            <p className="text-[10px] text-black">
               {RATION_REPORT_META.policeLine}
             </p>
-            <p className="mt-1 text-sm font-semibold">
+            <p className="mt-1 text-sm font-semibold text-black">
               {RATION_REPORT_META.orgName}
             </p>
-            <p className="text-[10px] text-neutral-600">
+            <p className="text-[10px] text-black">
               {RATION_REPORT_META.station}
             </p>
           </div>
 
-          <div className="mb-3 flex items-start justify-between gap-4 text-[11px]">
-            <p className="text-left">
-              {RATION_REPORT_META.refPrefixPayAllce}
-            </p>
+          <div className="mb-3 flex items-start justify-end text-[11px]">
             <p className="shrink-0 text-right font-medium">
-              Dt. {formatDateOrdinal(sheet.reportDate)}
+              Dt. {formatDateOrdinal(todayISO())}
             </p>
           </div>
 
@@ -89,7 +86,10 @@ export const CommunityBankLetterPrint = forwardRef<HTMLDivElement, Props>(
                 {COMMUNITY_BANK_COLUMNS.map((col) => (
                   <th
                     key={col}
-                    className="border border-black px-0.5 py-1 font-semibold"
+                    className={cn(
+                      "border border-black px-0.5 py-1 text-left font-semibold",
+                      /amount/i.test(col) && "text-right",
+                    )}
                   >
                     {col}
                   </th>
@@ -103,14 +103,9 @@ export const CommunityBankLetterPrint = forwardRef<HTMLDivElement, Props>(
                     <td
                       key={`${row.ser}-${i}`}
                       className={cn(
-                        "border border-black px-0.5 py-0.5",
-                        i === 0 || i === 6 || i === 13
-                          ? "text-center"
-                          : i === 9
-                            ? "text-right tabular-nums"
-                            : i === 7
-                              ? "text-left"
-                              : "font-mono",
+                        "border border-black px-0.5 py-0.5 text-left",
+                        /amount/i.test(COMMUNITY_BANK_COLUMNS[i] ?? "") &&
+                          "text-right tabular-nums",
                       )}
                     >
                       {cell}

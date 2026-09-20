@@ -15,6 +15,7 @@ import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
+import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
@@ -55,8 +56,9 @@ function FitPagePreview({ children }: { children: ReactNode }) {
     apply();
     const ro = new ResizeObserver(() => requestAnimationFrame(apply));
     ro.observe(frame);
+    ro.observe(page);
     return () => ro.disconnect();
-  }, []);
+  }, [children]);
 
   return (
     <div
@@ -110,7 +112,7 @@ export default function ConsumeLedgerPrintClient() {
         const range = buildRangeLedger(
           rangeBounds.from,
           rangeBounds.to,
-          undefined,
+          CONSUME_LEDGER_TAGS,
           { carry: true },
         );
         return {
@@ -121,7 +123,9 @@ export default function ConsumeLedgerPrintClient() {
           columnDates: range.dates,
         };
       }
-      const monthLedger = buildMonthLedger(month, undefined, { carry: true });
+      const monthLedger = buildMonthLedger(month, CONSUME_LEDGER_TAGS, {
+        carry: true,
+      });
       return { ...monthLedger, columnDates: undefined as string[] | undefined };
     });
   }, [
@@ -147,12 +151,16 @@ export default function ConsumeLedgerPrintClient() {
   }, [ledger.rows, q, rank, wing]);
 
   const backHref = useMemo(() => {
+    const back = searchParams.get("back")?.trim();
     const params = new URLSearchParams();
     params.set("month", month);
     if (dateFrom) params.set("from", dateFrom);
     if (dateTo) params.set("to", dateTo);
+    if (back?.startsWith("/ration/monthly")) {
+      return `${back}${back.includes("?") ? "&" : "?"}${params.toString()}`;
+    }
     return `/consume/monthly/ledger?${params.toString()}`;
-  }, [month, dateFrom, dateTo]);
+  }, [month, dateFrom, dateTo, searchParams]);
 
   const canAct = rows.length > 0;
   const rangeLabel = rangeBounds

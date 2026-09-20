@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { cellsToAssignments, cellsToSuppressed, listAssignments } from "@/lib/api/assignments";
-import { listMembers, memberToUser } from "@/lib/api/members";
-import { isApiEnabled } from "@/lib/api/mode";
+import {
+  cellsToCountedAssignments,
+  cellsToSuppressed,
+  listAssignments,
+} from "@/lib/api/assignments";
+import { listAllApprovedMembers, memberToUser } from "@/lib/api/members";
+import { isDailyApiEnabled } from "@/lib/api/mode";
 import { useStore } from "@/hooks/use-store";
 import type { PritibhojCountCtx } from "@/lib/store/pritibhoj-counts";
 
@@ -13,10 +17,10 @@ export function usePritibhojCountCtx(date: string): {
   ctx: PritibhojCountCtx | null;
   loading: boolean;
 } {
-  const apiOn = isApiEnabled();
+  const apiOn = isDailyApiEnabled();
   const state = useStore();
   const [apiCtx, setApiCtx] = useState<PritibhojCountCtx | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(apiOn);
 
   const storeCtx = useMemo<PritibhojCountCtx>(
     () => ({
@@ -36,25 +40,20 @@ export function usePritibhojCountCtx(date: string): {
     let cancelled = false;
     setLoading(true);
     Promise.all([
-      listMembers({
-        approval: "approved",
-        status: "1",
-        page: 1,
-        page_size: 500,
-      }),
+      listAllApprovedMembers(),
       listAssignments({ from: date, to: date }),
     ])
-      .then(([memberRes, assignRes]) => {
+      .then(([members, assignRes]) => {
         if (cancelled) return;
         setApiCtx({
-          users: memberRes.items.map(memberToUser),
-          assignments: cellsToAssignments(assignRes.items),
+          users: members.map(memberToUser),
+          assignments: cellsToCountedAssignments(assignRes.items),
           suppressed_carries: cellsToSuppressed(assignRes.items),
         });
       })
       .catch(() => {
         if (cancelled) return;
-        setApiCtx({ users: [], assignments: [], suppressed_carries: [] });
+        setApiCtx((prev) => prev);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

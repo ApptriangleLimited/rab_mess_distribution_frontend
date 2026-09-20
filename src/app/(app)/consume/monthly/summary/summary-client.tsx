@@ -51,7 +51,7 @@ export default function ConsumeSummaryClient() {
   }, [rawMonth, defaultMonth, pathname, router, searchParams]);
 
   const sheet = parseOfficialSheet(searchParams.get("sheet"));
-  const { source } = useReportSource({ month });
+  const { source, loading } = useReportSource({ month });
   const pack = useMemo(
     () =>
       withReportSource(source, () => buildOfficialConsumePack(month, sheet)),
@@ -165,7 +165,11 @@ export default function ConsumeSummaryClient() {
           ))}
         </div>
 
-        <OfficialConsumeLetter pack={pack} preview />
+        {loading ? (
+          <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+        ) : (
+          <OfficialConsumeLetter pack={pack} preview />
+        )}
       </motion.div>
     </PagePane>
   );

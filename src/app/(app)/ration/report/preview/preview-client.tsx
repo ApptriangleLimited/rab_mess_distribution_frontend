@@ -1,8 +1,14 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { IconDownload, IconFileSpreadsheet, IconPrinter } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconDownload,
+  IconFileSpreadsheet,
+  IconPrinter,
+} from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -38,12 +44,14 @@ import {
 } from "@/lib/community-bank-letter";
 import { isSonaliBankSheet, isSonaliFuelStaffSheet } from "@/lib/sonali-bank-letter";
 import { isTrustBankSheet, isTrustFuelStaffSheet } from "@/lib/trust-bank-letter";
+import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
 import { REPORT_PAYOUT_TAGS } from "@/lib/official-senders";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 
 const TAGS = new Set<string>([
+  ...CONSUME_LEDGER_TAGS,
   ...REPORT_PAYOUT_TAGS,
   "PL",
   "WR",
@@ -60,6 +68,11 @@ function parseTag(raw: string | null): DailyTag | "all" | null {
   return match ? (match as DailyTag) : null;
 }
 
+function ledgerBackHref(raw: string | null, month: string) {
+  if (raw?.startsWith("/") && !raw.startsWith("//")) return raw;
+  return `/consume/monthly/ledger?month=${month}`;
+}
+
 export default function RationReportPreviewClient() {
   const t = useT();
   const { locale } = useI18n();
@@ -74,43 +87,25 @@ export default function RationReportPreviewClient() {
   const isAll = tag === "all";
   const isFr = tag === "FR";
 
-  const { source } = useReportSource({ month });
+  const { source, loading } = useReportSource({ month });
 
   const staffSheets = useMemo(() => {
-    if (!tag || !senderId || isFr) return [];
+    if (loading || !source || !tag || !senderId || isFr) return [];
     return withReportSource(source, () =>
       buildRationStaffLines(month, senderId, isAll ? undefined : tag),
     );
-  }, [
-    state.assignments,
-    state.users,
-    state.senders,
-    state.rates,
-    month,
-    tag,
-    senderId,
-    isAll,
-    isFr,
-    source,
-  ]);
+  }, [source, loading, month, tag, senderId, isAll, isFr]);
 
   const frSheets = useMemo(() => {
-    if (!isFr || !senderId) return [];
+    if (loading || !source || !isFr || !senderId) return [];
     return withReportSource(source, () =>
       buildFrTransferSheetsByMemberBank(month, senderId, todayISO()),
     );
-  }, [
-    state.assignments,
-    state.users,
-    state.senders,
-    state.rates,
-    month,
-    senderId,
-    isFr,
-    source,
-  ]);
+  }, [source, loading, month, senderId, isFr]);
 
-  const sender = state.senders.find((s) => s.id === senderId);
+  const sender =
+    source?.senders?.find((s) => s.id === senderId) ??
+    state.senders.find((s) => s.id === senderId);
   const monthLabel = formatMonthLong(month);
 
   function onDownloadPdf() {
@@ -169,10 +164,12 @@ export default function RationReportPreviewClient() {
   }
 
   const invalid = !tag || !senderId || !sender;
-  const empty = isFr
-    ? frSheets.length === 0
-    : staffSheets.length === 0 ||
-      staffSheets.every((s) => s.lines.length === 0);
+  const empty =
+    !loading &&
+    (isFr
+      ? frSheets.length === 0
+      : staffSheets.length === 0 ||
+        staffSheets.every((s) => s.lines.length === 0));
   const canAct = isFr
     ? frSheets.length > 0
     : staffSheets.some((s) => s.lines.length > 0);
@@ -188,6 +185,19 @@ export default function RationReportPreviewClient() {
               : isFr
                 ? `FR · ${monthLabel} · ${sender!.label} · ${frSheets.length} bank letter(s)`
                 : `${isAll ? t("common.all") : tagLabel(tag!, locale)} · ${monthLabel} · ${sender!.label} · ${staffSheets.length} bank letter(s)`
+          }
+          leading={
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              className="rounded-xl"
+              aria-label={t("common.back")}
+            >
+              <Link href={ledgerBackHref(searchParams.get("back"), month)}>
+                <IconArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
           }
           actions={
             <>
@@ -234,6 +244,8 @@ export default function RationReportPreviewClient() {
           title={t("ration.reportEmpty")}
           description={t("ration.generateReportHint")}
         />
+      ) : loading ? (
+        <p className="text-sm text-neutral-500">{t("common.loading")}</p>
       ) : empty ? (
         <EmptyState
           title={t("ration.reportEmpty")}

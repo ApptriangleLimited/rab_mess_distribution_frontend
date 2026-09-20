@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
+import { loadLiveReportSource } from "@/lib/api/report-source";
 import { parseMonthInput } from "@/lib/date";
-import { REPORT_PAYOUT_TAGS } from "@/lib/official-senders";
+import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
 import { sendersForReportTag } from "@/lib/store/senders";
 import type { DailyTag } from "@/lib/types";
 import { tagLabel } from "@/i18n";
@@ -34,10 +36,13 @@ export function GenerateReportDialog({
   const t = useT();
   const { locale } = useI18n();
   const router = useRouter();
+  const pathname = usePathname();
   const state = useStore();
   const [month, setMonth] = useState(defaultMonth);
   const [tag, setTag] = useState<DailyTag | "all" | "">("");
   const [senderId, setSenderId] = useState("");
+  const previewMonth = parseMonthInput(month || defaultMonth);
+  useReportSource({ month: previewMonth });
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +67,9 @@ export function GenerateReportDialog({
       month: parsed,
       tag,
       sender: senderId,
+      back: `${pathname}?month=${parsed}`,
     });
+    void loadLiveReportSource({ month: parsed });
     onClose();
     router.push(`/ration/report/preview?${qs.toString()}`);
   }
@@ -102,7 +109,7 @@ export function GenerateReportDialog({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("common.all")}</SelectItem>
-              {REPORT_PAYOUT_TAGS.map((code) => (
+              {CONSUME_LEDGER_TAGS.map((code) => (
                 <SelectItem key={code} value={code}>
                   {tagLabel(code, locale)}
                 </SelectItem>

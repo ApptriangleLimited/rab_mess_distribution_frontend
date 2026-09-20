@@ -67,12 +67,14 @@ export function RosterRow({
   onOpen,
   actions,
   showDates = false,
+  sl,
 }: {
   user: User;
   onOpen?: () => void;
   actions?: ReactNode;
   /** Joining / out date columns (Daily members table). */
   showDates?: boolean;
+  sl?: number;
 }) {
   const t = useT();
   const active = user.status === "1";
@@ -100,6 +102,11 @@ export function RosterRow({
         !active && "opacity-70",
       )}
     >
+      {sl != null ? (
+        <td className="px-3 py-3 text-center text-xs font-semibold tabular-nums text-neutral-600 dark:text-neutral-400">
+          {sl}
+        </td>
+      ) : null}
       <td className="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-400">
         {user.rab_id}
       </td>

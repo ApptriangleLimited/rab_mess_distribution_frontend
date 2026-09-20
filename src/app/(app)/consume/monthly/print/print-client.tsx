@@ -22,7 +22,10 @@ import {
   parseConsumeFilter,
 } from "@/lib/consume-filters";
 import { formatMonthLong, monthKey } from "@/lib/date";
-import { downloadTagBillPdf } from "@/lib/download-consume-pdfs";
+import {
+  downloadLeaveMedBillPdf,
+  downloadTagBillPdf,
+} from "@/lib/download-consume-pdfs";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   buildLeaveMedBill,
@@ -49,7 +52,7 @@ export default function ConsumeTagBillPrintClient() {
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
 
-  const { source } = useReportSource({ month });
+  const { source, loading } = useReportSource({ month });
 
   const tagBill = useMemo(
     () =>
@@ -147,7 +150,20 @@ export default function ConsumeTagBillPrintClient() {
   const rowCount = filter === "leave-med" ? leaveRows.length : tagRows.length;
 
   function onDownload() {
-    if (!canAct || filter === "leave-med" || !tagBill) {
+    if (!canAct) return;
+    if (filter === "leave-med" && leaveBill) {
+      downloadLeaveMedBillPdf({
+        month,
+        tags: filterTags,
+        rows: leaveRows,
+        tagTotals: leaveTagTotals,
+        totalDays: leaveDays,
+        totalAmount: leaveAmount,
+        filename: `consume-bill-${month}-${filter}.pdf`,
+      });
+      return;
+    }
+    if (!tagBill) {
       void onPrint();
       return;
     }
@@ -232,7 +248,9 @@ export default function ConsumeTagBillPrintClient() {
         />
       </div>
 
-      {!canAct ? (
+      {loading ? (
+        <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+      ) : !canAct ? (
         <EmptyState title={t("common.noResults")} />
       ) : filter === "leave-med" && leaveBill ? (
         <LeaveMedBillPrint

@@ -1,8 +1,8 @@
 import { RATION_REPORT_META } from "@/lib/constants";
-import { formatDateDisplay, formatMonthLong } from "@/lib/date";
+import { formatDateDisplay, formatMonthLong, todayISO } from "@/lib/date";
 import { isFrFuelSender, isSonaliBank } from "@/lib/official-senders";
 import type { RationStaffLine, RationTransferLine } from "@/lib/reports";
-import { trustBankMoney } from "@/lib/trust-bank-letter";
+import { TRUST_BANK_FIXED, trustBankMoney } from "@/lib/trust-bank-letter";
 
 export const SONALI_BANK_COLUMNS = [
   "Ser",
@@ -33,21 +33,23 @@ export function sonaliBankBody(month: string) {
 }
 
 export function sonaliBankCells(row: RationTransferLine): string[] {
+  const memberAcct = row.user.account_number?.trim() || "";
+  const memberRouting = row.user.routing?.trim() || "";
   return [
     String(row.ser),
-    formatDateDisplay(row.date),
-    row.refNo,
+    formatDateDisplay(todayISO()),
+    TRUST_BANK_FIXED.refNo,
     row.senderAccountNo,
-    row.receiverRouting,
+    memberRouting,
     row.senderRouting,
-    row.type,
-    row.customerAccountName,
-    row.customerAccountNo,
+    TRUST_BANK_FIXED.type,
+    row.user.name || "",
+    memberAcct,
     trustBankMoney(row.amount),
-    row.institute,
-    row.entryDescription,
-    row.paymentInfo,
-    row.currency,
+    TRUST_BANK_FIXED.institute,
+    TRUST_BANK_FIXED.entryDescription,
+    TRUST_BANK_FIXED.paymentInfo,
+    TRUST_BANK_FIXED.currency,
   ];
 }
 
@@ -103,10 +105,10 @@ export function sonaliFuelCells(row: RationStaffLine): string[] {
     row.user.personal_id || row.user.rab_id || "—",
     row.user.rank || "",
     row.user.name,
-    row.user.account_number || "—",
+    row.user.account_number?.trim() || "—",
     row.user.routing || "—",
     row.user.bank_name || "—",
     trustBankMoney(row.amount),
-    row.remarks || (row.missingBank ? "Missing bank details" : ""),
+    "",
   ];
 }

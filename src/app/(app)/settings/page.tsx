@@ -21,7 +21,6 @@ import { resetToSeed } from "@/lib/store";
 import {
   CL_FR_MONTHLY_TAG,
   STORE_KEY,
-  isProtectedRateTag,
   isRationFamily,
   rolesForPicker,
 } from "@/lib/constants";
@@ -40,7 +39,11 @@ import { Label } from "@/components/ui/label";
 import { useI18n, useT } from "@/i18n/provider";
 import type { Locale } from "@/i18n";
 import { roleLabel, tagLabel } from "@/i18n";
-import { setRates, upsertRate, removeRate } from "@/lib/store/rates";
+import {
+  setRates,
+  upsertRate,
+  removeRate,
+} from "@/lib/store/rates";
 import { parseMoney } from "@/lib/money";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
@@ -117,7 +120,13 @@ function SettingsPageInner() {
   const [loadingRates, setLoadingRates] = useState(false);
   const [apiRates, setApiRates] = useState<AllowanceRate[] | null>(null);
 
-  const rates = apiOn && apiRates ? apiRates : state.rates;
+  const rates = useMemo(() => {
+    const source = apiOn && apiRates ? apiRates : state.rates;
+    return source.map((r) => ({
+      ...r,
+      amount_per_day: parseMoney(r.amount_per_day),
+    }));
+  }, [apiOn, apiRates, state.rates]);
 
   useEffect(() => {
     if (!apiOn) return;
@@ -203,6 +212,7 @@ function SettingsPageInner() {
             saved.map((r) => [r.tag, String(r.amount_per_day)]),
           ),
         );
+        setRates(saved);
         toast(t("settings.ratesSaved"), "success");
       } catch (err) {
         const detail =
@@ -395,7 +405,7 @@ function SettingsPageInner() {
                   aria-label={`${rate.tag} ${t("settings.amountPerDay")}`}
                 />
               </div>
-              {isRation && !isProtectedRateTag(rate.tag) ? (
+              {isRation ? (
                 <Button
                   type="button"
                   variant="ghost"

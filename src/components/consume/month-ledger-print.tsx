@@ -70,35 +70,57 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
     ) as Partial<Record<DailyTag, number>>;
     const grandDays = rows.reduce((s, r) => s + r.totalDays, 0);
 
+    /** A4 landscape content width — identity + days + tags + total must fit. */
+    const pageMm = 291;
+    const identityMm = english ? [6, 17, 13, 20] : [7, 22, 16, 26];
+    const tagColMm = english ? 6.4 : 7;
+    const totalColMm = english ? 8 : 10;
+    const reservedMm =
+      identityMm.reduce((s, n) => s + n, 0) +
+      tagCodes.length * tagColMm +
+      totalColMm;
+    const dayColMm = Math.max(
+      3.2,
+      (pageMm - reservedMm) / Math.max(columns.length, 1),
+    );
+
     return (
       <div
         ref={ref}
         className={cn(
           "month-ledger-print text-black",
           english &&
-            "box-border w-[297mm] max-w-[297mm] min-h-[210mm] overflow-hidden print:w-full print:max-w-none print:min-h-0",
+            "box-border w-[297mm] max-w-[297mm] min-h-[210mm] overflow-visible",
           preview
             ? "mx-auto block rounded-xl border border-neutral-200 bg-white p-3 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
             : "hidden print:block",
         )}
       >
-        <div className="letter-masthead mb-3 text-center">
-          <p className="text-[11px] font-semibold">
+        <div className="letter-masthead mb-10 whitespace-normal text-center [word-spacing:normal]">
+          <p className="text-[11px] font-semibold leading-snug">
             {CONSUME_REPORT_META.wing}
           </p>
-          <p className="mt-1 text-sm font-bold">
+          <p className="mt-2.5 text-sm font-bold leading-snug">
             Forces Mess food consumption list — {monthEn}
           </p>
-          <p className="mt-0.5 text-[10px] text-neutral-700">{campEn}</p>
+          <p className="mt-2 text-[10px] leading-snug text-neutral-700">
+            {campEn}
+          </p>
         </div>
 
         <style>{tagPrintCss()}</style>
         <table className="w-full table-fixed border-collapse text-[8px] leading-none">
           <colgroup>
-            <col style={{ width: "7mm" }} />
-            <col style={{ width: "26mm" }} />
-            <col style={{ width: "20mm" }} />
-            <col style={{ width: "30mm" }} />
+            {identityMm.map((w, i) => (
+              <col key={`id-${i}`} style={{ width: `${w}mm` }} />
+            ))}
+            {columns.map(({ date }) => (
+              <col key={`d-${date}`} style={{ width: `${dayColMm}mm` }} />
+            ))}
+            {tagCodes.map((code) => (
+              <col key={`t-${code}`} style={{ width: `${tagColMm}mm` }} />
+            ))}
+            <col style={{ width: `${totalColMm}mm` }} />
           </colgroup>
           <thead>
             <tr className="border border-black bg-neutral-100">
@@ -123,12 +145,15 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                 </th>
               ))}
               {tagCodes.map((code) => (
-                <th key={code} className="border border-black px-1 py-1">
+                <th
+                  key={code}
+                  className="overflow-hidden border border-black px-0 py-1 text-[7px] whitespace-nowrap"
+                >
                   {code}
                 </th>
               ))}
-              <th className="border border-black px-1 py-1">
-                {t("consume.colTotalDays")}
+              <th className="overflow-hidden border border-black px-0 py-1 text-[7px] whitespace-nowrap">
+                {english ? "Total" : t("consume.colTotalDays")}
               </th>
             </tr>
           </thead>
@@ -179,12 +204,12 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                 {tagCodes.map((code) => (
                   <td
                     key={code}
-                    className="border border-black px-1 py-0.5 text-center tabular-nums"
+                    className="border border-black px-0 py-0.5 text-center tabular-nums"
                   >
                     {row.tagCounts[code] ?? ""}
                   </td>
                 ))}
-                <td className="border border-black px-1 py-0.5 text-center tabular-nums font-semibold">
+                <td className="border border-black px-0 py-0.5 text-center tabular-nums font-semibold">
                   {row.totalDays || ""}
                 </td>
               </tr>
@@ -217,7 +242,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         </table>
 
         <ConsumeSignOff
-          className="text-[9px]"
+          className="mt-5 text-[8px]"
           labels={(
             [
               "consume.signDailySi",

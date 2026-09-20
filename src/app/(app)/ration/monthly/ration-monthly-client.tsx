@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { IconDownload, IconFileAnalytics } from "@tabler/icons-react";
+import { IconFileAnalytics, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
@@ -13,6 +14,7 @@ import {
 } from "@/components/shared/search-filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
+import { WingSummaryButton } from "@/components/consume/wing-summary-button";
 import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,8 +24,8 @@ import {
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 
+import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
 import { monthDateBounds } from "@/lib/date";
-import { downloadCsv } from "@/lib/csv";
 import { buildRangeLedger, withReportSource } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -71,7 +73,7 @@ export default function RationMonthlyClient() {
 
   const ledger = useMemo(() => {
     const range = withReportSource(source, () =>
-      buildRangeLedger(rangeBounds.from, rangeBounds.to, undefined, {
+      buildRangeLedger(rangeBounds.from, rangeBounds.to, CONSUME_LEDGER_TAGS, {
         carry: true,
       }),
     );
@@ -104,66 +106,68 @@ export default function RationMonthlyClient() {
     });
   }, [ledger.rows, q, rank, wing]);
 
-  function onExport() {
-    const header = [
-      t("consume.colSl"),
-      t("consume.colId"),
-      t("consume.colRank"),
-      t("consume.colName"),
-      ...ledger.tagCodes,
-    ];
-    const data = [
-      header,
-      ...rows.map((r, i) => [
-        String(i + 1),
-        r.user.rab_id,
-        r.user.rank,
-        r.user.name,
-        ...ledger.tagCodes.map((code) => String(r.tagCounts[code] ?? "")),
-      ]),
-    ];
-    downloadCsv(
-      `ration-ledger-${rangeBounds.from}_${rangeBounds.to}.csv`,
-      data,
-    );
-  }
+  const printHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("month", month);
+    params.set("from", dateFrom);
+    params.set("to", dateTo);
+    if (q.trim()) params.set("q", q.trim());
+    if (rank !== "all") params.set("rank", rank);
+    if (wing !== "all") params.set("wing", wing);
+    params.set("back", "/ration/monthly");
+    return `/consume/monthly/ledger/print?${params.toString()}`;
+  }, [month, q, rank, wing, dateFrom, dateTo]);
 
   const fieldClass = searchFilterFieldClass;
+  const printBtn =
+    rows.length > 0 ? (
+      <Button
+        asChild
+        variant="cta"
+        size="sm"
+        className="h-10 shrink-0 rounded-xl px-3"
+      >
+        <Link href={printHref}>
+          <IconPrinter className="h-4 w-4" />
+          {t("mess.print")}
+        </Link>
+      </Button>
+    ) : (
+      <Button
+        variant="cta"
+        size="sm"
+        className="h-10 shrink-0 rounded-xl px-3"
+        disabled
+      >
+        <IconPrinter className="h-4 w-4" />
+        {t("mess.print")}
+      </Button>
+    );
+
+  const reportBtn = (
+    <Button
+      type="button"
+      variant="cta"
+      size="sm"
+      className="h-10 shrink-0 rounded-xl px-3"
+      onClick={() => setReportOpen(true)}
+    >
+      <IconFileAnalytics className="h-4 w-4" />
+      {t("ration.openReport")}
+    </Button>
+  );
+
   return (
-    <PagePane className="gap-4">
+    <PagePane className="gap-5">
       <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-5"
       >
         <PageHeader
-          title={t("pages.rationMonthly.title")}
-          subtitle={t("pages.rationMonthly.subtitle", { month })}
+          title={t("pages.consumeLedger.title")}
+          subtitle={t("pages.consumeLedger.subtitle", { month })}
           center={<RationTabs />}
-          actions={
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-lg"
-                onClick={onExport}
-                disabled={!rows.length}
-              >
-                <IconDownload className="h-3.5 w-3.5" />
-                {t("ration.exportCsv")}
-              </Button>
-              <Button
-                type="button"
-                variant="cta"
-                size="sm"
-                className="h-9 rounded-lg"
-                onClick={() => setReportOpen(true)}
-              >
-                <IconFileAnalytics className="h-3.5 w-3.5" />
-                {t("ration.openReport")}
-              </Button>
-            </>
-          }
         />
 
         <GenerateReportDialog
@@ -177,6 +181,19 @@ export default function RationMonthlyClient() {
           search={q}
           onSearchChange={setQ}
           searchPlaceholder={t("cc.searchPlaceholder")}
+          tiles={
+            <MiniStat
+              label={t("daily.rosterStatAll")}
+              value={String(rows.length)}
+              accent
+            />
+          }
+          trailing={
+            <div className="flex shrink-0 items-center gap-2">
+              {printBtn}
+              {reportBtn}
+            </div>
+          }
         >
           <DateRangePicker
             from={dateFrom}
@@ -197,6 +214,12 @@ export default function RationMonthlyClient() {
             className="w-[9rem] shrink-0"
             triggerClassName={cn(fieldClass, "w-full")}
           />
+          <WingSummaryButton
+            month={month}
+            wing={wing}
+            back="/ration/monthly"
+            className="h-10 shrink-0 rounded-xl px-3"
+          />
         </SearchFilterBar>
 
         {ledger.rows.length === 0 ? (
@@ -214,5 +237,38 @@ export default function RationMonthlyClient() {
         )}
       </motion.div>
     </PagePane>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5",
+        accent
+          ? "border-primary/20 bg-primary/[0.08]"
+          : "border-neutral-200/90 bg-white dark:border-neutral-700 dark:bg-neutral-900",
+      )}
+    >
+      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
+        {label}
+      </span>
+      <span
+        className={cn(
+          "text-base font-bold tabular-nums",
+          accent ? "text-primary" : "text-neutral-900 dark:text-white",
+        )}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

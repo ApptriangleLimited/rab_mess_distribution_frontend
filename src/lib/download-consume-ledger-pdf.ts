@@ -64,7 +64,7 @@ export function downloadConsumeLedgerPdf({
     y,
     { align: "center" },
   );
-  y += 5;
+  y += 14;
 
   const head = [
     "Ser",
@@ -157,19 +157,34 @@ export function downloadConsumeLedgerPdf({
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const after = ((doc as any).lastAutoTable?.finalY ?? y) + 12;
+  let after = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
   const signs = [
-    "Consume SI",
-    "Picket SI",
-    "Senior DAD (Admin)",
-    "President, Mess Committee",
+    ["Daily SI"],
+    ["Consume SI"],
+    ["Picket SI"],
+    ["Senior DAD (Admin)"],
+    ["President", "Mess Committee, Forces Mess"],
+    ["Major", "Deputy Director (HQ)", "SRB Forces Headquarters"],
   ];
+  const pageH = doc.internal.pageSize.getHeight();
+  const signBlockH = 18;
+  if (after + signBlockH > pageH - 6) {
+    doc.addPage();
+    after = 14;
+  }
   const gap = pageW / signs.length;
-  doc.setFontSize(7);
-  signs.forEach((label, i) => {
-    const x = gap * i + gap / 2;
-    doc.line(x - 18, after, x + 18, after);
-    doc.text(label, x, after + 4, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  signs.forEach((lines, i) => {
+    const leftAlign = i >= signs.length - 2;
+    const x = leftAlign ? gap * i + 4 : gap * i + gap / 2;
+    if (leftAlign) doc.line(x, after, x + 32, after);
+    else doc.line(x - 16, after, x + 16, after);
+    lines.forEach((line, li) => {
+      doc.text(line, x, after + 3.6 + li * 3.1, {
+        align: leftAlign ? "left" : "center",
+      });
+    });
   });
 
   doc.save(filename ?? `consume-ledger-${month}.pdf`);

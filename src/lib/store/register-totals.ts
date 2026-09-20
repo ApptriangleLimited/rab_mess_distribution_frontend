@@ -13,11 +13,11 @@ export function registerCountedTag(
   suppressed: boolean,
   today: string,
 ): DailyTag | "" {
+  if (date > today) return "";
   if (!canAssignOnDate(user, date)) return stored ?? "";
   if (isMfrLocked(user)) return MFR_TAG;
   if (stored) return stored;
   if (suppressed) return "";
-  if (date > today) return "";
   return user.default_tag || "";
 }
 

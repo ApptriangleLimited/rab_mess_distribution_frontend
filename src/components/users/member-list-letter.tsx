@@ -16,10 +16,11 @@ type Props = {
   users: User[];
   filters: UserFilters;
   wingLabels?: Record<string, string>;
+  title?: string;
 };
 
 export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
-  function MemberListLetter({ users, filters, wingLabels = {} }, ref) {
+  function MemberListLetter({ users, filters, wingLabels = {}, title }, ref) {
     const t = useT();
     const { locale } = useI18n();
     const useBn = locale === "bn";
@@ -34,15 +35,12 @@ export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         className="member-list-letter mx-auto w-full max-w-[210mm] bg-white p-5 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
       >
-        <header className="border-b border-neutral-800 pb-2 text-center">
-          <p className="text-[11px] font-semibold">
-            {useBn ? CONSUME_REPORT_META.orgNameBn : CONSUME_REPORT_META.orgName}
-          </p>
-          <h1 className="mt-0.5 text-base font-bold tracking-wide">
-            {t("cc.memberListReportTitle")}
+        <header className="mb-8 border-b border-neutral-800 pb-3 text-center">
+          <h1 className="text-base font-bold tracking-wide">
+            {title ?? t("cc.memberListReportTitle")}
           </h1>
-          <p className="text-[10px] text-neutral-600">
-            {useBn ? CONSUME_REPORT_META.stationBn : CONSUME_REPORT_META.station}
+          <p className="mt-0.5 text-[9px] font-normal text-neutral-400">
+            {useBn ? CONSUME_REPORT_META.orgNameBn : CONSUME_REPORT_META.orgName}
           </p>
           <p className="mt-1 text-xs font-medium">
             {t("cc.memberListReportCount", { count: users.length })} ·{" "}
@@ -59,7 +57,7 @@ export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
           <thead>
             <tr className="bg-neutral-100">
               <th className="w-8 border border-neutral-800 px-1 py-1">
-                {t("daily.registerColSl")}
+                {t("cc.fields.sl")}
               </th>
               <th className="border border-neutral-800 px-1.5 py-1 text-left">
                 {t("cc.fields.personalNo")}

@@ -3,9 +3,12 @@
 import { forwardRef, type ReactNode } from "react";
 import {
   officialBghDays,
-  officialHospitalDays,
-  officialLeaveDays,
+  officialFrDays,
   officialLeaveTotal,
+  officialMedDays,
+  officialMsDays,
+  officialWitDays,
+  officialWrDays,
   type OfficialConsumePack,
   type OfficialConsumeRow,
   type OfficialConsumeTable,
@@ -19,12 +22,12 @@ type Props = {
 };
 
 const SIGNS = [
-  "ডেইলি এসআই",
-  "কনজিউম এসআই",
-  "মেস সি কিউ এসআই",
-  "সিনিয়র ডিএডি (প্রশাসন)",
-  "সভাপতি\nমেস কমিটি, ফোর্সেস মেস",
-  "মেজর\nউপ-পরিচালক (সদর দপ্তর)\nএসআরবি ফোর্সেস সদর দপ্তর",
+  "Daily SI",
+  "Consume SI",
+  "Mess CQ SI",
+  "Senior DAD (Admin)",
+  "President\nMess Committee, Forces Mess",
+  "Major\nDeputy Director (HQ)\nSRB Forces Headquarters",
 ] as const;
 
 function cell(n: number) {
@@ -36,11 +39,20 @@ function Signs() {
 }
 
 function Header({ table }: { table: OfficialConsumeTable }) {
+  const [first, ...rest] = table.lines;
   return (
-    <header className="mb-3 text-center">
-      <p className="text-[12px] font-bold leading-snug">{table.title}</p>
-      {table.lines.map((line) => (
-        <p key={line} className="text-[10px] leading-snug">
+    <header className="letter-masthead mb-10 text-center">
+      <p className="text-[16px] font-bold leading-snug">{table.title}</p>
+      {first ? (
+        <p className="mt-1.5 text-[9px] font-normal leading-snug text-neutral-400">
+          {first}
+        </p>
+      ) : null}
+      {rest.map((line) => (
+        <p
+          key={line}
+          className="text-[9px] font-normal leading-snug text-neutral-400"
+        >
           {line}
         </p>
       ))}
@@ -55,29 +67,35 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
     <table className="w-full border-collapse text-[9px] text-black">
       <thead>
         <tr>
-          <th className="border border-black px-1 py-1 align-bottom">ক্র/নং</th>
+          <th className="border border-black px-1 py-1 align-bottom">SL</th>
           <th className="border border-black px-1 py-1 text-left align-bottom">
-            {table.kind === "consume-pages" ? "পাতা নং" : "উইংয়ের নাম"}
+            {table.kind === "consume-pages" ? "Page no" : "Wing"}
           </th>
           {pageCol ? (
-            <th className="border border-black px-1 py-1 align-bottom">পাতা নং</th>
+            <th className="border border-black px-1 py-1 align-bottom">
+              Page no
+            </th>
           ) : null}
-          <th className="border border-black px-1 py-1 align-bottom">জনবল</th>
-          <th className="border border-black px-1 py-1 align-bottom">মেস</th>
-          <th className="border border-black px-1 py-1 align-bottom">এফআর</th>
-          <th className="border border-black px-1 py-1 align-bottom">সিএল</th>
-          <th className="border border-black px-1 py-1 align-bottom">পিএল</th>
-          <th className="border border-black px-1 py-1 align-bottom">সিডি</th>
-          <th className="border border-black px-1 py-1 align-bottom">ট্রেনিং</th>
-          <th className="border border-black px-1 py-1 align-bottom">সাক্ষী</th>
-          <th className="border border-black px-1 py-1 align-bottom">হাসপাতাল</th>
-          <th className="border border-black px-1 py-1 align-bottom">বিজিএইচ</th>
-          <th className="border border-black px-1 py-1 align-bottom leading-tight">
-            রেশন বিহীন
+          <th className="border border-black px-1 py-1 align-bottom">
+            Manpower
           </th>
-          <th className="border border-black px-1 py-1 align-bottom">মোট দিন</th>
+          <th className="border border-black px-1 py-1 align-bottom">MS</th>
+          <th className="border border-black px-1 py-1 align-bottom">FR</th>
+          <th className="border border-black px-1 py-1 align-bottom">CL</th>
+          <th className="border border-black px-1 py-1 align-bottom">PL</th>
+          <th className="border border-black px-1 py-1 align-bottom">CD</th>
+          <th className="border border-black px-1 py-1 align-bottom">TRG</th>
+          <th className="border border-black px-1 py-1 align-bottom">WT</th>
+          <th className="border border-black px-1 py-1 align-bottom">MED</th>
+          <th className="border border-black px-1 py-1 align-bottom">BGH</th>
+          <th className="border border-black px-1 py-1 align-bottom">WR</th>
+          <th className="border border-black px-1 py-1 align-bottom">
+            Total days
+          </th>
           {table.remarks ? (
-            <th className="border border-black px-1 py-1 align-bottom">মন্তব্য</th>
+            <th className="border border-black px-1 py-1 align-bottom">
+              Remarks
+            </th>
           ) : null}
         </tr>
       </thead>
@@ -93,10 +111,10 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
               {cell(row.manpower)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(row.tagDays.MS ?? 0)}
+              {cell(officialMsDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(row.tagDays.FR ?? 0)}
+              {cell(officialFrDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.CL ?? 0)}
@@ -111,16 +129,16 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
               {cell(row.tagDays.TRG ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(officialLeaveDays(row.tagDays))}
+              {cell(officialWitDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(officialHospitalDays(row.tagDays))}
+              {cell(officialMedDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialBghDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(row.tagDays.WR ?? 0)}
+              {cell(officialWrDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.totalDays)}
@@ -134,23 +152,30 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
 
 function TagTable({ table }: { table: OfficialConsumeTable }) {
   const all = [...table.rows, table.totals];
+  const isCd = (table.tagLabel ?? "").toUpperCase().includes("CD");
   return (
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
         <tr>
-          <th className="border border-black px-1.5 py-1 align-bottom">ক্র/নং</th>
+          <th className="border border-black px-1.5 py-1 align-bottom">SL</th>
           <th className="border border-black px-1.5 py-1 text-left align-bottom">
-            উইংয়ের নাম
+            Wing
           </th>
           {table.showPageNo ? (
-            <th className="border border-black px-1.5 py-1 align-bottom">পাতা নং</th>
+            <th className="border border-black px-1.5 py-1 align-bottom">
+              Page no
+            </th>
           ) : null}
-          <th className="border border-black px-1.5 py-1 align-bottom">জনবল</th>
           <th className="border border-black px-1.5 py-1 align-bottom">
-            {table.tagLabel}
+            Manpower
+          </th>
+          <th className="border border-black px-1.5 py-1 align-bottom">
+            {table.tagLabel ?? (isCd ? "Total CD" : "Total FR")}
           </th>
           {table.remarks ? (
-            <th className="border border-black px-1.5 py-1 align-bottom">মন্তব্য</th>
+            <th className="border border-black px-1.5 py-1 align-bottom">
+              Remarks
+            </th>
           ) : null}
         </tr>
       </thead>
@@ -166,11 +191,7 @@ function TagTable({ table }: { table: OfficialConsumeTable }) {
               {cell(row.manpower)}
             </td>
             <td className="border border-black px-1.5 py-1 text-center tabular-nums">
-              {cell(
-                table.tagLabel?.includes("সিডি")
-                  ? (row.tagDays.CD ?? 0)
-                  : (row.tagDays.FR ?? 0),
-              )}
+              {cell(isCd ? (row.tagDays.CD ?? 0) : officialFrDays(row.tagDays))}
             </td>
           </DataRow>
         ))}
@@ -185,25 +206,31 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
         <tr>
-          <th className="border border-black px-1 py-1 align-bottom">ক্র/নং</th>
+          <th className="border border-black px-1 py-1 align-bottom">SL</th>
           <th className="border border-black px-1 py-1 text-left align-bottom">
-            উইংয়ের নাম
+            Wing
           </th>
           {table.showPageNo ? (
-            <th className="border border-black px-1 py-1 align-bottom">পাতা নং</th>
+            <th className="border border-black px-1 py-1 align-bottom">
+              Page no
+            </th>
           ) : null}
           {table.showManpower ? (
-            <th className="border border-black px-1 py-1 align-bottom">জনবল</th>
+            <th className="border border-black px-1 py-1 align-bottom">
+              Manpower
+            </th>
           ) : null}
-          <th className="border border-black px-1 py-1 align-bottom">সিএল</th>
-          <th className="border border-black px-1 py-1 align-bottom">পিএল</th>
-          <th className="border border-black px-1 py-1 align-bottom">ট্রেনিং</th>
-          <th className="border border-black px-1 py-1 align-bottom">সাক্ষী</th>
-          <th className="border border-black px-1 py-1 align-bottom">হাসপাতাল</th>
-          <th className="border border-black px-1 py-1 align-bottom">বিজিএইচ</th>
-          <th className="border border-black px-1 py-1 align-bottom">সর্বমোট</th>
+          <th className="border border-black px-1 py-1 align-bottom">CL</th>
+          <th className="border border-black px-1 py-1 align-bottom">PL</th>
+          <th className="border border-black px-1 py-1 align-bottom">TRG</th>
+          <th className="border border-black px-1 py-1 align-bottom">WT</th>
+          <th className="border border-black px-1 py-1 align-bottom">MED</th>
+          <th className="border border-black px-1 py-1 align-bottom">BGH</th>
+          <th className="border border-black px-1 py-1 align-bottom">Total</th>
           {table.remarks ? (
-            <th className="border border-black px-1 py-1 align-bottom">মন্তব্য</th>
+            <th className="border border-black px-1 py-1 align-bottom">
+              Remarks
+            </th>
           ) : null}
         </tr>
       </thead>
@@ -230,10 +257,10 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
               {cell(row.tagDays.TRG ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(officialLeaveDays(row.tagDays))}
+              {cell(officialWitDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(officialHospitalDays(row.tagDays))}
+              {cell(officialMedDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialBghDays(row.tagDays))}
@@ -265,7 +292,9 @@ function DataRow({
       <td className="border border-black px-1 py-1 text-center">
         {row.sl || ""}
       </td>
-      <td className="border border-black px-1 py-1 text-left">{row.label}</td>
+      <td className="border border-black px-1 py-1 text-left">
+        {isTotal ? row.label || "Total" : row.label}
+      </td>
       {pageCol ? (
         <td className="border border-black px-1 py-1 text-center">
           {isTotal ? "" : row.pageNo}
@@ -300,13 +329,16 @@ export const OfficialConsumeLetter = forwardRef<HTMLDivElement, Props>(
           <section
             key={page.id}
             className={cn(
-              "bg-white text-black",
+              "official-consume-page bg-white text-black",
               preview &&
                 "rounded-xl border border-neutral-200 p-5 shadow-sm dark:border-neutral-700",
             )}
           >
-            {page.tables.map((table) => (
-              <div key={table.title + table.lines.join()} className="mb-8 last:mb-0">
+            {page.tables.map((table, tableIndex) => (
+              <div
+                key={`${page.id}-${tableIndex}-${table.rows[0]?.id ?? table.title}`}
+                className="mb-8 last:mb-0"
+              >
                 <Header table={table} />
                 <SheetTable table={table} />
                 <Signs />

@@ -1,7 +1,17 @@
 import { RATION_REPORT_META } from "@/lib/constants";
-import { formatDateDisplay, formatMonthLong } from "@/lib/date";
+import { formatDateDisplay, formatMonthLong, todayISO } from "@/lib/date";
 import { isFrFuelSender, isTrustBank } from "@/lib/official-senders";
 import type { RationTransferLine } from "@/lib/reports";
+
+/** Trust Bank BEFTN generate-report — fixed cells. */
+export const TRUST_BANK_FIXED = {
+  refNo: "150120250000500001",
+  type: "C",
+  institute: "SRB HRQ",
+  entryDescription: "Fresh money bill",
+  paymentInfo: "Fresh money",
+  currency: "BDT",
+} as const;
 
 export const TRUST_BANK_COLUMNS = [
   "Ser",
@@ -40,22 +50,24 @@ export function trustBankMoney(n: number) {
 }
 
 export function trustBankCells(row: RationTransferLine): string[] {
+  const memberAcct = row.user.account_number?.trim() || "";
+  const memberRouting = row.user.routing?.trim() || "";
   return [
     String(row.ser),
-    formatDateDisplay(row.date),
-    row.refNo,
+    formatDateDisplay(todayISO()),
+    TRUST_BANK_FIXED.refNo,
     row.senderAccountNo,
-    row.customerAccountNo,
-    row.receiverRouting,
+    memberAcct,
+    memberRouting,
     row.senderRouting,
-    row.type,
-    row.customerAccountName,
-    row.customerAccountNo,
+    TRUST_BANK_FIXED.type,
+    row.user.name || "",
+    memberAcct,
     trustBankMoney(row.amount),
-    row.institute,
-    row.entryDescription,
-    row.paymentInfo,
-    row.currency,
+    TRUST_BANK_FIXED.institute,
+    TRUST_BANK_FIXED.entryDescription,
+    TRUST_BANK_FIXED.paymentInfo,
+    TRUST_BANK_FIXED.currency,
   ];
 }
 

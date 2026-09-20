@@ -202,18 +202,30 @@ export default function TagsPageClient() {
     ? cockpit.suppressedCarries
     : (state.suppressed_carries ?? []);
 
-  const { counts: tagCounts, memberIds: tagMemberIds, totalDays: allTaggedCount } =
-    useMemo(
-      () =>
-        countRegisterTags(
-          users,
-          visibleDates,
-          assignments,
-          suppressedCarries,
-          today,
-        ),
-      [users, visibleDates, assignments, suppressedCarries, today],
-    );
+  const { memberIds: tagMemberIds } = useMemo(
+    () =>
+      countRegisterTags(
+        users,
+        visibleDates,
+        assignments,
+        suppressedCarries,
+        today,
+      ),
+    [users, visibleDates, assignments, suppressedCarries, today],
+  );
+
+  const tagMemberCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        allTags.map((tag) => [tag, tagMemberIds.get(tag)?.size ?? 0]),
+      ) as Record<string, number>,
+    [allTags, tagMemberIds],
+  );
+  const allTagMemberCount = useMemo(
+    () =>
+      allTags.reduce((sum, tag) => sum + (tagMemberCounts[tag] ?? 0), 0),
+    [allTags, tagMemberCounts],
+  );
 
   const boardUsers = useMemo(() => {
     if (tagFilter === "all") return users;
@@ -400,7 +412,7 @@ export default function TagsPageClient() {
             <MiniStat
               icon={<IconUsers className="h-3.5 w-3.5" />}
               label={t("daily.rosterStatAll")}
-              value={String(allTaggedCount)}
+              value={String(allTagMemberCount)}
               toneClass="border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100"
               selected={tagFilter === "all"}
               onClick={() => setTagFilter("all")}
@@ -410,7 +422,7 @@ export default function TagsPageClient() {
                 key={tag}
                 icon={tagTileIcon(tag)}
                 label={tag}
-                value={String(tagCounts[tag] ?? 0)}
+                value={String(tagMemberCounts[tag] ?? 0)}
                 title={`${tag} — ${tagLabel(tag, locale)}`}
                 toneClass={tagCellClass(tag)}
                 selected={tagFilter === tag}

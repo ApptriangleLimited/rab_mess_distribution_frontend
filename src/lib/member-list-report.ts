@@ -76,7 +76,7 @@ export function memberListFilterChips(
 
 export function memberListTableHeaders(t: Translate): string[] {
   return [
-    t("daily.registerColSl"),
+    t("cc.fields.sl"),
     t("cc.fields.personalNo"),
     t("cc.fields.rabId"),
     t("cc.fields.rank"),

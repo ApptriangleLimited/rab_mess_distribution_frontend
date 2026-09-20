@@ -47,6 +47,15 @@ import {
   trustBankSubject,
 } from "@/lib/trust-bank-letter";
 
+function transferColumnStyles(headers: readonly string[]) {
+  return Object.fromEntries(
+    headers.map((col, i) => [
+      i,
+      { halign: /amount/i.test(col) ? ("right" as const) : ("left" as const) },
+    ]),
+  );
+}
+
 function amt(n: number) {
   return n.toLocaleString("en-BD", {
     minimumFractionDigits: 2,
@@ -56,19 +65,21 @@ function amt(n: number) {
 
 function writeHeader(doc: jsPDF, y: number) {
   const pageW = doc.internal.pageSize.getWidth();
-  doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
   doc.text(RATION_REPORT_META.govLine, pageW / 2, y, { align: "center" });
-  y += 4;
-  doc.text(RATION_REPORT_META.policeLine, pageW / 2, y, { align: "center" });
   y += 5;
-  doc.setFontSize(11);
+  doc.text(RATION_REPORT_META.policeLine, pageW / 2, y, { align: "center" });
+  y += 6;
+  doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.text(RATION_REPORT_META.orgName, pageW / 2, y, { align: "center" });
-  y += 4;
+  y += 5;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.text(RATION_REPORT_META.station, pageW / 2, y, { align: "center" });
-  return y + 6;
+  return y + 8;
 }
 
 function writeTrustBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
@@ -80,7 +91,6 @@ function writeTrustBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
     "Dhaka";
 
   doc.setFontSize(9);
-  doc.text(RATION_REPORT_META.refPrefixPayAllce, 10, y);
   doc.text(`Dt. ${formatDateOrdinal(sheet.reportDate)}`, pageW - 10, y, {
     align: "right",
   });
@@ -127,9 +137,23 @@ function writeTrustBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
         "",
       ],
     ],
-    styles: { fontSize: 6, cellPadding: 1 },
-    headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: "bold" },
+    styles: {
+      fontSize: 6.5,
+      cellPadding: 1.1,
+      overflow: "linebreak",
+      halign: "left",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [240, 240, 240],
+      textColor: 20,
+      fontStyle: "bold",
+      overflow: "linebreak",
+      halign: "left",
+    },
     footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    columnStyles: transferColumnStyles(TRUST_BANK_COLUMNS),
+    showHead: "firstPage",
     theme: "grid",
     margin: { left: 8, right: 8 },
   });
@@ -160,7 +184,6 @@ function writeCommunityBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
     "Dhaka";
 
   doc.setFontSize(9);
-  doc.text(RATION_REPORT_META.refPrefixPayAllce, 10, y);
   doc.text(`Dt. ${formatDateOrdinal(sheet.reportDate)}`, pageW - 10, y, {
     align: "right",
   });
@@ -207,9 +230,23 @@ function writeCommunityBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
         "",
       ],
     ],
-    styles: { fontSize: 6, cellPadding: 1 },
-    headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: "bold" },
+    styles: {
+      fontSize: 6.5,
+      cellPadding: 1.1,
+      overflow: "linebreak",
+      halign: "left",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [240, 240, 240],
+      textColor: 20,
+      fontStyle: "bold",
+      overflow: "linebreak",
+      halign: "left",
+    },
     footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    columnStyles: transferColumnStyles(COMMUNITY_BANK_COLUMNS),
+    showHead: "firstPage",
     theme: "grid",
     margin: { left: 8, right: 8 },
   });
@@ -240,7 +277,6 @@ function writeSonaliBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
     "Dhaka";
 
   doc.setFontSize(9);
-  doc.text(RATION_REPORT_META.refPrefixPayAllce, 10, y);
   doc.text(`Dt. ${formatDateOrdinal(sheet.reportDate)}`, pageW - 10, y, {
     align: "right",
   });
@@ -287,9 +323,23 @@ function writeSonaliBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
         "",
       ],
     ],
-    styles: { fontSize: 6, cellPadding: 1 },
-    headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: "bold" },
+    styles: {
+      fontSize: 6.5,
+      cellPadding: 1.1,
+      overflow: "linebreak",
+      halign: "left",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [240, 240, 240],
+      textColor: 20,
+      fontStyle: "bold",
+      overflow: "linebreak",
+      halign: "left",
+    },
     footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    columnStyles: transferColumnStyles(SONALI_BANK_COLUMNS),
+    showHead: "firstPage",
     theme: "grid",
     margin: { left: 8, right: 8 },
   });
@@ -340,7 +390,6 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
     .replace("{bank}", memberBank);
 
   doc.setFontSize(9);
-  doc.text(`${RATION_REPORT_META.refPrefixPayAllce}/`, 10, y);
   doc.text(`DT: ${dtLabel}`, pageW - 10, y, { align: "right" });
   y += 6;
 
@@ -403,7 +452,7 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
       row.senderRouting,
       row.type,
       row.customerAccountName,
-      row.customerAccountNo,
+      row.user.account_number?.trim() || row.customerAccountNo || "—",
       amt(row.amount),
       row.institute,
       row.entryDescription,
@@ -428,9 +477,25 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
         "",
       ],
     ],
-    styles: { fontSize: 6, cellPadding: 1 },
-    headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: "bold" },
+    styles: {
+      fontSize: 6.5,
+      cellPadding: 1.1,
+      overflow: "linebreak",
+      halign: "left",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [240, 240, 240],
+      textColor: 20,
+      fontStyle: "bold",
+      overflow: "linebreak",
+      halign: "left",
+    },
     footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    columnStyles: {
+      9: { halign: "right" },
+    },
+    showHead: "firstPage",
     theme: "grid",
     margin: { left: 8, right: 8 },
   });
@@ -516,7 +581,6 @@ function writeCommunityFuelLetter(doc: jsPDF, sheet: RationStaffSheet) {
     "Dhaka";
 
   doc.setFontSize(9);
-  doc.text(`${RATION_REPORT_META.refPrefix}/${sheet.month}`, 14, y);
   doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
   y += 6;
 
@@ -556,8 +620,18 @@ function writeCommunityFuelLetter(doc: jsPDF, sheet: RationStaffSheet) {
       textColor: 20,
       fontStyle: "bold",
     },
+    columnStyles: {
+      5: { halign: "right" },
+    },
     theme: "grid",
     margin: { left: 12, right: 12 },
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  y = ((doc as any).lastAutoTable?.finalY ?? y) + 6;
+  doc.setFontSize(9);
+  doc.text(`Amount in word: ${amountToWordsEn(sheet.total)}`, 14, y, {
+    maxWidth: pageW - 28,
   });
 }
 
@@ -571,7 +645,6 @@ function writeSonaliFuelLetter(doc: jsPDF, sheet: RationStaffSheet) {
     "Dhaka";
 
   doc.setFontSize(9);
-  doc.text(`${RATION_REPORT_META.refPrefix}/${sheet.month}`, 14, y);
   doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
   y += 6;
 
@@ -615,6 +688,9 @@ function writeSonaliFuelLetter(doc: jsPDF, sheet: RationStaffSheet) {
       fontStyle: "bold",
     },
     footStyles: { fillColor: [255, 255, 255], textColor: 20, fontStyle: "bold" },
+    columnStyles: {
+      7: { halign: "right" },
+    },
     theme: "grid",
     margin: { left: 12, right: 12 },
   });
@@ -656,7 +732,6 @@ function writeStaffPayoutLetter(
         ));
 
   doc.setFontSize(9);
-  doc.text(`${RATION_REPORT_META.refPrefix}/${sheet.month}`, 14, y);
   doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
   y += 6;
 
@@ -707,11 +782,11 @@ function writeStaffPayoutLetter(
       row.user.personal_id || row.user.rab_id,
       row.user.rank || "",
       row.user.name,
-      row.user.account_number || "—",
+      row.user.account_number?.trim() || "—",
       row.user.routing || "—",
       row.user.bank_name || "—",
       amt(row.amount),
-      row.remarks || (row.missingBank ? "Missing bank details" : ""),
+      "",
     ]),
     styles: { fontSize: 7, cellPadding: 1.2 },
     headStyles: {
@@ -719,9 +794,21 @@ function writeStaffPayoutLetter(
       textColor: 20,
       fontStyle: "bold",
     },
+    columnStyles: {
+      7: { halign: "right" },
+    },
     theme: "grid",
     margin: { left: 12, right: 12 },
   });
+
+  if (isTrustFuelStaffSheet(sheet)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    y = ((doc as any).lastAutoTable?.finalY ?? y) + 6;
+    doc.setFontSize(9);
+    doc.text(`Amount in word: ${amountToWordsEn(sheet.total)}`, 14, y, {
+      maxWidth: pageW - 28,
+    });
+  }
 }
 
 export function downloadStaffPayoutPdf(

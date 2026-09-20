@@ -54,26 +54,25 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
         )}
       >
         <section>
-          <div className="letter-masthead mb-4 text-center">
-            <p className="text-[10px] text-neutral-700">
+          <div className="letter-masthead mb-8 text-center text-black">
+            <p className="text-[10px] text-black">
               {RATION_REPORT_META.govLine}
             </p>
-            <p className="text-[10px] text-neutral-700">
+            <p className="text-[10px] text-black">
               {RATION_REPORT_META.policeLine}
             </p>
-            <p className="mt-1 text-sm font-semibold">
+            <p className="mt-1 text-sm font-semibold text-black">
               {RATION_REPORT_META.orgNameBn}
             </p>
-            <p className="text-xs font-medium">{RATION_REPORT_META.orgName}</p>
-            <p className="text-[10px] text-neutral-600">
+            <p className="text-xs font-medium text-black">
+              {RATION_REPORT_META.orgName}
+            </p>
+            <p className="text-[10px] text-black">
               {RATION_REPORT_META.station}
             </p>
           </div>
 
-          <div className="mb-3 flex items-start justify-between gap-4 text-[11px]">
-            <p className="text-left">
-              {RATION_REPORT_META.refPrefixPayAllce}/
-            </p>
+          <div className="mb-3 flex items-start justify-end text-[11px]">
             <p className="shrink-0 text-right font-medium">DT: {dtLabel}</p>
           </div>
 
@@ -123,7 +122,7 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
                 <th className="border border-black px-0.5 py-1 text-left">
                   {t("ration.colCustomerName")}
                 </th>
-                <th className="border border-black px-0.5 py-1">
+                <th className="border border-black px-0.5 py-1 text-left">
                   {t("ration.colCustomerAcct")}
                 </th>
                 <th className="border border-black px-0.5 py-1">
@@ -146,7 +145,7 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
             <tbody>
               {sheet.lines.map((row) => (
                 <tr key={`${row.ser}-${row.refNo}`}>
-                  <td className="border border-black px-0.5 py-0.5 text-center tabular-nums">
+                  <td className="border border-black px-0.5 py-0.5 text-left tabular-nums">
                     {row.ser}
                   </td>
                   <td className="border border-black px-0.5 py-0.5 whitespace-nowrap">
@@ -164,14 +163,16 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
                   <td className="border border-black px-0.5 py-0.5 font-mono">
                     {row.senderRouting}
                   </td>
-                  <td className="border border-black px-0.5 py-0.5 text-center">
+                  <td className="border border-black px-0.5 py-0.5 text-left">
                     {row.type}
                   </td>
                   <td className="border border-black px-0.5 py-0.5 text-left">
                     {row.customerAccountName}
                   </td>
-                  <td className="border border-black px-0.5 py-0.5 font-mono">
-                    {row.customerAccountNo}
+                  <td className="border border-black px-0.5 py-0.5 text-left font-mono">
+                    {row.user.account_number?.trim() ||
+                      row.customerAccountNo ||
+                      "—"}
                   </td>
                   <td className="border border-black px-0.5 py-0.5 text-right tabular-nums">
                     {amt(row.amount)}
@@ -185,7 +186,7 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
                   <td className="border border-black px-0.5 py-0.5">
                     {row.paymentInfo}
                   </td>
-                  <td className="border border-black px-0.5 py-0.5 text-center">
+                  <td className="border border-black px-0.5 py-0.5 text-left">
                     {row.currency}
                   </td>
                 </tr>

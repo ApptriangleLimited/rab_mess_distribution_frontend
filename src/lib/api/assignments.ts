@@ -92,22 +92,38 @@ export function putAssignmentRange(body: {
   );
 }
 
+function cellToAssignment(cell: AssignmentCell): DailyAssignment {
+  return {
+    id: `${cell.member_id}|${cell.date}`,
+    user_id: cell.member_id,
+    date: cell.date,
+    tag: cell.tag as DailyTag,
+    trg_tone:
+      cell.trg_tone === "black" || cell.trg_tone === "red"
+        ? cell.trg_tone
+        : undefined,
+    updated_by: cell.updated_by ?? "daily",
+    updated_at: cell.updated_at ?? new Date().toISOString(),
+  };
+}
+
 /** Stored rows only — shape register board expects. */
 export function cellsToAssignments(items: AssignmentCell[]): DailyAssignment[] {
   return items
     .filter((cell) => cell.source === "stored" && cell.tag)
-    .map((cell) => ({
-      id: `${cell.member_id}|${cell.date}`,
-      user_id: cell.member_id,
-      date: cell.date,
-      tag: cell.tag as DailyTag,
-      trg_tone:
-        cell.trg_tone === "black" || cell.trg_tone === "red"
-          ? cell.trg_tone
-          : undefined,
-      updated_by: cell.updated_by ?? "daily",
-      updated_at: cell.updated_at ?? new Date().toISOString(),
-    }));
+    .map(cellToAssignment);
+}
+
+/** Stored + carry — Pritibhoj / reports that must match Daily RR projection. */
+export function cellsToCountedAssignments(
+  items: AssignmentCell[],
+): DailyAssignment[] {
+  return items
+    .filter(
+      (cell) =>
+        (cell.source === "stored" || cell.source === "carry") && cell.tag,
+    )
+    .map(cellToAssignment);
 }
 
 export function cellsToSuppressed(items: AssignmentCell[]): string[] {

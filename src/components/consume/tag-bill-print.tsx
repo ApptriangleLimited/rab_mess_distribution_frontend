@@ -1,7 +1,8 @@
 "use client";
 
 import { forwardRef } from "react";
-import { CONSUME_REPORT_META } from "@/lib/constants";
+import { ConsumeReportMasthead } from "@/components/consume/consume-report-masthead";
+import { formatMonthDash } from "@/lib/date";
 import { formatBdt, type TagBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
@@ -39,7 +40,11 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
     ref,
   ) {
   const t = useT();
-  const [year, mon] = month.split("-");
+  const monthLabel = formatMonthDash(month);
+  const tagKey = `${tag} ${tagLabel}`.toUpperCase();
+  const title = tagKey.includes("CD") && !tagKey.includes("FR")
+    ? t("consume.cdBillTitle", { month: monthLabel })
+    : t("consume.frBillTitle", { month: monthLabel });
 
   return (
     <div
@@ -51,36 +56,15 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
           : "hidden print:block",
       )}
     >
-      <header className="mb-4 text-center text-black">
-        <p className="text-[10px] text-neutral-600">{CONSUME_REPORT_META.formNo}</p>
-        <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgNameBn}</p>
-        <p className="text-xs">{CONSUME_REPORT_META.orgName}</p>
-        <p className="mt-2 text-base font-bold tracking-wide">
-          {t("consume.billTitle", { label: tagLabel, month, tag })}
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-left text-[11px]">
-          <p>
-            {t("consume.metaWing")}: {CONSUME_REPORT_META.wingBn}
-          </p>
-          <p>
-            {t("consume.metaStation")}: {CONSUME_REPORT_META.stationBn}
-          </p>
-          <p>
-            {t("consume.month")}: {mon}/{year}
-          </p>
-          <p>
-            {t("consume.tag")}: {tag}
-          </p>
-        </div>
-      </header>
+      <ConsumeReportMasthead title={title} />
 
-      <table className="w-full border-collapse text-[11px] text-black">
+      <table className="w-full border-collapse text-center text-[11px] text-black">
         <thead>
           <tr className="border border-black bg-neutral-100">
             <th className="border border-black px-1.5 py-1">{t("consume.colSl")}</th>
             <th className="border border-black px-1.5 py-1">{t("consume.colId")}</th>
             <th className="border border-black px-1.5 py-1">{t("consume.colRank")}</th>
-            <th className="border border-black px-1.5 py-1 text-left">
+            <th className="border border-black px-1.5 py-1">
               {t("consume.colName")}
             </th>
             <th className="border border-black px-1.5 py-1">{tag}</th>
@@ -103,28 +87,28 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
         <tbody>
           {rows.map((row) => (
             <tr key={row.user.id}>
-              <td className="border border-black px-1.5 py-1 text-center tabular-nums">
+              <td className="border border-black px-1.5 py-1 tabular-nums">
                 {row.sl}
               </td>
               <td className="border border-black px-1.5 py-1 font-mono text-[10px]">
                 {row.user.personal_id || "—"}
               </td>
               <td className="border border-black px-1.5 py-1">{row.user.rank}</td>
-              <td className="border border-black px-1.5 py-1 text-left">
+              <td className="border border-black px-1.5 py-1">
                 {row.user.name}
               </td>
-              <td className="border border-black px-1.5 py-1 text-center tabular-nums">
+              <td className="border border-black px-1.5 py-1 tabular-nums">
                 {row.days}
               </td>
-              <td className="border border-black px-1.5 py-1 text-right tabular-nums">
+              <td className="border border-black px-1.5 py-1 tabular-nums">
                 {formatBdt(row.amount)}
               </td>
               {showFuel ? (
-                <td className="border border-black px-1.5 py-1 text-right tabular-nums">
+                <td className="border border-black px-1.5 py-1 tabular-nums">
                   {formatBdt(row.fuelAmount)}
                 </td>
               ) : null}
-              <td className="border border-black px-1.5 py-1 text-right tabular-nums font-medium">
+              <td className="border border-black px-1.5 py-1 tabular-nums font-medium">
                 {formatBdt(row.grandTotal)}
               </td>
               <td className="border border-black px-1.5 py-1">
@@ -137,22 +121,22 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
           <tr className="border border-black font-semibold">
             <td
               colSpan={4}
-              className="border border-black px-1.5 py-1.5 text-right"
+              className="border border-black px-1.5 py-1.5 text-center"
             >
               {t("consume.billTotal")}
             </td>
-            <td className="border border-black px-1.5 py-1.5 text-center tabular-nums">
+            <td className="border border-black px-1.5 py-1.5 tabular-nums">
               {totalDays}
             </td>
-            <td className="border border-black px-1.5 py-1.5 text-right tabular-nums">
+            <td className="border border-black px-1.5 py-1.5 tabular-nums">
               {formatBdt(totalAmount)}
             </td>
             {showFuel ? (
-              <td className="border border-black px-1.5 py-1.5 text-right tabular-nums">
+              <td className="border border-black px-1.5 py-1.5 tabular-nums">
                 {formatBdt(totalFuel)}
               </td>
             ) : null}
-            <td className="border border-black px-1.5 py-1.5 text-right tabular-nums">
+            <td className="border border-black px-1.5 py-1.5 tabular-nums">
               {formatBdt(grandTotal)}
             </td>
             <td className="border border-black px-1.5 py-1.5" />

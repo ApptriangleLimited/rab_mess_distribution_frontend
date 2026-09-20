@@ -117,7 +117,7 @@ export function downloadDayMsCdPdf({
     y,
     { align: "center" },
   );
-  y += 8;
+  y += 14;
 
   const showMs = include === "all" || include === "MS";
   const showCd = include === "all" || include === "CD";
