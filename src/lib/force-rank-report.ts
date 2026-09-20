@@ -290,7 +290,9 @@ function placeCivilCells(
   const leftover: string[] = [];
   for (const rank of ranks) {
     const key = civilSlotKey(rank);
-    const slot = CIVIL_SLOTS.findIndex((s) => s.keys.includes(key));
+    const slot = CIVIL_SLOTS.findIndex((s) =>
+      (s.keys as readonly string[]).includes(key),
+    );
     if (slot >= 0 && !slots[slot].rank) {
       slots[slot] = {
         rank,
