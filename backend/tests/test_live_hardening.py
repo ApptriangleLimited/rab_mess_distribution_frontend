@@ -18,10 +18,10 @@ def _live() -> bool:
 pytestmark = pytest.mark.skipif(not _live(), reason="API not running")
 
 
-def _login(email: str, password: str = "ChangeMe!") -> dict:
+def _login(rab_id: str, password: str = "ChangeMe!") -> dict:
     res = httpx.post(
         f"{BASE}/api/v1/auth/login",
-        json={"email": email, "password": password},
+        json={"rab_id": rab_id, "password": password},
         timeout=8,
     )
     assert res.status_code == 200, res.text
@@ -33,7 +33,7 @@ def _auth(token: str) -> dict:
 
 
 def test_refresh_rotation_and_reuse():
-    data = _login("cc@mess.rab")
+    data = _login("SRB-CC")
     first = data["refresh_token"]
     rotated = httpx.post(
         f"{BASE}/api/v1/auth/refresh",
@@ -67,7 +67,7 @@ def test_password_reset_generic_and_one_time():
 
 
 def test_snapshot_idor_consume_cannot_write_users():
-    token = _login("consume@mess.rab")["access_token"]
+    token = _login("SRB-CONSUME")["access_token"]
     before = httpx.get(f"{BASE}/api/v1/app/snapshot", headers=_auth(token), timeout=10)
     assert before.status_code == 200
     users = before.json()["data"]["users"]
@@ -85,7 +85,7 @@ def test_snapshot_idor_consume_cannot_write_users():
 
 
 def test_import_denied_for_non_admin():
-    token = _login("cc@mess.rab")["access_token"]
+    token = _login("SRB-CC")["access_token"]
     res = httpx.post(
         f"{BASE}/api/v1/app/import",
         headers=_auth(token),
@@ -96,7 +96,7 @@ def test_import_denied_for_non_admin():
 
 
 def test_permissions_and_notifications():
-    token = _login("cc@mess.rab")["access_token"]
+    token = _login("SRB-CC")["access_token"]
     perms = httpx.get(f"{BASE}/api/v1/auth/permissions", headers=_auth(token), timeout=8)
     assert perms.status_code == 200
     assert "member.view" in perms.json()["data"]["permissions"]
@@ -109,7 +109,7 @@ def test_permissions_and_notifications():
 
 
 def test_file_upload_and_forbidden_type():
-    token = _login("cc@mess.rab")["access_token"]
+    token = _login("SRB-CC")["access_token"]
     ok = httpx.post(
         f"{BASE}/api/v1/files",
         headers=_auth(token),
@@ -143,7 +143,7 @@ def test_security_headers_present():
 
 
 def test_logout_revokes_refresh():
-    data = _login("daily@mess.rab")
+    data = _login("SRB-DAILY")
     httpx.post(
         f"{BASE}/api/v1/auth/logout",
         headers=_auth(data["access_token"]),

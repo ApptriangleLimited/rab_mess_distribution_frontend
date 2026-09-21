@@ -59,7 +59,10 @@ class EmergencyContactIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    email: str
+    email: str = ""
+    srb_id: str = ""
+    rab_id: str = ""
+    username: str = ""
     password: str
     otp: str = ""
     recovery_code: str = ""
@@ -69,8 +72,11 @@ class LoginIn(BaseModel):
 class StaffPublic(BaseModel):
     id: str
     email: str
+    srb_id: str = ""
+    rab_id: str = ""
     display_name: str
     role: str
+    avatar: str = ""
 
 
 class LoginData(BaseModel):

@@ -1,6 +1,6 @@
 import { loginStaff } from "@/lib/api/auth";
 import { isApiEnabled } from "@/lib/api/mode";
-import { ROLE_KEYS, SEED_STAFF_EMAIL, SEED_STAFF_PASSWORD } from "@/lib/constants";
+import { ROLE_KEYS, SEED_STAFF_EMAIL, SEED_STAFF_PASSWORD, isSuperAdminLogin } from "@/lib/constants";
 import { nowISO } from "@/lib/date";
 import {
   setAccessToken,
@@ -13,7 +13,7 @@ function isRole(value: string): value is Role {
   return (ROLE_KEYS as readonly string[]).includes(value);
 }
 
-/** Demo role jump: log in as `{role}@mess.rab` so the API token matches. */
+/** Demo role jump: log in as `SRB-{ROLE}` so the API token matches. */
 export async function switchToSeedRole(
   role: Role,
   current?: Session | null,
@@ -23,11 +23,14 @@ export async function switchToSeedRole(
     if (!isRole(data.staff.role)) {
       throw new Error("Invalid staff role");
     }
+    const keepSwitcher =
+      Boolean(current?.roleSwitcher) || isSuperAdminLogin(current?.username);
     const next: Session = {
       role: data.staff.role,
       name: data.staff.display_name,
-      username: data.staff.email,
+      username: data.staff.srb_id || data.staff.rab_id || data.staff.email,
       loggedInAt: nowISO(),
+      roleSwitcher: keepSwitcher,
     };
     setAccessToken(data.access_token);
     if (data.refresh_token) setRefreshToken(data.refresh_token);
@@ -44,6 +47,8 @@ export async function switchToSeedRole(
     name: current?.name ?? role,
     username: seedUser,
     loggedInAt: current?.loggedInAt ?? nowISO(),
+    roleSwitcher:
+      Boolean(current?.roleSwitcher) || isSuperAdminLogin(current?.username),
   };
   setSession(next);
   return next;

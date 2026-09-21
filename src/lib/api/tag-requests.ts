@@ -48,7 +48,7 @@ export type TagRequestListData = {
 };
 
 export type TagRequestListParams = {
-  queue?: TagRequestQueue;
+  queue?: TagRequestQueue | "all";
   status?: string;
   q?: string;
   wing?: string;
@@ -102,7 +102,8 @@ export async function listTagRequests(params: TagRequestListParams = {}) {
   }
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value == null || value === "" || value === "all") continue;
+    if (value == null || value === "") continue;
+    if (value === "all" && key !== "queue") continue;
     qs.set(key, String(value));
   }
   const suffix = qs.toString() ? `?${qs}` : "";

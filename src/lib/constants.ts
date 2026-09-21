@@ -190,7 +190,7 @@ export const ADMIN_SUB_WINGS = [
 ] as const;
 
 /**
- * Headquarters Branch children (short = stored). Serial 1–6 under HQ Br.
+ * Headquarters Branch children (short = stored). Serial 1–7 under HQ Br.
  */
 export const HQ_SUB_WINGS = [
   "HQ Office",
@@ -199,6 +199,7 @@ export const HQ_SUB_WINGS = [
   "Fd Mess",
   "MT Br",
   "New Temp Att",
+  "HQ",
 ] as const;
 
 /** Old HQ / Admin names — remapped or stripped so the paper list wins. */
@@ -278,6 +279,7 @@ export const WING_LABELS: Record<string, string> = {
   "Dev Br": "Development Branch",
   "Wksp Br": "Central Workshop Branch",
   "HQ Br": "Headquarters Branch",
+  HQ: "Headquarter",
   "HQ Office": "Headquarters Office",
   "SY Br": "Security Branch",
   "Forces Mess": "Forces Mess",
@@ -316,6 +318,7 @@ export const WING_LABELS_BN: Record<string, string> = {
   "Dev Br": "উন্নয়ন শাখা",
   "Wksp Br": "কেন্দ্রীয় ওয়ার্কশপ শাখা",
   "HQ Br": "সদর দপ্তর শাখা",
+  HQ: "সদর",
   "HQ Office": "সদর দপ্তর অফিস",
   "SY Br": "নিরাপত্তা শাখা",
   "Forces Mess": "ফোর্সেস মেস",
@@ -324,7 +327,7 @@ export const WING_LABELS_BN: Record<string, string> = {
   "New Temp Att": "নতুন অস্থায়ী সংযুক্ত",
 };
 
-/** Official serials: mains 1–10, Admin children 1–15, HQ children 1–6. */
+/** Official serials: mains 1–10, Admin children 1–15, HQ children 1–7. */
 export const WING_CATALOG_SERIALS: Record<string, number> = {
   ...Object.fromEntries(WINGS.map((wing, i) => [wing, i + 1])),
   ...Object.fromEntries(ADMIN_SUB_WINGS.map((wing, i) => [wing, i + 1])),
@@ -1628,4 +1631,10 @@ export const REMEMBER_EMAIL_KEY = "mess_login_email";
 export const SEED_STAFF_PASSWORD = "ChangeMe!";
 export const SEED_STAFF_RAB_ID = (role: Role) => `SRB-${role.toUpperCase()}`;
 export const SEED_STAFF_EMAIL = SEED_STAFF_RAB_ID;
+export const SUPERADMIN_SRB_ID = "SRB-SUPERADMIN";
+export const SUPERADMIN_PASSWORD = "SuperAdmin@123";
+
+export function isSuperAdminLogin(id?: string | null) {
+  return (id || "").trim().toUpperCase() === SUPERADMIN_SRB_ID;
+}
 export const STORE_KEY = "mess_proto_v1";

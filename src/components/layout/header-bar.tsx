@@ -13,11 +13,15 @@ import {
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { ProfileDialog } from "@/components/layout/profile-dialog";
+import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { switchToSeedRole } from "@/lib/api/switch-role";
+import { ROLE_KEYS, isSuperAdminLogin } from "@/lib/constants";
 import type { Role, Session } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import type { Locale } from "@/i18n";
 import { roleLabel } from "@/i18n";
-import { getProfileAvatar } from "@/lib/session";
+import { getProfileAvatar, homeForRole } from "@/lib/session";
 
 export function HeaderBar({
   session,
@@ -37,11 +41,31 @@ export function HeaderBar({
   onProfileSaved?: (name: string, avatarUrl: string | null, username?: string) => void;
 }) {
   const t = useT();
+  const { toast } = useToast();
   const { locale, setLocale } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const avatarUrl = session.avatarUrl ?? getProfileAvatar(session.role, session.username) ?? null;
+  const canSwitchRoles =
+    Boolean(session.roleSwitcher) || isSuperAdminLogin(session.username);
+
+  async function onSwitchRole(role: Role) {
+    if (role === session.role || switching) return;
+    setSwitching(true);
+    try {
+      await switchToSeedRole(role, session);
+      toast(t("settings.switchedTo", { role: roleLabel(role, locale) }), "success");
+      window.location.href = homeForRole(role);
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("settings.switchFailed"),
+        "error",
+      );
+      setSwitching(false);
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -116,6 +140,24 @@ export function HeaderBar({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          {canSwitchRoles ? (
+            <label className="flex items-center gap-1.5">
+              <span className="sr-only">{t("settings.activeRole")}</span>
+              <select
+                className="h-9 max-w-[9.5rem] rounded-xl border border-white/15 bg-white/10 px-2 text-xs font-semibold text-white outline-none ring-white/20 hover:bg-white/15 focus:ring-2"
+                value={session.role}
+                disabled={switching}
+                onChange={(e) => void onSwitchRole(e.target.value as Role)}
+                aria-label={t("settings.roleSwitcher")}
+              >
+                {ROLE_KEYS.map((role) => (
+                  <option key={role} value={role} className="text-neutral-900">
+                    {roleLabel(role, locale)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div
             className="flex items-center rounded-2xl border border-white/10 bg-white/[0.07] p-0.5 shadow-inner shadow-black/10"
             role="group"

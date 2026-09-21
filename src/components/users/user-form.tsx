@@ -63,6 +63,7 @@ import {
   listForces,
   listRanks,
   listWingChildren,
+  listWingDescendants,
   memberWingCascade,
 } from "@/lib/store/org-options";
 import { useStore } from "@/hooks/use-store";
@@ -203,7 +204,7 @@ export function UserForm({
     [store.wings, store.wing_parent, store.wing_serials],
   );
   const hqSubWings = useMemo(
-    () => listWingChildren("HQ Br"),
+    () => listWingDescendants("HQ Br"),
     [store.wings, store.wing_parent, store.wing_serials],
   );
   const forces = useMemo(() => listForces(), [store.forces]);

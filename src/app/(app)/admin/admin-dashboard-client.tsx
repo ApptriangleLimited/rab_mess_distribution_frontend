@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -34,6 +34,10 @@ import { PagePane } from "@/components/shared/page-pane";
 import { RationTabs } from "@/components/layout/ration-tabs";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
+import { syncStoreFromApi } from "@/lib/api/app-sync";
+import { onCcDataChange } from "@/lib/api/cc-events";
+import { listAllMembers, memberToUser } from "@/lib/api/members";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import {
   formatDateDisplay,
   monthDatesThroughToday,
@@ -54,7 +58,7 @@ import { useI18n, useT } from "@/i18n/provider";
 import { tagLabel } from "@/i18n";
 import { formatBdt } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { ApprovalStatus } from "@/lib/types";
+import type { ApprovalStatus, User } from "@/lib/types";
 
 const WING_COLORS = [
   "#0d9488",
@@ -148,9 +152,35 @@ export default function AdminDashboardClient() {
   const { source } = useReportSource({ month });
   const today = todayISO();
   const tomorrow = nextISODate(today);
+  const apiOn = isCcApiEnabled();
+  const [apiUsers, setApiUsers] = useState<User[] | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+
+  useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setApiUsers(null);
+      return;
+    }
+    let cancelled = false;
+    void syncStoreFromApi().catch(() => undefined);
+    listAllMembers()
+      .then((rows) => {
+        if (!cancelled) setApiUsers(rows.map(memberToUser));
+      })
+      .catch(() => {
+        if (!cancelled) setApiUsers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, reloadTick]);
 
   const stats = useMemo(() => {
-    const users = state.users;
+    const users =
+      apiUsers ??
+      (source?.users?.length ? source.users : state.users);
     const accepted = users.filter((u) => u.approval_status === "approved");
     const pendingUsers = users
       .filter((u) => u.approval_status === "pending")
@@ -160,7 +190,10 @@ export default function AdminDashboardClient() {
     const ended = users.filter((u) => u.approval_status === "ended").length;
     const active = accepted.filter((u) => u.status === "1").length;
     const inactive = accepted.filter((u) => u.status === "0").length;
-    const taggedToday = state.assignments.filter((a) => a.date === today).length;
+    const assignments = source?.assignments?.length
+      ? source.assignments
+      : state.assignments;
+    const taggedToday = assignments.filter((a) => a.date === today).length;
 
     const messToday = getMessEaters(today);
     const messTomorrow = getProjectedMessEaters(tomorrow);
@@ -241,7 +274,7 @@ export default function AdminDashboardClient() {
       .slice()
       .reverse()
       .map((date) => {
-        const dayTags = state.assignments.filter((a) => a.date === date);
+        const dayTags = assignments.filter((a) => a.date === date);
         const ms = dayTags.filter((a) => a.tag === "MS").length;
         return {
           date,
@@ -251,11 +284,12 @@ export default function AdminDashboardClient() {
         };
       });
 
-    const liveRates = state.rates
+    const liveRates = (source?.rates?.length ? source.rates : state.rates)
       .filter((r) => r.amount_per_day > 0)
       .sort((a, b) => b.amount_per_day - a.amount_per_day);
 
-    const bankMaps = state.senders.reduce(
+    const senders = source?.senders?.length ? source.senders : state.senders;
+    const bankMaps = senders.reduce(
       (n, s) => n + s.mapped_tags.length,
       0,
     );
@@ -314,13 +348,15 @@ export default function AdminDashboardClient() {
       pendingUsers: pendingUsers.slice(0, 6),
       active,
       inactive,
-      banks: state.senders.length,
+      banks: senders.length,
       bankMaps,
       taggedToday,
       tagDayTotal,
       msMonth,
       frMonth,
-      messToday: messToday.length,
+      messToday:
+        messToday.length ||
+        assignments.filter((a) => a.date === today && a.tag === "MS").length,
       messTomorrow: messTomorrow.eaters.length,
       messTomorrowTagged: messTomorrow.tagged,
       messTomorrowCarried: messTomorrow.carried,
@@ -338,6 +374,7 @@ export default function AdminDashboardClient() {
       mealShiftPie,
     };
   }, [
+    apiUsers,
     state.users,
     state.assignments,
     state.senders,
@@ -869,7 +906,7 @@ export default function AdminDashboardClient() {
             subtitle={t("pages.adminDashboard.pending.hint")}
             action={
               <Link
-                href="/ration/members"
+                href="/admin/members"
                 className="text-[11px] font-semibold text-teal-700 hover:underline dark:text-teal-300"
               >
                 {t("pages.adminDashboard.pending.viewAll")}

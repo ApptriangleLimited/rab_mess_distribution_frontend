@@ -2,8 +2,10 @@
 
 import { usePathname } from "next/navigation";
 import { IconSend, IconUsers } from "@tabler/icons-react";
+import { AdminTabs } from "@/components/layout/ration-tabs";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
 import { useRequestMenuBadge } from "@/hooks/use-pending-request-counts";
+import { useSession } from "@/hooks/use-session";
 import { useT } from "@/i18n/provider";
 
 const TABS = [
@@ -29,7 +31,12 @@ const TABS = [
 export function CcTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();
+  const { session } = useSession();
   const requestBadge = useRequestMenuBadge("/cc/requested");
+
+  if (session?.role === "admin") {
+    return <AdminTabs className={className} />;
+  }
 
   return (
     <RoleNavTabs

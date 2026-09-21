@@ -269,8 +269,8 @@ export function WingTreeList() {
   }
 
   function onSave() {
-    const label = formValue.trim();
     const full = formFull.trim();
+    const label = formValue.trim() || full;
     const bangla = formBangla.trim();
     const serial = parsedSerial();
     if (!label) {
@@ -454,7 +454,7 @@ export function WingTreeList() {
             <Input
               value={formValue}
               onChange={(e) => setFormValue(e.target.value)}
-              placeholder={t("settings.wingPlaceholder")}
+              placeholder={t("settings.wingShortOptional")}
               className="h-9 rounded-lg text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {

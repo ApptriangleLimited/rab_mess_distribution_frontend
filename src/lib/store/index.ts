@@ -385,7 +385,14 @@ function ensureWings(raw: unknown): string[] {
       ...LEGACY_FORM1_WINGS,
       ...LEGACY_HQ_SUB_WINGS,
       ...DROPPED_MAIN_WINGS,
-    ].map((w) => w.toLowerCase()),
+    ]
+      .map((w) => w.toLowerCase())
+      .filter(
+        (key) =>
+          !WINGS.some((w) => w.toLowerCase() === key) &&
+          !ADMIN_SUB_WINGS.some((w) => w.toLowerCase() === key) &&
+          !HQ_SUB_WINGS.some((w) => w.toLowerCase() === key),
+      ),
   );
   const catalog = uniqueWingLabels([
     ...WINGS,
@@ -847,13 +854,6 @@ function ensureWingParent(
   for (const [child, parent] of Object.entries(DEFAULT_WING_PARENT)) {
     if (!wingSet.has(child) || !wingSet.has(parent)) continue;
     out[child] = parent;
-  }
-  const hqKids = new Set(HQ_SUB_WINGS.map((wing) => wing.toLowerCase()));
-  for (const [child, parent] of Object.entries(out)) {
-    if (parent.toLowerCase() !== "hq br") continue;
-    if (hqKids.has(child.toLowerCase())) continue;
-    if (wingSet.has("Admin")) out[child] = "Admin";
-    else delete out[child];
   }
   return out;
 }
@@ -1693,11 +1693,15 @@ export function getState(): AppState {
     apiBacked = true;
   }
   if (memory && isCurrentSeed(memory)) {
-    const hasBanned = memory.wings.some((w) =>
-      [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS, ...DROPPED_MAIN_WINGS].some(
-        (b) => b.toLowerCase() === w.toLowerCase(),
-      ),
-    );
+    const hasBanned = memory.wings.some((w) => {
+      const key = w.toLowerCase();
+      if (HQ_SUB_WINGS.some((wing) => wing.toLowerCase() === key)) return false;
+      if (ADMIN_SUB_WINGS.some((wing) => wing.toLowerCase() === key)) return false;
+      if (WINGS.some((wing) => wing.toLowerCase() === key)) return false;
+      return [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS, ...DROPPED_MAIN_WINGS].some(
+        (b) => b.toLowerCase() === key,
+      );
+    });
     const catalogMetaMissing =
       !memory.wing_labels_bn || !memory.wing_serials;
     const officialLabelsStale = WINGS.some((wing) => {
@@ -1713,15 +1717,9 @@ export function getState(): AppState {
     });
     const officialSubs = [...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS];
     const haveWings = new Set(memory.wings.map((w) => w.toLowerCase()));
-    const strayHqKids = Object.entries(memory!.wing_parent ?? {}).some(
-      ([child, parent]) =>
-        (parent ?? "").trim().toLowerCase() === "hq br" &&
-        !HQ_SUB_WINGS.some((wing) => wing.toLowerCase() === child.toLowerCase()),
-    );
     const adminHqCatalogStale =
       officialSubs.some((wing) => !haveWings.has(wing.toLowerCase())) ||
       HQ_SUB_WINGS.some((wing) => memory!.wing_parent[wing] !== "HQ Br") ||
-      strayHqKids ||
       officialSubs.some((wing) => memory!.wing_serials?.[wing] == null) ||
       officialSubs.some(
         (wing) => !(memory!.wing_labels_bn?.[wing] ?? "").trim(),
@@ -1919,7 +1917,8 @@ function normalizeState(state: AppState): AppState {
   );
   return {
     ...state,
-    users: ensureTrustFirewoodMembers(ensureCockpitPoliceMembers((state.users ?? []).map((u) => {
+    users: (() => {
+      const mapped = (state.users ?? []).map((u) => {
       const legacy = u as LegacyUser;
       const {
         emergency_name: _n,
@@ -1963,8 +1962,14 @@ function normalizeState(state: AppState): AppState {
         ),
         emergency_contacts: normalizeEmergencyContacts(legacy),
       };
-    }))),
-    assignments: ensureTrustFirewoodAssignments(state.assignments ?? []),
+      });
+      if (apiBacked || isCcApiEnabled()) return mapped;
+      return ensureTrustFirewoodMembers(ensureCockpitPoliceMembers(mapped));
+    })(),
+    assignments:
+      apiBacked || isCcApiEnabled()
+        ? (state.assignments ?? [])
+        : ensureTrustFirewoodAssignments(state.assignments ?? []),
     rates: ensureRateOnlyRates(state.rates ?? []),
     ranks: ensureRanks(state.ranks),
     wings: ensureWings(state.wings),

@@ -17,10 +17,13 @@ from auth import (
     JWT_EXPIRES_SECONDS,
     create_access_token,
     current_staff,
+    find_staff_by_login,
     hash_password,
     issue_refresh_session,
     revoke_staff_sessions,
     rotate_refresh_session,
+    set_staff_password,
+    staff_login_id_from_body,
     verify_password,
 )
 from audit import write_audit
@@ -31,7 +34,7 @@ from jobs import enqueue, send_reset_email
 from models import CatalogState, FileObject, Notification, PasswordReset, Staff
 from permissions import require_permission, role_permission_codes
 from persist import CATALOG_KEYS, apply_catalog
-from rate_limit import client_ip, enforce_reset_limit
+from rate_limit import client_ip, clear_login_limits, enforce_login_limits, enforce_reset_limit
 from security import (
     decrypt_secret,
     encrypt_secret,
@@ -88,6 +91,15 @@ class PasswordChangeIn(BaseModel):
     new_password: str
 
 
+class LoginPasswordChangeIn(BaseModel):
+    srb_id: str = ""
+    rab_id: str = ""
+    email: str = ""
+    username: str = ""
+    current_password: str
+    new_password: str
+
+
 class MfaEnableIn(BaseModel):
     otp: str
 
@@ -105,8 +117,11 @@ def staff_public(staff: Staff, db: Session | None = None) -> dict:
     data = {
         "id": staff.id,
         "email": staff.email,
+        "srb_id": staff.email,
+        "rab_id": staff.email,
         "display_name": staff.display_name,
         "role": staff.role,
+        "avatar": getattr(staff, "avatar", "") or "",
         "mfa_enabled": bool(staff.mfa_enabled),
     }
     if db is not None:
@@ -201,8 +216,7 @@ def reset_password(body: ResetIn, request: Request, db: Session = Depends(get_db
     error = validate_password(body.password, staff.email)
     if error:
         return fail(422, error, "AUTH_PASSWORD_WEAK")
-    staff.password_hash = hash_password(body.password)
-    staff.password_changed_at = utcnow()
+    set_staff_password(staff, body.password)
     row.used_at = utcnow()
     db.query(PasswordReset).filter(
         PasswordReset.staff_id == staff.id,
@@ -224,20 +238,35 @@ def reset_password(body: ResetIn, request: Request, db: Session = Depends(get_db
     return envelope(None, "Password updated")
 
 
-@router.post("/api/v1/auth/change-password")
-def change_password(
-    body: PasswordChangeIn,
+def _apply_password_change(
+    db: Session,
     request: Request,
-    staff: Staff = Depends(current_staff),
-    db: Session = Depends(get_db),
+    staff: Staff,
+    current_password: str,
+    new_password: str,
+    *,
+    login_id: str = "",
 ):
-    if not verify_password(body.current_password, staff.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    error = validate_password(body.new_password, staff.email)
+    if not verify_password(current_password, staff.password_hash):
+        write_audit(
+            db,
+            actor_id=staff.id,
+            action="PASSWORD_CHANGE_FAIL",
+            entity="staff",
+            entity_id=login_id or staff.id,
+            ip=client_ip(request),
+            user_agent=request.headers.get("user-agent", ""),
+        )
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid SRB ID or password")
+    if not staff.active:
+        return fail(401, "Account is inactive", "AUTH_INACTIVE")
+    if current_password == new_password:
+        return fail(400, "New password must be different", "AUTH_PASSWORD_SAME")
+    error = validate_password(new_password, staff.email)
     if error:
         return fail(422, error, "AUTH_PASSWORD_WEAK")
-    staff.password_hash = hash_password(body.new_password)
-    staff.password_changed_at = utcnow()
+    set_staff_password(staff, new_password)
     revoke_staff_sessions(db, staff.id)
     revoke_staff_access(staff.id)
     write_audit(
@@ -251,6 +280,57 @@ def change_password(
     )
     db.commit()
     return envelope(None, "Password updated")
+
+
+@router.post("/api/v1/auth/login-change-password")
+def change_password_at_login(
+    body: LoginPasswordChangeIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    login_id = staff_login_id_from_body(body)
+    enforce_login_limits(request, login_id or "unknown")
+    staff = find_staff_by_login(db, login_id)
+    if staff is None:
+        write_audit(
+            db,
+            actor_id="",
+            action="PASSWORD_CHANGE_FAIL",
+            entity="staff",
+            entity_id=login_id,
+            ip=client_ip(request),
+            user_agent=request.headers.get("user-agent", ""),
+        )
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid SRB ID or password")
+    result = _apply_password_change(
+        db,
+        request,
+        staff,
+        body.current_password,
+        body.new_password,
+        login_id=login_id,
+    )
+    if getattr(result, "status_code", 200) < 400:
+        clear_login_limits(request, login_id)
+    return result
+
+
+@router.post("/api/v1/auth/change-password")
+def change_password(
+    body: PasswordChangeIn,
+    request: Request,
+    staff: Staff = Depends(current_staff),
+    db: Session = Depends(get_db),
+):
+    return _apply_password_change(
+        db,
+        request,
+        staff,
+        body.current_password,
+        body.new_password,
+        login_id=staff.email,
+    )
 
 
 @router.get("/api/v1/auth/permissions")

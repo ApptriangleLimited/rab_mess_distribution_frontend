@@ -140,6 +140,24 @@ export function memberToUser(row: MemberApiRow): User {
   };
 }
 
+/** Every member (all approval states), paging past the first 500. */
+export async function listAllMembers() {
+  const pageSize = 500;
+  const first = await listMembers({ page: 1, page_size: pageSize });
+  const items = [...(first.items ?? [])];
+  const total = first.total ?? items.length;
+  const pages = Math.min(20, Math.ceil(total / pageSize) || 1);
+  if (pages <= 1) return items;
+
+  const rest = await Promise.all(
+    Array.from({ length: pages - 1 }, (_, i) =>
+      listMembers({ page: i + 2, page_size: pageSize }),
+    ),
+  );
+  for (const data of rest) items.push(...(data.items ?? []));
+  return items;
+}
+
 /** Every approved member, paging past the first 500. Default: active only. */
 export async function listAllApprovedMembers(opts?: { status?: string }) {
   const pageSize = 500;

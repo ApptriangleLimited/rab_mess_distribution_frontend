@@ -44,6 +44,7 @@ export function MemberAcceptActions({
   withTag = false,
   iconOnly = false,
   after,
+  onAccepted,
 }: {
   user: User;
   withTag?: boolean;
@@ -51,6 +52,8 @@ export function MemberAcceptActions({
   iconOnly?: boolean;
   /** Renders after Accept/Reject (e.g. Edit). */
   after?: ReactNode;
+  /** After a successful accept: close preview and return to the list. */
+  onAccepted?: () => void;
 }) {
   const t = useT();
   const { toast } = useToast();
@@ -108,35 +111,50 @@ export function MemberAcceptActions({
             : undefined;
           const queue =
             needsTag && actionTag ? dutyTagQueue(actionTag, trgTone) : "immediate";
-          await acceptMember(user.id, needsTag && actionTag ? actionTag : undefined);
-          if (needsTag && actionTag && queue !== "immediate") {
-            const created = await createTagRequestApi({
-              userId: user.id,
-              toTag: actionTag,
-              from: todayISO(),
-              to: todayISO(),
-              queue,
-              trg_tone: trgTone,
-              trg_sarda:
-                isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
-                  ? sardaChecked
-                  : undefined,
-            });
-            upsertLocalTagRequest(requestToTagRequest(created));
-            toast(
-              queue === "ration"
-                ? t("daily.queuedRation", { tag: actionTag })
-                : t("daily.queuedConsume", { tag: actionTag }),
-              "success",
-            );
+          try {
+            await acceptMember(user.id, needsTag && actionTag ? actionTag : undefined);
+          } catch (err) {
+            const already =
+              err instanceof ApiClientError &&
+              /already a member/i.test(err.detail);
+            if (!already) throw err;
           }
+          approveUser(user.id);
+          if (needsTag && actionTag && queue !== "immediate") {
+            try {
+              const created = await createTagRequestApi({
+                userId: user.id,
+                toTag: actionTag,
+                from: todayISO(),
+                to: todayISO(),
+                queue,
+                trg_tone: trgTone,
+                trg_sarda:
+                  isTrgTag(actionTag) && needsTrgSardaPrompt(user.force)
+                    ? sardaChecked
+                    : undefined,
+              });
+              upsertLocalTagRequest(requestToTagRequest(created));
+              toast(
+                queue === "ration"
+                  ? t("daily.queuedRation", { tag: actionTag })
+                  : t("daily.queuedConsume", { tag: actionTag }),
+                "success",
+              );
+            } catch {
+              // Member is already accepted — don't keep the preview open.
+            }
+          }
+          notifyCcDataChange();
+          setPendingAction(null);
           toast(t("daily.approvedToast"), "success");
+          onAccepted?.();
         } else {
           await rejectMember(user.id);
+          notifyCcDataChange();
+          setPendingAction(null);
           toast(t("daily.rejectedToast"), "success");
         }
-        notifyCcDataChange();
-        setPendingAction(null);
       } catch (err) {
         toast(
           err instanceof ApiClientError ? err.detail : t("cc.createFail"),
@@ -188,12 +206,14 @@ export function MemberAcceptActions({
         }
       }
       approveUser(user.id);
+      setPendingAction(null);
       toast(t("daily.approvedToast"), "success");
-    } else {
-      rejectUser(user.id);
-      toast(t("daily.rejectedToast"), "success");
+      onAccepted?.();
+      return;
     }
+    rejectUser(user.id);
     setPendingAction(null);
+    toast(t("daily.rejectedToast"), "success");
   }
 
   const copy =

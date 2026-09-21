@@ -654,7 +654,13 @@ export const bn = {
     staffRabIdHint: "এই এসআরবি আইডি ও পাসওয়ার্ড দিয়ে লগইন করবে।",
     staffSrbId: "এসআরবি আইডি",
     staffSrbIdRequired: "এসআরবি আইডি লিখুন, ইমেইল নয়।",
-    staffSrbIdHint: "এই এসআরবি আইডি ও পাসওয়ার্ড দিয়ে লগইন করবে।",
+    staffSrbIdHint:
+      "গৃহীত সদস্যের এসআরবি আইডি হতে হবে। আগে সদস্য যোগ করুন, তারপর এই লগইন তৈরি করুন।",
+    staffMustBeMember:
+      "এই এসআরবি আইডির গৃহীত সদস্য নেই। আগে সদস্য যোগ করুন, তারপর স্টাফ অ্যাকাউন্ট তৈরি করুন।",
+    staffMemberPending:
+      "এই এসআরবি আইডি এখনো পেন্ডিং। আগে Daily সদস্য গ্রহণ করুক।",
+    staffMemberFound: "সদস্য পাওয়া গেছে: {name}",
     staffViewPassword: "পাসওয়ার্ড দেখুন",
     staffHidePassword: "লুকান",
     staffCopyPassword: "কপি",
@@ -723,7 +729,8 @@ export const bn = {
     wingSerial: "ক্রমিক",
     addSubWing: "সাব-উইং",
     addSubWingTitle: "নতুন সাব-উইং",
-    addSubWingBody: "{parent} এর নিচে যোগ করুন।",
+    addSubWingBody:
+      "{parent} এর নিচে যোগ করুন। সংক্ষিপ্ত নাম ইউনিক হতে হবে; খালি রাখলে পূর্ণ নাম ব্যবহার হবে।",
     subWingAdded: "সাব-উইং যোগ হয়েছে",
     wingChildBadge: "{count} সাব",
     wingChildBadgePlural: "{count} সাব",
@@ -794,6 +801,7 @@ export const bn = {
     forceName: "ফোর্স",
     rankPlaceholder: "যেমন DAD",
     wingPlaceholder: "যেমন Ops Wg",
+    wingShortOptional: "ঐচ্ছিক — খালি রাখলে পূর্ণ নাম ব্যবহার হবে",
     wingFullPlaceholder: "যেমন Operations Wing",
     forcePlaceholder: "যেমন Army",
     rankAdded: "পদবী যোগ হয়েছে",

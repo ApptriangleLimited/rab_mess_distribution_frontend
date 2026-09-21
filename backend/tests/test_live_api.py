@@ -24,7 +24,7 @@ def test_ready_and_login():
     assert ready.status_code == 200
     login = httpx.post(
         f"{BASE}/api/v1/auth/login",
-        json={"email": "cc@mess.rab", "password": "ChangeMe!"},
+        json={"rab_id": "SRB-CC", "password": "ChangeMe!"},
         timeout=5,
     )
     assert login.status_code == 200

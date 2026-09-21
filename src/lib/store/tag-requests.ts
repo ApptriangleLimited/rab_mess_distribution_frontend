@@ -140,6 +140,9 @@ export function pendingRequestCountForHref(
   if (href.startsWith("/daily/requests") || href.startsWith("/cc/requested")) {
     return counts.daily;
   }
+  if (href.startsWith("/admin/requests")) {
+    return counts.daily + counts.ration + counts.consume;
+  }
   if (href.startsWith("/ration/requests")) return counts.ration;
   if (href.startsWith("/consume/requests")) return counts.consume;
   return 0;

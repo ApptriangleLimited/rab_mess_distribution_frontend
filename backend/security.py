@@ -50,7 +50,8 @@ def validate_password(password: str, email: str = "") -> str | None:
         return "Password is too common"
     if email:
         local = email.split("@", 1)[0].lower()
-        if local and local in password.lower():
+        # Numeric SRB IDs often appear in passwords (e.g. name@425691).
+        if local and not local.isdigit() and local in password.lower():
             return "Password must not include the account name"
     if password.isalpha() or password.isdigit():
         return "Password must mix letters with numbers or symbols"

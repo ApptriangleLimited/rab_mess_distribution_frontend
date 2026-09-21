@@ -7,6 +7,7 @@ import {
   SESSION_COOKIE,
   SESSION_STORAGE_KEY,
   SESSION_TTL_SECONDS,
+  isSuperAdminLogin,
 } from "@/lib/constants";
 import type { Role, Session } from "@/lib/types";
 
@@ -78,6 +79,7 @@ export function getSessionFromStorage(): Session | null {
       ...next,
       username,
       avatarUrl: getProfileAvatar(next.role, username) ?? undefined,
+      roleSwitcher: Boolean(next.roleSwitcher) || isSuperAdminLogin(username),
     };
   }
   const leftover =
@@ -94,6 +96,7 @@ export function setSession(session: Session, remember?: boolean) {
     name: session.name,
     username: session.username || "",
     loggedInAt: session.loggedInAt,
+    roleSwitcher: Boolean(session.roleSwitcher),
   });
   const encoded = encodeURIComponent(payload);
   if (persist) {
@@ -201,8 +204,8 @@ export function isRoleAllowed(role: Role, pathname: string) {
     consume: "/consume",
     /** Ration also uses Consume panels (ledger / bills / summary). */
     ration: ["/ration", "/consume"],
-    /** Admin = ration panels + /admin dashboard. */
-    admin: ["/admin", "/ration", "/consume"],
+    /** Admin = own desk + member CRUD (/cc) + ration/consume panels. */
+    admin: ["/admin", "/ration", "/consume", "/cc"],
   };
   const allowed = map[role];
   const prefixes = Array.isArray(allowed) ? allowed : [allowed];

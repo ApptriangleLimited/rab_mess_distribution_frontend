@@ -4,6 +4,7 @@ import {
   canonicalForceServiceRank,
   forceRankChoices,
   forceRankOfficialSerial,
+  ADMIN_SUB_WINGS,
   DROPPED_MAIN_WINGS,
   HQ_SUB_WINGS,
   LEGACY_FORM1_WINGS,
@@ -21,10 +22,14 @@ import {
 import { persistAppStateNow } from "@/lib/api/app-sync";
 import { getState, setState } from "@/lib/store";
 
+const OFFICIAL_WING_KEYS = new Set(
+  [...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS].map((w) => w.toLowerCase()),
+);
+
 const BANNED_WINGS = new Set(
-  [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS, ...DROPPED_MAIN_WINGS].map((w) =>
-    w.toLowerCase(),
-  ),
+  [...LEGACY_WINGS, ...LEGACY_FORM1_WINGS, ...DROPPED_MAIN_WINGS]
+    .filter((w) => !OFFICIAL_WING_KEYS.has(w.toLowerCase()))
+    .map((w) => w.toLowerCase()),
 );
 
 function normalizeLabel(value: string): string {
@@ -66,6 +71,28 @@ function lookupParent(
   return "";
 }
 
+function resolveWingName(wings: string[], label: string): string {
+  const want = canonicalWingName(normalizeLabel(label)).toLowerCase();
+  if (!want) return "";
+  return (
+    wings.find((w) => w.toLowerCase() === want) ||
+    wings.find((w) => canonicalWingName(w).toLowerCase() === want) ||
+    ""
+  );
+}
+
+function wingNameTaken(label: string, except?: string): boolean {
+  const key = canonicalWingName(normalizeLabel(label)).toLowerCase();
+  if (!key) return false;
+  if (BANNED_WINGS.has(key)) return true;
+  return listWings().some((w) => {
+    if (except && w === except) return false;
+    return (
+      w.toLowerCase() === key || canonicalWingName(w).toLowerCase() === key
+    );
+  });
+}
+
 /** Direct children of `parent` (null = root wings). Order follows catalog. */
 export function listWingChildrenFrom(
   wings: string[],
@@ -90,14 +117,24 @@ export function listWingChildrenFrom(
   const parents = (Array.isArray(parent) ? parent : [parent]).map((p) =>
     p.trim().toLowerCase(),
   );
-  if (parents.some((p) => p === "hq br" || p === "headquarters branch")) {
-    return [...HQ_SUB_WINGS];
-  }
   const hqKids = new Set(HQ_SUB_WINGS.map((w) => w.toLowerCase()));
-  return live.filter((w) => {
+  const extras = live.filter((w) => {
     if (hqKids.has(w.toLowerCase())) return false;
     return parents.includes(lookupParent(wingParent, w).toLowerCase());
   });
+  if (parents.some((p) => p === "hq br" || p === "headquarters branch")) {
+    const hqSeen = new Set(HQ_SUB_WINGS.map((w) => w.toLowerCase()));
+    return [
+      ...HQ_SUB_WINGS,
+      ...extras.filter((w) => {
+        const key = w.toLowerCase();
+        if (hqSeen.has(key)) return false;
+        hqSeen.add(key);
+        return true;
+      }),
+    ];
+  }
+  return extras;
 }
 
 export function listWingChildren(parent: string | null): string[] {
@@ -108,6 +145,23 @@ export function listWingChildren(parent: string | null): string[] {
     if (as !== bs) return as - bs;
     return a.localeCompare(b);
   });
+}
+
+/** Nested children under `parent` (depth-first, catalog order per level). */
+export function listWingDescendants(parent: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const walk = (node: string) => {
+    for (const child of listWingChildren(node)) {
+      const key = child.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(child);
+      walk(child);
+    }
+  };
+  walk(parent);
+  return out;
 }
 
 /** Settings wings in serial order: mains, then Admin/HQ children. */
@@ -125,7 +179,7 @@ export function listOfficialWings(): string[] {
     for (const child of listWingChildren(main)) {
       push(child);
       if (isHqBranchName(child)) {
-        for (const hq of listWingChildren(child)) push(hq);
+        for (const hq of listWingDescendants(child)) push(hq);
       }
     }
   }
@@ -155,17 +209,32 @@ export function memberWingCascade(wing: string): {
   const stored = normalizeLabel(wing);
   if (!stored) return { main: "", sub: "", leaf: "" };
   const { wing_parent } = getState();
-  const parent = lookupParent(wing_parent, stored);
-  if (isHqSubWingName(stored) || isHqBranchName(parent)) {
-    return { main: "Admin", sub: "HQ Br", leaf: stored };
-  }
   if (isHqBranchName(stored)) {
     return { main: "Admin", sub: "HQ Br", leaf: "" };
   }
-  if (isAdminRootName(parent) || isAdminRootName(stored)) {
+  const chain: string[] = [stored];
+  const seen = new Set<string>([stored.toLowerCase()]);
+  let cur = lookupParent(wing_parent, stored);
+  while (cur) {
+    const key = cur.toLowerCase();
+    if (seen.has(key)) break;
+    seen.add(key);
+    chain.unshift(cur);
+    cur = lookupParent(wing_parent, cur);
+  }
+  if (chain.some(isHqBranchName) || isHqSubWingName(stored)) {
+    const leaf = chain[chain.length - 1];
     return {
       main: "Admin",
-      sub: isAdminRootName(stored) ? "" : stored,
+      sub: "HQ Br",
+      leaf: isHqBranchName(leaf) ? "" : leaf,
+    };
+  }
+  if (chain.some(isAdminRootName) || isAdminRootName(stored)) {
+    const last = chain[chain.length - 1];
+    return {
+      main: "Admin",
+      sub: isAdminRootName(last) ? "" : last,
       leaf: "",
     };
   }
@@ -203,21 +272,15 @@ export function listForceServiceRanks(force: string): string[] {
   });
 }
 
-/** Paper HQ Br children only — Headquarters Office, SY Br, Forces Mess, Fd Mess, MT Br, New Temp Att. */
+/** Paper HQ Br children stay official; extra nested HQ units are kept. */
 export function repairOfficialHqBranch() {
   const prev = getState();
   const have = new Set(prev.wings.map((w) => w.toLowerCase()));
-  const hqKids = new Set(HQ_SUB_WINGS.map((w) => w.toLowerCase()));
   const missing = HQ_SUB_WINGS.some((w) => !have.has(w.toLowerCase()));
   const wrongParent = HQ_SUB_WINGS.some(
     (w) => (prev.wing_parent[w] ?? "").trim() !== "HQ Br",
   );
-  const stray = Object.entries(prev.wing_parent ?? {}).some(
-    ([child, parent]) =>
-      (parent ?? "").trim().toLowerCase() === "hq br" &&
-      !hqKids.has(child.toLowerCase()),
-  );
-  if (!missing && !wrongParent && !stray) return;
+  if (!missing && !wrongParent) return;
 
   setState((state) => {
     const seen = new Set<string>();
@@ -230,10 +293,6 @@ export function repairOfficialHqBranch() {
       wings.push(next);
     }
     const wing_parent = { ...state.wing_parent };
-    for (const [child, parent] of Object.entries(wing_parent)) {
-      if ((parent ?? "").trim().toLowerCase() !== "hq br") continue;
-      if (!hqKids.has(child.toLowerCase())) wing_parent[child] = "Admin";
-    }
     for (const child of HQ_SUB_WINGS) wing_parent[child] = "HQ Br";
     const wing_labels = { ...state.wing_labels };
     const wing_labels_bn = { ...(state.wing_labels_bn ?? {}) };
@@ -739,12 +798,11 @@ export function addWing(
   bangla?: string,
   serial?: number | null,
 ): string | null {
-  const next = normalizeLabel(label);
+  const next = canonicalWingName(normalizeLabel(label));
   if (!next) return null;
   const key = next.toLowerCase();
-  if (BANNED_WINGS.has(key)) return null;
-  if (listWings().some((w) => w.toLowerCase() === key)) return null;
-  const parentLabel = parent ? normalizeLabel(parent) : "";
+  if (wingNameTaken(next)) return null;
+  const parentWanted = parent ? canonicalWingName(normalizeLabel(parent)) : "";
   const full = normalizeLabel(elaborate ?? "");
   const bn = normalizeLabel(bangla ?? "");
   const serialNo =
@@ -752,9 +810,12 @@ export function addWing(
       ? Math.floor(serial)
       : 0;
   setState((prev) => {
-    if (parentLabel && !prev.wings.includes(parentLabel)) return prev;
+    const parentFound = parentWanted
+      ? resolveWingName(prev.wings, parentWanted)
+      : "";
+    if (parentWanted && !parentFound) return prev;
     const wing_parent = { ...prev.wing_parent };
-    if (parentLabel) wing_parent[next] = parentLabel;
+    if (parentFound) wing_parent[next] = parentFound;
     return {
       ...prev,
       wings: [...prev.wings, next],
@@ -923,13 +984,11 @@ export function renameWing(
   bangla?: string,
   serial?: number | null,
 ): boolean {
-  const next = normalizeLabel(to);
+  const next = canonicalWingName(normalizeLabel(to));
   if (!next) return false;
-  const key = next.toLowerCase();
-  if (BANNED_WINGS.has(key)) return false;
   const wings = listWings();
   if (!wings.includes(from)) return false;
-  if (wings.some((w) => w !== from && w.toLowerCase() === key)) return false;
+  if (wingNameTaken(next, from)) return false;
   const full = normalizeLabel(elaborate ?? "");
   setState((prev) => {
     const rank_force_wings: Record<string, Record<string, string[]>> = {};

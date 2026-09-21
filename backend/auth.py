@@ -5,13 +5,14 @@ import bcrypt
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from cache import is_revoked
 from config import settings
 from database import get_db
 from models import RefreshSession, Staff
-from security import hash_token, new_id, new_token, utcnow
+from security import encrypt_secret, hash_token, new_id, new_token, utcnow
 
 JWT_SECRET = settings.jwt_secret
 JWT_EXPIRES_SECONDS = settings.jwt_expires_seconds
@@ -19,8 +20,42 @@ JWT_REFRESH_EXPIRES_SECONDS = settings.jwt_refresh_expires_seconds
 bearer = HTTPBearer(auto_error=False)
 
 
+def seed_staff_rab_id(role: str) -> str:
+    return f"SRB-{str(role or '').strip().upper()}"
+
+
+def normalize_staff_login_id(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if "@" in raw:
+        return raw.lower()
+    return raw.upper()
+
+
+def staff_login_id_from_body(body: object) -> str:
+    for key in ("srb_id", "rab_id", "email", "username"):
+        value = str(getattr(body, key, "") or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def find_staff_by_login(db: Session, login_id: str) -> Staff | None:
+    key = (login_id or "").strip().lower()
+    if not key:
+        return None
+    return db.query(Staff).filter(func.lower(Staff.email) == key).first()
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def set_staff_password(row: Staff, password: str) -> None:
+    row.password_hash = hash_password(password)
+    row.password_vault = encrypt_secret(password)
+    row.password_changed_at = utcnow()
 
 
 def verify_password(password: str, password_hash: str) -> bool:
@@ -141,6 +176,9 @@ def current_staff(
     staff = db.get(Staff, payload.get("sub"))
     if staff is None or not staff.active:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    from audit_user import set_actor_srb
+
+    set_actor_srb(staff.email)
     return staff
 
 

@@ -111,7 +111,8 @@ function shouldAttemptRefresh(path: string, status: number) {
     status === 401 &&
     !path.includes("/api/v1/auth/login") &&
     !path.includes("/api/v1/auth/refresh") &&
-    !path.includes("/api/v1/auth/forgot-password")
+    !path.includes("/api/v1/auth/forgot-password") &&
+    !path.includes("/api/v1/auth/login-change-password")
   );
 }
 

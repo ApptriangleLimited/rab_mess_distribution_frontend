@@ -7,6 +7,13 @@ set -euo pipefail
 REMOTE_TMP="${REMOTE_TMP:-/tmp/rab-mess-frontend}"
 REMOTE_APP="${REMOTE_APP:-/var/www/mess/frontend}"
 
+# Shared workshop VM already runs WMS + Meal Tracker + host nginx.
+# Isolate mess in its own Docker stack; never bind 80/8888/3000.
+if [ "${WORKSHOP:-}" = "1" ] || [ -d /usr/share/nginx/html/projects/wms ]; then
+  echo "Detected workshop host. Using isolated Docker deploy (ports 3010/8000)."
+  exec bash "$(cd "$(dirname "$0")" && pwd)/workshop-deploy.sh"
+fi
+
 if [ ! -f "$REMOTE_TMP/package.json" ] || [ ! -f "$REMOTE_TMP/docker-compose.yml" ]; then
   echo "FATAL: upload missing at $REMOTE_TMP. SCP the tarball and extract first." >&2
   exit 1

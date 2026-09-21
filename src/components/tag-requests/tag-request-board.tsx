@@ -67,13 +67,20 @@ import type {
   User,
 } from "@/lib/types";
 
-type Mode = "daily" | "cc" | "ration" | "consume";
+type Mode = "daily" | "cc" | "ration" | "consume" | "admin";
 type StatusView = "all" | TagRequestStatus;
+type QueueFilter = TagRequestQueue | "all";
 
 function queueForMode(mode: Mode): TagRequestQueue {
   if (mode === "ration") return "ration";
   if (mode === "consume") return "consume";
   return "daily";
+}
+
+function queueLabel(queue: TagRequestQueue, t: ReturnType<typeof useT>) {
+  if (queue === "ration") return t("tagRequest.queueRation");
+  if (queue === "consume") return t("tagRequest.queueConsume");
+  return t("tagRequest.queueDaily");
 }
 
 function requestDay(iso: string) {
@@ -119,7 +126,6 @@ export function TagRequestBoard({
   const [wing, setWing] = useState("all");
   const [tag, setTagFilter] = useState("all");
   const [status, setStatus] = useState("all");
-  const queue = queueForMode(mode);
   const canAct = mode !== "cc";
   const showStatusChips = mode !== "daily";
   const [view, setView] = useState<StatusView>(
@@ -127,14 +133,16 @@ export function TagRequestBoard({
   );
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
   const [pendingUpdate, setPendingUpdate] = useState<TagRequest | null>(null);
   const [pendingReject, setPendingReject] = useState<TagRequest | null>(null);
+  const queue: QueueFilter = mode === "admin" ? queueFilter : queueForMode(mode);
 
   useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
 
   useEffect(() => {
     setApiPage(1);
-  }, [q, rank, wing, tag, status, view, dateFrom, dateTo]);
+  }, [q, rank, wing, tag, status, view, dateFrom, dateTo, queue]);
 
   useEffect(() => {
     if (!apiOn) {
@@ -222,7 +230,7 @@ export function TagRequestBoard({
     const query = q.trim().toLowerCase();
     return state.tag_requests
       .filter((req) => {
-        if ((req.queue ?? "daily") !== queue) return false;
+        if (queue !== "all" && (req.queue ?? "daily") !== queue) return false;
         if (mode === "daily" && req.status !== "requested") return false;
         if (view !== "all" && req.status !== view) return false;
         const user = usersById.get(req.user_id);
@@ -272,8 +280,8 @@ export function TagRequestBoard({
 
   const rows = apiOn ? apiRows : demoRows;
 
-  const queued = state.tag_requests.filter(
-    (r) => (r.queue ?? "daily") === queue,
+  const queued = state.tag_requests.filter((r) =>
+    queue === "all" ? true : (r.queue ?? "daily") === queue,
   );
   const requestedCount = apiOn
     ? apiCounts.requested
@@ -405,6 +413,39 @@ export function TagRequestBoard({
           </div>
         </div>
 
+        {mode === "admin" ? (
+          <div
+            role="tablist"
+            aria-label={t("tagRequest.queue")}
+            className="grid grid-cols-2 gap-2 rounded-2xl border border-neutral-200/80 bg-gradient-to-br from-white via-neutral-50 to-emerald-50/40 p-1.5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.35)] sm:grid-cols-4 dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900"
+          >
+            {(
+              [
+                ["all", t("tagRequest.queueAll")],
+                ["daily", t("tagRequest.queueDaily")],
+                ["ration", t("tagRequest.queueRation")],
+                ["consume", t("tagRequest.queueConsume")],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={queueFilter === id}
+                onClick={() => setQueueFilter(id)}
+                className={cn(
+                  "rounded-xl px-3 py-3 text-sm font-semibold tracking-wide transition",
+                  queueFilter === id
+                    ? "bg-primary text-white shadow-lg shadow-primary/25"
+                    : "text-neutral-600 hover:bg-white hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-white",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         <SearchFilterBar
           flat
           singleLine
@@ -517,13 +558,15 @@ export function TagRequestBoard({
         ) : page.total === 0 ? (
           <EmptyState
             title={
-              mode === "ration"
-                ? t("tagRequest.emptyRation")
-                : mode === "consume"
-                  ? t("tagRequest.emptyConsume")
-                  : mode === "daily"
-                    ? t("tagRequest.emptyDaily")
-                    : t("tagRequest.emptyCc")
+              mode === "admin"
+                ? t("tagRequest.emptyAdmin")
+                : mode === "ration"
+                  ? t("tagRequest.emptyRation")
+                  : mode === "consume"
+                    ? t("tagRequest.emptyConsume")
+                    : mode === "daily"
+                      ? t("tagRequest.emptyDaily")
+                      : t("tagRequest.emptyCc")
             }
           />
         ) : (
@@ -536,6 +579,9 @@ export function TagRequestBoard({
                     <th className="px-4 py-3.5">{t("cc.fields.rank")}</th>
                     <th className="px-4 py-3.5">{t("cc.fields.name")}</th>
                     <th className="px-4 py-3.5">{t("cc.fields.wing")}</th>
+                    {mode === "admin" ? (
+                      <th className="px-4 py-3.5">{t("tagRequest.queue")}</th>
+                    ) : null}
                     <th className="px-4 py-3.5">{t("tagRequest.currentTag")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.requestedTag")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.status")}</th>
@@ -558,7 +604,9 @@ export function TagRequestBoard({
                         canAct={canAct}
                         onUpdate={() => setPendingUpdate(req)}
                         onReject={
-                          mode === "ration" || mode === "consume"
+                          mode === "ration" ||
+                          mode === "consume" ||
+                          mode === "admin"
                             ? () => setPendingReject(req)
                             : undefined
                         }
@@ -710,6 +758,13 @@ function RequestRow({
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
         {user.wing || "—"}
       </td>
+      {mode === "admin" ? (
+        <td className="px-4 py-3">
+          <Badge className="rounded-md border border-neutral-200 bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+            {queueLabel(req.queue ?? "daily", t)}
+          </Badge>
+        </td>
+      ) : null}
       <td className="px-4 py-3">
         <TagChip tag={current} tone={getCockpitToneOnDate(user, today)} />
       </td>

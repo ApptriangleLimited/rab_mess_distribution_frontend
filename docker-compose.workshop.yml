@@ -1,0 +1,15 @@
+# Shared workshop VM (wksp-vom / 103.22.96.22).
+# Other apps already own 80, 8888, 3000, 4000, 5000, 7000.
+# This overlay publishes ONLY unused ports. Never combine with docker-compose.prod.yml
+# (that overlay starts srb_proxy on 80/443 and would take nginx's ports).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.workshop.yml up -d --build
+
+services:
+  web:
+    ports:
+      - "3010:3000"
+
+  api:
+    ports:
+      - "8000:8000"

@@ -176,6 +176,8 @@ export interface Session {
   loggedInAt: string;
   /** Not stored in the session cookie — see PROFILE_AVATAR_KEY. */
   avatarUrl?: string;
+  /** Superadmin title-bar role switcher. Survives jumping to another desk. */
+  roleSwitcher?: boolean;
 }
 
 export type StateReportStatus = "pending" | "approved" | "rejected";

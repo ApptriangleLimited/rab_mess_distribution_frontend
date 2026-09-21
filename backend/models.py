@@ -7,7 +7,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
 
-class Staff(Base):
+class AuditUserMixin:
+    au_entry_by: Mapped[str] = mapped_column(String(128), nullable=False, default="", server_default="")
+    au_update_by: Mapped[str] = mapped_column(String(128), nullable=False, default="", server_default="")
+
+
+class Staff(AuditUserMixin, Base):
     __tablename__ = "staff"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -21,6 +26,7 @@ class Staff(Base):
     mfa_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     mfa_recovery: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    avatar: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -32,7 +38,7 @@ class Staff(Base):
     )
 
 
-class Member(Base):
+class Member(AuditUserMixin, Base):
     __tablename__ = "members"
     __table_args__ = (
         Index(
@@ -89,7 +95,7 @@ class Member(Base):
     tag_requests = relationship("TagRequest", back_populates="member")
 
 
-class TagRequest(Base):
+class TagRequest(AuditUserMixin, Base):
     __tablename__ = "tag_requests"
     __table_args__ = (
         Index(
@@ -124,7 +130,7 @@ class TagRequest(Base):
     member = relationship("Member", back_populates="tag_requests")
 
 
-class Assignment(Base):
+class Assignment(AuditUserMixin, Base):
     __tablename__ = "assignments"
     __table_args__ = (
         Index("uq_assignments_member_date", "user_id", "date", unique=True),
@@ -143,7 +149,7 @@ class Assignment(Base):
     )
 
 
-class SuppressedCarry(Base):
+class SuppressedCarry(AuditUserMixin, Base):
     __tablename__ = "suppressed_carries"
 
     user_id: Mapped[str] = mapped_column(
@@ -152,7 +158,7 @@ class SuppressedCarry(Base):
     date: Mapped[date] = mapped_column(Date, primary_key=True)
 
 
-class DayLock(Base):
+class DayLock(AuditUserMixin, Base):
     __tablename__ = "day_locks"
 
     date: Mapped[date] = mapped_column(Date, primary_key=True)
@@ -162,7 +168,7 @@ class DayLock(Base):
     locked_by: Mapped[str] = mapped_column(String(40), nullable=False, default="daily")
 
 
-class BoroKhanaDay(Base):
+class BoroKhanaDay(AuditUserMixin, Base):
     __tablename__ = "boro_khana_days"
 
     date: Mapped[date] = mapped_column(Date, primary_key=True)
@@ -171,7 +177,7 @@ class BoroKhanaDay(Base):
     )
 
 
-class Rate(Base):
+class Rate(AuditUserMixin, Base):
     __tablename__ = "rates"
 
     tag: Mapped[str] = mapped_column(String(32), primary_key=True)
@@ -180,7 +186,7 @@ class Rate(Base):
     is_protected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
-class Sender(Base):
+class Sender(AuditUserMixin, Base):
     __tablename__ = "senders"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -195,7 +201,7 @@ class Sender(Base):
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
-class CatalogState(Base):
+class CatalogState(AuditUserMixin, Base):
     """Org catalogs (ranks, wings, forces, banks) as one durable row."""
 
     __tablename__ = "catalog_state"
@@ -204,7 +210,7 @@ class CatalogState(Base):
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class AuthorizedStrength(Base):
+class AuthorizedStrength(AuditUserMixin, Base):
     __tablename__ = "authorized_strength"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -215,7 +221,7 @@ class AuthorizedStrength(Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class ManpowerAbsent(Base):
+class ManpowerAbsent(AuditUserMixin, Base):
     __tablename__ = "manpower_officer_absent"
 
     date: Mapped[date] = mapped_column(Date, primary_key=True)
@@ -223,7 +229,7 @@ class ManpowerAbsent(Base):
     count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class StateReport(Base):
+class StateReport(AuditUserMixin, Base):
     __tablename__ = "state_reports"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -239,7 +245,7 @@ class StateReport(Base):
     totals: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class MealShift(Base):
+class MealShift(AuditUserMixin, Base):
     __tablename__ = "meal_shifts"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -255,7 +261,7 @@ class MealShift(Base):
     )
 
 
-class MealPlan(Base):
+class MealPlan(AuditUserMixin, Base):
     __tablename__ = "meal_plans"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -269,7 +275,7 @@ class MealPlan(Base):
     )
 
 
-class MealAssign(Base):
+class MealAssign(AuditUserMixin, Base):
     __tablename__ = "meal_assigns"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -286,7 +292,7 @@ class MealAssign(Base):
     )
 
 
-class GuestMeal(Base):
+class GuestMeal(AuditUserMixin, Base):
     __tablename__ = "guest_meals"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -304,7 +310,7 @@ class GuestMeal(Base):
     )
 
 
-class AuditLog(Base):
+class AuditLog(AuditUserMixin, Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -320,7 +326,7 @@ class AuditLog(Base):
     )
 
 
-class PritibhojEvent(Base):
+class PritibhojEvent(AuditUserMixin, Base):
     __tablename__ = "pritibhoj_events"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -335,7 +341,7 @@ class PritibhojEvent(Base):
     )
 
 
-class RefreshSession(Base):
+class RefreshSession(AuditUserMixin, Base):
     __tablename__ = "refresh_sessions"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -354,7 +360,7 @@ class RefreshSession(Base):
     ip: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
 
-class PasswordReset(Base):
+class PasswordReset(AuditUserMixin, Base):
     __tablename__ = "password_resets"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -369,14 +375,14 @@ class PasswordReset(Base):
     )
 
 
-class Permission(Base):
+class Permission(AuditUserMixin, Base):
     __tablename__ = "permissions"
 
     code: Mapped[str] = mapped_column(String(64), primary_key=True)
     description: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
 
-class RolePermission(Base):
+class RolePermission(AuditUserMixin, Base):
     __tablename__ = "role_permissions"
 
     role: Mapped[str] = mapped_column(String(32), primary_key=True)
@@ -385,7 +391,7 @@ class RolePermission(Base):
     )
 
 
-class FileObject(Base):
+class FileObject(AuditUserMixin, Base):
     __tablename__ = "file_objects"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -403,7 +409,7 @@ class FileObject(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class Notification(Base):
+class Notification(AuditUserMixin, Base):
     __tablename__ = "notifications"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)

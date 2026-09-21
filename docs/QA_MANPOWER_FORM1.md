@@ -3,7 +3,7 @@
 Use this sheet to verify **Daily → Manpower → Form 1** (`/daily/manpower?form=1`).  
 Print uses the same rules (`/daily/manpower/print?date=YYYY-MM-DD&form=1`).
 
-**Login (Daily):** `{role}@mess.rab` / `ChangeMe!`  
+**Login (Daily):** `SRB-DAILY` / `ChangeMe!`  
 Pick a date that has Daily Cockpit tags, then open Form 1 for that same date.
 
 ---

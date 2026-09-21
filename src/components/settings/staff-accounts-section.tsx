@@ -28,9 +28,11 @@ import {
   createStaffAccount,
   listStaffAccounts,
   revealStaffPassword,
+  staffLoginId,
   updateStaffAccount,
   type StaffAccount,
 } from "@/lib/api/staff";
+import { listMembers, type MemberApiRow } from "@/lib/api/members";
 import { ROLE_KEYS } from "@/lib/constants";
 import {
   recalledStaffPassword,
@@ -44,14 +46,38 @@ import { cn } from "@/lib/utils";
 
 const EMPTY_FORM = {
   name: "",
-  email: "",
+  srbId: "",
   password: "",
   confirmPassword: "",
   role: "cc" as Role,
 };
 
-function looksLikeEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || value.includes("@");
+function looksLikeSrbId(value: string) {
+  const next = value.trim();
+  if (next.length < 2 || next.includes("@")) return false;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(next);
+}
+
+function staffIdKeys(value: string) {
+  const raw = value.trim();
+  if (!raw) return [] as string[];
+  const upper = raw.toUpperCase();
+  const bare = upper.replace(/^SRB-?/, "");
+  return [
+    ...new Set(
+      [raw, upper, bare, bare ? `SRB-${bare}` : ""]
+        .filter(Boolean)
+        .map((item) => item.toLowerCase()),
+    ),
+  ];
+}
+
+function memberMatchesStaffId(member: MemberApiRow, srbId: string) {
+  const keys = new Set(staffIdKeys(srbId));
+  return (
+    staffIdKeys(member.rab_id).some((key) => keys.has(key)) ||
+    staffIdKeys(member.personal_id || "").some((key) => keys.has(key))
+  );
 }
 
 export function StaffAccountsSection({
@@ -82,6 +108,11 @@ export function StaffAccountsSection({
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [memberMatch, setMemberMatch] = useState<MemberApiRow | null>(null);
+  const [memberLookupError, setMemberLookupError] = useState("");
+  const [memberLookupBusy, setMemberLookupBusy] = useState(false);
+  const isAdmin = session?.role === "admin";
+  const [roleBusyId, setRoleBusyId] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
     return ROLE_KEYS.map((role) => ({
@@ -114,6 +145,8 @@ export function StaffAccountsSection({
     setEditing(null);
     setForm(EMPTY_FORM);
     setShowFormPassword(false);
+    setMemberMatch(null);
+    setMemberLookupError("");
     setFormOpen(true);
   }
 
@@ -121,12 +154,14 @@ export function StaffAccountsSection({
     setEditing(row);
     setForm({
       name: row.display_name,
-      email: row.email,
+      srbId: staffLoginId(row),
       password: "",
       confirmPassword: "",
       role: row.role,
     });
     setShowFormPassword(false);
+    setMemberMatch(null);
+    setMemberLookupError("");
     setFormOpen(true);
   }
 
@@ -135,21 +170,85 @@ export function StaffAccountsSection({
     setEditing(null);
     setForm(EMPTY_FORM);
     setShowFormPassword(false);
+    setMemberMatch(null);
+    setMemberLookupError("");
+  }
+
+  async function lookupAcceptedMember(srbId: string) {
+    if (!apiOn) return null;
+    const key = srbId.trim();
+    if (!looksLikeSrbId(key)) {
+      setMemberMatch(null);
+      setMemberLookupError("");
+      return null;
+    }
+    if (ROLE_KEYS.some((role) => `SRB-${role.toUpperCase()}` === key.toUpperCase()) || key.toUpperCase() === "SRB-SUPERADMIN") {
+      setMemberMatch(null);
+      setMemberLookupError("");
+      return "system";
+    }
+    setMemberLookupBusy(true);
+    try {
+      const data = await listMembers({ q: key, page: 1, page_size: 50 });
+      const match = data.items.find((row) => memberMatchesStaffId(row, key));
+      if (!match) {
+        setMemberMatch(null);
+        setMemberLookupError(t("settings.staffMustBeMember"));
+        return null;
+      }
+      if (match.approval_status === "pending") {
+        setMemberMatch(null);
+        setMemberLookupError(t("settings.staffMemberPending"));
+        return "pending";
+      }
+      if (match.approval_status !== "approved") {
+        setMemberMatch(null);
+        setMemberLookupError(t("settings.staffMustBeMember"));
+        return null;
+      }
+      setMemberMatch(match);
+      setMemberLookupError("");
+      setForm((prev) =>
+        prev.name.trim().length >= 2
+          ? prev
+          : { ...prev, name: match.name || prev.name },
+      );
+      return match;
+    } catch {
+      setMemberMatch(null);
+      setMemberLookupError(t("settings.staffMustBeMember"));
+      return null;
+    } finally {
+      setMemberLookupBusy(false);
+    }
   }
 
   async function saveForm() {
     const name = form.name.trim();
-    const email = form.email.trim().toLowerCase();
+    const srbId = form.srbId.trim();
     if (name.length < 2) {
       toast(t("profile.nameRequired"), "error");
       return;
     }
-    if (!looksLikeEmail(email)) {
-      toast(t("settings.staffEmailRequired"), "error");
+    if (!looksLikeSrbId(srbId)) {
+      toast(t("settings.staffSrbIdRequired"), "error");
+      return;
+    }
+    const member = await lookupAcceptedMember(srbId);
+    if (apiOn && member === "pending") {
+      toast(t("settings.staffMemberPending"), "error");
+      return;
+    }
+    if (apiOn && member !== "system" && !member) {
+      toast(t("settings.staffMustBeMember"), "error");
       return;
     }
     if (!editing && !form.password) {
       toast(t("settings.staffPasswordRequired"), "error");
+      return;
+    }
+    if (form.password && !form.confirmPassword) {
+      toast(t("profile.confirmPasswordRequired"), "error");
       return;
     }
     if (form.password && form.password !== form.confirmPassword) {
@@ -161,7 +260,7 @@ export function StaffAccountsSection({
       if (editing) {
         const updated = await updateStaffAccount(editing.id, {
           display_name: name,
-          email,
+          srb_id: srbId,
           role: form.role,
           password: form.password || undefined,
         });
@@ -171,7 +270,7 @@ export function StaffAccountsSection({
       } else {
         const created = await createStaffAccount({
           display_name: name,
-          email,
+          srb_id: srbId,
           password: form.password,
           role: form.role,
         });
@@ -187,6 +286,23 @@ export function StaffAccountsSection({
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function changeRole(row: StaffAccount, role: Role) {
+    if (row.role === role) return;
+    setRoleBusyId(row.id);
+    try {
+      const updated = await updateStaffAccount(row.id, { role });
+      setRows((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      toast(t("settings.staffUpdated"), "success");
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("settings.staffSaveFail"),
+        "error",
+      );
+    } finally {
+      setRoleBusyId(null);
     }
   }
 
@@ -289,7 +405,7 @@ export function StaffAccountsSection({
           <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
             {group.items.map((row) => {
               const mine =
-                session?.username?.toLowerCase() === row.email.toLowerCase();
+                session?.username?.toLowerCase() === staffLoginId(row).toLowerCase();
               return (
                 <li
                   key={row.id}
@@ -304,9 +420,49 @@ export function StaffAccountsSection({
                         </span>
                       ) : null}
                     </p>
-                    <p className="truncate text-xs text-neutral-500">{row.email}</p>
+                    <p className="truncate text-xs text-neutral-500">{staffLoginId(row)}</p>
+                    {isAdmin && row.password ? (
+                      <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-neutral-700 dark:text-neutral-200">
+                        <span className="text-neutral-500">{t("profile.password")}:</span>
+                        <span className="font-semibold">{row.password}</span>
+                        <button
+                          type="button"
+                          className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(row.password ?? "");
+                            toast(t("settings.staffPasswordCopied"), "success");
+                          }}
+                          aria-label={t("settings.staffCopyPassword")}
+                        >
+                          <IconCopy className="h-3.5 w-3.5" />
+                        </button>
+                      </p>
+                    ) : isAdmin ? (
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {t("settings.staffPasswordMissing")}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={row.role}
+                      disabled={mine || roleBusyId === row.id}
+                      onValueChange={(value) => void changeRole(row, value as Role)}
+                    >
+                      <SelectTrigger
+                        className="h-8 w-[8.5rem] rounded-xl text-xs"
+                        aria-label={t("profile.role")}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLE_KEYS.map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {roleLabel(role, locale)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <span
                       className={cn(
                         "rounded-full px-2 py-0.5 text-[11px] font-semibold",
@@ -319,16 +475,18 @@ export function StaffAccountsSection({
                         ? t("settings.staffActive")
                         : t("settings.staffInactive")}
                     </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8 rounded-xl"
-                      onClick={() => void openViewPassword(row)}
-                    >
-                      <IconEye className="h-3.5 w-3.5" />
-                      {t("settings.staffViewPassword")}
-                    </Button>
+                    {!isAdmin || !row.password ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-xl"
+                        onClick={() => void openViewPassword(row)}
+                      >
+                        <IconEye className="h-3.5 w-3.5" />
+                        {t("settings.staffViewPassword")}
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       size="sm"
@@ -389,27 +547,6 @@ export function StaffAccountsSection({
       >
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="staff-name">{t("profile.name")}</Label>
-            <Input
-              id="staff-name"
-              value={form.name}
-              maxLength={80}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="staff-email">{t("settings.staffEmail")}</Label>
-            <Input
-              id="staff-email"
-              type="email"
-              value={form.email}
-              maxLength={120}
-              autoComplete="off"
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-            />
-            <p className="text-xs text-neutral-500">{t("settings.staffEmailHint")}</p>
-          </div>
-          <div className="space-y-1.5">
             <Label htmlFor="staff-role">{t("profile.role")}</Label>
             <Select
               value={form.role}
@@ -427,6 +564,45 @@ export function StaffAccountsSection({
               </SelectContent>
             </Select>
             <p className="text-xs text-neutral-500">{t("settings.staffRoleAccess")}</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="staff-name">{t("profile.name")}</Label>
+            <Input
+              id="staff-name"
+              value={form.name}
+              maxLength={80}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="staff-srb-id">{t("settings.staffSrbId")}</Label>
+            <Input
+              id="staff-srb-id"
+              type="text"
+              inputMode="text"
+              value={form.srbId}
+              maxLength={40}
+              autoComplete="off"
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, srbId: e.target.value }));
+                setMemberMatch(null);
+                setMemberLookupError("");
+              }}
+              onBlur={() => {
+                if (form.srbId.trim()) void lookupAcceptedMember(form.srbId);
+              }}
+            />
+            {memberLookupBusy ? (
+              <p className="text-xs text-neutral-500">{t("common.loading")}</p>
+            ) : memberLookupError ? (
+              <p className="text-xs font-medium text-red-600">{memberLookupError}</p>
+            ) : memberMatch ? (
+              <p className="text-xs font-medium text-emerald-700">
+                {t("settings.staffMemberFound", { name: memberMatch.name })}
+              </p>
+            ) : (
+              <p className="text-xs text-neutral-500">{t("settings.staffSrbIdHint")}</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="staff-password">{t("profile.password")}</Label>
@@ -462,15 +638,34 @@ export function StaffAccountsSection({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="staff-password-confirm">{t("profile.confirmPassword")}</Label>
-            <Input
-              id="staff-password-confirm"
-              type={showFormPassword ? "text" : "password"}
-              value={form.confirmPassword}
-              autoComplete="new-password"
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))
-              }
-            />
+            <div className="relative">
+              <Input
+                id="staff-password-confirm"
+                type={showFormPassword ? "text" : "password"}
+                value={form.confirmPassword}
+                autoComplete="new-password"
+                className="pr-10"
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                }
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 grid w-10 place-items-center text-neutral-500"
+                onClick={() => setShowFormPassword((prev) => !prev)}
+                aria-label={
+                  showFormPassword
+                    ? t("settings.staffHidePassword")
+                    : t("settings.staffViewPassword")
+                }
+              >
+                {showFormPassword ? (
+                  <IconEyeOff className="h-4 w-4" />
+                ) : (
+                  <IconEye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </ConfirmDialog>
@@ -478,7 +673,7 @@ export function StaffAccountsSection({
       <ConfirmDialog
         open={!!viewRow}
         title={t("settings.staffPasswordTitle")}
-        body={viewRow ? `${viewRow.display_name} · ${viewRow.email}` : ""}
+        body={viewRow ? `${viewRow.display_name} · ${staffLoginId(viewRow)}` : ""}
         confirmLabel={t("common.done")}
         onCancel={() => setViewRow(null)}
         onConfirm={() => setViewRow(null)}

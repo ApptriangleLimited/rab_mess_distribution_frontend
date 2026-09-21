@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { logoutStaff } from "@/lib/api/auth";
 import { isCcApiEnabled } from "@/lib/api/mode";
+import { isSuperAdminLogin } from "@/lib/constants";
 import {
   clearSession,
   getAccessToken,
@@ -11,6 +12,7 @@ import {
   sessionMsRemaining,
   setAccessToken,
   setRefreshToken,
+  setProfileAvatar,
   setSession as persistSession,
 } from "@/lib/session";
 import type { Role, Session } from "@/lib/types";
@@ -51,13 +53,23 @@ export function useSession() {
   }, [session]);
 
   const login = useCallback(
-    (role: Role, name: string, accessToken?: string, remember = true, refreshToken?: string, username?: string) => {
+    (
+      role: Role,
+      name: string,
+      accessToken?: string,
+      remember = true,
+      refreshToken?: string,
+      username?: string,
+      avatarUrl?: string | null,
+    ) => {
+      if (avatarUrl) setProfileAvatar(role, avatarUrl, username);
       const next: Session = {
         role,
         name,
         username,
         loggedInAt: nowISO(),
-        avatarUrl: getProfileAvatar(role, username) ?? undefined,
+        avatarUrl: avatarUrl || getProfileAvatar(role, username) || undefined,
+        roleSwitcher: isSuperAdminLogin(username),
       };
       persistSession(next, remember);
       if (accessToken) setAccessToken(accessToken, remember);

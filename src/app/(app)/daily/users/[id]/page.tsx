@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { IconArrowLeft, IconPencil } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
@@ -30,6 +30,7 @@ import type { DailyTag, User, UserStatus } from "@/lib/types";
 export default function DailyUserDetailPage() {
   const t = useT();
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { toast } = useToast();
   const state = useStore();
   const apiOn = isDailyApiEnabled();
@@ -184,6 +185,7 @@ export default function DailyUserDetailPage() {
             <MemberAcceptActions
               user={user}
               withTag
+              onAccepted={() => router.replace("/daily/roster")}
               after={
                 <Button
                   asChild

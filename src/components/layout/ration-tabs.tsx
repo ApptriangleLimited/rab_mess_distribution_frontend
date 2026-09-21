@@ -49,43 +49,76 @@ const USERS_TAB: Tab = {
   match: (path) => path.startsWith("/admin/users"),
 };
 
+const LEDGER_TAB: Tab = {
+  href: "/ration/monthly",
+  labelKey: "nav.consumeLedger",
+  icon: IconTags,
+  match: (path) =>
+    path.startsWith("/ration/monthly") ||
+    path.startsWith("/ration/report") ||
+    path.startsWith("/consume/monthly/ledger"),
+};
+
+const RATION_REQUESTS_TAB: Tab = {
+  href: "/ration/requests",
+  labelKey: "nav.requests",
+  icon: IconSend,
+  match: (path) => path.startsWith("/ration/requests"),
+};
+
+const ADMIN_REQUESTS_TAB: Tab = {
+  href: "/admin/requests",
+  labelKey: "nav.requests",
+  icon: IconSend,
+  match: (path) => path.startsWith("/admin/requests"),
+};
+
+const MONTHLY_CONSUME_TAB: Tab = {
+  href: "/consume/monthly",
+  labelKey: "nav.monthlyConsume",
+  icon: IconChartBar,
+  match: (path) =>
+    path === "/consume/monthly" ||
+    path.startsWith("/consume/monthly/tag") ||
+    path.startsWith("/consume/monthly/print"),
+};
+
+const SUMMARY_TAB: Tab = {
+  href: "/consume/monthly/summary",
+  labelKey: "nav.consumeSummary",
+  icon: IconFileReport,
+  match: (path) => path.startsWith("/consume/monthly/summary"),
+};
+
+const RATION_MEMBERS_TAB: Tab = {
+  href: "/ration/members",
+  labelKey: "nav.rationMembers",
+  icon: IconUsers,
+  match: (path) => path.startsWith("/ration/members"),
+};
+
+const ADMIN_MEMBERS_TAB: Tab = {
+  href: "/admin/members",
+  labelKey: "nav.rationMembers",
+  icon: IconUsers,
+  match: (path) =>
+    path.startsWith("/admin/members") || path.startsWith("/cc/users"),
+};
+
 const BASE_TABS: Tab[] = [
-  {
-    href: "/ration/monthly",
-    labelKey: "nav.consumeLedger",
-    icon: IconTags,
-    match: (path) =>
-      path.startsWith("/ration/monthly") ||
-      path.startsWith("/ration/report") ||
-      path.startsWith("/consume/monthly/ledger"),
-  },
-  {
-    href: "/ration/requests",
-    labelKey: "nav.requests",
-    icon: IconSend,
-    match: (path) => path.startsWith("/ration/requests"),
-  },
-  {
-    href: "/consume/monthly",
-    labelKey: "nav.monthlyConsume",
-    icon: IconChartBar,
-    match: (path) =>
-      path === "/consume/monthly" ||
-      path.startsWith("/consume/monthly/tag") ||
-      path.startsWith("/consume/monthly/print"),
-  },
-  {
-    href: "/consume/monthly/summary",
-    labelKey: "nav.consumeSummary",
-    icon: IconFileReport,
-    match: (path) => path.startsWith("/consume/monthly/summary"),
-  },
-  {
-    href: "/ration/members",
-    labelKey: "nav.rationMembers",
-    icon: IconUsers,
-    match: (path) => path.startsWith("/ration/members"),
-  },
+  LEDGER_TAB,
+  RATION_REQUESTS_TAB,
+  MONTHLY_CONSUME_TAB,
+  SUMMARY_TAB,
+  RATION_MEMBERS_TAB,
+];
+
+const ADMIN_WORK_TABS: Tab[] = [
+  LEDGER_TAB,
+  ADMIN_REQUESTS_TAB,
+  MONTHLY_CONSUME_TAB,
+  SUMMARY_TAB,
+  ADMIN_MEMBERS_TAB,
 ];
 
 const SETTINGS_TAB: Tab = {
@@ -110,7 +143,8 @@ export function RationTabs({
   const pathname = usePathname();
   const t = useT();
   const { session } = useSession();
-  const requestBadge = useRequestMenuBadge("/ration/requests");
+  const rationBadge = useRequestMenuBadge("/ration/requests");
+  const adminBadge = useRequestMenuBadge("/admin/requests");
   const store = useStore();
   const paperBadge = useMemo(
     () => pendingPaperReportCount(),
@@ -123,7 +157,7 @@ export function RationTabs({
         DASHBOARD_TAB,
         REPORT_REQUESTS_TAB,
         USERS_TAB,
-        ...BASE_TABS,
+        ...ADMIN_WORK_TABS,
         SETTINGS_TAB,
       ]
     : [...BASE_TABS, SETTINGS_TAB];
@@ -140,11 +174,13 @@ export function RationTabs({
         icon: tab.icon,
         active: tab.match(pathname),
         badge:
-          tab.href === "/ration/requests"
-            ? requestBadge
-            : tab.href === "/admin/report-requests"
-              ? paperBadge
-              : undefined,
+          tab.href === "/admin/requests"
+            ? adminBadge
+            : tab.href === "/ration/requests"
+              ? rationBadge
+              : tab.href === "/admin/report-requests"
+                ? paperBadge
+                : undefined,
       }))}
     />
   );

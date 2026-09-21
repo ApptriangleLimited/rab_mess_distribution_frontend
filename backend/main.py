@@ -18,10 +18,13 @@ from auth import (
     create_access_token,
     current_staff,
     decode_token,
+    find_staff_by_login,
     hash_password,
     issue_refresh_session,
     require_roles,
     revoke_staff_sessions,
+    seed_staff_rab_id,
+    staff_login_id_from_body,
     verify_password,
 )
 from cache import (
@@ -45,6 +48,7 @@ from headers import SecurityHeadersMiddleware
 from permissions import seed_permissions
 from security import encrypt_secret, verify_login_mfa
 from audit import write_audit
+import audit_user  # noqa: F401 — register au_entry_by / au_update_by flush hooks
 from config import settings
 from database import Base, SessionLocal, engine, get_db
 from models import Assignment, Member, Staff, TagRequest
@@ -166,7 +170,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         409: "CONFLICT",
     }.get(exc.status_code, "ERROR")
     if exc.status_code == 401 and (
-        "invalid email" in detail.lower() or "credentials" in detail.lower()
+        "invalid email" in detail.lower()
+        or "invalid rab" in detail.lower()
+        or "invalid srb" in detail.lower()
+        or "credentials" in detail.lower()
     ):
         code = "AUTH_INVALID_CREDENTIALS"
     if exc.status_code == 409 and ("RAB" in detail or "SRB" in detail):
@@ -342,25 +349,52 @@ def seed_staff() -> None:
     password = settings.seed_staff_password
     db = SessionLocal()
     try:
-        existing = {row.email for row in db.query(Staff.email).all()}
-        created = False
+        changed = False
         for role in ROLES:
-            email = f"{role}@mess.rab"
-            if email in existing:
+            rab_id = seed_staff_rab_id(role)
+            legacy = f"{role}@mess.rab"
+            current = find_staff_by_login(db, rab_id)
+            if current is None:
+                current = find_staff_by_login(db, legacy)
+            if current is None:
+                db.add(
+                    Staff(
+                        id=new_id("st"),
+                        email=rab_id,
+                        display_name=role.upper(),
+                        role=role,
+                        password_hash=hash_password(password),
+                        password_vault=encrypt_secret(password),
+                        active=True,
+                    )
+                )
+                changed = True
                 continue
+            if current.email.lower() != rab_id.lower():
+                current.email = rab_id
+                changed = True
+            if not getattr(current, "password_vault", None) and verify_password(
+                password, current.password_hash
+            ):
+                current.password_vault = encrypt_secret(password)
+                changed = True
+        super_id = "SRB-SUPERADMIN"
+        super_password = "SuperAdmin@123"
+        super_row = find_staff_by_login(db, super_id)
+        if super_row is None:
             db.add(
                 Staff(
                     id=new_id("st"),
-                    email=email,
-                    display_name=role.upper(),
-                    role=role,
-                    password_hash=hash_password(password),
-                    password_vault=encrypt_secret(password),
+                    email=super_id,
+                    display_name="SUPERADMIN",
+                    role="admin",
+                    password_hash=hash_password(super_password),
+                    password_vault=encrypt_secret(super_password),
                     active=True,
                 )
             )
-            created = True
-        if created:
+            changed = True
+        if changed:
             db.commit()
     finally:
         db.close()
@@ -430,28 +464,28 @@ def health_ready():
 
 @app.post("/api/v1/auth/login")
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
-    email = body.email.strip().lower()
-    enforce_login_limits(request, email)
-    staff = db.query(Staff).filter(func.lower(Staff.email) == email).first()
+    login_id = staff_login_id_from_body(body)
+    enforce_login_limits(request, login_id or "unknown")
+    staff = find_staff_by_login(db, login_id)
     if staff is None or not verify_password(body.password, staff.password_hash):
         write_audit(
             db,
             actor_id="",
             action="LOGIN_FAIL",
             entity="staff",
-            entity_id=email,
+            entity_id=login_id,
             ip=client_ip(request),
             user_agent=request.headers.get("user-agent", ""),
         )
         db.commit()
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid SRB ID or password")
     if not staff.active:
         return fail(401, "Account is inactive", "AUTH_INACTIVE")
     mfa_error = verify_login_mfa(staff, body.otp, body.recovery_code)
     if mfa_error:
         code, message = mfa_error
         return fail(401, message, code)
-    clear_login_limits(request, email)
+    clear_login_limits(request, login_id)
     write_audit(
         db,
         actor_id=staff.id,
@@ -478,8 +512,11 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             "staff": {
                 "id": staff.id,
                 "email": staff.email,
+                "srb_id": staff.email,
+                "rab_id": staff.email,
                 "display_name": staff.display_name,
                 "role": staff.role,
+                "avatar": getattr(staff, "avatar", "") or "",
                 "mfa_enabled": bool(staff.mfa_enabled),
             },
         },
@@ -674,6 +711,8 @@ def accept_member(
     row = db.get(Member, member_id)
     if row is None:
         raise HTTPException(status_code=404, detail="User not found")
+    if row.approval_status == "approved":
+        return envelope(member_out(row), "Member request accepted.")
     if row.approval_status != "pending":
         raise HTTPException(status_code=409, detail="This user is already a member.")
     payload = body or AcceptMemberIn()
@@ -810,16 +849,17 @@ def list_tag_requests(
     date_to: date | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=500),
-    _staff: Staff = Depends(current_staff),
+    staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    if queue not in QUEUE_ROLES:
+    if queue == "all":
+        if staff.role != "admin":
+            raise HTTPException(status_code=403, detail="Admin only")
+    elif queue not in QUEUE_ROLES:
         raise HTTPException(status_code=400, detail="Invalid queue")
-    query = (
-        db.query(TagRequest)
-        .options(joinedload(TagRequest.member))
-        .filter(TagRequest.queue == queue)
-    )
+    query = db.query(TagRequest).options(joinedload(TagRequest.member))
+    if queue != "all":
+        query = query.filter(TagRequest.queue == queue)
     if status and status != "all":
         query = query.filter(TagRequest.status == status)
     if tag and tag != "all":
@@ -874,12 +914,10 @@ def list_tag_requests(
         .limit(page_size)
         .all()
     )
-    status_rows = (
-        db.query(TagRequest.status, func.count(TagRequest.id))
-        .filter(TagRequest.queue == queue)
-        .group_by(TagRequest.status)
-        .all()
-    )
+    status_query = db.query(TagRequest.status, func.count(TagRequest.id))
+    if queue != "all":
+        status_query = status_query.filter(TagRequest.queue == queue)
+    status_rows = status_query.group_by(TagRequest.status).all()
     status_counts = {"requested": 0, "updated": 0, "rejected": 0}
     for key, count in status_rows:
         if key in status_counts:
@@ -938,7 +976,9 @@ def create_tag_request(
         .first()
     )
     if pending and pending.to_tag == to_tag and pending.from_date == start and pending.to_date == end:
-        raise HTTPException(status_code=409, detail="A pending request already exists.")
+        pending.member = member
+        bust_tag_requests()
+        return envelope(request_out(pending), "Tag request already pending")
 
     now = utcnow()
     if pending:

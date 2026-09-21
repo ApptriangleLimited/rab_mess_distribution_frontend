@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,31 @@ from persist import CATALOG_KEYS
 from schemas import DUTY_TAGS, MemberIn
 from storage import StorageError, checksum, put_bytes, sniff_mime
 from config import settings
+
+try:
+    from auth import normalize_staff_login_id, staff_login_id_from_body
+except ImportError:
+    def normalize_staff_login_id(value: str) -> str:
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        if "@" in raw:
+            return raw.lower()
+        return raw.upper()
+
+    def staff_login_id_from_body(body: object) -> str:
+        for key in ("srb_id", "rab_id", "email", "username"):
+            value = str(getattr(body, key, "") or "").strip()
+            if value:
+                return value
+        return ""
+
+try:
+    from auth import set_staff_password
+except ImportError:
+    def set_staff_password(row: Staff, password: str) -> None:
+        row.password_hash = hash_password(password)
+        row.password_vault = encrypt_secret(password)
 
 router = APIRouter()
 
@@ -212,8 +237,11 @@ def auth_me(staff: Staff = Depends(current_staff)):
         {
             "id": staff.id,
             "email": staff.email,
+            "srb_id": staff.email,
+            "rab_id": staff.email,
             "display_name": staff.display_name,
             "role": staff.role,
+            "avatar": getattr(staff, "avatar", "") or "",
             "mfa_enabled": bool(staff.mfa_enabled),
         }
     )
@@ -222,7 +250,10 @@ def auth_me(staff: Staff = Depends(current_staff)):
 class ProfileIn(BaseModel):
     display_name: str = Field(min_length=2, max_length=255)
     username: str = ""
+    srb_id: str = ""
+    rab_id: str = ""
     password: str = ""
+    avatar: str | None = None
 
 
 @router.patch("/api/v1/auth/me")
@@ -238,29 +269,29 @@ def update_me(
     if row is None:
         raise HTTPException(status_code=404, detail="Staff not found")
     row.display_name = name
-    username = (body.username or "").strip().lower()
-    if username:
-        taken = (
-            db.query(Staff)
-            .filter(func.lower(Staff.email) == username, Staff.id != row.id)
-            .first()
-        )
-        if taken:
-            raise HTTPException(status_code=409, detail="Username is already in use")
-        row.email = username
+    if body.avatar is not None:
+        avatar = (body.avatar or "").strip()
+        if avatar and not avatar.startswith("data:image/"):
+            raise HTTPException(status_code=400, detail="Profile photo must be an image")
+        if len(avatar) > 1_200_000:
+            raise HTTPException(status_code=400, detail="Profile photo is too large")
+        row.avatar = avatar
     password = (body.password or "").strip()
     if password:
-        error = validate_password(password, username or row.email)
+        error = validate_password(password, row.email)
         if error:
             raise HTTPException(status_code=400, detail=error)
-        row.password_hash = hash_password(password)
+        set_staff_password(row, password)
     db.commit()
     return envelope(
         {
             "id": row.id,
             "email": row.email,
+            "srb_id": row.email,
+            "rab_id": row.email,
             "display_name": row.display_name,
             "role": row.role,
+            "avatar": getattr(row, "avatar", "") or "",
             "mfa_enabled": bool(row.mfa_enabled),
         },
         "Updated",
@@ -271,32 +302,43 @@ STAFF_ROLES = ("cc", "daily", "mess", "consume", "ration", "admin")
 STAFF_MANAGE = ("admin", "mess")
 
 
-def staff_out(row: Staff) -> dict:
-    return {
+def _plain_staff_password(row: Staff) -> str:
+    vault = getattr(row, "password_vault", None)
+    if not vault:
+        return ""
+    try:
+        return decrypt_secret(vault)
+    except ValueError:
+        return ""
+
+
+def staff_out(row: Staff, *, include_password: bool = False) -> dict:
+    data = {
         "id": row.id,
         "email": row.email,
+        "srb_id": row.email,
+        "rab_id": row.email,
         "display_name": row.display_name,
         "role": row.role,
+        "avatar": getattr(row, "avatar", "") or "",
         "active": bool(row.active),
         "has_password": bool(getattr(row, "password_vault", None)),
     }
-
-
-def _staff_login_id(body: object) -> str:
-    email = str(getattr(body, "email", "") or "").strip()
-    username = str(getattr(body, "username", "") or "").strip()
-    return (email or username).lower()
+    if include_password:
+        data["password"] = _plain_staff_password(row)
+    return data
 
 
 def _set_staff_password(row: Staff, password: str) -> None:
-    row.password_hash = hash_password(password)
-    row.password_vault = encrypt_secret(password)
+    set_staff_password(row, password)
 
 
 class StaffCreateIn(BaseModel):
     display_name: str = Field(min_length=2, max_length=255)
     username: str = ""
     email: str = ""
+    srb_id: str = ""
+    rab_id: str = ""
     password: str = Field(min_length=1, max_length=255)
     role: str
 
@@ -305,44 +347,134 @@ class StaffUpdateIn(BaseModel):
     display_name: str = ""
     username: str = ""
     email: str = ""
+    srb_id: str = ""
+    rab_id: str = ""
     password: str = ""
     role: str = ""
     active: bool | None = None
 
 
+def find_staff_by_login(db: Session, login_id: str) -> Staff | None:
+    key = (login_id or "").strip().lower()
+    if not key:
+        return None
+    return db.query(Staff).filter(func.lower(Staff.email) == key).first()
+
+
 def _staff_username_taken(db: Session, username: str, exclude_id: str | None = None) -> bool:
-    query = db.query(Staff).filter(func.lower(Staff.email) == username)
-    if exclude_id:
-        query = query.filter(Staff.id != exclude_id)
-    return query.first() is not None
+    existing = find_staff_by_login(db, username)
+    return existing is not None and existing.id != exclude_id
+
+
+SYSTEM_STAFF_LOGINS = {
+    "SRB-ADMIN",
+    "SRB-CC",
+    "SRB-DAILY",
+    "SRB-MESS",
+    "SRB-CONSUME",
+    "SRB-RATION",
+    "SRB-SUPERADMIN",
+}
+
+
+def _staff_login_keys(login_id: str) -> list[str]:
+    raw = (login_id or "").strip()
+    if not raw:
+        return []
+    upper = raw.upper()
+    keys = {raw.lower(), upper.lower()}
+    bare = upper.removeprefix("SRB-").removeprefix("SRB")
+    if bare:
+        keys.add(bare.lower())
+        keys.add(f"srb-{bare.lower()}")
+    return [key for key in keys if key]
+
+
+def _is_system_staff_login(login_id: str) -> bool:
+    return (login_id or "").strip().upper() in SYSTEM_STAFF_LOGINS
+
+
+def find_member_for_staff_login(db: Session, login_id: str) -> Member | None:
+    keys = _staff_login_keys(login_id)
+    if not keys:
+        return None
+    rows = (
+        db.query(Member)
+        .filter(
+            or_(
+                func.lower(Member.rab_id).in_(keys),
+                func.lower(Member.personal_id).in_(keys),
+            )
+        )
+        .all()
+    )
+    if not rows:
+        return None
+    want = (login_id or "").strip().lower()
+    for row in rows:
+        if (row.rab_id or "").strip().lower() == want:
+            return row
+    return rows[0]
+
+
+def require_accepted_member_for_staff(db: Session, login_id: str) -> Member:
+    member = find_member_for_staff_login(db, login_id)
+    if member is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No accepted member has this SRB ID. Add them as a member first.",
+        )
+    status = (member.approval_status or "").strip().lower()
+    if status == "pending":
+        raise HTTPException(
+            status_code=400,
+            detail="This SRB ID is still pending. Daily must accept the member first.",
+        )
+    if status != "approved":
+        raise HTTPException(
+            status_code=400,
+            detail="This SRB ID is not an accepted member.",
+        )
+    return member
 
 
 @router.get("/api/v1/staff")
 def list_staff(
-    _staff: Staff = Depends(require_roles(*STAFF_MANAGE)),
+    staff: Staff = Depends(require_roles(*STAFF_MANAGE)),
     db: Session = Depends(get_db),
 ):
     rows = db.query(Staff).order_by(Staff.role.asc(), Staff.display_name.asc()).all()
-    return envelope({"items": [staff_out(row) for row in rows]})
+    include_password = staff.role == "admin"
+    return envelope(
+        {
+            "items": [
+                staff_out(row, include_password=include_password) for row in rows
+            ]
+        }
+    )
 
 
 @router.post("/api/v1/staff")
 def create_staff(
     body: StaffCreateIn,
-    _staff: Staff = Depends(require_roles(*STAFF_MANAGE)),
+    actor: Staff = Depends(require_roles(*STAFF_MANAGE)),
     db: Session = Depends(get_db),
 ):
     name = body.display_name.strip()
-    username = _staff_login_id(body)
+    username = normalize_staff_login_id(staff_login_id_from_body(body))
     role = body.role.strip().lower()
     if len(name) < 2:
         raise HTTPException(status_code=400, detail="Name is too short")
-    if len(username) < 2 or "@" not in username:
-        raise HTTPException(status_code=400, detail="Email is required")
+    if len(username) < 2:
+        raise HTTPException(status_code=400, detail="SRB ID is required")
+    if "@" in username:
+        raise HTTPException(status_code=400, detail="Use a SRB ID, not an email address")
     if role not in STAFF_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
     if _staff_username_taken(db, username):
-        raise HTTPException(status_code=409, detail="Username is already in use")
+        raise HTTPException(status_code=409, detail="SRB ID is already in use")
+    if not _is_system_staff_login(username):
+        require_accepted_member_for_staff(db, username)
     error = validate_password(body.password, username)
     if error:
         raise HTTPException(status_code=400, detail=error)
@@ -360,9 +492,13 @@ def create_staff(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Username is already in use") from exc
+        raise HTTPException(status_code=409, detail="SRB ID is already in use") from exc
     db.refresh(row)
-    return envelope(staff_out(row), "Staff created", 201)
+    return envelope(
+        staff_out(row, include_password=actor.role == "admin"),
+        "Staff created",
+        201,
+    )
 
 
 @router.patch("/api/v1/staff/{staff_id}")
@@ -380,10 +516,14 @@ def update_staff(
         if len(name) < 2:
             raise HTTPException(status_code=400, detail="Name is too short")
         row.display_name = name
-    username = _staff_login_id(body)
+    username = normalize_staff_login_id(staff_login_id_from_body(body))
     if username:
+        if "@" in username and username.lower() != row.email.lower():
+            raise HTTPException(status_code=400, detail="Use a SRB ID, not an email address")
         if _staff_username_taken(db, username, row.id):
-            raise HTTPException(status_code=409, detail="Username is already in use")
+            raise HTTPException(status_code=409, detail="SRB ID is already in use")
+        if not _is_system_staff_login(username):
+            require_accepted_member_for_staff(db, username)
         row.email = username
     role = (body.role or "").strip().lower()
     if role:
@@ -414,9 +554,12 @@ def update_staff(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Username is already in use") from exc
+        raise HTTPException(status_code=409, detail="SRB ID is already in use") from exc
     db.refresh(row)
-    return envelope(staff_out(row), "Updated")
+    return envelope(
+        staff_out(row, include_password=actor.role == "admin"),
+        "Updated",
+    )
 
 
 @router.get("/api/v1/staff/{staff_id}/password")

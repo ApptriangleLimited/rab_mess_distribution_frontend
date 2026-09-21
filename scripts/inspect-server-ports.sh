@@ -4,6 +4,9 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/mess/frontend}"
+if [ ! -f "$APP_DIR/.env" ] && [ -d /usr/share/nginx/html/projects/rab-mess ]; then
+  APP_DIR="/usr/share/nginx/html/projects/rab-mess"
+fi
 
 echo "========================================"
 echo "This app (srb_* / rab-mess) — keep these ports"
@@ -23,7 +26,7 @@ echo "Everything listening on common web/API ports"
 echo "(other projects on this host)"
 echo "========================================"
 if command -v ss >/dev/null 2>&1; then
-  ss -lntp | grep -E ':80 |:443 |:3000 |:3001 |:8000 |:8001 |:8080 |:8443 ' || true
+  ss -lntp | grep -E ':80 |:443 |:8888 |:3000 |:3001 |:3010 |:4000 |:5000 |:7000 |:8000 |:8001 |:8080 |:8443 ' || true
 else
   netstat -lntp 2>/dev/null | grep -E ':80 |:443 |:3000 |:8000 ' || true
 fi

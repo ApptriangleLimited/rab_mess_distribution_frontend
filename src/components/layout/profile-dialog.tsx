@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
-import { getStaffMe, updateStaffProfile } from "@/lib/api/auth";
+import { getStaffMe, staffSrbId, updateStaffProfile } from "@/lib/api/auth";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import { SEED_STAFF_EMAIL } from "@/lib/constants";
 import { setProfileAvatar } from "@/lib/session";
@@ -71,8 +71,9 @@ export function ProfileDialog({
     if (isCcApiEnabled()) {
       void getStaffMe()
         .then((me) => {
-          setUsername(me.email);
+          setUsername(staffSrbId(me));
           setName(me.display_name || session.name);
+          if (me.avatar) setPreview(me.avatar);
         })
         .catch(() => {
           /* keep session values */
@@ -111,7 +112,7 @@ export function ProfileDialog({
       if (isCcApiEnabled()) {
         await updateStaffProfile({
           display_name: nextName,
-          username: nextUser,
+          avatar: preview,
         });
       }
       setProfileAvatar(session.role as Role, preview, nextUser);
@@ -260,14 +261,16 @@ export function ProfileDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="profile-username">{t("profile.username")}</Label>
+              <Label htmlFor="profile-username">{t("profile.srbId")}</Label>
               <Input
                 id="profile-username"
                 value={username}
                 maxLength={120}
                 autoComplete="username"
-                onChange={(e) => setUsername(e.target.value)}
+                readOnly
+                disabled
               />
+              <p className="text-xs text-neutral-500">{t("profile.srbIdFixed")}</p>
             </div>
           </>
         ) : null}
@@ -275,7 +278,7 @@ export function ProfileDialog({
         {mode === "password" ? (
           <>
             <div className="space-y-1.5">
-              <Label>{t("profile.username")}</Label>
+              <Label>{t("profile.srbId")}</Label>
               <Input value={username} readOnly disabled />
             </div>
             <div className="space-y-1.5">
@@ -305,7 +308,7 @@ export function ProfileDialog({
           <>
             <dl className="grid gap-3 text-sm">
               <div>
-                <dt className="text-xs font-medium text-neutral-500">{t("profile.username")}</dt>
+                <dt className="text-xs font-medium text-neutral-500">{t("profile.srbId")}</dt>
                 <dd className="mt-0.5 font-medium text-neutral-900 dark:text-neutral-100">
                   {username || "—"}
                 </dd>

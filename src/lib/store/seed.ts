@@ -32,6 +32,7 @@ import {
   shiftMonthKey,
   todayISO,
 } from "@/lib/date";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { officialSenderAccounts } from "@/lib/official-senders";
 import { demoPritibhojEvents } from "@/lib/pritibhoj-demo";
 import { demoTagRequests } from "@/lib/tag-request-demo";
@@ -305,6 +306,7 @@ function buildDemoUsers(): User[] {
 
 /** Approved Police members for Daily cockpit. Merge if local roster predates them. */
 export function extraCockpitPoliceMembers(): User[] {
+  if (isCcApiEnabled()) return [];
   return SEED_MEMBERS.flatMap((row, i) =>
     COCKPIT_POLICE_IDS.has(row.id) ? [userFromSeedRow(row, i)] : [],
   );
@@ -319,6 +321,7 @@ const TRUST_FIREWOOD_ROWS: SeedRow[] = [
 
 /** Trust Bank + FR days so Firewood FR generate-report has a letter to preview. */
 export function extraTrustFirewoodMembers(): User[] {
+  if (isCcApiEnabled()) return [];
   return TRUST_FIREWOOD_ROWS.map((row, i) => {
     const n = 9101 + i;
     return {
@@ -338,6 +341,7 @@ export function extraTrustFirewoodMembers(): User[] {
 
 /** FR tags for the current month (and Sept 2026) so the Trust Firewood letter is not empty. */
 export function extraTrustFirewoodAssignments(): DailyAssignment[] {
+  if (isCcApiEnabled()) return [];
   const stamp = nowISO();
   const months = new Set([monthKey(), "2026-09"]);
   const today = todayISO();
