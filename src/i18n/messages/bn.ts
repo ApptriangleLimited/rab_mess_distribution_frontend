@@ -217,7 +217,7 @@ export const bn = {
     panelTag: "ডিউটি গেট",
     gateLabel: "সাইন ইন",
     chooseDuty: "ডিউটি ডেস্ক",
-    subtitleDemo: "ডেমো এসআরবি আইডি ও পাসওয়ার্ড ব্যবহার করুন, অথবা নিচের ডেস্ক বেছে নিন।",
+    subtitleDemo: "সাইন ইন করতে আপনার এসআরবি আইডি ও পাসওয়ার্ড ব্যবহার করুন।",
     passwordHintDemo: "প্রতিটি ডেমো ডেস্কে এসআরবি আইডি ও পাসওয়ার্ড দেখা যাবে।",
     email: "এসআরবি আইডি",
     emailPlaceholder: "SRB-DAILY",

@@ -216,7 +216,7 @@ export const en = {
     panelTag: "Duty gate",
     gateLabel: "Sign in",
     chooseDuty: "Duty desk",
-    subtitleDemo: "Use a demo SRB ID and password, or pick a desk below.",
+    subtitleDemo: "Use your SRB ID and password to sign in.",
     passwordHintDemo: "Each demo desk shows its SRB ID and password.",
     email: "SRB ID",
     emailPlaceholder: "SRB-DAILY",

@@ -3,8 +3,11 @@ import { apiJson } from "@/lib/api/client";
 export type StaffPublic = {
   id: string;
   email: string;
+  srb_id?: string;
+  rab_id?: string;
   display_name: string;
   role: string;
+  avatar?: string;
 };
 
 export type LoginData = {
@@ -15,10 +18,31 @@ export type LoginData = {
   staff: StaffPublic;
 };
 
-export function loginStaff(email: string, password: string, otp?: string) {
+export function staffSrbId(staff: Pick<StaffPublic, "srb_id" | "rab_id" | "email">) {
+  return (staff.srb_id || staff.rab_id || staff.email || "").trim();
+}
+
+export function loginStaff(srbId: string, password: string, otp?: string) {
   return apiJson<LoginData>("/api/v1/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password, otp: otp || "" }),
+    body: JSON.stringify({ srb_id: srbId, rab_id: srbId, email: srbId, password, otp: otp || "" }),
+  });
+}
+
+export function changePasswordAtLogin(
+  srbId: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  return apiJson<void>("/api/v1/auth/login-change-password", {
+    method: "POST",
+    body: JSON.stringify({
+      srb_id: srbId,
+      rab_id: srbId,
+      email: srbId,
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
   });
 }
 
@@ -44,10 +68,17 @@ export function getStaffMe() {
 export function updateStaffProfile(body: {
   display_name: string;
   username?: string;
+  srb_id?: string;
+  rab_id?: string;
   password?: string;
+  avatar?: string | null;
 }) {
   return apiJson<StaffPublic>("/api/v1/auth/me", {
     method: "PATCH",
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      display_name: body.display_name,
+      password: body.password,
+      avatar: body.avatar,
+    }),
   });
 }

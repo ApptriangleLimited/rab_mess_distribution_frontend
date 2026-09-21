@@ -14,21 +14,10 @@ import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { ProfileDialog } from "@/components/layout/profile-dialog";
 import type { Role, Session } from "@/lib/types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useI18n, useT } from "@/i18n/provider";
 import type { Locale } from "@/i18n";
 import { roleLabel } from "@/i18n";
-import { ROLE_HOMES, rolesForPicker } from "@/lib/constants";
-import { switchToSeedRole } from "@/lib/api/switch-role";
-import { ApiClientError } from "@/lib/api/client";
 import { getProfileAvatar } from "@/lib/session";
-import { useToast } from "@/components/shared/toast-provider";
 
 export function HeaderBar({
   session,
@@ -49,7 +38,6 @@ export function HeaderBar({
 }) {
   const t = useT();
   const { locale, setLocale } = useI18n();
-  const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -70,20 +58,6 @@ export function HeaderBar({
       document.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
-
-  async function onSwitchRole(role: Role) {
-    if (role === session.role) return;
-    try {
-      await switchToSeedRole(role, session);
-      toast(t("settings.switchedTo", { role: roleLabel(role, locale) }), "success");
-      window.location.href = ROLE_HOMES[role];
-    } catch (err) {
-      toast(
-        err instanceof ApiClientError ? err.detail : t("settings.switchFailed"),
-        "error",
-      );
-    }
-  }
 
   return (
     <header
@@ -167,27 +141,6 @@ export function HeaderBar({
                 </button>
               );
             })}
-          </div>
-
-          <div className="hidden sm:block">
-            <Select
-              value={session.role}
-              onValueChange={(v) => onSwitchRole(v as Role)}
-            >
-              <SelectTrigger
-                className="h-10 min-w-[148px] rounded-xl border-white/10 bg-white/10 text-sm text-white shadow-none hover:bg-white/15 focus:ring-2 focus:ring-primary-light/40"
-                aria-label={t("common.switchRole")}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {rolesForPicker(session.role).map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {roleLabel(r, locale)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="relative" ref={menuRef}>

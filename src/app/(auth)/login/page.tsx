@@ -2,18 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  IconArrowRight,
-  IconCashBanknote,
-  IconChartBar,
-  IconChecklist,
-  IconEye,
-  IconEyeOff,
-  IconLayoutDashboard,
-  IconSoup,
-  IconUsers,
-  type Icon,
-} from "@tabler/icons-react";
+import { IconArrowRight, IconEye, IconEyeOff } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +11,6 @@ import {
   ROLE_KEYS,
   REMEMBER_EMAIL_KEY,
   SEED_STAFF_EMAIL,
-  SEED_STAFF_PASSWORD,
   VISIBLE_ROLE_KEYS,
 } from "@/lib/constants";
 import { useSession } from "@/hooks/use-session";
@@ -30,47 +18,67 @@ import { useToast } from "@/components/shared/toast-provider";
 import { useI18n, useT } from "@/i18n/provider";
 import { roleLabel } from "@/i18n";
 import { ApiClientError } from "@/lib/api/client";
-import { loginStaff } from "@/lib/api/auth";
+import { changePasswordAtLogin, loginStaff } from "@/lib/api/auth";
 import { isApiEnabled, isCcApiEnabled } from "@/lib/api/mode";
-import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 
 function isRole(value: string): value is Role {
   return (ROLE_KEYS as readonly string[]).includes(value);
 }
 
-const ROLE_META: Record<Role, { icon: Icon; accent: string; chip: string }> = {
-  cc: {
-    icon: IconUsers,
-    accent: "from-sky-500/20 to-sky-600/5",
-    chip: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  },
-  daily: {
-    icon: IconChecklist,
-    accent: "from-amber-500/20 to-amber-600/5",
-    chip: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-  },
-  mess: {
-    icon: IconSoup,
-    accent: "from-rose-500/20 to-rose-600/5",
-    chip: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-  },
-  consume: {
-    icon: IconChartBar,
-    accent: "from-violet-500/20 to-violet-600/5",
-    chip: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  },
-  ration: {
-    icon: IconCashBanknote,
-    accent: "from-teal-500/20 to-teal-600/5",
-    chip: "bg-teal-500/15 text-teal-800 dark:text-teal-300",
-  },
-  admin: {
-    icon: IconLayoutDashboard,
-    accent: "from-emerald-500/20 to-emerald-600/5",
-    chip: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
-  },
-};
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+  disabled,
+  revealed,
+  onToggleReveal,
+  showLabel,
+  hideLabel,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  autoComplete: string;
+  disabled: boolean;
+  revealed: boolean;
+  onToggleReveal: () => void;
+  showLabel: string;
+  hideLabel: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-neutral-700 dark:text-neutral-300">
+        {label}
+      </Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={revealed ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="h-11 rounded-xl border-neutral-200 bg-neutral-50 px-3.5 pr-11 text-base shadow-none focus-visible:ring-primary dark:border-neutral-700 dark:bg-neutral-900"
+          autoComplete={autoComplete}
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          onClick={onToggleReveal}
+          aria-label={revealed ? hideLabel : showLabel}
+        >
+          {revealed ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const { login } = useSession();
@@ -79,18 +87,24 @@ export default function LoginPage() {
   const { locale } = useI18n();
   const reduceMotion = useReducedMotion();
   const apiOn = isApiEnabled() || isCcApiEnabled();
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<"signin" | "change">("signin");
+  const [rabId, setRabId] = useState("");
   const [password, setPassword] = useState("");
-  const [demoRole, setDemoRole] = useState<Role>("cc");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(REMEMBER_EMAIL_KEY);
       if (saved) {
-        setEmail(saved);
+        setRabId(saved);
         setRememberMe(true);
       }
     } catch {
@@ -126,11 +140,12 @@ export default function LoginPage() {
         data.access_token,
         rememberMe,
         data.refresh_token,
-        data.staff.email,
+        data.staff.srb_id || data.staff.rab_id || data.staff.email,
+        data.staff.avatar,
       );
       try {
         if (rememberMe) {
-          localStorage.setItem(REMEMBER_EMAIL_KEY, nextEmail);
+          localStorage.setItem(REMEMBER_EMAIL_KEY, nextEmail.trim());
         } else {
           localStorage.removeItem(REMEMBER_EMAIL_KEY);
         }
@@ -157,58 +172,115 @@ export default function LoginPage() {
     }
   }
 
+  function resetChangeFields() {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowCurrent(false);
+    setShowNew(false);
+    setShowConfirm(false);
+  }
+
+  function openChangePassword() {
+    setMode("change");
+    setCurrentPassword(password);
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowCurrent(showPassword);
+    setShowNew(false);
+    setShowConfirm(false);
+  }
+
+  function backToSignIn() {
+    setMode("signin");
+    resetChangeFields();
+  }
+
+  async function updatePassword() {
+    if (busy) return;
+    if (!rabId.trim()) {
+      toast(t("login.srbIdRequired"), "error");
+      return;
+    }
+    if (!currentPassword.trim()) {
+      toast(t("login.passwordRequired"), "error");
+      return;
+    }
+    if (!newPassword.trim()) {
+      toast(t("profile.passwordRequired"), "error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast(t("profile.passwordMismatch"), "error");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      toast(t("login.passwordSame"), "error");
+      return;
+    }
+    if (!apiOn) {
+      toast(t("settings.staffApiOff"), "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      await changePasswordAtLogin(rabId.trim(), currentPassword, newPassword);
+      setPassword("");
+      backToSignIn();
+      toast(t("login.changePasswordDone"), "success");
+    } catch (err) {
+      if (err instanceof ApiClientError && err.code === "AUTH_INVALID_CREDENTIALS") {
+        toast(t("login.invalidCredentials"), "error");
+      } else if (err instanceof ApiClientError && err.code === "AUTH_INACTIVE") {
+        toast(t("login.inactive"), "error");
+      } else if (err instanceof ApiClientError && err.code === "AUTH_PASSWORD_SAME") {
+        toast(t("login.passwordSame"), "error");
+      } else if (err instanceof ApiClientError) {
+        toast(err.detail, "error");
+      } else {
+        toast(t("login.changePasswordFail"), "error");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "change") {
+      await updatePassword();
+      return;
+    }
     if (apiOn) {
-      if (!email.trim()) {
-        toast(t(apiOn ? "login.emailRequired" : "login.usernameRequired"), "error");
+      if (!rabId.trim()) {
+        toast(t("login.srbIdRequired"), "error");
         return;
       }
       if (!password.trim()) {
         toast(t("login.passwordRequired"), "error");
         return;
       }
-      await signIn(email.trim().toLowerCase(), password);
+      await signIn(rabId.trim(), password);
       return;
     }
-    if (!email.trim()) {
-      toast(t("login.usernameRequired"), "error");
+    if (!rabId.trim()) {
+      toast(t("login.srbIdRequired"), "error");
       return;
     }
     if (!password.trim()) {
       toast(t("login.passwordRequired"), "error");
       return;
     }
-    const nextUser = email.trim().toLowerCase();
-    const matched = VISIBLE_ROLE_KEYS.find((r) => nextUser === SEED_STAFF_EMAIL(r));
+    const nextUser = rabId.trim();
+    const matched = VISIBLE_ROLE_KEYS.find(
+      (r) => nextUser.toLowerCase() === SEED_STAFF_EMAIL(r).toLowerCase(),
+    );
     finishDemo(
-      matched ?? demoRole,
-      matched ? roleLabel(matched, locale) : email.trim(),
+      matched ?? "cc",
+      matched ? roleLabel(matched, locale) : nextUser,
       nextUser,
     );
   }
-
-  async function onQuickRole(role: Role) {
-    if (apiOn) {
-      const nextEmail = SEED_STAFF_EMAIL(role);
-      setEmail(nextEmail);
-      setPassword(SEED_STAFF_PASSWORD);
-      try {
-        await signIn(nextEmail, SEED_STAFF_PASSWORD);
-        return;
-      } catch {
-        if (isApiEnabled()) return;
-      }
-    }
-    setDemoRole(role);
-    setEmail(SEED_STAFF_EMAIL(role));
-    setPassword(SEED_STAFF_PASSWORD);
-    finishDemo(role, roleLabel(role, locale), SEED_STAFF_EMAIL(role));
-  }
-
-  const selectedRole = apiOn
-    ? VISIBLE_ROLE_KEYS.find((r) => email.trim().toLowerCase() === SEED_STAFF_EMAIL(r))
-    : demoRole;
 
   const fade = reduceMotion
     ? undefined
@@ -298,139 +370,108 @@ export default function LoginPage() {
         >
           <div className="mb-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
-              {t("login.gateLabel")}
+              {t(mode === "change" ? "login.changePassword" : "login.gateLabel")}
             </p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight text-brand-title dark:text-white">
-              {t("login.welcome")}
+              {t(mode === "change" ? "login.changePasswordTitle" : "login.welcome")}
             </h2>
             <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-              {t(apiOn ? "login.subtitle" : "login.subtitleDemo")}
+              {mode === "change"
+                ? t("login.changePasswordSubtitle")
+                : t(apiOn ? "login.subtitle" : "login.subtitleDemo")}
             </p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="identity" className="text-neutral-700 dark:text-neutral-300">
-                {t(apiOn ? "login.email" : "login.username")}
+                {t("login.srbId")}
               </Label>
               <Input
                 id="identity"
-                type={apiOn ? "email" : "text"}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t(apiOn ? "login.emailPlaceholder" : "login.usernamePlaceholder")}
+                type="text"
+                value={rabId}
+                onChange={(e) => setRabId(e.target.value)}
+                placeholder={t("login.srbIdPlaceholder")}
                 className="h-11 rounded-xl border-neutral-200 bg-neutral-50 px-3.5 text-base shadow-none focus-visible:ring-primary dark:border-neutral-700 dark:bg-neutral-900"
                 autoComplete="username"
                 disabled={busy}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-neutral-700 dark:text-neutral-300">
-                {t("login.password")}
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+            {mode === "change" ? (
+              <>
+                <PasswordField
+                  id="current-password"
+                  label={t("login.currentPassword")}
+                  value={currentPassword}
+                  onChange={setCurrentPassword}
                   placeholder={t("login.passwordPlaceholder")}
-                  className="h-11 rounded-xl border-neutral-200 bg-neutral-50 px-3.5 pr-11 text-base shadow-none focus-visible:ring-primary dark:border-neutral-700 dark:bg-neutral-900"
                   autoComplete="current-password"
                   disabled={busy}
+                  revealed={showCurrent}
+                  onToggleReveal={() => setShowCurrent((v) => !v)}
+                  showLabel={t("login.showPassword")}
+                  hideLabel={t("login.hidePassword")}
                 />
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={
-                    showPassword ? t("login.hidePassword") : t("login.showPassword")
-                  }
-                >
-                  {showPassword ? (
-                    <IconEyeOff className="h-4 w-4" />
-                  ) : (
-                    <IconEye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-              <p className="text-xs text-neutral-400">
-                {t(apiOn ? "login.passwordHint" : "login.passwordHintDemo")}
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-neutral-700 dark:text-neutral-300">
-                {t("login.quickAccess")}
-              </Label>
-              <div
-                role="group"
-                aria-label={t("login.quickAccess")}
-                className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"
-              >
-                {VISIBLE_ROLE_KEYS.map((r) => {
-                  const meta = ROLE_META[r];
-                  const Icon = meta.icon;
-                  const selected = selectedRole === r;
-                  return (
-                    <motion.button
-                      key={r}
-                      type="button"
-                      disabled={busy}
-                      whileHover={reduceMotion || busy ? undefined : { y: -2 }}
-                      whileTap={reduceMotion || busy ? undefined : { scale: 0.98 }}
-                      onClick={() => void onQuickRole(r)}
-                      className={cn(
-                        "group relative flex flex-col items-start gap-2.5 overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 disabled:opacity-60",
-                        selected
-                          ? "border-primary bg-primary/[0.06] shadow-[0_0_0_1px_var(--primary)] dark:bg-primary/10"
-                          : "border-neutral-200 bg-neutral-50/80 hover:border-neutral-300 hover:bg-white dark:border-neutral-700 dark:bg-neutral-900/80 dark:hover:border-neutral-600",
-                      )}
-                    >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-200",
-                          meta.accent,
-                          selected && "opacity-100",
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "relative flex h-9 w-9 items-center justify-center rounded-xl transition",
-                          selected
-                            ? "bg-primary text-white shadow-md shadow-primary/25"
-                            : cn(meta.chip, "group-hover:scale-105"),
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="relative text-xs font-semibold leading-snug text-neutral-800 dark:text-neutral-100">
-                        {roleLabel(r, locale)}
-                      </span>
-                      <span className="relative space-y-0.5 font-mono text-[10px] leading-tight text-neutral-500 dark:text-neutral-400">
-                        <span className="block truncate">{SEED_STAFF_EMAIL(r)}</span>
-                        <span className="block truncate">{SEED_STAFF_PASSWORD}</span>
-                      </span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <label className="flex cursor-pointer items-center gap-2.5 select-none">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                <PasswordField
+                  id="new-password"
+                  label={t("login.newPassword")}
+                  value={newPassword}
+                  onChange={setNewPassword}
+                  placeholder={t("login.passwordPlaceholder")}
+                  autoComplete="new-password"
+                  disabled={busy}
+                  revealed={showNew}
+                  onToggleReveal={() => setShowNew((v) => !v)}
+                  showLabel={t("login.showPassword")}
+                  hideLabel={t("login.hidePassword")}
+                />
+                <PasswordField
+                  id="confirm-password"
+                  label={t("login.confirmPassword")}
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  placeholder={t("login.passwordPlaceholder")}
+                  autoComplete="new-password"
+                  disabled={busy}
+                  revealed={showConfirm}
+                  onToggleReveal={() => setShowConfirm((v) => !v)}
+                  showLabel={t("login.showPassword")}
+                  hideLabel={t("login.hidePassword")}
+                />
+                <p className="text-xs text-neutral-400">{t("settings.staffPasswordHint")}</p>
+              </>
+            ) : (
+              <PasswordField
+                id="password"
+                label={t("login.password")}
+                value={password}
+                onChange={setPassword}
+                placeholder={t("login.passwordPlaceholder")}
+                autoComplete="current-password"
                 disabled={busy}
-                className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+                revealed={showPassword}
+                onToggleReveal={() => setShowPassword((v) => !v)}
+                showLabel={t("login.showPassword")}
+                hideLabel={t("login.hidePassword")}
               />
-              <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                {t("login.rememberMe")}
-              </span>
-            </label>
+            )}
+
+            {mode === "signin" ? (
+              <label className="flex cursor-pointer items-center gap-2.5 select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={busy}
+                  className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+                />
+                <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                  {t("login.rememberMe")}
+                </span>
+              </label>
+            ) : null}
 
             <motion.div
               whileHover={reduceMotion || busy ? undefined : { scale: 1.01 }}
@@ -443,10 +484,30 @@ export default function LoginPage() {
                 className="h-12 w-full rounded-xl text-sm font-semibold tracking-wide"
                 disabled={busy}
               >
-                {t("login.enterSystem")}
+                {mode === "change" ? t("login.changePasswordSubmit") : t("login.enterSystem")}
                 <IconArrowRight className="h-4 w-4" />
               </Button>
             </motion.div>
+
+            {mode === "change" ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={backToSignIn}
+                className="w-full text-center text-sm font-medium text-primary hover:underline disabled:opacity-50"
+              >
+                {t("login.changePasswordBack")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={openChangePassword}
+                className="w-full text-center text-sm font-medium text-primary hover:underline disabled:opacity-50"
+              >
+                {t("login.changePassword")}
+              </button>
+            )}
           </div>
         </motion.form>
       </section>
