@@ -5,6 +5,7 @@ import {
   officialBghDays,
   officialFrDays,
   officialLeaveTotal,
+  officialLnkDays,
   officialMedDays,
   officialMsDays,
   officialWitDays,
@@ -88,6 +89,7 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
           <th className="border border-black px-1 py-1 align-bottom">WT</th>
           <th className="border border-black px-1 py-1 align-bottom">MED</th>
           <th className="border border-black px-1 py-1 align-bottom">BGH</th>
+          <th className="border border-black px-1 py-1 align-bottom">LNK</th>
           <th className="border border-black px-1 py-1 align-bottom">WR</th>
           <th className="border border-black px-1 py-1 align-bottom">
             Total days
@@ -136,6 +138,9 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialBghDays(row.tagDays))}
+            </td>
+            <td className="border border-black px-1 py-1 text-center tabular-nums">
+              {cell(officialLnkDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialWrDays(row.tagDays))}
@@ -226,6 +231,7 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
           <th className="border border-black px-1 py-1 align-bottom">WT</th>
           <th className="border border-black px-1 py-1 align-bottom">MED</th>
           <th className="border border-black px-1 py-1 align-bottom">BGH</th>
+          <th className="border border-black px-1 py-1 align-bottom">LNK</th>
           <th className="border border-black px-1 py-1 align-bottom">Total</th>
           {table.remarks ? (
             <th className="border border-black px-1 py-1 align-bottom">
@@ -264,6 +270,9 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialBghDays(row.tagDays))}
+            </td>
+            <td className="border border-black px-1 py-1 text-center tabular-nums">
+              {cell(officialLnkDays(row.tagDays))}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(officialLeaveTotal(row.tagDays))}

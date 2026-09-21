@@ -25,9 +25,13 @@ import { useReportSource } from "@/hooks/use-report-source";
 import { useSession } from "@/hooks/use-session";
 import { useStore } from "@/hooks/use-store";
 
-import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
+import { CONSUME_LEDGER_SOURCE_TAGS } from "@/lib/constants";
 import { monthDateBounds } from "@/lib/date";
-import { buildRangeLedger, withReportSource } from "@/lib/reports";
+import {
+  buildRangeLedger,
+  presentConsumeLedger,
+  withReportSource,
+} from "@/lib/reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -77,9 +81,14 @@ export default function ConsumeLedgerClient() {
 
   const ledger = useMemo(() => {
     const range = withReportSource(source, () =>
-      buildRangeLedger(rangeBounds.from, rangeBounds.to, CONSUME_LEDGER_TAGS, {
-        carry: true,
-      }),
+      presentConsumeLedger(
+        buildRangeLedger(
+          rangeBounds.from,
+          rangeBounds.to,
+          CONSUME_LEDGER_SOURCE_TAGS,
+          { carry: true },
+        ),
+      ),
     );
     return {
       month,

@@ -1,7 +1,6 @@
 import { getState, setState } from "@/lib/store";
 import {
   CL_FR_MONTHLY_TAG,
-  CONSUME_LEDGER_TAGS,
   DAILY_TAGS,
   FR_FUEL_RATE_PER_DAY,
   FUEL_RATE_TAG,
@@ -11,14 +10,27 @@ import {
 import { parseMoney, roundPaisa } from "@/lib/money";
 import type { AllowanceRate, DailyTag } from "@/lib/types";
 
-/** Settings + consume bills always have FR, MFR, CL, PL, CD, TRG, WIT, MED, BGH. */
+/** Settings + consume bills always have FR, MFR, CL, PL, CD, TRG, WIT, MED, BGH, LNK. */
+const CONSUME_BILL_RATE_TAGS: DailyTag[] = [
+  "FR",
+  "MFR",
+  "CL",
+  "PL",
+  "CD",
+  "TRG",
+  "WIT",
+  "MED",
+  "BGH",
+  "LNK",
+];
+
 export function ensureConsumeRates(rates: AllowanceRate[]): AllowanceRate[] {
   const next = rates.map((r) => ({
     ...r,
     amount_per_day: parseMoney(r.amount_per_day),
   }));
   const seen = new Set(next.map((r) => r.tag.toLowerCase()));
-  for (const tag of CONSUME_LEDGER_TAGS) {
+  for (const tag of CONSUME_BILL_RATE_TAGS) {
     const key = tag.toLowerCase();
     if (seen.has(key)) continue;
     next.push({ tag, amount_per_day: 0 });

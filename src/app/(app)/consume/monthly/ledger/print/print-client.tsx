@@ -15,13 +15,14 @@ import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
-import { CONSUME_LEDGER_TAGS } from "@/lib/constants";
+import { CONSUME_LEDGER_SOURCE_TAGS } from "@/lib/constants";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   buildMonthLedger,
   buildRangeLedger,
+  presentConsumeLedger,
   withReportSource,
 } from "@/lib/reports";
 import { useT } from "@/i18n/provider";
@@ -109,11 +110,13 @@ export default function ConsumeLedgerPrintClient() {
   const ledger = useMemo(() => {
     return withReportSource(source, () => {
       if (rangeBounds) {
-        const range = buildRangeLedger(
-          rangeBounds.from,
-          rangeBounds.to,
-          CONSUME_LEDGER_TAGS,
-          { carry: true },
+        const range = presentConsumeLedger(
+          buildRangeLedger(
+            rangeBounds.from,
+            rangeBounds.to,
+            CONSUME_LEDGER_SOURCE_TAGS,
+            { carry: true },
+          ),
         );
         return {
           month,
@@ -123,9 +126,11 @@ export default function ConsumeLedgerPrintClient() {
           columnDates: range.dates,
         };
       }
-      const monthLedger = buildMonthLedger(month, CONSUME_LEDGER_TAGS, {
-        carry: true,
-      });
+      const monthLedger = presentConsumeLedger(
+        buildMonthLedger(month, CONSUME_LEDGER_SOURCE_TAGS, {
+          carry: true,
+        }),
+      );
       return { ...monthLedger, columnDates: undefined as string[] | undefined };
     });
   }, [

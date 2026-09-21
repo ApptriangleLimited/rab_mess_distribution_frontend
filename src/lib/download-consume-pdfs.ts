@@ -304,7 +304,7 @@ export function downloadLeaveMedBillPdf(args: {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const monthLabel = formatMonthDash(month);
-  const title = `Fresh money bill — ${monthLabel} (CL, PL, Training, Witness, Doctor and BGH bill)`;
+  const title = `Fresh money bill — ${monthLabel} (CL, PL, Training, Witness, Doctor, BGH and LNK bill)`;
   let y = 12;
 
   doc.setFont("helvetica", "bold");

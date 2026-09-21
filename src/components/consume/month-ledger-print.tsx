@@ -267,7 +267,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
             [
               "consume.signDailySi",
               "consume.signConsumeSi",
-              "consume.signPicketSi",
+              "consume.signScheduleSi",
               "consume.signSeniorDad",
               "consume.signMessPresident",
               "consume.signLastOfficer",

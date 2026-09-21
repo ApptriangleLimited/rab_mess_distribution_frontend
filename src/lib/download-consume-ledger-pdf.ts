@@ -169,7 +169,7 @@ export function downloadConsumeLedgerPdf({
   const signs = [
     ["Daily SI"],
     ["Consume SI"],
-    ["Picket SI"],
+    ["Mess CQ SI"],
     ["Senior DAD (Admin)"],
     ["President", "Mess Committee, Forces Mess"],
     ["Major", "Deputy Director (HQ)", "SRB Forces Headquarters"],

@@ -100,6 +100,10 @@ export function officialBghDays(tagDays: Partial<Record<DailyTag, number>>) {
   return tagDays.BGH ?? 0;
 }
 
+export function officialLnkDays(tagDays: Partial<Record<DailyTag, number>>) {
+  return tagDays.LNK ?? 0;
+}
+
 export function officialWrDays(tagDays: Partial<Record<DailyTag, number>>) {
   return tagDays.WR ?? 0;
 }
@@ -116,6 +120,7 @@ export function officialConsumeTotal(tagDays: Partial<Record<DailyTag, number>>)
     officialWitDays(tagDays) +
     officialMedDays(tagDays) +
     officialBghDays(tagDays) +
+    officialLnkDays(tagDays) +
     officialWrDays(tagDays)
   );
 }
@@ -396,7 +401,7 @@ export function buildOfficialLeaveBill(month: string): OfficialConsumeReport {
   const wings = buildOfficialWingConsume(month);
   return {
     ...wings,
-    title: `CL, PL, Training, WT, MED and BGH bill summary by wing — ${monthLabelEn(month)}`,
+    title: `CL, PL, Training, WT, MED, BGH and LNK bill summary by wing — ${monthLabelEn(month)}`,
   };
 }
 
@@ -417,7 +422,8 @@ export function officialLeaveTotal(tagDays: Partial<Record<DailyTag, number>>) {
     (tagDays.TRG ?? 0) +
     officialWitDays(tagDays) +
     officialMedDays(tagDays) +
-    officialBghDays(tagDays)
+    officialBghDays(tagDays) +
+    officialLnkDays(tagDays)
   );
 }
 
@@ -612,7 +618,7 @@ export function buildOfficialConsumePack(
     const perWing = WING_DEFS.map((def) => {
       const row = wings.rows.find((r) => r.id === def.id) ?? rowFromBucket(def, 1, emptyBucket());
       return consumeTable(
-        `CL, PL, Training, WT, MED and BGH bill — ${def.label} — ${monthLabel}`,
+        `CL, PL, Training, WT, MED, BGH and LNK bill — ${def.label} — ${monthLabel}`,
         [org],
         [{ ...row, sl: 1 }],
         {

@@ -2,6 +2,7 @@ import type { AssignmentCell } from "@/lib/api/assignments";
 import { getState } from "@/lib/store";
 import {
   CL_FR_MONTHLY_TAG,
+  CONSUME_LEDGER_TAGS,
   DAILY_TAGS,
   FR_FUEL_RATE_PER_DAY,
   FUEL_RATE_TAG,
@@ -510,7 +511,7 @@ export function buildTagBill(
 
 export function buildLeaveMedBill(
   month: string,
-  tags: readonly DailyTag[] = ["CL", "PL", "TRG", "WIT", "MED", "BGH"],
+  tags: readonly DailyTag[] = ["CL", "PL", "TRG", "WIT", "MED", "BGH", "LNK"],
 ): {
   month: string;
   tags: DailyTag[];
@@ -542,7 +543,9 @@ export function buildLeaveMedBill(
         if (!n) continue;
         tagDays[code] = n;
         totalDays += n;
-        amount = roundPaisa(amount + moneyDays(n, rates.get(code)));
+        const tagRate =
+          rates.get(code) || (code === "LNK" ? rates.get("CL") : 0);
+        amount = roundPaisa(amount + moneyDays(n, tagRate));
       }
       if (!totalDays) return null;
       return {
@@ -827,6 +830,27 @@ export function buildRangeLedger(
     .sort((a, b) => sortUsersForBill(a.user, b.user));
 
   return { dates, tagCodes, rows };
+}
+
+/** FR result column = FR + MFR. Display columns hide the separate MFR header. */
+export function presentConsumeLedger<
+  T extends { tagCodes: DailyTag[]; rows: LedgerRow[] },
+>(built: T): T {
+  return {
+    ...built,
+    tagCodes: [...CONSUME_LEDGER_TAGS],
+    rows: built.rows.map((row) => {
+      const mfr = row.tagCounts.MFR ?? 0;
+      if (!mfr) return row;
+      return {
+        ...row,
+        tagCounts: {
+          ...row.tagCounts,
+          FR: (row.tagCounts.FR ?? 0) + mfr,
+        },
+      };
+    }),
+  };
 }
 
 /**

@@ -49,8 +49,25 @@ export function isRationFamily(role?: Role | null) {
 /** Tags visible on Mess Distributioner ledger. */
 export const MESS_LEDGER_TAGS: DailyTag[] = ["MS", "CD"];
 
-/** Tags visible on Consume monthly ledger + print. */
+/** Result columns on Consume / Ration / Admin monthly ledger + print.
+ *  FR column is FR+MFR; day cells still show MFR when painted. */
 export const CONSUME_LEDGER_TAGS: DailyTag[] = [
+  "MS",
+  "FR",
+  "CL",
+  "PL",
+  "CD",
+  "TRG",
+  "WIT",
+  "MED",
+  "BGH",
+  "LNK",
+  "WR",
+];
+
+/** Day marks included in the consume ledger. MFR days roll into the FR column. */
+export const CONSUME_LEDGER_SOURCE_TAGS: DailyTag[] = [
+  "MS",
   "FR",
   "MFR",
   "CL",
@@ -60,6 +77,8 @@ export const CONSUME_LEDGER_TAGS: DailyTag[] = [
   "WIT",
   "MED",
   "BGH",
+  "LNK",
+  "WR",
 ];
 
 export const DAILY_TAGS: {
@@ -1605,7 +1624,8 @@ export const REFRESH_TOKEN_KEY = "mess_refresh_token";
 export const SESSION_TTL_SECONDS = 2 * 60 * 60;
 export const PROFILE_AVATAR_KEY = "mess_profile_avatar_v1";
 export const REMEMBER_EMAIL_KEY = "mess_login_email";
-/** Demo seed staff. Matches backend `SEED_STAFF_PASSWORD` / `{role}@mess.rab`. */
+/** Demo seed staff. Matches backend `SEED_STAFF_PASSWORD` / `SRB-{ROLE}`. */
 export const SEED_STAFF_PASSWORD = "ChangeMe!";
-export const SEED_STAFF_EMAIL = (role: Role) => `${role}@mess.rab`;
+export const SEED_STAFF_RAB_ID = (role: Role) => `SRB-${role.toUpperCase()}`;
+export const SEED_STAFF_EMAIL = SEED_STAFF_RAB_ID;
 export const STORE_KEY = "mess_proto_v1";

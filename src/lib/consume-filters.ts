@@ -7,7 +7,7 @@ export type ConsumeFilter = (typeof CONSUME_FILTERS)[number];
 export const CONSUME_FILTER_TAGS: Record<ConsumeFilter, readonly DailyTag[]> = {
   "fr-mfr": ["FR", "MFR"],
   cd: ["CD"],
-  "leave-med": ["CL", "PL", "TRG", "WIT", "MED", "BGH"],
+  "leave-med": ["CL", "PL", "TRG", "WIT", "MED", "BGH", "LNK"],
 };
 
 export const LEAVE_MED_BILL_TAGS = CONSUME_FILTER_TAGS["leave-med"];
