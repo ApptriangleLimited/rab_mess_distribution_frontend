@@ -2,6 +2,7 @@ import { getState, setState } from "@/lib/store";
 import {
   isFrFuelSender,
   isFrFuelTag,
+  sameBankName,
 } from "@/lib/official-senders";
 import { digitsOnly } from "@/lib/utils";
 import type { DailyTag, SenderAccount } from "@/lib/types";
@@ -27,6 +28,7 @@ export type SenderInput = {
   branch_location: string;
   mapped_tags: DailyTag[];
   active?: boolean;
+  kind?: "srb" | "mess";
 };
 
 export function isSenderActive(sender: Pick<SenderAccount, "active">) {
@@ -35,6 +37,21 @@ export function isSenderActive(sender: Pick<SenderAccount, "active">) {
 
 export function activeSenders(senders: SenderAccount[] = listSenders()) {
   return senders.filter(isSenderActive);
+}
+
+/** SRB payout account whose bank name matches the chosen member bank. */
+export function senderForMemberBank(
+  senders: SenderAccount[],
+  tag: DailyTag | "all" | "",
+  memberBank: string,
+) {
+  const bank = memberBank.trim();
+  if (!bank) return null;
+  return (
+    sendersForReportTag(senders, tag).find((sender) =>
+      sameBankName(sender.bank_name, bank),
+    ) ?? null
+  );
 }
 
 export function sendersForReportTag(

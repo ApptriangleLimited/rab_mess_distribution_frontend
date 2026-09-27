@@ -19,6 +19,7 @@ import { IconTip } from "@/components/shared/icon-tip";
 import { MemberAcceptActions } from "@/components/users/member-accept-actions";
 import { useStore } from "@/hooks/use-store";
 import { getCockpitTagOnDate } from "@/lib/store/tag-requests";
+import { formatMemberWing } from "@/lib/store/org-options";
 import { todayISO } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -242,7 +243,7 @@ export function UserTable({
                           {user.rab_id}
                         </span>
                         {user.rank ? ` · ${user.rank}` : ""}
-                        {user.wing ? ` · ${user.wing}` : ""}
+                        {user.wing ? ` · ${formatMemberWing(user.wing)}` : ""}
                       </p>
                     </div>
                   </div>
@@ -400,7 +401,7 @@ export function UserTable({
                   <td className="px-4 py-3">
                     {user.wing ? (
                       <span className="inline-flex rounded-full border border-sky-200/80 bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900 dark:border-sky-800/50 dark:bg-sky-950/40 dark:text-sky-200">
-                        {user.wing}
+                        {formatMemberWing(user.wing)}
                       </span>
                     ) : (
                       "—"

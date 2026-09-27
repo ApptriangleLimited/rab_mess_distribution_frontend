@@ -162,6 +162,8 @@ export interface SenderAccount {
   mapped_tags: DailyTag[];
   /** false = deactivated; hidden from payout pickers. Default active. */
   active?: boolean;
+  /** srb = Settings SRB Bank. mess = Settings Mess Bank, used by generate report. */
+  kind?: "srb" | "mess";
 }
 
 export interface AllowanceRate {

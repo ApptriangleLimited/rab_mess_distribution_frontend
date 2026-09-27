@@ -205,6 +205,8 @@ export function downloadTagBillPdf(args: {
   totalAmount: number;
   totalFuel: number;
   grandTotal: number;
+  /** FR+MFR fuel bill: no allowance column, grand total is the fuel figure. */
+  fuelOnly?: boolean;
   filename?: string;
 }) {
   const {
@@ -217,6 +219,7 @@ export function downloadTagBillPdf(args: {
     totalAmount,
     totalFuel,
     grandTotal,
+    fuelOnly = false,
     filename,
   } = args;
 
@@ -240,28 +243,43 @@ export function downloadTagBillPdf(args: {
   doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
   y += 16;
 
-  const head = [
-    "SL",
-    "Personal No",
-    "Rank",
-    "Name",
-    tag,
-    "Allowance",
-    ...(showFuel ? ["Fuel"] : []),
-    "Grand total",
-    "Remarks",
-  ];
-  const body = rows.map((r) => [
-    String(r.sl),
-    r.user.personal_id || "—",
-    consumeRankShort(r.user.rank),
-    r.user.name,
-    String(r.days),
-    amt(r.amount),
-    ...(showFuel ? [amt(r.fuelAmount)] : []),
-    amt(r.grandTotal),
-    r.remarks || "",
-  ]);
+  const head = fuelOnly
+    ? ["SI", "ID", "Rank", "Name", tag, "Fuel ৳", "Grand total", "Remarks"]
+    : [
+        "SL",
+        "Personal No",
+        "Rank",
+        "Name",
+        tag,
+        "Allowance",
+        ...(showFuel ? ["Fuel"] : []),
+        "Grand total",
+        "Remarks",
+      ];
+  const body = rows.map((r) =>
+    fuelOnly
+      ? [
+          String(r.sl),
+          r.user.personal_id || "—",
+          consumeRankShort(r.user.rank),
+          r.user.name,
+          String(r.days),
+          amt(r.fuelAmount),
+          amt(r.fuelAmount),
+          r.remarks || "",
+        ]
+      : [
+          String(r.sl),
+          r.user.personal_id || "—",
+          consumeRankShort(r.user.rank),
+          r.user.name,
+          String(r.days),
+          amt(r.amount),
+          ...(showFuel ? [amt(r.fuelAmount)] : []),
+          amt(r.grandTotal),
+          r.remarks || "",
+        ],
+  );
   autoTable(doc, {
     startY: y,
     head: [head],
@@ -283,7 +301,7 @@ export function downloadTagBillPdf(args: {
     margin: { left: 12, right: 12, bottom: 28 },
     didParseCell: (data) => {
       if (data.section === "head") return;
-      const moneyCols = showFuel ? [5, 6, 7] : [5, 6];
+      const moneyCols = fuelOnly ? [5, 6] : showFuel ? [5, 6, 7] : [5, 6];
       if (moneyCols.includes(data.column.index)) {
         data.cell.styles.halign = "right";
       }
@@ -296,15 +314,23 @@ export function downloadTagBillPdf(args: {
     },
   });
 
-  const afterTable = drawConsumeTotalRow(doc, [
-    { text: "Total", colSpan: 4, align: "left" },
-    { text: String(totalDays), align: centerFrDays ? "center" : "left" },
-    { text: amt(totalAmount), align: "right" },
-    ...(showFuel ? [{ text: amt(totalFuel), align: "right" as const }] : []),
-    { text: amt(grandTotal), align: "right" },
-    { text: "" },
-  ]);
-  drawConsumeBillSigns(doc, afterTable + 12);
+  const afterTable = drawConsumeTotalRow(doc, fuelOnly
+    ? [
+        { text: "Total", colSpan: 4, align: "left" },
+        { text: String(totalDays), align: "center" },
+        { text: amt(totalFuel), align: "right" },
+        { text: amt(totalFuel), align: "right" },
+        { text: "" },
+      ]
+    : [
+        { text: "Total", colSpan: 4, align: "left" },
+        { text: String(totalDays), align: centerFrDays ? "center" : "left" },
+        { text: amt(totalAmount), align: "right" },
+        ...(showFuel ? [{ text: amt(totalFuel), align: "right" as const }] : []),
+        { text: amt(grandTotal), align: "right" },
+        { text: "" },
+      ]);
+  if (!fuelOnly) drawConsumeBillSigns(doc, afterTable + 12);
 
   doc.save(filename ?? `consume-bill-${month}-${tag}.pdf`);
 }

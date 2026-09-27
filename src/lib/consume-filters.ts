@@ -2,12 +2,22 @@ import type { DailyTag } from "@/lib/types";
 
 export const CONSUME_FILTERS = ["fr-mfr", "cd", "leave-med"] as const;
 
-export type ConsumeFilter = (typeof CONSUME_FILTERS)[number];
+/** Ration Consume tab only — fuel bill for FR+MFR days. */
+export const FUEL_CONSUME_FILTER = "fuel" as const;
+
+export type ConsumeFilter =
+  | (typeof CONSUME_FILTERS)[number]
+  | typeof FUEL_CONSUME_FILTER;
+
+export function consumeFiltersForRole(ration: boolean): ConsumeFilter[] {
+  return ration ? [...CONSUME_FILTERS, FUEL_CONSUME_FILTER] : [...CONSUME_FILTERS];
+}
 
 export const CONSUME_FILTER_TAGS: Record<ConsumeFilter, readonly DailyTag[]> = {
   "fr-mfr": ["FR", "MFR"],
   cd: ["CD"],
   "leave-med": ["CL", "PL", "TRG", "WIT", "MED", "BGH", "LNK"],
+  fuel: ["FR", "MFR"],
 };
 
 export const LEAVE_MED_BILL_TAGS = CONSUME_FILTER_TAGS["leave-med"];
@@ -15,6 +25,7 @@ export const LEAVE_MED_BILL_TAGS = CONSUME_FILTER_TAGS["leave-med"];
 const LEAVE_MED_SET = new Set<string>(LEAVE_MED_BILL_TAGS);
 
 export function parseConsumeFilter(raw: string | null): ConsumeFilter {
+  if (raw === FUEL_CONSUME_FILTER) return FUEL_CONSUME_FILTER;
   if (raw && (CONSUME_FILTERS as readonly string[]).includes(raw)) {
     return raw as ConsumeFilter;
   }

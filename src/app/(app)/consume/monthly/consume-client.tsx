@@ -19,10 +19,13 @@ import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { ConsumeTagTabs } from "@/components/layout/consume-tag-tabs";
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
+import { useSession } from "@/hooks/use-session";
 import { useStore } from "@/hooks/use-store";
+import { isRationFamily } from "@/lib/constants";
 import {
   CONSUME_FILTER_TAGS,
   consumeFilterLabel,
+  consumeFiltersForRole,
   parseConsumeFilter,
   type ConsumeFilter,
 } from "@/lib/consume-filters";
@@ -41,6 +44,9 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
 export default function ConsumeMonthlyClient() {
   const t = useT();
   const state = useStore();
+  const { session } = useSession();
+  const ration = isRationFamily(session?.role);
+  const filters = consumeFiltersForRole(ration);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -63,13 +69,15 @@ export default function ConsumeMonthlyClient() {
       params.set("month", defaultMonth);
       dirty = true;
     }
-    if (searchParams.get("tag") !== filter) {
-      params.set("tag", filter);
+    const tagInUrl = searchParams.get("tag");
+    const visibleFilter = !ration && filter === "fuel" ? "fr-mfr" : filter;
+    if (tagInUrl !== visibleFilter) {
+      params.set("tag", visibleFilter);
       dirty = true;
     }
     if (!dirty) return;
     router.replace(`${pathname}?${params.toString()}`);
-  }, [rawMonth, defaultMonth, filter, pathname, router, searchParams]);
+  }, [rawMonth, defaultMonth, filter, ration, pathname, router, searchParams]);
 
   const tagBill = useMemo(
     () =>
@@ -97,10 +105,14 @@ export default function ConsumeMonthlyClient() {
     const leave = withReportSource(source, () =>
       buildLeaveMedBill(month, CONSUME_FILTER_TAGS["leave-med"]),
     );
+    const fuel = withReportSource(source, () =>
+      buildTagBill(month, CONSUME_FILTER_TAGS.fuel),
+    );
     return {
       "fr-mfr": fr.rows.length,
       cd: cd.rows.length,
       "leave-med": leave.rows.length,
+      fuel: fuel.rows.length,
     } satisfies Record<ConsumeFilter, number>;
   }, [state.assignments, state.users, state.rates, month, source]);
 
@@ -117,7 +129,10 @@ export default function ConsumeMonthlyClient() {
       days: tagBill?.totalDays ?? 0,
       members: tagBill?.rows.length ?? 0,
       allowance: tagBill?.totalDays ?? 0,
-      amount: tagBill?.grandTotal ?? 0,
+      amount:
+        filter === "fuel"
+          ? (tagBill?.totalFuel ?? 0)
+          : (tagBill?.grandTotal ?? 0),
     };
   }, [leaveBill, tagBill]);
 
@@ -139,7 +154,7 @@ export default function ConsumeMonthlyClient() {
   const printHref = `/consume/monthly/print?month=${month}&tag=${filter}`;
   const exportDisabled = headerStats.members === 0;
   const amountLabel =
-    filter === "fr-mfr"
+    filter === "fr-mfr" || filter === "fuel"
       ? t("consume.colGrandTotal")
       : t("consume.statAmount");
 
@@ -228,9 +243,10 @@ export default function ConsumeMonthlyClient() {
         <section className="overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
           <div className="border-b border-neutral-100 bg-gradient-to-br from-white via-white to-emerald-50/40 px-4 py-3.5 dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
             <ConsumeTagTabs
-              value={filter}
+              value={filter === "fuel" && !ration ? "fr-mfr" : filter}
               onChange={setFilter}
               counts={counts}
+              filters={filters}
             />
           </div>
 
@@ -250,10 +266,11 @@ export default function ConsumeMonthlyClient() {
                 key={`${month}-${filter}`}
                 month={month}
                 tag={filterTags}
-                displayTag={filterLabel}
+                displayTag={filter === "fuel" ? "FR+MFR" : filterLabel}
                 onMonthChange={setMonth}
                 tiles={statsTiles}
                 source={source}
+                fuelOnly={filter === "fuel"}
               />
             )}
           </div>

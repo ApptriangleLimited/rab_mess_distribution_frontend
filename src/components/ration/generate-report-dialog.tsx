@@ -14,11 +14,13 @@ import {
 } from "@/components/ui/select";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
+import { isApiEnabled } from "@/lib/api/mode";
 import { loadLiveReportSource } from "@/lib/api/report-source";
+import { listSenders } from "@/lib/api/settings";
 import { parseMonthInput } from "@/lib/date";
 import { FUEL_RATE_TAG } from "@/lib/constants";
-import { sendersForReportTag } from "@/lib/store/senders";
-import type { DailyTag } from "@/lib/types";
+import { senderForMemberBank } from "@/lib/store/senders";
+import type { DailyTag, SenderAccount } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 
@@ -53,7 +55,8 @@ export function GenerateReportDialog({
   const state = useStore();
   const [month, setMonth] = useState(defaultMonth);
   const [tag, setTag] = useState<DailyTag | "all" | "">("");
-  const [senderId, setSenderId] = useState("");
+  const [memberBank, setMemberBank] = useState("");
+  const [liveSenders, setLiveSenders] = useState<SenderAccount[] | null>(null);
   const previewMonth = parseMonthInput(month || defaultMonth);
   useReportSource({ month: previewMonth });
 
@@ -61,25 +64,40 @@ export function GenerateReportDialog({
     if (!open) return;
     setMonth(defaultMonth);
     setTag("");
-    setSenderId("");
+    setMemberBank("");
   }, [open, defaultMonth]);
 
-  const senders = sendersForReportTag(state.senders, tag);
-  const canGenerate = Boolean(tag && senderId);
+  useEffect(() => {
+    if (!open || !isApiEnabled()) return;
+    let cancelled = false;
+    void listSenders()
+      .then((res) => {
+        if (!cancelled) setLiveSenders(res.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setLiveSenders(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const memberBanks = state.member_banks;
+  const senderAccounts = liveSenders ?? state.senders;
+  const matchedSender = senderForMemberBank(senderAccounts, tag, memberBank);
+  const canGenerate = Boolean(tag && memberBank && matchedSender);
 
   function onTagChange(nextTag: DailyTag | "all") {
     setTag(nextTag);
-    const match = sendersForReportTag(state.senders, nextTag)[0] ?? null;
-    setSenderId(match?.id ?? "");
   }
 
   function onGenerate() {
-    if (!tag || !senderId) return;
+    if (!tag || !memberBank || !matchedSender) return;
     const parsed = parseMonthInput(month);
     const qs = new URLSearchParams({
       month: parsed,
       tag,
-      sender: senderId,
+      sender: matchedSender.id,
       back: `${pathname}?month=${parsed}`,
     });
     void loadLiveReportSource({ month: parsed });
@@ -131,25 +149,26 @@ export function GenerateReportDialog({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>{t("ration.reportBank")}</Label>
+          <Label>{t("settings.tabMemberBank")}</Label>
           <Select
-            value={senderId || undefined}
-            onValueChange={setSenderId}
-            disabled={!tag}
+            value={memberBank || undefined}
+            onValueChange={setMemberBank}
           >
             <SelectTrigger className="h-10 rounded-lg">
               <SelectValue placeholder={t("ration.selectBank")} />
             </SelectTrigger>
             <SelectContent>
-              {senders.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.label}
+              {memberBanks.map((bank) => (
+                <SelectItem key={bank} value={bank}>
+                  {bank}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        {!canGenerate ? (
+        {memberBanks.length === 0 ? (
+          <p className="text-xs text-neutral-500">{t("settings.memberBankEmpty")}</p>
+        ) : !canGenerate ? (
           <p className="text-xs text-neutral-500">
             {`${t("ration.selectTag")} · ${t("ration.selectBank")}`}
           </p>

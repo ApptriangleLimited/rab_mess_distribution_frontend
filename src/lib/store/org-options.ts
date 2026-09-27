@@ -267,6 +267,27 @@ export function memberWingCascade(wing: string): {
   return { main: stored, sub: "", leaf: "" };
 }
 
+/** Main wing, or `Wing (Sub wing)` when the member is filed under a child. */
+export function formatMemberWing(storedWing: string): string {
+  const stored = normalizeLabel(storedWing);
+  if (!stored) return "";
+  const { wing_parent } = getState();
+  const chain: string[] = [canonicalWingName(stored)];
+  const seen = new Set<string>([stored.toLowerCase()]);
+  let cur = lookupParent(wing_parent, stored);
+  while (cur) {
+    const key = cur.toLowerCase();
+    if (seen.has(key)) break;
+    seen.add(key);
+    chain.unshift(canonicalWingName(cur));
+    cur = lookupParent(wing_parent, cur);
+  }
+  const root = chain[0];
+  const leaf = chain[chain.length - 1];
+  if (root.toLowerCase() === leaf.toLowerCase()) return root;
+  return `${root} (${leaf})`;
+}
+
 export function listForceServiceRanks(force: string): string[] {
   if (!force.trim()) return [];
   const {

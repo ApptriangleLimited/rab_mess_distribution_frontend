@@ -66,6 +66,7 @@ export function officialSenderAccounts(): SenderAccount[] {
     branch_location: "Dhaka",
     mapped_tags: [...FRESH_MONEY_TAGS],
     active: true,
+    kind: "mess" as const,
   }));
   const fuel: SenderAccount[] = MEMBER_BANKS.map((bank, i) => ({
     id: `s_fuel_${bankSlug(bank)}`,
@@ -78,6 +79,7 @@ export function officialSenderAccounts(): SenderAccount[] {
     branch_location: "Dhaka",
     mapped_tags: [FUEL_RATE_TAG as DailyTag],
     active: true,
+    kind: "mess" as const,
   }));
   return [...fresh, ...fuel];
 }

@@ -1444,6 +1444,7 @@ export const en = {
     filterFrMfr: "FR+MFR",
     filterCd: "CD",
     filterLeaveMed: "CL+PL+TRG+WIT+MED+BGH+LNK",
+    filterFuel: "fuel (FR+MFR)",
     leaveMedBillTitle:
       "Fresh money bill — {month} (CL, PL, Training, Witness, Doctor, BGH and LNK bill)",
     frBillTitle: "FR bill — {month} (FR and MFR)",
@@ -1588,7 +1589,7 @@ export const en = {
     reportTag: "Tag",
     reportBank: "Bank account",
     selectTag: "Select tag",
-    selectBank: "Select bank account",
+    selectBank: "Select member bank",
     generatePreview: "Generate",
     reportPreview: "Report preview",
     reportPreviewHint: "Review letter, then print or download CSV.",

@@ -12,6 +12,7 @@ type Props = {
   value: ConsumeFilter;
   onChange: (filter: ConsumeFilter) => void;
   counts?: Partial<Record<ConsumeFilter, number>>;
+  filters?: readonly ConsumeFilter[];
   className?: string;
 };
 
@@ -19,10 +20,17 @@ const LABEL_KEY = {
   "fr-mfr": "consume.filterFrMfr",
   cd: "consume.filterCd",
   "leave-med": "consume.filterLeaveMed",
+  fuel: "consume.filterFuel",
 } as const;
 
 /** Three consume bills — not the old per-tag chip row. */
-export function ConsumeTagTabs({ value, onChange, counts, className }: Props) {
+export function ConsumeTagTabs({
+  value,
+  onChange,
+  counts,
+  filters = CONSUME_FILTERS,
+  className,
+}: Props) {
   const t = useT();
 
   return (
@@ -30,7 +38,7 @@ export function ConsumeTagTabs({ value, onChange, counts, className }: Props) {
       className={cn("flex w-full flex-wrap gap-1.5", className)}
       aria-label={t("consume.byTag")}
     >
-      {CONSUME_FILTERS.map((id) => {
+      {filters.map((id) => {
         const active = value === id;
         const count = counts?.[id] ?? 0;
         return (

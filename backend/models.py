@@ -199,6 +199,10 @@ class Sender(AuditUserMixin, Base):
     branch_location: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     mapped_tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # srb = Settings → SRB Bank. mess = Settings → Mess Bank (generate-report payout).
+    kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="srb", server_default="srb"
+    )
 
 
 class CatalogState(AuditUserMixin, Base):

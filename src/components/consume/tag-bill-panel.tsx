@@ -35,6 +35,8 @@ type Props = {
   onMonthChange: (month: string) => void;
   tiles?: ReactNode;
   source?: ReportSource;
+  /** Fuel (FR+MFR) bill: no allowance column, grand total is the fuel. */
+  fuelOnly?: boolean;
 };
 
 /** Tag bill body — filters + member table (inline under consume filters). */
@@ -45,6 +47,7 @@ export function TagBillPanel({
   onMonthChange,
   tiles,
   source,
+  fuelOnly = false,
 }: Props) {
   const t = useT();
   const state = useStore();
@@ -168,8 +171,9 @@ export function TagBillPanel({
               totalDays={filteredDays}
               totalAmount={filteredFresh}
               totalFuel={filteredFuel}
-              grandTotal={filteredTotal}
+              grandTotal={fuelOnly ? filteredFuel : filteredTotal}
               showFuel={showFuel}
+              fuelOnly={fuelOnly}
               preview
             />
             <ListPagination

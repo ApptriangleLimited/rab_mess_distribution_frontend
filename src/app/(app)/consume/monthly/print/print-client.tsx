@@ -144,7 +144,10 @@ export default function ConsumeTagBillPrintClient() {
     return next;
   }, [leaveRows, filterTags]);
 
-  const showFuel = Boolean(tagBill && (tagBill.tags.includes("FR") || tagBill.fuelRate > 0));
+  const fuelOnly = filter === "fuel";
+  const showFuel = Boolean(
+    tagBill && (fuelOnly || tagBill.tags.includes("FR") || tagBill.fuelRate > 0),
+  );
   const backHref = `/consume/monthly?month=${month}&tag=${filter}`;
   const canAct =
     filter === "leave-med" ? leaveRows.length > 0 : tagRows.length > 0;
@@ -177,7 +180,8 @@ export default function ConsumeTagBillPrintClient() {
       totalDays: filteredDays,
       totalAmount: filteredAmount,
       totalFuel: filteredFuel,
-      grandTotal: filteredGrand,
+      grandTotal: fuelOnly ? filteredFuel : filteredGrand,
+      fuelOnly,
       filename: `consume-bill-${month}-${filter}.pdf`,
     });
   }
@@ -269,14 +273,15 @@ export default function ConsumeTagBillPrintClient() {
         <TagBillPrint
           ref={printRef}
           month={month}
-          tag={filterLabel}
-          tagLabel={filterLabel}
+          tag={fuelOnly ? "FR+MFR" : filterLabel}
+          tagLabel={fuelOnly ? "FR+MFR" : filterLabel}
           rows={tagRows}
           totalDays={filteredDays}
           totalAmount={filteredAmount}
           totalFuel={filteredFuel}
-          grandTotal={filteredGrand}
+          grandTotal={fuelOnly ? filteredFuel : filteredGrand}
           showFuel={showFuel}
+          fuelOnly={fuelOnly}
           preview
         />
       ) : (

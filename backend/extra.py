@@ -161,6 +161,13 @@ def rate_out(row: Rate) -> dict:
     }
 
 
+def sender_kind(value: str | None, default: str = "srb") -> str:
+    raw = (value or "").strip().lower()
+    if raw in ("mess", "srb"):
+        return raw
+    return default
+
+
 def sender_out(row: Sender) -> dict:
     return {
         "id": row.id,
@@ -173,6 +180,7 @@ def sender_out(row: Sender) -> dict:
         "branch_location": row.branch_location,
         "mapped_tags": list(row.mapped_tags or []),
         "active": bool(row.active),
+        "kind": sender_kind(getattr(row, "kind", None)),
     }
 
 
@@ -203,6 +211,7 @@ def seed_catalog() -> None:
                         branch_location="Dhaka",
                         mapped_tags=item["mapped_tags"],
                         active=True,
+                        kind="mess",
                     )
                 )
         db.commit()
@@ -229,6 +238,7 @@ class SenderIn(BaseModel):
     branch_location: str = ""
     mapped_tags: list[str] = Field(default_factory=list)
     active: bool = True
+    kind: str = "srb"
 
 
 @router.get("/api/v1/auth/me")
@@ -693,6 +703,7 @@ def create_sender(
         branch_location=body.branch_location,
         mapped_tags=[t.strip().upper() for t in body.mapped_tags if t.strip()],
         active=body.active,
+        kind=sender_kind(body.kind),
     )
     db.add(row)
     db.commit()
@@ -719,6 +730,7 @@ def update_sender(
     row.branch_location = body.branch_location
     row.mapped_tags = [t.strip().upper() for t in body.mapped_tags if t.strip()]
     row.active = body.active
+    row.kind = sender_kind(body.kind, getattr(row, "kind", None) or "srb")
     db.commit()
     db.refresh(row)
     return envelope(sender_out(row), "Sender updated")

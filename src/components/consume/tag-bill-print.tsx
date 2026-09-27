@@ -20,6 +20,8 @@ type Props = {
   totalFuel: number;
   grandTotal: number;
   showFuel: boolean;
+  /** Fuel bill: FR+MFR days, Fuel ৳, grand total = fuel. No allowance column. */
+  fuelOnly?: boolean;
   /** Show on-screen for review; default print-only. */
   preview?: boolean;
 };
@@ -36,6 +38,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       totalFuel,
       grandTotal,
       showFuel,
+      fuelOnly = false,
       preview = false,
     },
     ref,
@@ -43,6 +46,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
   const t = useT();
   const monthLabel = formatMonthDash(month);
   const centerDays = String(tag).toUpperCase().includes("FR");
+  const showAllowance = !fuelOnly;
   const tagKey = `${tag} ${tagLabel}`.toUpperCase();
   const title = tagKey.includes("CD") && !tagKey.includes("FR")
     ? t("consume.cdBillTitle", { month: monthLabel })
@@ -63,17 +67,23 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       <table className="w-full border-collapse text-center text-[11px] text-black">
         <thead>
           <tr className="consume-col-titles border border-black bg-neutral-100">
-            <th className="border border-black px-1.5 py-1">{t("consume.colSl")}</th>
-            <th className="border border-black px-1.5 py-1">{t("consume.colId")}</th>
+            <th className="border border-black px-1.5 py-1">
+              {fuelOnly ? "SI" : t("consume.colSl")}
+            </th>
+            <th className="border border-black px-1.5 py-1">
+              {fuelOnly ? "ID" : t("consume.colId")}
+            </th>
             <th className="border border-black px-1.5 py-1">{t("consume.colRank")}</th>
             <th className="border border-black px-1.5 py-1">
               {t("consume.colName")}
             </th>
             <th className="border border-black px-1.5 py-1">{tag}</th>
-            <th className="border border-black px-1.5 py-1">
-              {t("consume.colFreshAmount")}
-            </th>
-            {showFuel ? (
+            {showAllowance ? (
+              <th className="border border-black px-1.5 py-1">
+                {t("consume.colFreshAmount")}
+              </th>
+            ) : null}
+            {showFuel || fuelOnly ? (
               <th className="border border-black px-1.5 py-1">
                 {t("consume.colFuelAmount")}
               </th>
@@ -109,16 +119,18 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
               >
                 {row.days}
               </td>
-              <td className="consume-money border border-black px-1.5 py-1 tabular-nums">
-                {formatBdt(row.amount)}
-              </td>
-              {showFuel ? (
+              {showAllowance ? (
+                <td className="consume-money border border-black px-1.5 py-1 tabular-nums">
+                  {formatBdt(row.amount)}
+                </td>
+              ) : null}
+              {showFuel || fuelOnly ? (
                 <td className="consume-money border border-black px-1.5 py-1 tabular-nums">
                   {formatBdt(row.fuelAmount)}
                 </td>
               ) : null}
               <td className="consume-money border border-black px-1.5 py-1 tabular-nums font-medium">
-                {formatBdt(row.grandTotal)}
+                {formatBdt(fuelOnly ? row.fuelAmount : row.grandTotal)}
               </td>
               <td className="border border-black px-1.5 py-1">
                 {row.remarks || ""}
@@ -142,22 +154,25 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
             >
               {totalDays}
             </td>
-            <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
-              {formatBdt(totalAmount)}
-            </td>
-            {showFuel ? (
+            {showAllowance ? (
+              <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
+                {formatBdt(totalAmount)}
+              </td>
+            ) : null}
+            {showFuel || fuelOnly ? (
               <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
                 {formatBdt(totalFuel)}
               </td>
             ) : null}
             <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
-              {formatBdt(grandTotal)}
+              {formatBdt(fuelOnly ? totalFuel : grandTotal)}
             </td>
             <td className="border border-black px-1.5 py-1.5" />
           </tr>
         </tfoot>
       </table>
 
+      {fuelOnly ? null : (
       <ConsumeSignOff
         className="grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
         labels={(
@@ -171,6 +186,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
           ] as const
         ).map((key) => t(key))}
       />
+      )}
     </div>
   );
   },

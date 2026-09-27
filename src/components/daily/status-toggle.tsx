@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import type { User, UserStatus } from "@/lib/types";
 import { formatDateDisplay } from "@/lib/date";
+import { formatMemberWing } from "@/lib/store/org-options";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -108,6 +109,9 @@ export function RosterRow({
         </td>
       ) : null}
       <td className="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-400">
+        {user.personal_id || "—"}
+      </td>
+      <td className="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-400">
         {user.rab_id}
       </td>
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
@@ -122,7 +126,7 @@ export function RosterRow({
         </div>
       </td>
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
-        {user.wing || "—"}
+        {formatMemberWing(user.wing) || "—"}
       </td>
       {showDates ? (
         <>

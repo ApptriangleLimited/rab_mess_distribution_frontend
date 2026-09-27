@@ -252,6 +252,7 @@ export default function RationMembersPage() {
                 <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
                   <tr>
                     <th className="w-12 px-3 py-3">{t("cc.fields.sl")}</th>
+                    <th className="px-4 py-3">{t("cc.fields.personalId")}</th>
                     <th className="px-4 py-3">{t("cc.fields.rabId")}</th>
                     <th className="px-4 py-3">{t("cc.fields.rank")}</th>
                     <th className="px-4 py-3">{t("cc.fields.name")}</th>

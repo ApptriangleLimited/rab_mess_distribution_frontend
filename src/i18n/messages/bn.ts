@@ -1446,6 +1446,7 @@ export const bn = {
     filterFrMfr: "FR+MFR",
     filterCd: "CD",
     filterLeaveMed: "CL+PL+TRG+WIT+MED+BGH+LNK",
+    filterFuel: "fuel (FR+MFR)",
     leaveMedBillTitle:
       "ফ্রেশ মানি বিল — {month} (সিএল, পিএল, ট্রেনিং, সাক্ষী, ডাক্তার, বিজিএইচ ও এলএনকে বিল)",
     frBillTitle: "এফআর বিল — {month} (এফআর ও এমএফআর)",
@@ -1590,7 +1591,7 @@ export const bn = {
     reportTag: "ট্যাগ",
     reportBank: "ব্যাংক অ্যাকাউন্ট",
     selectTag: "ট্যাগ নির্বাচন",
-    selectBank: "ব্যাংক অ্যাকাউন্ট নির্বাচন",
+    selectBank: "সদস্য ব্যাংক নির্বাচন",
     generatePreview: "তৈরি করুন",
     reportPreview: "রিপোর্ট প্রিভিউ",
     reportPreviewHint: "লেটার দেখে প্রিন্ট বা CSV ডাউনলোড করুন।",
