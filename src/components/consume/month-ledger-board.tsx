@@ -9,6 +9,7 @@ import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
+import { consumeRankShort } from "@/lib/consume-rank-short";
 import { cn } from "@/lib/utils";
 
 type Density = "default" | "medium" | "comfortable";
@@ -39,6 +40,8 @@ type Props = {
   hideDayColumns?: boolean;
   /** Show future MS/CD (etc.) as muted preview — still read-only. */
   previewFuture?: boolean;
+  /** Consume register: column titles only are bold and centered, serial is SL. */
+  centerColumnTitles?: boolean;
   /** @deprecated Prefer `density="comfortable"`. */
   comfortable?: boolean;
   /** Table spacing: default (dense) · medium · comfortable. */
@@ -115,6 +118,7 @@ export function MonthLedgerBoard({
   previewFuture = false,
   comfortable = false,
   density,
+  centerColumnTitles = false,
 }: Props) {
   const t = useT();
   const { locale } = useI18n();
@@ -149,11 +153,14 @@ export function MonthLedgerBoard({
     density ?? (comfortable ? "comfortable" : "default");
   const d = DENSITY[resolved];
 
-  const SER_W = d.ser;
-  const ID_W = d.id;
+  const SER_W = centerColumnTitles ? Math.max(d.ser, 56) : d.ser;
+  /** 12-digit personal number, plus the "Personal No" title. */
+  const ID_W = centerColumnTitles ? 118 : d.id;
   const SRB_W = showSrbNo ? d.srb : 0;
-  const RANK_W = d.rank;
-  const NAME_W = d.name;
+  const RANK_W = centerColumnTitles ? 72 : d.rank;
+  const NAME_W = centerColumnTitles
+    ? d.name + (d.id - ID_W) + (d.rank - RANK_W)
+    : d.name;
   const TAG_W = d.tag;
   const SRB_LEFT = SER_W + ID_W;
   const RANK_LEFT = SRB_LEFT + SRB_W;
@@ -225,7 +232,12 @@ export function MonthLedgerBoard({
 
       <div className="overflow-x-auto bg-white dark:bg-neutral-950">
         <table className={cn("min-w-full border-collapse text-left", d.tableText)}>
-          <thead className="sticky top-0 z-30">
+          <thead
+            className={cn(
+              "sticky top-0 z-30",
+              centerColumnTitles && "consume-col-titles",
+            )}
+          >
             <tr
               className={cn(
                 "bg-neutral-100 font-bold uppercase tracking-wide text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300",
@@ -236,7 +248,7 @@ export function MonthLedgerBoard({
                 className="sticky left-0 z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 text-center dark:border-neutral-700 dark:bg-neutral-900"
                 style={{ width: SER_W, minWidth: SER_W, padding: cellPad }}
               >
-                {t("daily.colSerial")}
+                {centerColumnTitles ? t("consume.colSl") : t("daily.colSerial")}
               </th>
               {!hideUserDetails ? (
                 <>
@@ -244,7 +256,7 @@ export function MonthLedgerBoard({
                     className="sticky z-40 box-border overflow-hidden border-b border-r border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900"
                     style={{ left: SER_W, width: ID_W, minWidth: ID_W, padding: cellPad }}
                   >
-                    {t("daily.colId")}
+                    {centerColumnTitles ? t("consume.colId") : t("daily.colId")}
                   </th>
                   {showSrbNo ? (
                     <th
@@ -418,11 +430,14 @@ export function MonthLedgerBoard({
                           padding: cellPad,
                         }}
                       >
-                        {row.user.rank || "—"}
+                        {(centerColumnTitles
+                          ? consumeRankShort(row.user.rank)
+                          : row.user.rank) || "—"}
                       </td>
                       <td
                         className={cn(
-                          "sticky z-30 box-border truncate overflow-hidden border-b border-r border-neutral-200 font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
+                          "sticky z-30 box-border overflow-hidden border-b border-r border-neutral-200 font-medium text-neutral-900 dark:border-neutral-800 dark:text-white",
+                          centerColumnTitles ? "whitespace-normal" : "truncate",
                           d.bodyText,
                           stickyBg,
                         )}

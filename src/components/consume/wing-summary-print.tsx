@@ -38,7 +38,7 @@ export const WingSummaryPrint = forwardRef<HTMLDivElement, Props>(
           : "hidden print:block",
       )}
     >
-      <header className="mb-8 text-center text-black">
+      <header className="consume-masthead mb-8 text-center text-black">
         <p className="text-sm font-semibold">{CONSUME_REPORT_META.orgNameBn}</p>
         <p className="text-xs">{CONSUME_REPORT_META.stationBn}</p>
         <p className="mt-2 text-base font-bold">
@@ -48,8 +48,8 @@ export const WingSummaryPrint = forwardRef<HTMLDivElement, Props>(
 
       <table className="w-full border-collapse text-[10px] text-black">
         <thead>
-          <tr className="border border-black bg-neutral-100">
-            <th className="border border-black px-1 py-1 text-left">
+          <tr className="consume-col-titles border border-black bg-neutral-100">
+            <th className="border border-black px-1 py-1">
               {t("consume.colWing")}
             </th>
             <th className="border border-black px-1 py-1">
@@ -94,7 +94,7 @@ export const WingSummaryPrint = forwardRef<HTMLDivElement, Props>(
         </tbody>
         <tfoot>
           <tr className="font-semibold">
-            <td className="border border-black px-1 py-1.5 text-right">
+            <td className="border border-black px-1 py-1.5 text-left">
               {t("consume.billTotal")}
             </td>
             <td className="border border-black px-1 py-1.5 text-center tabular-nums">

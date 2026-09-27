@@ -7,6 +7,7 @@ import { formatBdt, type TagBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { useT } from "@/i18n/provider";
+import { consumeRankShort } from "@/lib/consume-rank-short";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -41,6 +42,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
   ) {
   const t = useT();
   const monthLabel = formatMonthDash(month);
+  const centerDays = String(tag).toUpperCase().includes("FR");
   const tagKey = `${tag} ${tagLabel}`.toUpperCase();
   const title = tagKey.includes("CD") && !tagKey.includes("FR")
     ? t("consume.cdBillTitle", { month: monthLabel })
@@ -60,7 +62,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
 
       <table className="w-full border-collapse text-center text-[11px] text-black">
         <thead>
-          <tr className="border border-black bg-neutral-100">
+          <tr className="consume-col-titles border border-black bg-neutral-100">
             <th className="border border-black px-1.5 py-1">{t("consume.colSl")}</th>
             <th className="border border-black px-1.5 py-1">{t("consume.colId")}</th>
             <th className="border border-black px-1.5 py-1">{t("consume.colRank")}</th>
@@ -93,22 +95,29 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
               <td className="border border-black px-1.5 py-1 font-mono text-[10px]">
                 {row.user.personal_id || "—"}
               </td>
-              <td className="border border-black px-1.5 py-1">{row.user.rank}</td>
+              <td className="border border-black px-1.5 py-1">
+                {consumeRankShort(row.user.rank)}
+              </td>
               <td className="border border-black px-1.5 py-1">
                 {row.user.name}
               </td>
-              <td className="border border-black px-1.5 py-1 tabular-nums">
+              <td
+                className={cn(
+                  "border border-black px-1.5 py-1 tabular-nums",
+                  centerDays && "consume-days",
+                )}
+              >
                 {row.days}
               </td>
-              <td className="border border-black px-1.5 py-1 tabular-nums">
+              <td className="consume-money border border-black px-1.5 py-1 tabular-nums">
                 {formatBdt(row.amount)}
               </td>
               {showFuel ? (
-                <td className="border border-black px-1.5 py-1 tabular-nums">
+                <td className="consume-money border border-black px-1.5 py-1 tabular-nums">
                   {formatBdt(row.fuelAmount)}
                 </td>
               ) : null}
-              <td className="border border-black px-1.5 py-1 tabular-nums font-medium">
+              <td className="consume-money border border-black px-1.5 py-1 tabular-nums font-medium">
                 {formatBdt(row.grandTotal)}
               </td>
               <td className="border border-black px-1.5 py-1">
@@ -121,22 +130,27 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
           <tr className="border border-black font-semibold">
             <td
               colSpan={4}
-              className="border border-black px-1.5 py-1.5 text-center"
+              className="border border-black px-1.5 py-1.5 text-left"
             >
               {t("consume.billTotal")}
             </td>
-            <td className="border border-black px-1.5 py-1.5 tabular-nums">
+            <td
+              className={cn(
+                "border border-black px-1.5 py-1.5 tabular-nums",
+                centerDays && "consume-days",
+              )}
+            >
               {totalDays}
             </td>
-            <td className="border border-black px-1.5 py-1.5 tabular-nums">
+            <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
               {formatBdt(totalAmount)}
             </td>
             {showFuel ? (
-              <td className="border border-black px-1.5 py-1.5 tabular-nums">
+              <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
                 {formatBdt(totalFuel)}
               </td>
             ) : null}
-            <td className="border border-black px-1.5 py-1.5 tabular-nums">
+            <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
               {formatBdt(grandTotal)}
             </td>
             <td className="border border-black px-1.5 py-1.5" />

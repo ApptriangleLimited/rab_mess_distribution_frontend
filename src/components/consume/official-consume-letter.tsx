@@ -42,7 +42,7 @@ function Signs() {
 function Header({ table }: { table: OfficialConsumeTable }) {
   const [first, ...rest] = table.lines;
   return (
-    <header className="letter-masthead mb-10 text-center">
+    <header className="consume-masthead letter-masthead mb-10 text-center">
       <p className="text-[16px] font-bold leading-snug">{table.title}</p>
       {first ? (
         <p className="mt-1.5 text-[9px] font-normal leading-snug text-neutral-400">
@@ -67,9 +67,9 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
   return (
     <table className="w-full border-collapse text-[9px] text-black">
       <thead>
-        <tr>
+        <tr className="consume-col-titles">
           <th className="border border-black px-1 py-1 align-bottom">SL</th>
-          <th className="border border-black px-1 py-1 text-left align-bottom">
+          <th className="border border-black px-1 py-1 align-bottom">
             {table.kind === "consume-pages" ? "Page no" : "Wing"}
           </th>
           {pageCol ? (
@@ -107,6 +107,7 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
             key={row.id}
             row={row}
             pageCol={pageCol}
+            centerLabel={table.kind === "consume-pages"}
             remarks={table.remarks}
           >
             <td className="border border-black px-1 py-1 text-center tabular-nums">
@@ -161,9 +162,9 @@ function TagTable({ table }: { table: OfficialConsumeTable }) {
   return (
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
-        <tr>
+        <tr className="consume-col-titles">
           <th className="border border-black px-1.5 py-1 align-bottom">SL</th>
-          <th className="border border-black px-1.5 py-1 text-left align-bottom">
+          <th className="border border-black px-1.5 py-1 align-bottom">
             Wing
           </th>
           {table.showPageNo ? (
@@ -210,9 +211,9 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
   return (
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
-        <tr>
+        <tr className="consume-col-titles">
           <th className="border border-black px-1 py-1 align-bottom">SL</th>
-          <th className="border border-black px-1 py-1 text-left align-bottom">
+          <th className="border border-black px-1 py-1 align-bottom">
             Wing
           </th>
           {table.showPageNo ? (
@@ -287,26 +288,48 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
 function DataRow({
   row,
   pageCol,
+  centerLabel = false,
   remarks,
   children,
 }: {
   row: OfficialConsumeRow;
   pageCol: boolean;
+  centerLabel?: boolean;
   remarks: boolean;
   children: ReactNode;
 }) {
   const isTotal = row.id === "total";
+  const leadSpan = 2 + (pageCol ? 1 : 0);
+  if (isTotal) {
+    return (
+      <tr className="font-semibold">
+        <td
+          colSpan={leadSpan}
+          className="border border-black px-1 py-1 text-left"
+        >
+          {row.label || "Total"}
+        </td>
+        {children}
+        {remarks ? <td className="border border-black px-1 py-1" /> : null}
+      </tr>
+    );
+  }
   return (
-    <tr className={cn(isTotal && "font-semibold")}>
+    <tr>
       <td className="border border-black px-1 py-1 text-center">
         {row.sl || ""}
       </td>
-      <td className="border border-black px-1 py-1 text-left">
-        {isTotal ? row.label || "Total" : row.label}
+      <td
+        className={cn(
+          "border border-black px-1 py-1",
+          centerLabel ? "consume-page-no text-center" : "text-left",
+        )}
+      >
+        {row.label}
       </td>
       {pageCol ? (
-        <td className="border border-black px-1 py-1 text-center">
-          {isTotal ? "" : row.pageNo}
+        <td className="consume-page-no border border-black px-1 py-1 text-center">
+          {row.pageNo}
         </td>
       ) : null}
       {children}

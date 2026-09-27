@@ -22,6 +22,7 @@ import {
   withReportSource,
   type ReportSource,
 } from "@/lib/reports";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { useStore } from "@/hooks/use-store";
@@ -61,7 +62,7 @@ export function TagBillPanel({
     const query = q.trim().toLowerCase();
     return bill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.wing, row.user.rank]
         .join(" ")
@@ -142,6 +143,7 @@ export function TagBillPanel({
           <SettingsWingFilter
             value={wing}
             onChange={setWing}
+            rootsOnly
             className="w-[7.25rem] shrink"
             triggerClassName={cn(fieldClass, "w-full")}
           />

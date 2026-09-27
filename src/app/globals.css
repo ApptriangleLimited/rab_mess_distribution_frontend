@@ -247,6 +247,17 @@ body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  .consume-masthead.letter-masthead p,
+  .month-ledger-print .consume-masthead p,
+  .official-consume-letter .consume-masthead.letter-masthead p,
+  .wing-food-list-print .consume-masthead p,
+  .wing-food-list-print .consume-masthead .wing-food-hq,
+  .wing-summary-print .consume-masthead p {
+    text-transform: uppercase !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px !important;
+    color: #111111 !important;
+  }
   .trust-bank-letter,
   .community-bank-letter,
   .sonali-bank-letter,
@@ -267,4 +278,38 @@ body {
     display: block !important;
     text-align: center !important;
   }
+}
+
+/* Consume report titles: capitals, each line underlined. */
+.consume-masthead p {
+  text-transform: uppercase !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  color: #111111 !important;
+}
+
+/* Consume column titles only — heavier than the row text under them. */
+.consume-col-titles th {
+  font-weight: 800 !important;
+  text-align: center !important;
+  color: #111111 !important;
+  letter-spacing: 0.03em;
+}
+.tag-bill-print tbody td,
+.tag-bill-print tfoot td,
+.leave-med-bill-print tbody td,
+.leave-med-bill-print tfoot td {
+  text-align: left !important;
+}
+.tag-bill-print td.consume-money {
+  text-align: right !important;
+}
+.tag-bill-print td.consume-days {
+  text-align: center !important;
+}
+.official-consume-letter td.consume-page-no {
+  text-align: center !important;
+}
+.dark .consume-col-titles th {
+  color: #fafafa !important;
 }

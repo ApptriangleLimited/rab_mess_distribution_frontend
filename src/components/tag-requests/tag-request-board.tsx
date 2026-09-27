@@ -55,6 +55,7 @@ import {
   rejectTagRequest,
   upsertLocalTagRequest,
 } from "@/lib/store/tag-requests";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { listAllTags } from "@/lib/store/rates";
 import { formatDateDisplay, todayISO } from "@/lib/date";
 import { tagLabel } from "@/i18n";
@@ -157,6 +158,7 @@ export function TagRequestBoard({
       q: q || undefined,
       rank,
       wing,
+      wing_family: mode === "consume" && wing !== "all" ? "1" : undefined,
       tag,
       member_status: status,
       date_from: dateFrom || undefined,
@@ -236,7 +238,13 @@ export function TagRequestBoard({
         const user = usersById.get(req.user_id);
         if (!user) return false;
         if (rank !== "all" && user.rank !== rank) return false;
-        if (wing !== "all" && user.wing !== wing) return false;
+        if (
+          wing !== "all" &&
+          (mode === "consume"
+            ? !memberMatchesWingFilter(user.wing, wing)
+            : user.wing !== wing)
+        )
+          return false;
         if (status !== "all" && user.status !== status) return false;
         if (tag !== "all" && req.to_tag !== tag) return false;
         const day = requestDay(req.requested_at);
@@ -511,6 +519,7 @@ export function TagRequestBoard({
           <SettingsWingFilter
             value={wing}
             onChange={setWing}
+            rootsOnly={mode === "consume"}
             className="w-[7.25rem] shrink"
             triggerClassName={cn(fieldClass, "w-full")}
           />

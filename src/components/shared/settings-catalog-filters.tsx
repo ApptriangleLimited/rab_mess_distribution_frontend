@@ -9,7 +9,11 @@ import {
   rankOfficialName,
   wingDisplayLabel,
 } from "@/lib/constants";
-import { listOfficialWings, listRanks } from "@/lib/store/org-options";
+import {
+  listOfficialWings,
+  listRanks,
+  listWingChildren,
+} from "@/lib/store/org-options";
 import { cn } from "@/lib/utils";
 
 const ALL = "all";
@@ -19,6 +23,8 @@ type CatalogFilterProps = {
   onChange: (value: string) => void;
   className?: string;
   triggerClassName?: string;
+  /** Main wings only. Sub-wings and nested units stay off the list. */
+  rootsOnly?: boolean;
 };
 
 function settingsRankLabel(
@@ -79,12 +85,19 @@ export function SettingsWingFilter({
   onChange,
   className,
   triggerClassName,
+  rootsOnly = false,
 }: CatalogFilterProps) {
   const t = useT();
   const state = useStore();
   const wings = useMemo(
-    () => listOfficialWings(),
-    [state.wings, state.wing_parent, state.wing_serials, state.wing_labels],
+    () => (rootsOnly ? listWingChildren(null) : listOfficialWings()),
+    [
+      rootsOnly,
+      state.wings,
+      state.wing_parent,
+      state.wing_serials,
+      state.wing_labels,
+    ],
   );
 
   return (

@@ -17,6 +17,7 @@ import {
 } from "@/components/shared/settings-catalog-filters";
 import { usePagination } from "@/hooks/use-pagination";
 import { LEAVE_MED_BILL_TAGS } from "@/lib/consume-filters";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import {
   buildLeaveMedBill,
   withReportSource,
@@ -58,7 +59,7 @@ export function LeaveMedBillPanel({
     const query = q.trim().toLowerCase();
     return bill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [
         row.user.name,
@@ -136,6 +137,7 @@ export function LeaveMedBillPanel({
           <SettingsWingFilter
             value={wing}
             onChange={setWing}
+            rootsOnly
             className="w-[7.25rem] shrink"
             triggerClassName={cn(fieldClass, "w-full")}
           />

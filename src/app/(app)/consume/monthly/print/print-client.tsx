@@ -32,6 +32,7 @@ import {
   buildTagBill,
   withReportSource,
 } from "@/lib/reports";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -75,7 +76,7 @@ export default function ConsumeTagBillPrintClient() {
     const query = q.trim().toLowerCase();
     return tagBill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [
         row.user.name,
@@ -95,7 +96,7 @@ export default function ConsumeTagBillPrintClient() {
     const query = q.trim().toLowerCase();
     return leaveBill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [
         row.user.name,

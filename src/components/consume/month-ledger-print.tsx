@@ -9,6 +9,7 @@ import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { tagPrintClass, tagPrintCss, tagPrintFill } from "@/lib/tag-colors";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 import { useT } from "@/i18n/provider";
+import { consumeRankShort } from "@/lib/consume-rank-short";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -73,18 +74,40 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
     ) as Partial<Record<DailyTag, number>>;
     const grandDays = rows.reduce((s, r) => s + r.totalDays, 0);
 
-    /** A4 landscape content width — identity + days + tags + total must fit. */
-    const pageMm = 291;
+    /** Inside the preview padding and the 8mm print margin, so the last column stays on the sheet. */
+    const pageMm = english ? 270 : 291;
+    const tagColMm = english ? 5.6 : 7;
+    const totalColMm = english ? 8 : 10;
+    const fixedWithoutName = showSrbNo
+      ? english
+        ? 6 + 22 + 15 + 11
+        : 7 + 16 + 16 + 14
+      : english
+        ? 6 + 22 + 11
+        : 7 + 22 + 16;
+    const minDayMm = 3.4;
+    const maxNameMm = Math.max(
+      14,
+      pageMm -
+        fixedWithoutName -
+        tagCodes.length * tagColMm -
+        totalColMm -
+        columns.length * minDayMm,
+    );
+    const longestName = Math.max(
+      (english ? "Name" : t("consume.colName")).length,
+      ...rows.map((row) => row.user.name.trim().length),
+      1,
+    );
+    const nameMm = Math.min(maxNameMm, Math.max(14, longestName * 1.45 + 2));
     const identityMm = showSrbNo
       ? english
-        ? [6, 14, 14, 12, 16]
-        : [7, 16, 16, 14, 20]
+        ? [6, 22, 15, 11, nameMm]
+        : [7, 16, 16, 14, nameMm]
       : english
-        ? [6, 17, 13, 20]
-        : [7, 22, 16, 26];
+        ? [6, 22, 11, nameMm]
+        : [7, 22, 16, nameMm];
     const identityColCount = identityMm.length;
-    const tagColMm = english ? 6.4 : 7;
-    const totalColMm = english ? 8 : 10;
     const reservedMm =
       identityMm.reduce((s, n) => s + n, 0) +
       tagCodes.length * tagColMm +
@@ -100,13 +123,13 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         className={cn(
           "month-ledger-print text-black",
           english &&
-            "box-border w-[297mm] max-w-[297mm] min-h-[210mm] overflow-visible",
+            "box-border w-[281mm] max-w-[281mm] min-h-[210mm] overflow-visible",
           preview
             ? "mx-auto block rounded-xl border border-neutral-200 bg-white p-3 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
             : "hidden print:block",
         )}
       >
-        <div className="letter-masthead mb-10 whitespace-normal text-center [word-spacing:normal]">
+        <div className="consume-masthead letter-masthead mb-3 whitespace-normal text-center [word-spacing:normal]">
           <p className="text-[11px] font-semibold leading-snug">
             {CONSUME_REPORT_META.wing}
           </p>
@@ -133,22 +156,22 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
             <col style={{ width: `${totalColMm}mm` }} />
           </colgroup>
           <thead>
-            <tr className="border border-black bg-neutral-100">
+            <tr className="consume-col-titles border border-black bg-neutral-100">
               <th className="border border-black px-0.5 py-1">
                 {t("consume.colSl")}
               </th>
-              <th className="border border-black px-0.5 py-1 text-left">
+              <th className="border border-black px-0.5 py-1">
                 {t("consume.colId")}
               </th>
               {showSrbNo ? (
-                <th className="border border-black px-0.5 py-1 text-left">
+                <th className="border border-black px-0.5 py-1">
                   {t("consume.colSrbNo")}
                 </th>
               ) : null}
-              <th className="border border-black px-0.5 py-1 text-left">
+              <th className="border border-black px-0.5 py-1">
                 {t("consume.colRank")}
               </th>
-              <th className="border border-black px-0.5 py-1 text-left">
+              <th className="border border-black px-0.5 py-1">
                 {t("consume.colName")}
               </th>
               {columns.map(({ date, dayNum }) => (
@@ -187,9 +210,9 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                   </td>
                 ) : null}
                 <td className="ledger-rank overflow-hidden border border-black px-0.5 py-0.5 whitespace-nowrap">
-                  {row.user.rank}
+                  {consumeRankShort(row.user.rank)}
                 </td>
-                <td className="ledger-name overflow-hidden border border-black px-0.5 py-0.5 text-left whitespace-nowrap">
+                <td className="ledger-name border border-black px-0.5 py-0.5 text-left">
                   {row.user.name}
                 </td>
                 {columns.map(({ date, dayNum }, vi) => {
@@ -238,14 +261,11 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           <tfoot>
             <tr className="border border-black font-semibold">
               <td
-                colSpan={identityColCount}
-                className="border border-black px-1 py-1 text-right"
+                colSpan={identityColCount + columns.length}
+                className="border border-black px-1 py-1 text-left"
               >
                 {t("consume.colGrandTotal")}
               </td>
-              {columns.map(({ date }) => (
-                <td key={date} className="border border-black px-0 py-1" />
-              ))}
               {tagCodes.map((code) => (
                 <td
                   key={code}

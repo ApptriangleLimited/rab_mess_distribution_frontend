@@ -164,6 +164,32 @@ export function listWingDescendants(parent: string): string[] {
   return out;
 }
 
+/**
+ * True when a member's stored wing is the filter, or sits under it.
+ * Selecting a main wing includes its sub-wings.
+ */
+export function memberMatchesWingFilter(
+  storedWing: string,
+  filterWing: string,
+): boolean {
+  const want = canonicalWingName(normalizeLabel(filterWing)).toLowerCase();
+  if (!want || want === "all") return true;
+  let cur = normalizeLabel(storedWing);
+  if (!cur) return false;
+  const { wing_parent } = getState();
+  const seen = new Set<string>();
+  while (cur) {
+    const key = canonicalWingName(cur).toLowerCase();
+    if (key === want) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const parent = lookupParent(wing_parent, cur);
+    if (!parent) return false;
+    cur = parent;
+  }
+  return false;
+}
+
 /** Settings wings in serial order: mains, then Admin/HQ children. */
 export function listOfficialWings(): string[] {
   const seen = new Set<string>();

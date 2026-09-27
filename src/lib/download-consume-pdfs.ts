@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { consumeHqLine } from "@/components/consume/consume-report-masthead";
+import { consumeRankShort } from "@/lib/consume-rank-short";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatMonthDash, formatMonthLong } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
@@ -52,7 +53,11 @@ function amt(n: number) {
   });
 }
 
-type TotalCell = { text: string; colSpan?: number };
+type TotalCell = {
+  text: string;
+  colSpan?: number;
+  align?: "left" | "center" | "right";
+};
 
 type AutoColBox = { x: number; width: number };
 
@@ -176,8 +181,11 @@ function drawConsumeTotalRow(doc: jsPDF, cells: TotalCell[]) {
     const x = slice[0].x;
     const w = slice.reduce((sum, c) => sum + c.width, 0);
     if (finiteRect(doc, x, y, w, rowH) && cell.text) {
-      doc.text(cell.text, x + w / 2, y + rowH / 2 + 0.8, {
-        align: "center",
+      const align = cell.align ?? "center";
+      const textX =
+        align === "right" ? x + w - 1.2 : align === "left" ? x + 1.2 : x + w / 2;
+      doc.text(cell.text, textX, y + rowH / 2 + 0.8, {
+        align,
         baseline: "middle",
       });
     }
@@ -216,6 +224,7 @@ export function downloadTagBillPdf(args: {
   const pageW = doc.internal.pageSize.getWidth();
   const monthLabel = formatMonthDash(month);
   const tagKey = `${tag} ${tagLabel}`.toUpperCase();
+  const centerFrDays = tagKey.includes("FR");
   const title =
     tagKey.includes("CD") && !tagKey.includes("FR")
       ? `CD bill — ${monthLabel} (CD)`
@@ -232,8 +241,8 @@ export function downloadTagBillPdf(args: {
   y += 16;
 
   const head = [
-    "Sl",
-    "ID",
+    "SL",
+    "Personal No",
     "Rank",
     "Name",
     tag,
@@ -245,7 +254,7 @@ export function downloadTagBillPdf(args: {
   const body = rows.map((r) => [
     String(r.sl),
     r.user.personal_id || "—",
-    r.user.rank,
+    consumeRankShort(r.user.rank),
     r.user.name,
     String(r.days),
     amt(r.amount),
@@ -260,7 +269,7 @@ export function downloadTagBillPdf(args: {
     styles: {
       fontSize: 8,
       cellPadding: 1.2,
-      halign: "center",
+      halign: "left",
       valign: "middle",
     },
     headStyles: {
@@ -272,17 +281,27 @@ export function downloadTagBillPdf(args: {
     },
     theme: "grid",
     margin: { left: 12, right: 12, bottom: 28 },
+    didParseCell: (data) => {
+      if (data.section === "head") return;
+      const moneyCols = showFuel ? [5, 6, 7] : [5, 6];
+      if (moneyCols.includes(data.column.index)) {
+        data.cell.styles.halign = "right";
+      }
+      if (centerFrDays && data.column.index === 4) {
+        data.cell.styles.halign = "center";
+      }
+    },
     didDrawCell: (data) => {
       recordConsumeColBox(doc, data.column.index, data.cell.x, data.cell.width);
     },
   });
 
   const afterTable = drawConsumeTotalRow(doc, [
-    { text: "Total", colSpan: 4 },
-    { text: String(totalDays) },
-    { text: amt(totalAmount) },
-    ...(showFuel ? [{ text: amt(totalFuel) }] : []),
-    { text: amt(grandTotal) },
+    { text: "Total", colSpan: 4, align: "left" },
+    { text: String(totalDays), align: centerFrDays ? "center" : "left" },
+    { text: amt(totalAmount), align: "right" },
+    ...(showFuel ? [{ text: amt(totalFuel), align: "right" as const }] : []),
+    { text: amt(grandTotal), align: "right" },
     { text: "" },
   ]);
   drawConsumeBillSigns(doc, afterTable + 12);
@@ -317,8 +336,8 @@ export function downloadLeaveMedBillPdf(args: {
   y += 16;
 
   const head = [
-    "Sl",
-    "No",
+    "SL",
+    "Personal No",
     "Rank",
     "Name",
     ...tags,
@@ -329,7 +348,7 @@ export function downloadLeaveMedBillPdf(args: {
   const body = rows.map((r) => [
     String(r.sl),
     r.user.personal_id || "—",
-    r.user.rank,
+    consumeRankShort(r.user.rank),
     r.user.name,
     ...tags.map((code) => (r.tagDays[code] ? String(r.tagDays[code]) : "")),
     String(r.totalDays),
@@ -343,7 +362,7 @@ export function downloadLeaveMedBillPdf(args: {
     styles: {
       fontSize: 7.5,
       cellPadding: 1,
-      halign: "center",
+      halign: "left",
       valign: "middle",
     },
     headStyles: {
@@ -361,12 +380,13 @@ export function downloadLeaveMedBillPdf(args: {
   });
 
   const afterTable = drawConsumeTotalRow(doc, [
-    { text: "Total", colSpan: 4 },
+    { text: "Total", colSpan: 4, align: "left" },
     ...tags.map((code) => ({
       text: tagTotals[code] ? String(tagTotals[code]) : "",
+      align: "left" as const,
     })),
-    { text: totalDays ? String(totalDays) : "" },
-    { text: amt(totalAmount) },
+    { text: totalDays ? String(totalDays) : "", align: "left" },
+    { text: amt(totalAmount), align: "left" },
     { text: "" },
   ]);
   drawConsumeBillSigns(doc, afterTable + 12);
@@ -453,8 +473,8 @@ export function downloadConsumeMonthPdf(args: {
     startY: y,
     head: [
       [
-        "Ser",
-        "Pers No",
+        "SL",
+        "Personal No",
         "Rank",
         "Name",
         "Total days",
@@ -465,7 +485,7 @@ export function downloadConsumeMonthPdf(args: {
     body: rows.map((r, i) => [
       String(i + 1),
       r.user.personal_id || "—",
-      r.user.rank,
+      consumeRankShort(r.user.rank),
       r.user.name,
       String(r.totalDays),
       String(r.allowanceDays),

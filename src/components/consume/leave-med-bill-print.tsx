@@ -8,6 +8,7 @@ import type { LeaveMedBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { useT } from "@/i18n/provider";
+import { consumeRankShort } from "@/lib/consume-rank-short";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -66,9 +67,9 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
 
         <table className="w-full border-collapse text-center text-[10px] text-black">
           <thead>
-            <tr className="border border-black bg-neutral-100">
-              <th className="border border-black px-1 py-1">Sl</th>
-              <th className="border border-black px-1 py-1">No</th>
+            <tr className="consume-col-titles border border-black bg-neutral-100">
+              <th className="border border-black px-1 py-1">SL</th>
+              <th className="border border-black px-1 py-1">{t("consume.colId")}</th>
               <th className="border border-black px-1 py-1">Rank</th>
               <th className="border border-black px-1 py-1">Name</th>
               {tags.map((code) => (
@@ -92,7 +93,9 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="border border-black px-1 py-0.5 font-mono">
                   {row.user.personal_id || "—"}
                 </td>
-                <td className="border border-black px-1 py-0.5">{row.user.rank}</td>
+                <td className="border border-black px-1 py-0.5">
+                  {consumeRankShort(row.user.rank)}
+                </td>
                 <td className="border border-black px-1 py-0.5">
                   {row.user.name}
                 </td>
@@ -118,7 +121,7 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
             <tr className="border border-black font-semibold">
               <td
                 colSpan={4}
-                className="border border-black px-1 py-1 text-center"
+                className="border border-black px-1 py-1 text-left"
               >
                 Total
               </td>

@@ -52,6 +52,8 @@ export type TagRequestListParams = {
   status?: string;
   q?: string;
   wing?: string;
+  /** When "1", the wing filter includes nested sub-wings. */
+  wing_family?: string;
   rank?: string;
   tag?: string;
   member_status?: string;

@@ -4,6 +4,7 @@ import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatMonthLong } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
+import { consumeRankShort } from "@/lib/consume-rank-short";
 import { tagPrintFill } from "@/lib/tag-colors";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 
@@ -67,8 +68,8 @@ export function downloadConsumeLedgerPdf({
   y += 14;
 
   const head = [
-    "Ser",
-    "Pers No",
+    "SL",
+    "Personal No",
     "SRB No",
     "Rank",
     "Name",
@@ -81,7 +82,7 @@ export function downloadConsumeLedgerPdf({
     String(i + 1),
     row.user.personal_id || "—",
     row.user.rab_id || "—",
-    row.user.rank,
+    consumeRankShort(row.user.rank),
     row.user.name,
     ...(rangeMode
       ? dayHeaders.map((_, di) => row.days[di] || "")
@@ -97,12 +98,8 @@ export function downloadConsumeLedgerPdf({
   );
   const grandDays = rows.reduce((s, r) => s + r.totalDays, 0);
   const foot = [
-    "",
-    "",
-    "",
-    "",
     "Grand total",
-    ...dayHeaders.map(() => ""),
+    ...Array.from({ length: 4 + dayHeaders.length }, () => ""),
     ...tagTotals,
     String(grandDays || ""),
   ];
@@ -141,15 +138,19 @@ export function downloadConsumeLedgerPdf({
     },
     columnStyles: {
       0: { cellWidth: 7 },
-      1: { cellWidth: 13, halign: "left" },
-      2: { cellWidth: 13, halign: "left" },
-      3: { cellWidth: 13, halign: "left" },
-      4: { cellWidth: 22, halign: "left" },
+      1: { cellWidth: 24, halign: "left" },
+      2: { cellWidth: 16, halign: "left" },
+      3: { cellWidth: 12, halign: "center" },
+      4: { cellWidth: 36, halign: "left", overflow: "linebreak" },
     },
     theme: "grid",
     margin: { left: 6, right: 6 },
     tableWidth: "auto",
     didParseCell: (data) => {
+      if (data.section === "foot" && data.column.index === 0) {
+        data.cell.colSpan = 5 + dayHeaders.length;
+        data.cell.styles.halign = "left";
+      }
       if (data.section !== "body" || data.column.index < 5) return;
       if (data.column.index >= 5 + dayHeaders.length) return;
       const row = rows[data.row.index];

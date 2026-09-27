@@ -40,7 +40,7 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
             : "hidden print:block",
         )}
       >
-        <header className="letter-masthead mb-10 text-center">
+        <header className="consume-masthead letter-masthead mb-10 text-center">
           <p className="wing-food-title text-[20px] font-bold leading-tight">
             {table.title}
           </p>
@@ -58,7 +58,7 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
 
         <table className="w-full border-collapse text-[10px] text-black">
           <thead>
-            <tr className="border border-black bg-neutral-100">
+            <tr className="consume-col-titles border border-black bg-neutral-100">
               <th className="border border-black px-1 py-1">SL</th>
               <th className="border border-black px-1 py-1">Page no</th>
               <th className="border border-black px-1 py-1">Manpower</th>

@@ -347,16 +347,34 @@ function letterSheetCss() {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  .consume-masthead.letter-masthead p,
+  .month-ledger-print .consume-masthead p,
+  .official-consume-letter .consume-masthead.letter-masthead p,
+  .wing-food-list-print .consume-masthead p,
+  .wing-food-list-print .consume-masthead .wing-food-hq,
+  .wing-summary-print .consume-masthead p {
+    text-transform: uppercase !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px !important;
+    color: #111 !important;
+  }
   .month-ledger-print table:not(.consume-sign-off) {
     table-layout: fixed !important;
     width: 100% !important;
   }
   .month-ledger-print .ledger-id,
-  .month-ledger-print .ledger-rank,
-  .month-ledger-print .ledger-name {
+  .month-ledger-print .ledger-rank {
     overflow: hidden !important;
     white-space: nowrap !important;
     text-overflow: clip !important;
+  }
+  .month-ledger-print .ledger-name {
+    overflow: visible !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    text-overflow: clip !important;
+    line-height: 1.15 !important;
   }
   .month-ledger-print th,
   .month-ledger-print td {
@@ -441,6 +459,21 @@ function letterSheetCss() {
   .leave-med-bill-print td {
     text-align: center !important;
     vertical-align: middle !important;
+  }
+  .tag-bill-print tbody td,
+  .tag-bill-print tfoot td,
+  .leave-med-bill-print tbody td,
+  .leave-med-bill-print tfoot td {
+    text-align: left !important;
+  }
+  .tag-bill-print td.consume-money {
+    text-align: right !important;
+  }
+  .tag-bill-print td.consume-days {
+    text-align: center !important;
+  }
+  .official-consume-letter td.consume-page-no {
+    text-align: center !important;
   }
   .manpower-letter,
   .strength-letter {

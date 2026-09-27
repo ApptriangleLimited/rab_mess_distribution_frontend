@@ -1483,7 +1483,7 @@ export const bn = {
     metaWing: "উইং / অফিস",
     metaStation: "স্টেশন",
     colSl: "ক্রমিক",
-    colId: "নং",
+    colId: "ব্যক্তিগত নং",
     colSrbNo: "এসআরবি নং",
     colRank: "পদবী",
     colName: "নাম",

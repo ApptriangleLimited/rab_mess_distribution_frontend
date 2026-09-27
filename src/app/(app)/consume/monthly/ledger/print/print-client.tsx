@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import { CONSUME_LEDGER_SOURCE_TAGS } from "@/lib/constants";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
@@ -146,7 +147,7 @@ export default function ConsumeLedgerPrintClient() {
     const query = q.trim().toLowerCase();
     return ledger.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [row.user.name, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")

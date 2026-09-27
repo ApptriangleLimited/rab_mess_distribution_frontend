@@ -17,7 +17,7 @@ export function ConsumeReportMasthead({
   return (
     <header
       className={cn(
-        "letter-masthead mb-10 whitespace-normal text-center [word-spacing:normal]",
+        "consume-masthead letter-masthead mb-10 whitespace-normal text-center [word-spacing:normal]",
         className,
       )}
     >

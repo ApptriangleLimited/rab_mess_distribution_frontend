@@ -6,6 +6,7 @@ import {
 } from "@/lib/constants";
 import { countedDaysInMonth, formatMonthDash } from "@/lib/date";
 import { buildConsumeMonth } from "@/lib/reports";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { compareUsers } from "@/lib/store/users";
 import type { DailyTag, MemberType, User } from "@/lib/types";
 
@@ -457,7 +458,7 @@ export function buildWingFoodList(
 ): OfficialConsumeTable {
   const consume = buildConsumeMonth(month);
   const members = consume.rows
-    .filter((row) => row.user.wing === wingName)
+    .filter((row) => memberMatchesWingFilter(row.user.wing, wingName))
     .sort((a, b) => compareUsers(a.user, b.user));
   const monthDays = countedDaysInMonth(month);
   const rows = members.length

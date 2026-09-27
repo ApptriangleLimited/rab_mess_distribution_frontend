@@ -17,6 +17,8 @@ import {
 import { usePagination } from "@/hooks/use-pagination";
 
 import { formatBdt } from "@/lib/reports";
+import { consumeRankShort } from "@/lib/consume-rank-short";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import type { User } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -51,7 +53,7 @@ export function AllConsumePanel({
     const query = q.trim().toLowerCase();
     return rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [row.user.name, row.user.rab_id, row.user.wing, row.user.rank]
         .join(" ")
@@ -115,6 +117,7 @@ export function AllConsumePanel({
         <SettingsWingFilter
           value={wing}
           onChange={setWing}
+          rootsOnly
           className="w-[7.25rem] shrink"
           triggerClassName={cn(fieldClass, "w-full")}
         />
@@ -140,22 +143,22 @@ export function AllConsumePanel({
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-neutral-50 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
+              <thead className="consume-col-titles bg-neutral-50 text-[11px] uppercase tracking-wide dark:bg-neutral-900">
                 <tr>
-                  <th className="w-12 px-4 py-3 text-center">
+                  <th className="w-12 px-4 py-3">
                     {t("consume.colSl")}
                   </th>
                   <th className="min-w-[12rem] px-4 py-3">
                     {t("consume.colName")}
                   </th>
                   <th className="px-4 py-3">{t("consume.colRank")}</th>
-                  <th className="px-4 py-3 text-center">
+                  <th className="px-4 py-3">
                     {t("consume.totalDays")}
                   </th>
-                  <th className="px-4 py-3 text-center">
+                  <th className="px-4 py-3">
                     {t("consume.allowanceDays")}
                   </th>
-                  <th className="px-4 py-3 text-right">
+                  <th className="px-4 py-3">
                     {t("consume.colGrandTotal")}
                   </th>
                   <th className="min-w-[6rem] px-4 py-3">
@@ -186,7 +189,7 @@ export function AllConsumePanel({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">
-                      {row.user.rank || "—"}
+                      {consumeRankShort(row.user.rank) || "—"}
                     </td>
                     <td className="px-4 py-3 text-center font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
                       {row.totalDays}

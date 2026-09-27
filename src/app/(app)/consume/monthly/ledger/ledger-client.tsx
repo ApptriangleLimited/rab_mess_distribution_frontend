@@ -26,6 +26,7 @@ import { useSession } from "@/hooks/use-session";
 import { useStore } from "@/hooks/use-store";
 
 import { CONSUME_LEDGER_SOURCE_TAGS } from "@/lib/constants";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { monthDateBounds } from "@/lib/date";
 import {
   buildRangeLedger,
@@ -110,14 +111,14 @@ export default function ConsumeLedgerClient() {
     const query = q.trim().toLowerCase();
     return ledger.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [row.user.name, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing]);
+  }, [ledger.rows, q, rank, wing, state.wing_parent]);
 
   const printHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -223,6 +224,7 @@ export default function ConsumeLedgerClient() {
           <SettingsWingFilter
             value={wing}
             onChange={setWing}
+            rootsOnly
             className="w-[9rem] shrink-0"
             triggerClassName={cn(fieldClass, "w-full")}
           />
@@ -246,6 +248,7 @@ export default function ConsumeLedgerClient() {
             rows={rows}
             columnDates={ledger.columnDates}
             showSrbNo
+            centerColumnTitles
           />
         )}
       </motion.div>
