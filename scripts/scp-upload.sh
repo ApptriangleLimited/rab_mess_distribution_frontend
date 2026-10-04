@@ -2,10 +2,12 @@
 # Pack this repo (no node_modules / .next / .env) and SCP it to /tmp on the server.
 # Usage (from repo root):
 #   DEPLOY_HOST=your.server.ip DEPLOY_USER=ubuntu ./scripts/scp-upload.sh
+# Optional: DEPLOY_PORT=2222
 set -euo pipefail
 
 : "${DEPLOY_HOST:?Set DEPLOY_HOST}"
 : "${DEPLOY_USER:?Set DEPLOY_USER}"
+DEPLOY_PORT="${DEPLOY_PORT:-22}"
 REMOTE_TMP="${REMOTE_TMP:-/tmp/rab-mess-frontend}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAR="${TMPDIR:-/tmp}/rab-mess-frontend.tgz"
@@ -22,14 +24,14 @@ tar -C "$REPO_ROOT" -czf "$TAR" \
   --exclude='*.tgz' \
   .
 
-SCP_OPTS=()
-SSH_OPTS=()
+SCP_OPTS=(-P "$DEPLOY_PORT")
+SSH_OPTS=(-p "$DEPLOY_PORT")
 if [ -n "${DEPLOY_KEY:-}" ]; then
   SCP_OPTS+=(-i "$DEPLOY_KEY")
   SSH_OPTS+=(-i "$DEPLOY_KEY")
 fi
 
-echo "Uploading to ${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/rab-mess-frontend.tgz"
+echo "Uploading to ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PORT}:/tmp/rab-mess-frontend.tgz"
 scp "${SCP_OPTS[@]}" "$TAR" "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/rab-mess-frontend.tgz"
 
 ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "set -euo pipefail

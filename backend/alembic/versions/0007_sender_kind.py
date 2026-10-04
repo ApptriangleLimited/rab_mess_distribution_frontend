@@ -27,9 +27,9 @@ def upgrade() -> None:
         """
         UPDATE senders
            SET kind = 'mess'
-         WHERE lower(coalesce(label, '')) LIKE 'fresh money%'
-            OR lower(coalesce(label, '')) LIKE 'firewood fr%'
-            OR lower(coalesce(label, '')) LIKE 'fr fuel%'
+         WHERE lower(coalesce(label, '')) LIKE 'fresh money%%'
+            OR lower(coalesce(label, '')) LIKE 'firewood fr%%'
+            OR lower(coalesce(label, '')) LIKE 'fr fuel%%'
             OR lower(coalesce(account_name, '')) IN ('fresh money', 'firewood fr', 'fr fuel');
         """
     )

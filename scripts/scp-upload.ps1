@@ -3,12 +3,14 @@
 #   $env:DEPLOY_HOST = "your.server.ip"
 #   $env:DEPLOY_USER = "ubuntu"
 #   .\scripts\scp-upload.ps1
+# Optional: $env:DEPLOY_PORT = "2222"
 # Optional: $env:DEPLOY_KEY = "C:\path\to\id_rsa"
 
 $ErrorActionPreference = "Stop"
 
 $HostName = $env:DEPLOY_HOST
 $User = $env:DEPLOY_USER
+$Port = if ($env:DEPLOY_PORT) { $env:DEPLOY_PORT } else { "22" }
 if (-not $HostName -or -not $User) {
   Write-Error "Set DEPLOY_HOST and DEPLOY_USER, then re-run."
 }
@@ -36,15 +38,16 @@ try {
   Pop-Location
 }
 
-$ScpArgs = @()
-$SshArgs = @()
+$ScpArgs = @("-P", $Port)
+$SshArgs = @("-p", $Port)
 if ($Key) {
   $ScpArgs += @("-i", $Key)
   $SshArgs += @("-i", $Key)
 }
 
-Write-Host "Uploading to ${User}@${HostName}:/tmp/rab-mess-frontend.tgz"
+Write-Host "Uploading to ${User}@${HostName}:${Port}:/tmp/rab-mess-frontend.tgz"
 & scp @ScpArgs $Tar "${User}@${HostName}:/tmp/rab-mess-frontend.tgz"
+if ($LASTEXITCODE -ne 0) { Write-Error "scp failed (exit $LASTEXITCODE)." }
 
 $Remote = @"
 set -euo pipefail
@@ -58,6 +61,7 @@ ls '$RemoteTmp'/package.json '$RemoteTmp'/docker-compose.yml
 
 Write-Host "Extracting on the server..."
 & ssh @SshArgs "${User}@${HostName}" $Remote
+if ($LASTEXITCODE -ne 0) { Write-Error "ssh extract failed (exit $LASTEXITCODE)." }
 Write-Host "Upload ready. On the server run:"
 Write-Host "  bash $RemoteTmp/scripts/inspect-server-ports.sh"
 Write-Host "  sudo bash $RemoteTmp/scripts/server-deploy.sh"
