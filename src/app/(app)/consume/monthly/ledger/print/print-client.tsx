@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
 import { CONSUME_LEDGER_SOURCE_TAGS } from "@/lib/constants";
+import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
@@ -49,9 +50,8 @@ function FitPagePreview({ children }: { children: ReactNode }) {
       const lh = page.offsetHeight;
       page.style.zoom = prev;
       const fw = frame.clientWidth - 16;
-      const fh = frame.clientHeight - 16;
-      if (!lw || !lh || fw <= 0 || fh <= 0) return;
-      const next = Math.min(fw / lw, fh / lh, 1);
+      if (!lw || !lh || fw <= 0) return;
+      const next = Math.min(fw / lw, 1);
       setZoom((z) => (Math.abs(z - next) < 0.002 ? z : next));
     };
 
@@ -65,7 +65,7 @@ function FitPagePreview({ children }: { children: ReactNode }) {
   return (
     <div
       ref={frameRef}
-      className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
+      className="flex min-h-0 w-full flex-1 justify-center overflow-auto"
     >
       <div ref={pageRef} className="shrink-0" style={{ zoom }}>
         {children}
@@ -168,6 +168,8 @@ export default function ConsumeLedgerPrintClient() {
     return `/consume/monthly/ledger?${params.toString()}`;
   }, [month, dateFrom, dateTo, searchParams]);
 
+  const wingLedgers = useMemo(() => groupRowsByOfficialWing(rows), [rows]);
+
   const canAct = rows.length > 0;
   const rangeLabel = rangeBounds
     ? `${rangeBounds.from} → ${rangeBounds.to}`
@@ -181,6 +183,10 @@ export default function ConsumeLedgerPrintClient() {
       tagCodes: ledger.tagCodes,
       rows,
       columnDates: ledger.columnDates,
+      sections: wingLedgers.map((group) => ({
+        wingLabel: group.label,
+        rows: group.rows,
+      })),
       filename: `consume-ledger-${month}.pdf`,
     });
   }
@@ -254,17 +260,23 @@ export default function ConsumeLedgerPrintClient() {
         <EmptyState title={t("common.noResults")} />
       ) : (
         <FitPagePreview>
-          <MonthLedgerPrint
-            ref={printRef}
-            month={month}
-            dayCount={ledger.dayCount}
-            tagCodes={ledger.tagCodes}
-            rows={rows}
-            columnDates={ledger.columnDates}
-            preview
-            reportLang="en"
-            showSrbNo
-          />
+          <div ref={printRef} data-print-stack="true" className="flex flex-col gap-6">
+            {wingLedgers.map((group, index) => (
+              <MonthLedgerPrint
+                key={group.id}
+                month={month}
+                dayCount={ledger.dayCount}
+                tagCodes={ledger.tagCodes}
+                rows={group.rows}
+                columnDates={ledger.columnDates}
+                wingTitle={group.label}
+                pageBreak={index > 0}
+                preview
+                reportLang="en"
+                showSrbNo
+              />
+            ))}
+          </div>
         </FitPagePreview>
       )}
     </PagePane>

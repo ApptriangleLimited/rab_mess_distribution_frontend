@@ -9,6 +9,7 @@ import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { tagPrintClass, tagPrintCss, tagPrintFill } from "@/lib/tag-colors";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 import { useT } from "@/i18n/provider";
+import { chunkBillRows, CONSUME_BILL_ROWS_PER_PAGE } from "@/lib/consume-bill-pages";
 import { consumeRankShort } from "@/lib/consume-rank-short";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,10 @@ type Props = {
   reportLang?: "en" | "bn";
   /** Show SRB No beside personal number (ration ledger). */
   showSrbNo?: boolean;
+  /** Official wing for this copy. Falls back to the report masthead wing. */
+  wingTitle?: string;
+  /** Start this wing's ledger on a new printed page. */
+  pageBreak?: boolean;
 };
 
 /** Landscape Forces Mess consume ledger — matches BN register print. */
@@ -42,6 +47,8 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
       preview = false,
       reportLang = "bn",
       showSrbNo = false,
+      wingTitle,
+      pageBreak = false,
     },
     ref,
   ) {
@@ -62,6 +69,8 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         }));
     const monthEn = formatMonthLong(month, "en-US");
     const campEn = `${CONSUME_REPORT_META.orgName} Camp, ${CONSUME_REPORT_META.station}`;
+    const wingHeading = (wingTitle || CONSUME_REPORT_META.wing).toUpperCase();
+    const pages = chunkBillRows(rows);
 
     const dayLabel = (d: number) => String(d);
     const serLabel = (n: number) => String(n);
@@ -121,22 +130,35 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
       <div
         ref={ref}
         className={cn(
-          "month-ledger-print text-black",
-          english &&
-            "box-border w-[281mm] max-w-[281mm] min-h-[210mm] overflow-visible",
-          preview
-            ? "mx-auto block rounded-xl border border-neutral-200 bg-white p-3 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
-            : "hidden print:block",
+          "month-ledger-print flex flex-col gap-6 text-black",
+          pageBreak && "consume-wing-break",
+          preview ? "block" : "hidden print:block",
         )}
       >
-        <div className="consume-masthead letter-masthead mb-3 whitespace-normal text-center [word-spacing:normal]">
-          <p className="text-[11px] font-semibold leading-snug">
-            {CONSUME_REPORT_META.wing}
+        {pages.map((pageRows, pageIndex) => {
+          const lastPage = pageIndex === pages.length - 1;
+          const serialOffset = pageIndex * CONSUME_BILL_ROWS_PER_PAGE;
+          return (
+        <section
+          key={pageIndex}
+          className={cn(
+            "consume-ledger-page",
+            english && "box-border w-[281mm] max-w-[281mm] overflow-visible",
+            pageIndex > 0 && "consume-wing-break",
+            preview
+              ? "mx-auto rounded-xl border border-neutral-200 bg-white p-3 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
+              : "",
+          )}
+        >
+        <div>
+        <div className="consume-masthead letter-masthead mb-2 whitespace-normal text-center [word-spacing:normal]">
+          <p className="ledger-title text-sm font-bold leading-tight">
+            {wingHeading}
           </p>
-          <p className="mt-2.5 text-sm font-bold leading-snug">
+          <p className="ledger-title mt-0.5 text-sm font-bold leading-tight">
             Forces Mess food consumption list — {monthEn}
           </p>
-          <p className="mt-2 text-[10px] leading-snug text-neutral-700">
+          <p className="mt-1 text-[10px] leading-tight text-neutral-700">
             {campEn}
           </p>
         </div>
@@ -196,10 +218,10 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
+            {pageRows.map((row, i) => (
               <tr key={row.user.id}>
-                <td className="border border-black px-0.5 py-0.5 text-center tabular-nums">
-                  {serLabel(i + 1)}
+                <td className="consume-sl border border-black px-0.5 py-0.5 text-center tabular-nums">
+                  {serLabel(serialOffset + i + 1)}
                 </td>
                 <td className="ledger-id overflow-hidden border border-black px-0.5 py-0.5 font-mono whitespace-nowrap">
                   {row.user.personal_id || "—"}
@@ -258,6 +280,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               </tr>
             ))}
           </tbody>
+          {lastPage ? (
           <tfoot>
             <tr className="border border-black font-semibold">
               <td
@@ -279,10 +302,14 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               </td>
             </tr>
           </tfoot>
+          ) : null}
         </table>
+        </div>
 
+        {lastPage ? (
+        <div className="consume-bill-signs">
         <ConsumeSignOff
-          className="mt-5 text-[8px]"
+          className="mt-0 text-[8px]"
           labels={(
             [
               "consume.signDailySi",
@@ -294,6 +321,11 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
             ] as const
           ).map((key) => t(key))}
         />
+        </div>
+        ) : null}
+        </section>
+          );
+        })}
       </div>
     );
   },

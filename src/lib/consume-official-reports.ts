@@ -224,7 +224,7 @@ function norm(value: string) {
 
 const ATTACHED_TYPES = new Set<MemberType>(["attached", "guest"]);
 
-function officialRowId(user: User): string {
+export function officialRowId(user: User): string {
   if (user.member_type === "new") return "new";
   if (ATTACHED_TYPES.has(user.member_type) || ATTACHED_WINGS.has(norm(user.wing))) {
     return "attached";
@@ -304,6 +304,22 @@ export function officialSheetOrientation(
   _sheet?: ConsumeOfficialSheet,
 ): "portrait" | "landscape" {
   return "portrait";
+}
+
+/** Same wing order as the consume summary: one group per official wing that has rows. */
+export function groupRowsByOfficialWing<T extends { user: User }>(rows: T[]) {
+  const buckets = new Map<string, T[]>();
+  for (const row of rows) {
+    const id = officialRowId(row.user);
+    const list = buckets.get(id) ?? [];
+    list.push(row);
+    buckets.set(id, list);
+  }
+  return WING_DEFS.flatMap((def) => {
+    const list = buckets.get(def.id);
+    if (!list?.length) return [];
+    return [{ id: def.id, label: def.label, rows: list }];
+  });
 }
 
 function membersByWing(month: string) {

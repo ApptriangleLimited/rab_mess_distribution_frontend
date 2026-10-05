@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ListPagination } from "@/components/shared/list-pagination";
 import { MonthNav } from "@/components/shared/month-nav";
 import {
   SearchFilterBar,
@@ -15,8 +14,9 @@ import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
-import { usePagination } from "@/hooks/use-pagination";
 import { LEAVE_MED_BILL_TAGS } from "@/lib/consume-filters";
+import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
+import type { DailyTag } from "@/lib/types";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import {
   buildLeaveMedBill,
@@ -74,38 +74,26 @@ export function LeaveMedBillPanel({
     });
   }, [bill.rows, q, rank, wing]);
 
-  const filteredDays = useMemo(
-    () => members.reduce((s, r) => s + r.totalDays, 0),
-    [members],
-  );
-  const filteredAmount = useMemo(
-    () => members.reduce((s, r) => s + r.amount, 0),
-    [members],
-  );
-  const filteredTagTotals = useMemo(() => {
-    const next: Record<string, number> = {};
-    for (const code of LEAVE_MED_BILL_TAGS) {
-      next[code] = members.reduce((s, r) => s + (r.tagDays[code] ?? 0), 0);
-    }
-    return next;
-  }, [members]);
-
-  const resetKey = useMemo(
+  const wingBills = useMemo(
     () =>
-      `${month}|leave-med|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
-    [month, q, rank, wing, members],
+      groupRowsByOfficialWing(members).map((group) => {
+        const tagTotals: Partial<Record<DailyTag, number>> = {};
+        for (const code of LEAVE_MED_BILL_TAGS) {
+          tagTotals[code] = group.rows.reduce(
+            (s, r) => s + (r.tagDays[code] ?? 0),
+            0,
+          );
+        }
+        return {
+          ...group,
+          rows: group.rows.map((row, i) => ({ ...row, sl: i + 1 })),
+          tagTotals,
+          totalDays: group.rows.reduce((s, r) => s + r.totalDays, 0),
+          totalAmount: group.rows.reduce((s, r) => s + r.amount, 0),
+        };
+      }),
+    [members],
   );
-  const {
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    totalPages,
-    pageItems,
-    total,
-    from,
-    to,
-  } = usePagination(members, resetKey);
 
   const fieldClass = searchFilterCompactFieldClass;
 
@@ -153,27 +141,22 @@ export function LeaveMedBillPanel({
         ) : members.length === 0 ? (
           <EmptyState title={t("common.noResults")} />
         ) : (
-          <section className="flex flex-col gap-3">
-            <LeaveMedBillPrint
-              month={month}
-              tags={LEAVE_MED_BILL_TAGS}
-              rows={pageItems}
-              tagTotals={filteredTagTotals}
-              totalDays={filteredDays}
-              totalAmount={filteredAmount}
-              rate={bill.rate}
-              preview
-            />
-            <ListPagination
-              page={page}
-              totalPages={totalPages}
-              total={total}
-              from={from}
-              to={to}
-              onPageChange={setPage}
-              pageSize={pageSize}
-              onPageSizeChange={setPageSize}
-            />
+          <section className="flex flex-col gap-8">
+            {wingBills.map((group, index) => (
+              <LeaveMedBillPrint
+                key={group.id}
+                month={month}
+                tags={LEAVE_MED_BILL_TAGS}
+                rows={group.rows}
+                tagTotals={group.tagTotals}
+                totalDays={group.totalDays}
+                totalAmount={group.totalAmount}
+                rate={bill.rate}
+                wingLabel={group.label}
+                pageBreak={index > 0}
+                preview
+              />
+            ))}
           </section>
         )}
       </motion.div>

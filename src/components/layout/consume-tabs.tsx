@@ -14,10 +14,10 @@ const TABS = [
     match: (path: string) => path.startsWith("/consume/monthly/ledger"),
   },
   {
-    href: "/consume/requests",
-    labelKey: "nav.requests" as const,
-    icon: IconSend,
-    match: (path: string) => path.startsWith("/consume/requests"),
+    href: "/consume/monthly/summary",
+    labelKey: "nav.consumeSummary" as const,
+    icon: IconFileReport,
+    match: (path: string) => path.startsWith("/consume/monthly/summary"),
   },
   {
     href: "/consume/monthly",
@@ -27,10 +27,10 @@ const TABS = [
       path === "/consume/monthly" || path.startsWith("/consume/monthly/tag"),
   },
   {
-    href: "/consume/monthly/summary",
-    labelKey: "nav.consumeSummary" as const,
-    icon: IconFileReport,
-    match: (path: string) => path.startsWith("/consume/monthly/summary"),
+    href: "/consume/requests",
+    labelKey: "nav.requests" as const,
+    icon: IconSend,
+    match: (path: string) => path.startsWith("/consume/requests"),
   },
 ] as const;
 

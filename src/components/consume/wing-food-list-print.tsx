@@ -40,12 +40,12 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
             : "hidden print:block",
         )}
       >
-        <header className="consume-masthead letter-masthead mb-10 text-center">
-          <p className="wing-food-title text-[20px] font-bold leading-tight">
+        <header className="consume-masthead letter-masthead mb-6 text-center">
+          <p className="wing-food-title text-sm font-bold leading-tight">
             {table.title}
           </p>
           {table.lines[0] ? (
-            <p className="wing-food-report-title mt-1.5 text-[16px] font-bold leading-snug">
+            <p className="wing-food-report-title mt-0.5 text-sm font-bold leading-tight">
               {table.lines[0]}
             </p>
           ) : null}

@@ -33,6 +33,7 @@ import {
   LEGACY_MEMBER_BANKS,
   DEFAULT_AUTHORIZED,
   MEMBER_BANKS,
+  CL_FR_MONTHLY_TAG,
   DAILY_TAGS,
   RATE_ONLY_TAGS,
   RANKS,
@@ -1614,10 +1615,12 @@ function ensureRankForceWings(
 }
 
 function ensureRateOnlyRates(rates: AllowanceRate[]): AllowanceRate[] {
-  const next = rates.map((r) => ({
-    ...r,
-    amount_per_day: parseMoney(r.amount_per_day),
-  }));
+  const next = rates
+    .filter((r) => r.tag.toLowerCase() !== CL_FR_MONTHLY_TAG.toLowerCase())
+    .map((r) => ({
+      ...r,
+      amount_per_day: parseMoney(r.amount_per_day),
+    }));
   for (const builtIn of DAILY_TAGS) {
     const exists = next.some(
       (r) => r.tag.toLowerCase() === builtIn.code.toLowerCase(),

@@ -704,7 +704,7 @@ export const bn = {
       "তালিকা থেকে {name} সরান। সদস্যরা এডিট না করা পর্যন্ত পুরনো নাম রাখে।",
     memberBankDeleted: "ব্যাংক মুছে ফেলা হয়েছে",
     ratesHint:
-      "ট্যাগ অনুযায়ী BDT। FR/MS = দৈনিক; CLFR = MS-এর CL-এর জন্য মাসিক নির্ধারিত (FR রেট নয়)। FUEL = Firewood FR/দিন। শূন্য = পেমেন্ট নেই।",
+      "ট্যাগ অনুযায়ী BDT। FR/MS = দৈনিক। FUEL = Firewood FR/দিন। শূন্য = পেমেন্ট নেই।",
     ratesSaved: "রেট সেভ",
     amountPerDay: "পরিমাণ / দিন",
     amountPerMonth: "পরিমাণ / মাস",
@@ -1447,10 +1447,9 @@ export const bn = {
     filterCd: "CD",
     filterLeaveMed: "CL+PL+TRG+WIT+MED+BGH+LNK",
     filterFuel: "fuel (FR+MFR)",
-    leaveMedBillTitle:
-      "ফ্রেশ মানি বিল — {month} (সিএল, পিএল, ট্রেনিং, সাক্ষী, ডাক্তার, বিজিএইচ ও এলএনকে বিল)",
-    frBillTitle: "এফআর বিল — {month} (এফআর ও এমএফআর)",
-    cdBillTitle: "সিডি বিল — {month} (সিডি)",
+    leaveMedBillTitle: "ফ্রেশ মানি বিল – {wing} – {month}",
+    frBillTitle: "এফআর বিল – {wing} – {month}",
+    cdBillTitle: "সিডি বিল – {wing} – {month}",
     colFreshMoneyBabod: "ফ্রেশ মানি বাবদ টাকা",
     perUser: "সদস্য অনুযায়ী",
     totalDays: "মোট দিন",

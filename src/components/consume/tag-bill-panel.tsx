@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ListPagination } from "@/components/shared/list-pagination";
 import { MonthNav } from "@/components/shared/month-nav";
 import {
   SearchFilterBar,
@@ -15,8 +14,7 @@ import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
-import { usePagination } from "@/hooks/use-pagination";
-
+import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
 import {
   buildTagBill,
   withReportSource,
@@ -74,46 +72,21 @@ export function TagBillPanel({
     });
   }, [bill.rows, q, rank, wing]);
 
-  const filteredDays = useMemo(
-    () => members.reduce((s, r) => s + r.days, 0),
-    [members],
-  );
-
-  const filteredFresh = useMemo(
-    () => members.reduce((sum, row) => sum + row.amount, 0),
-    [members],
-  );
-
-  const filteredFuel = useMemo(
-    () => members.reduce((sum, row) => sum + row.fuelAmount, 0),
-    [members],
-  );
-
-  const filteredTotal = useMemo(
-    () => members.reduce((sum, row) => sum + row.grandTotal, 0),
-    [members],
-  );
-
   const tagKey = typeof tag === "string" ? tag : tag.join("+");
   const dayHeader = displayTag || tagKey;
   const showFuel = bill.tags.includes("FR") || bill.fuelRate > 0;
-
-  const resetKey = useMemo(
+  const wingBills = useMemo(
     () =>
-      `${month}|${tagKey}|${q}|${rank}|${wing}|${members.map((m) => m.user.id).join(",")}`,
-    [month, tagKey, q, rank, wing, members],
+      groupRowsByOfficialWing(members).map((group) => ({
+        ...group,
+        rows: group.rows.map((row, i) => ({ ...row, sl: i + 1 })),
+        totalDays: group.rows.reduce((s, r) => s + r.days, 0),
+        totalAmount: group.rows.reduce((s, r) => s + r.amount, 0),
+        totalFuel: group.rows.reduce((s, r) => s + r.fuelAmount, 0),
+        grandTotal: group.rows.reduce((s, r) => s + r.grandTotal, 0),
+      })),
+    [members],
   );
-  const {
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    totalPages,
-    pageItems,
-    total,
-    from,
-    to,
-  } = usePagination(members, resetKey);
 
   const fieldClass = searchFilterCompactFieldClass;
 
@@ -162,30 +135,25 @@ export function TagBillPanel({
         ) : members.length === 0 ? (
           <EmptyState title={t("common.noResults")} />
         ) : (
-          <section className="flex flex-col gap-3">
-            <TagBillPrint
-              month={month}
-              tag={dayHeader}
-              tagLabel={dayHeader}
-              rows={pageItems}
-              totalDays={filteredDays}
-              totalAmount={filteredFresh}
-              totalFuel={filteredFuel}
-              grandTotal={fuelOnly ? filteredFuel : filteredTotal}
-              showFuel={showFuel}
-              fuelOnly={fuelOnly}
-              preview
-            />
-            <ListPagination
-              page={page}
-              totalPages={totalPages}
-              total={total}
-              from={from}
-              to={to}
-              onPageChange={setPage}
-              pageSize={pageSize}
-              onPageSizeChange={setPageSize}
-            />
+          <section className="flex flex-col gap-8">
+            {wingBills.map((group, index) => (
+              <TagBillPrint
+                key={group.id}
+                month={month}
+                tag={dayHeader}
+                tagLabel={dayHeader}
+                rows={group.rows}
+                totalDays={group.totalDays}
+                totalAmount={group.totalAmount}
+                totalFuel={group.totalFuel}
+                grandTotal={fuelOnly ? group.totalFuel : group.grandTotal}
+                showFuel={showFuel}
+                fuelOnly={fuelOnly}
+                wingLabel={group.label}
+                pageBreak={index > 0}
+                preview
+              />
+            ))}
           </section>
         )}
       </motion.div>

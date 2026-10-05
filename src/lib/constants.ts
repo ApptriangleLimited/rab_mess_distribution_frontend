@@ -112,21 +112,17 @@ export const DAILY_TAGS: {
 
 /** Rate-only codes — Settings list yes, daily/consume tag pickers no. */
 export const FUEL_RATE_TAG = "FUEL" as const;
-/** Fixed monthly Fresh Ration for MS members' CL days (≠ FR daily rate). */
+/** Fixed monthly Fresh Ration for MS members' CL days (≠ FR daily rate). Not a Settings row. */
 export const CL_FR_MONTHLY_TAG = "CLFR" as const;
+export const CL_FR_MONTHLY_AMOUNT = 2500;
 
 export const RATE_ONLY_TAGS: {
-  code: typeof FUEL_RATE_TAG | typeof CL_FR_MONTHLY_TAG;
+  code: typeof FUEL_RATE_TAG;
   labelKey: MessageKey;
-  /** FUEL = ৳/day; CLFR = fixed ৳/month. */
+  /** FUEL = ৳/day. */
   defaultAmount: number;
 }[] = [
   { code: FUEL_RATE_TAG, labelKey: "tags.FUEL", defaultAmount: 50 },
-  {
-    code: CL_FR_MONTHLY_TAG,
-    labelKey: "tags.CLFR",
-    defaultAmount: 2500,
-  },
 ];
 
 export function isRateOnlyTag(tag: string) {

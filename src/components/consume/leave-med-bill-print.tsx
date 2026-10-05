@@ -8,6 +8,7 @@ import type { LeaveMedBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { useT } from "@/i18n/provider";
+import { chunkBillRows } from "@/lib/consume-bill-pages";
 import { consumeRankShort } from "@/lib/consume-rank-short";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,8 @@ type Props = {
   totalDays: number;
   totalAmount: number;
   rate: number;
+  wingLabel?: string;
+  pageBreak?: boolean;
   preview?: boolean;
 };
 
@@ -44,28 +47,46 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
       tagTotals,
       totalDays,
       totalAmount,
+      wingLabel,
+      pageBreak = false,
       preview = false,
     },
     ref,
   ) {
     const t = useT();
     const monthLabel = formatMonthDash(month);
+    const pages = chunkBillRows(rows);
 
     return (
       <div
         ref={ref}
         className={cn(
-          "leave-med-bill-print text-black",
-          preview
-            ? "block overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700"
-            : "hidden print:block",
+          "leave-med-bill-print flex flex-col gap-6 text-black",
+          pageBreak && "consume-wing-break",
+          preview ? "block" : "hidden print:block",
         )}
       >
+        {pages.map((pageRows, pageIndex) => {
+          const lastPage = pageIndex === pages.length - 1;
+          return (
+        <section
+          key={pageIndex}
+          className={cn(
+            "consume-bill-page",
+            pageIndex > 0 && "consume-wing-break",
+            preview &&
+              "overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700",
+          )}
+        >
+        <div>
         <ConsumeReportMasthead
-          title={t("consume.leaveMedBillTitle", { month: monthLabel })}
+          title={t("consume.leaveMedBillTitle", {
+            wing: (wingLabel ?? "").trim().toUpperCase(),
+            month: monthLabel.toUpperCase(),
+          })}
         />
 
-        <table className="w-full border-collapse text-center text-[10px] text-black">
+        <table className="w-full border-collapse text-[10px] text-black">
           <thead>
             <tr className="consume-col-titles border border-black bg-neutral-100">
               <th className="border border-black px-1 py-1">SL</th>
@@ -85,9 +106,9 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {pageRows.map((row) => (
               <tr key={row.user.id}>
-                <td className="border border-black px-1 py-0.5 tabular-nums">
+                <td className="consume-sl border border-black px-1 py-0.5 text-center tabular-nums">
                   {row.sl}
                 </td>
                 <td className="border border-black px-1 py-0.5 font-mono">
@@ -117,6 +138,7 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
               </tr>
             ))}
           </tbody>
+          {lastPage ? (
           <tfoot>
             <tr className="border border-black font-semibold">
               <td
@@ -142,12 +164,21 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
               <td className="border border-black px-1 py-1" />
             </tr>
           </tfoot>
+          ) : null}
         </table>
+        </div>
 
+        {lastPage ? (
+        <div className="consume-bill-signs">
         <ConsumeSignOff
-          className="grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
+          className="mt-0 grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
           labels={[...SIGNS]}
         />
+        </div>
+        ) : null}
+        </section>
+          );
+        })}
       </div>
     );
   },

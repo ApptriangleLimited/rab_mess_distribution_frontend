@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { consumeHqLine } from "@/components/consume/consume-report-masthead";
+import { chunkBillRows } from "@/lib/consume-bill-pages";
 import { consumeRankShort } from "@/lib/consume-rank-short";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatMonthDash, formatMonthLong } from "@/lib/date";
@@ -12,6 +13,14 @@ import type {
   WingSummaryRow,
 } from "@/lib/reports";
 
+function consumeWingBillTitle(head: string, wing: string, monthLabel: string) {
+  const wingPart = wing.trim().toUpperCase();
+  const monthPart = monthLabel.toUpperCase();
+  return wingPart
+    ? `${head} – ${wingPart} – ${monthPart}`
+    : `${head} – ${monthPart}`;
+}
+
 const CONSUME_BILL_SIGNS = [
   ["Daily SI"],
   ["Consume SI"],
@@ -21,12 +30,12 @@ const CONSUME_BILL_SIGNS = [
   ["Major", "Deputy Director (HQ)", "SRB Forces Headquarters"],
 ] as const;
 
-function drawConsumeBillSigns(doc: jsPDF, afterY: number) {
+function drawConsumeBillSigns(doc: jsPDF, afterY: number, pinToPageEnd = false) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const signBlockH = 24;
-  let after = afterY;
-  if (after + signBlockH > pageH - 8) {
+  let after = pinToPageEnd ? pageH - 10 - signBlockH : afterY;
+  if (!pinToPageEnd && after + signBlockH > pageH - 8) {
     doc.addPage();
     after = 16;
   }
@@ -207,6 +216,15 @@ export function downloadTagBillPdf(args: {
   grandTotal: number;
   /** FR+MFR fuel bill: no allowance column, grand total is the fuel figure. */
   fuelOnly?: boolean;
+  /** One bill per official wing. Each section keeps the same columns. */
+  sections?: {
+    wingLabel: string;
+    rows: TagBillRow[];
+    totalDays: number;
+    totalAmount: number;
+    totalFuel: number;
+    grandTotal: number;
+  }[];
   filename?: string;
 }) {
   const {
@@ -220,6 +238,7 @@ export function downloadTagBillPdf(args: {
     totalFuel,
     grandTotal,
     fuelOnly = false,
+    sections,
     filename,
   } = args;
 
@@ -227,110 +246,140 @@ export function downloadTagBillPdf(args: {
   const pageW = doc.internal.pageSize.getWidth();
   const monthLabel = formatMonthDash(month);
   const tagKey = `${tag} ${tagLabel}`.toUpperCase();
-  const centerFrDays = tagKey.includes("FR");
-  const title =
-    tagKey.includes("CD") && !tagKey.includes("FR")
-      ? `CD bill — ${monthLabel} (CD)`
-      : `FR bill — ${monthLabel} (FR and MFR)`;
-  let y = 12;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text(title, pageW / 2, y, { align: "center" });
-  y += 6;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
-  y += 16;
-
-  const head = fuelOnly
-    ? ["SI", "ID", "Rank", "Name", tag, "Fuel ৳", "Grand total", "Remarks"]
+  const titleHead =
+    tagKey.includes("CD") && !tagKey.includes("FR") ? "CD BILL" : "FR BILL";
+  const bills = sections?.length
+    ? sections
     : [
-        "SL",
-        "Personal No",
-        "Rank",
-        "Name",
-        tag,
-        "Allowance",
-        ...(showFuel ? ["Fuel"] : []),
-        "Grand total",
-        "Remarks",
+        {
+          wingLabel: "",
+          rows,
+          totalDays,
+          totalAmount,
+          totalFuel,
+          grandTotal,
+        },
       ];
-  const body = rows.map((r) =>
-    fuelOnly
-      ? [
-          String(r.sl),
-          r.user.personal_id || "—",
-          consumeRankShort(r.user.rank),
-          r.user.name,
-          String(r.days),
-          amt(r.fuelAmount),
-          amt(r.fuelAmount),
-          r.remarks || "",
-        ]
-      : [
-          String(r.sl),
-          r.user.personal_id || "—",
-          consumeRankShort(r.user.rank),
-          r.user.name,
-          String(r.days),
-          amt(r.amount),
-          ...(showFuel ? [amt(r.fuelAmount)] : []),
-          amt(r.grandTotal),
-          r.remarks || "",
-        ],
-  );
-  autoTable(doc, {
-    startY: y,
-    head: [head],
-    body,
-    styles: {
-      fontSize: 8,
-      cellPadding: 1.2,
-      halign: "left",
-      valign: "middle",
-    },
-    headStyles: {
-      fillColor: [235, 235, 235],
-      textColor: 20,
-      fontStyle: "bold",
-      halign: "center",
-      valign: "middle",
-    },
-    theme: "grid",
-    margin: { left: 12, right: 12, bottom: 28 },
-    didParseCell: (data) => {
-      if (data.section === "head") return;
-      const moneyCols = fuelOnly ? [5, 6] : showFuel ? [5, 6, 7] : [5, 6];
-      if (moneyCols.includes(data.column.index)) {
-        data.cell.styles.halign = "right";
-      }
-      if (centerFrDays && data.column.index === 4) {
-        data.cell.styles.halign = "center";
-      }
-    },
-    didDrawCell: (data) => {
-      recordConsumeColBox(doc, data.column.index, data.cell.x, data.cell.width);
-    },
-  });
 
-  const afterTable = drawConsumeTotalRow(doc, fuelOnly
-    ? [
-        { text: "Total", colSpan: 4, align: "left" },
-        { text: String(totalDays), align: "center" },
-        { text: amt(totalFuel), align: "right" },
-        { text: amt(totalFuel), align: "right" },
-        { text: "" },
-      ]
-    : [
-        { text: "Total", colSpan: 4, align: "left" },
-        { text: String(totalDays), align: centerFrDays ? "center" : "left" },
-        { text: amt(totalAmount), align: "right" },
-        ...(showFuel ? [{ text: amt(totalFuel), align: "right" as const }] : []),
-        { text: amt(grandTotal), align: "right" },
-        { text: "" },
-      ]);
-  if (!fuelOnly) drawConsumeBillSigns(doc, afterTable + 12);
+  bills.forEach((section, wingIndex) => {
+    const pageGroups = chunkBillRows(section.rows);
+    pageGroups.forEach((pageRows, pageIndex) => {
+    if (wingIndex > 0 || pageIndex > 0) doc.addPage();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (doc as any).__consumeColBoxes = [];
+    const lastPage = pageIndex === pageGroups.length - 1;
+    let y = 12;
+
+    const title = consumeWingBillTitle(titleHead, section.wingLabel, monthLabel);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(title, pageW / 2, y, { align: "center" });
+    const titleW = doc.getTextWidth(title);
+    doc.setLineWidth(0.35);
+    doc.line((pageW - titleW) / 2, y + 1.2, (pageW + titleW) / 2, y + 1.2);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
+    y += 16;
+
+    const head = fuelOnly
+      ? ["SI", "ID", "Rank", "Name", tag, "Fuel ৳", "Grand total", "Remarks"]
+      : [
+          "SL",
+          "Personal No",
+          "Rank",
+          "Name",
+          tag,
+          "Allowance",
+          ...(showFuel ? ["Fuel"] : []),
+          "Grand total",
+          "Remarks",
+        ];
+    const body = pageRows.map((r) =>
+      fuelOnly
+        ? [
+            String(r.sl),
+            r.user.personal_id || "—",
+            consumeRankShort(r.user.rank),
+            r.user.name,
+            String(r.days),
+            amt(r.fuelAmount),
+            amt(r.fuelAmount),
+            r.remarks || "",
+          ]
+        : [
+            String(r.sl),
+            r.user.personal_id || "—",
+            consumeRankShort(r.user.rank),
+            r.user.name,
+            String(r.days),
+            amt(r.amount),
+            ...(showFuel ? [amt(r.fuelAmount)] : []),
+            amt(r.grandTotal),
+            r.remarks || "",
+          ],
+    );
+    autoTable(doc, {
+      startY: y,
+      head: [head],
+      body,
+      styles: {
+        fontSize: 8,
+        cellPadding: 1.2,
+        halign: "left",
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: [235, 235, 235],
+        textColor: 20,
+        fontStyle: "bold",
+        halign: "center",
+        valign: "middle",
+      },
+      theme: "grid",
+      margin: { left: 12, right: 12, bottom: 28 },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 0) {
+          data.cell.styles.halign = "center";
+        }
+        if (data.section === "head") return;
+        const moneyCols = fuelOnly ? [5, 6] : showFuel ? [5, 6, 7] : [5, 6];
+        if (moneyCols.includes(data.column.index)) {
+          data.cell.styles.halign = "right";
+        }
+      },
+      didDrawCell: (data) => {
+        recordConsumeColBox(doc, data.column.index, data.cell.x, data.cell.width);
+      },
+    });
+
+    if (!lastPage) return;
+
+    const afterTable = drawConsumeTotalRow(
+      doc,
+      fuelOnly
+        ? [
+            { text: "Total", colSpan: 4, align: "left" },
+            { text: String(section.totalDays), align: "left" },
+            { text: amt(section.totalFuel), align: "right" },
+            { text: amt(section.totalFuel), align: "right" },
+            { text: "" },
+          ]
+        : [
+            { text: "Total", colSpan: 4, align: "left" },
+            { text: String(section.totalDays), align: "left" },
+            { text: amt(section.totalAmount), align: "right" },
+            ...(showFuel
+              ? [{ text: amt(section.totalFuel), align: "right" as const }]
+              : []),
+            { text: amt(section.grandTotal), align: "right" },
+            { text: "" },
+          ],
+    );
+    if (!fuelOnly) drawConsumeBillSigns(doc, afterTable + 12, true);
+    });
+  });
 
   doc.save(filename ?? `consume-bill-${month}-${tag}.pdf`);
 }
@@ -342,80 +391,111 @@ export function downloadLeaveMedBillPdf(args: {
   tagTotals: Partial<Record<DailyTag, number>>;
   totalDays: number;
   totalAmount: number;
+  sections?: {
+    wingLabel: string;
+    rows: LeaveMedBillRow[];
+    tagTotals: Partial<Record<DailyTag, number>>;
+    totalDays: number;
+    totalAmount: number;
+  }[];
   filename?: string;
 }) {
-  const { month, tags, rows, tagTotals, totalDays, totalAmount, filename } =
+  const { month, tags, rows, tagTotals, totalDays, totalAmount, sections, filename } =
     args;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const monthLabel = formatMonthDash(month);
-  const title = `Fresh money bill — ${monthLabel} (CL, PL, Training, Witness, Doctor, BGH and LNK bill)`;
-  let y = 12;
+  const titleHead = "FRESH MONEY BILL";
+  const bills = sections?.length
+    ? sections
+    : [{ wingLabel: "", rows, tagTotals, totalDays, totalAmount }];
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text(title, pageW / 2, y, { align: "center" });
-  y += 6;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
-  y += 16;
+  bills.forEach((section, wingIndex) => {
+    const pageGroups = chunkBillRows(section.rows);
+    pageGroups.forEach((pageRows, pageIndex) => {
+    if (wingIndex > 0 || pageIndex > 0) doc.addPage();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (doc as any).__consumeColBoxes = [];
+    const lastPage = pageIndex === pageGroups.length - 1;
+    let y = 12;
 
-  const head = [
-    "SL",
-    "Personal No",
-    "Rank",
-    "Name",
-    ...tags,
-    "Total",
-    "Fresh money babod taka",
-    "Remarks",
-  ];
-  const body = rows.map((r) => [
-    String(r.sl),
-    r.user.personal_id || "—",
-    consumeRankShort(r.user.rank),
-    r.user.name,
-    ...tags.map((code) => (r.tagDays[code] ? String(r.tagDays[code]) : "")),
-    String(r.totalDays),
-    amt(r.amount),
-    r.remarks || "",
-  ]);
-  autoTable(doc, {
-    startY: y,
-    head: [head],
-    body,
-    styles: {
-      fontSize: 7.5,
-      cellPadding: 1,
-      halign: "left",
-      valign: "middle",
-    },
-    headStyles: {
-      fillColor: [235, 235, 235],
-      textColor: 20,
-      fontStyle: "bold",
-      halign: "center",
-      valign: "middle",
-    },
-    theme: "grid",
-    margin: { left: 10, right: 10, bottom: 28 },
-    didDrawCell: (data) => {
-      recordConsumeColBox(doc, data.column.index, data.cell.x, data.cell.width);
-    },
+    const title = consumeWingBillTitle(titleHead, section.wingLabel, monthLabel);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(title, pageW / 2, y, { align: "center" });
+    const titleW = doc.getTextWidth(title);
+    doc.setLineWidth(0.35);
+    doc.line((pageW - titleW) / 2, y + 1.2, (pageW + titleW) / 2, y + 1.2);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
+    y += 16;
+
+    const head = [
+      "SL",
+      "Personal No",
+      "Rank",
+      "Name",
+      ...tags,
+      "Total",
+      "Fresh money babod taka",
+      "Remarks",
+    ];
+    const body = pageRows.map((r) => [
+      String(r.sl),
+      r.user.personal_id || "—",
+      consumeRankShort(r.user.rank),
+      r.user.name,
+      ...tags.map((code) => (r.tagDays[code] ? String(r.tagDays[code]) : "")),
+      String(r.totalDays),
+      amt(r.amount),
+      r.remarks || "",
+    ]);
+    autoTable(doc, {
+      startY: y,
+      head: [head],
+      body,
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 1,
+        halign: "left",
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: [235, 235, 235],
+        textColor: 20,
+        fontStyle: "bold",
+        halign: "center",
+        valign: "middle",
+      },
+      theme: "grid",
+      margin: { left: 10, right: 10, bottom: 28 },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 0) {
+          data.cell.styles.halign = "center";
+        }
+      },
+      didDrawCell: (data) => {
+        recordConsumeColBox(doc, data.column.index, data.cell.x, data.cell.width);
+      },
+    });
+
+    if (!lastPage) return;
+
+    const afterTable = drawConsumeTotalRow(doc, [
+      { text: "Total", colSpan: 4, align: "left" },
+      ...tags.map((code) => ({
+        text: section.tagTotals[code] ? String(section.tagTotals[code]) : "",
+        align: "left" as const,
+      })),
+      { text: section.totalDays ? String(section.totalDays) : "", align: "left" },
+      { text: amt(section.totalAmount), align: "left" },
+      { text: "" },
+    ]);
+    drawConsumeBillSigns(doc, afterTable + 12, true);
+    });
   });
-
-  const afterTable = drawConsumeTotalRow(doc, [
-    { text: "Total", colSpan: 4, align: "left" },
-    ...tags.map((code) => ({
-      text: tagTotals[code] ? String(tagTotals[code]) : "",
-      align: "left" as const,
-    })),
-    { text: totalDays ? String(totalDays) : "", align: "left" },
-    { text: amt(totalAmount), align: "left" },
-    { text: "" },
-  ]);
-  drawConsumeBillSigns(doc, afterTable + 12);
 
   doc.save(filename ?? `consume-bill-${month}-leave-med.pdf`);
 }

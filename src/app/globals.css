@@ -156,6 +156,26 @@ body {
     box-shadow: none !important;
     break-inside: avoid;
   }
+  .consume-wing-break {
+    break-before: page;
+    page-break-before: always;
+  }
+  .consume-bill-page {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 262mm !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .consume-ledger-page {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 178mm !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
   .tag-bill-print,
   .leave-med-bill-print,
   .wing-food-list-print,
@@ -287,6 +307,21 @@ body {
   text-underline-offset: 3px;
   color: #111111 !important;
 }
+.month-ledger-print .ledger-title,
+.wing-food-list-print .wing-food-title,
+.wing-food-list-print .wing-food-report-title {
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+}
+.wing-food-list-print .wing-food-report-title {
+  margin-top: 2px !important;
+}
+.month-ledger-print .ledger-title + .ledger-title,
+.month-ledger-print .letter-masthead p + p {
+  margin-top: 2px !important;
+}
 
 /* Consume column titles only — heavier than the row text under them. */
 .consume-col-titles th {
@@ -295,11 +330,34 @@ body {
   color: #111111 !important;
   letter-spacing: 0.03em;
 }
+.consume-bill-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 262mm;
+  box-sizing: border-box;
+}
+.consume-bill-page .consume-bill-signs,
+.consume-ledger-page .consume-bill-signs {
+  margin-top: auto;
+}
+.consume-ledger-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 178mm;
+  box-sizing: border-box;
+}
+.month-ledger-print tbody td.consume-sl {
+  text-align: center !important;
+}
 .tag-bill-print tbody td,
 .tag-bill-print tfoot td,
 .leave-med-bill-print tbody td,
 .leave-med-bill-print tfoot td {
   text-align: left !important;
+}
+.tag-bill-print tbody td.consume-sl,
+.leave-med-bill-print tbody td.consume-sl {
+  text-align: center !important;
 }
 .tag-bill-print td.consume-money {
   text-align: right !important;

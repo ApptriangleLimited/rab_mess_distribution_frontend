@@ -21,6 +21,7 @@ import {
   consumeFilterLabel,
   parseConsumeFilter,
 } from "@/lib/consume-filters";
+import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import {
   downloadLeaveMedBillPdf,
@@ -33,6 +34,7 @@ import {
   withReportSource,
 } from "@/lib/reports";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
+import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -111,38 +113,39 @@ export default function ConsumeTagBillPrintClient() {
     });
   }, [leaveBill, q, rank, wing]);
 
-  const filteredDays = useMemo(
-    () => tagRows.reduce((s, r) => s + r.days, 0),
-    [tagRows],
-  );
-  const filteredAmount = useMemo(
-    () => tagRows.reduce((s, r) => s + r.amount, 0),
-    [tagRows],
-  );
-  const filteredFuel = useMemo(
-    () => tagRows.reduce((s, r) => s + r.fuelAmount, 0),
-    [tagRows],
-  );
-  const filteredGrand = useMemo(
-    () => tagRows.reduce((s, r) => s + r.grandTotal, 0),
+  const tagWingBills = useMemo(
+    () =>
+      groupRowsByOfficialWing(tagRows).map((group) => ({
+        ...group,
+        rows: group.rows.map((row, i) => ({ ...row, sl: i + 1 })),
+        totalDays: group.rows.reduce((s, r) => s + r.days, 0),
+        totalAmount: group.rows.reduce((s, r) => s + r.amount, 0),
+        totalFuel: group.rows.reduce((s, r) => s + r.fuelAmount, 0),
+        grandTotal: group.rows.reduce((s, r) => s + r.grandTotal, 0),
+      })),
     [tagRows],
   );
 
-  const leaveDays = useMemo(
-    () => leaveRows.reduce((s, r) => s + r.totalDays, 0),
-    [leaveRows],
+  const leaveWingBills = useMemo(
+    () =>
+      groupRowsByOfficialWing(leaveRows).map((group) => {
+        const tagTotals: Partial<Record<DailyTag, number>> = {};
+        for (const code of filterTags) {
+          tagTotals[code] = group.rows.reduce(
+            (s, r) => s + (r.tagDays[code] ?? 0),
+            0,
+          );
+        }
+        return {
+          ...group,
+          rows: group.rows.map((row, i) => ({ ...row, sl: i + 1 })),
+          tagTotals,
+          totalDays: group.rows.reduce((s, r) => s + r.totalDays, 0),
+          totalAmount: group.rows.reduce((s, r) => s + r.amount, 0),
+        };
+      }),
+    [leaveRows, filterTags],
   );
-  const leaveAmount = useMemo(
-    () => leaveRows.reduce((s, r) => s + r.amount, 0),
-    [leaveRows],
-  );
-  const leaveTagTotals = useMemo(() => {
-    const next: Partial<Record<string, number>> = {};
-    for (const code of filterTags) {
-      next[code] = leaveRows.reduce((s, r) => s + (r.tagDays[code] ?? 0), 0);
-    }
-    return next;
-  }, [leaveRows, filterTags]);
 
   const fuelOnly = filter === "fuel";
   const showFuel = Boolean(
@@ -160,9 +163,16 @@ export default function ConsumeTagBillPrintClient() {
         month,
         tags: filterTags,
         rows: leaveRows,
-        tagTotals: leaveTagTotals,
-        totalDays: leaveDays,
-        totalAmount: leaveAmount,
+        tagTotals: {},
+        totalDays: 0,
+        totalAmount: 0,
+        sections: leaveWingBills.map((group) => ({
+          wingLabel: group.label,
+          rows: group.rows,
+          tagTotals: group.tagTotals,
+          totalDays: group.totalDays,
+          totalAmount: group.totalAmount,
+        })),
         filename: `consume-bill-${month}-${filter}.pdf`,
       });
       return;
@@ -177,11 +187,19 @@ export default function ConsumeTagBillPrintClient() {
       tagLabel: filterLabel,
       rows: tagRows,
       showFuel,
-      totalDays: filteredDays,
-      totalAmount: filteredAmount,
-      totalFuel: filteredFuel,
-      grandTotal: fuelOnly ? filteredFuel : filteredGrand,
+      totalDays: 0,
+      totalAmount: 0,
+      totalFuel: 0,
+      grandTotal: 0,
       fuelOnly,
+      sections: tagWingBills.map((group) => ({
+        wingLabel: group.label,
+        rows: group.rows,
+        totalDays: group.totalDays,
+        totalAmount: group.totalAmount,
+        totalFuel: group.totalFuel,
+        grandTotal: fuelOnly ? group.totalFuel : group.grandTotal,
+      })),
       filename: `consume-bill-${month}-${filter}.pdf`,
     });
   }
@@ -258,32 +276,44 @@ export default function ConsumeTagBillPrintClient() {
       ) : !canAct ? (
         <EmptyState title={t("common.noResults")} />
       ) : filter === "leave-med" && leaveBill ? (
-        <LeaveMedBillPrint
-          ref={printRef}
-          month={month}
-          tags={filterTags}
-          rows={leaveRows}
-          tagTotals={leaveTagTotals}
-          totalDays={leaveDays}
-          totalAmount={leaveAmount}
-          rate={leaveBill.rate}
-          preview
-        />
+        <div ref={printRef} data-print-stack="true" className="flex flex-col gap-8">
+          {leaveWingBills.map((group, index) => (
+            <LeaveMedBillPrint
+              key={group.id}
+              month={month}
+              tags={filterTags}
+              rows={group.rows}
+              tagTotals={group.tagTotals}
+              totalDays={group.totalDays}
+              totalAmount={group.totalAmount}
+              rate={leaveBill.rate}
+              wingLabel={group.label}
+              pageBreak={index > 0}
+              preview
+            />
+          ))}
+        </div>
       ) : tagBill ? (
-        <TagBillPrint
-          ref={printRef}
-          month={month}
-          tag={fuelOnly ? "FR+MFR" : filterLabel}
-          tagLabel={fuelOnly ? "FR+MFR" : filterLabel}
-          rows={tagRows}
-          totalDays={filteredDays}
-          totalAmount={filteredAmount}
-          totalFuel={filteredFuel}
-          grandTotal={fuelOnly ? filteredFuel : filteredGrand}
-          showFuel={showFuel}
-          fuelOnly={fuelOnly}
-          preview
-        />
+        <div ref={printRef} data-print-stack="true" className="flex flex-col gap-8">
+          {tagWingBills.map((group, index) => (
+            <TagBillPrint
+              key={group.id}
+              month={month}
+              tag={fuelOnly ? "FR+MFR" : filterLabel}
+              tagLabel={fuelOnly ? "FR+MFR" : filterLabel}
+              rows={group.rows}
+              totalDays={group.totalDays}
+              totalAmount={group.totalAmount}
+              totalFuel={group.totalFuel}
+              grandTotal={fuelOnly ? group.totalFuel : group.grandTotal}
+              showFuel={showFuel}
+              fuelOnly={fuelOnly}
+              wingLabel={group.label}
+              pageBreak={index > 0}
+              preview
+            />
+          ))}
+        </div>
       ) : (
         <EmptyState title={t("pages.consumeTagBillPrint.subtitleMissing")} />
       )}

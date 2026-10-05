@@ -275,7 +275,7 @@ function letterSheetCss() {
     text-align: right !important;
   }
   .month-ledger-print .letter-masthead {
-    margin-bottom: 24px !important;
+    margin-bottom: 8px !important;
   }
   .tag-bill-print .letter-masthead,
   .leave-med-bill-print .letter-masthead,
@@ -298,6 +298,10 @@ function letterSheetCss() {
   .official-consume-letter .print-page:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
+  }
+  .consume-wing-break {
+    page-break-before: always !important;
+    break-before: page !important;
   }
   .tag-bill-print,
   .leave-med-bill-print,
@@ -325,19 +329,28 @@ function letterSheetCss() {
     white-space: normal !important;
     word-spacing: normal !important;
   }
+  .month-ledger-print .letter-masthead p.ledger-title {
+    margin: 0 !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    line-height: 1.15 !important;
+  }
+  .month-ledger-print .letter-masthead p.ledger-title + p.ledger-title {
+    margin-top: 2px !important;
+  }
   .month-ledger-print .letter-masthead p + p {
-    margin-top: 8px !important;
+    margin-top: 2px !important;
+  }
+  .wing-food-list-print .wing-food-title,
+  .wing-food-list-print .wing-food-report-title {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    line-height: 1.15 !important;
+    color: #111 !important;
+    margin-top: 2px !important;
   }
   .wing-food-list-print .wing-food-title {
-    font-size: 20px !important;
-    font-weight: 700 !important;
-    color: #111 !important;
-  }
-  .wing-food-list-print .wing-food-report-title {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #111 !important;
-    margin-top: 6px !important;
+    margin-top: 0 !important;
   }
   .wing-food-list-print .wing-food-hq {
     font-size: 9px !important;
@@ -460,11 +473,40 @@ function letterSheetCss() {
     text-align: center !important;
     vertical-align: middle !important;
   }
+  .consume-bill-page {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 262mm !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .consume-bill-page .consume-bill-signs,
+  .consume-ledger-page .consume-bill-signs {
+    margin-top: auto !important;
+  }
+  .consume-ledger-page {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 178mm !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .month-ledger-print tbody td.consume-sl {
+    text-align: center !important;
+  }
   .tag-bill-print tbody td,
   .tag-bill-print tfoot td,
   .leave-med-bill-print tbody td,
   .leave-med-bill-print tfoot td {
     text-align: left !important;
+  }
+  .tag-bill-print tbody td.consume-sl,
+  .leave-med-bill-print tbody td.consume-sl {
+    text-align: center !important;
   }
   .tag-bill-print td.consume-money {
     text-align: right !important;

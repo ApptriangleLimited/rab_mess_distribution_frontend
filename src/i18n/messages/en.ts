@@ -704,7 +704,7 @@ export const en = {
       "Remove {name} from the list. Members keep the old name until edited.",
     memberBankDeleted: "Bank deleted",
     ratesHint:
-      "BDT by tag. FR/MS = per day; CLFR = fixed monthly for MS on CL (not FR rate). FUEL = Firewood FR/day. Zero = no payout.",
+      "BDT by tag. FR/MS = per day. FUEL = Firewood FR/day. Zero = no payout.",
     ratesSaved: "Rates saved",
     amountPerDay: "Amount / day",
     amountPerMonth: "Amount / month",
@@ -1445,10 +1445,9 @@ export const en = {
     filterCd: "CD",
     filterLeaveMed: "CL+PL+TRG+WIT+MED+BGH+LNK",
     filterFuel: "fuel (FR+MFR)",
-    leaveMedBillTitle:
-      "Fresh money bill — {month} (CL, PL, Training, Witness, Doctor, BGH and LNK bill)",
-    frBillTitle: "FR bill — {month} (FR and MFR)",
-    cdBillTitle: "CD bill — {month} (CD)",
+    leaveMedBillTitle: "Fresh money bill – {wing} – {month}",
+    frBillTitle: "FR bill – {wing} – {month}",
+    cdBillTitle: "CD bill – {wing} – {month}",
     colFreshMoneyBabod: "ফ্রেশ মানি বাবদ টাকা",
     perUser: "Per member",
     totalDays: "Total days",

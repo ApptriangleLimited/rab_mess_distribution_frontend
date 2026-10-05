@@ -83,10 +83,10 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
-      href: "/consume/requests",
-      labelKey: "nav.requests",
-      icon: IconSend,
-      chip: "amber",
+      href: "/consume/monthly/summary",
+      labelKey: "nav.consumeSummary",
+      icon: IconFileReport,
+      chip: "indigo",
     },
     {
       href: "/consume/monthly",
@@ -95,10 +95,10 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "purple",
     },
     {
-      href: "/consume/monthly/summary",
-      labelKey: "nav.consumeSummary",
-      icon: IconFileReport,
-      chip: "indigo",
+      href: "/consume/requests",
+      labelKey: "nav.requests",
+      icon: IconSend,
+      chip: "amber",
     },
   ],
   ration: [

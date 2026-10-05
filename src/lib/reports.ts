@@ -1,13 +1,13 @@
 import type { AssignmentCell } from "@/lib/api/assignments";
 import { getState } from "@/lib/store";
 import {
+  CL_FR_MONTHLY_AMOUNT,
   CL_FR_MONTHLY_TAG,
   CONSUME_LEDGER_TAGS,
   DAILY_TAGS,
   FR_FUEL_RATE_PER_DAY,
   FUEL_RATE_TAG,
   isRateOnlyTag,
-  RATE_ONLY_TAGS,
   RATION_REPORT_META,
 } from "@/lib/constants";
 import { ensureConsumeRates } from "@/lib/store/rates";
@@ -137,8 +137,7 @@ function getClFrMonthlyAmount(): number {
     (r) => r.tag.toLowerCase() === CL_FR_MONTHLY_TAG.toLowerCase(),
   );
   if (rate) return parseMoney(rate.amount_per_day);
-  const fallback = RATE_ONLY_TAGS.find((t) => t.code === CL_FR_MONTHLY_TAG);
-  return fallback ? parseMoney(fallback.defaultAmount) : 0;
+  return CL_FR_MONTHLY_AMOUNT;
 }
 
 function findPriorTag(userId: string): DailyTag | null {
@@ -1082,7 +1081,7 @@ export function buildRationMonth(month: string) {
   };
 }
 
-export function buildRationReport(month: string): {
+export function buildRationReport(month: string, bankOverride = ""): {
   month: string;
   groups: SenderReportGroup[];
   unmapped: RationLine[];
@@ -1140,7 +1139,11 @@ export function buildRationReport(month: string): {
       (l) =>
         sender.mapped_tags.some(
           (t) => t.toLowerCase() === l.tag.toLowerCase(),
-        ) && sameBankName(l.user.bank_name ?? "", sender.bank_name),
+        ) &&
+        sameBankName(
+          l.user.bank_name ?? "",
+          bankOverride || sender.bank_name,
+        ),
     );
     return {
       sender,
@@ -1160,8 +1163,8 @@ export function buildRationReport(month: string): {
   };
 }
 
-export function buildRationReportClean(month: string) {
-  const raw = buildRationReport(month);
+export function buildRationReportClean(month: string, bankOverride = "") {
+  const raw = buildRationReport(month, bankOverride);
   return {
     ...raw,
     groups: raw.groups.filter((g) => g.lines.length > 0),
@@ -1292,7 +1295,9 @@ export function buildRationStaffLines(
   month: string,
   senderId?: string,
   tag?: DailyTag,
+  memberBank?: string,
 ): RationStaffSheet[] {
+  const chosenBank = memberBank?.trim() ?? "";
   // Tag + bank letter: count days for tag even when rate is 0 / tag not on mapped_tags.
   if (tag && senderId) {
     const { users, senders, rates } = reportState();
@@ -1300,7 +1305,7 @@ export function buildRationStaffLines(
     if (!sender) return [];
 
     const bankOk = (user: User) =>
-      sameBankName(user.bank_name ?? "", sender.bank_name);
+      sameBankName(user.bank_name ?? "", chosenBank || sender.bank_name);
 
     // CL ration letter: MS members get fixed monthly Fresh Ration (CLFR), not FR/day.
     if (tag === "CL") {
@@ -1384,7 +1389,7 @@ export function buildRationStaffLines(
     ]);
   }
 
-  const report = buildRationReportClean(month);
+  const report = buildRationReportClean(month, chosenBank);
   const groups = senderId
     ? report.groups.filter((g) => g.sender.id === senderId)
     : report.groups;
@@ -1494,8 +1499,9 @@ export function buildFrTransferSheet(
   senderId: string,
   reportDate = todayISO(),
   userId?: string,
+  memberBank?: string,
 ): RationTransferSheet | null {
-  const sheets = buildRationStaffLines(month, senderId, "FR");
+  const sheets = buildRationStaffLines(month, senderId, "FR", memberBank);
   if (!sheets.length) return null;
 
   const merged = sheets.flatMap((s) => s.lines);
@@ -1538,8 +1544,15 @@ export function buildFrTransferSheetsByMemberBank(
   month: string,
   senderId: string,
   reportDate = todayISO(),
+  memberBank?: string,
 ): RationTransferSheet[] {
-  const all = buildFrTransferSheet(month, senderId, reportDate);
+  const all = buildFrTransferSheet(
+    month,
+    senderId,
+    reportDate,
+    undefined,
+    memberBank,
+  );
   if (!all) return [];
   const groups = new Map<string, typeof all.lines>();
   for (const line of all.lines) {

@@ -19,7 +19,6 @@ import {
 } from "@/lib/api/settings";
 import { resetToSeed } from "@/lib/store";
 import {
-  CL_FR_MONTHLY_TAG,
   STORE_KEY,
   isRationFamily,
   rolesForPicker,
@@ -283,7 +282,9 @@ function SettingsPageInner() {
     if (apiOn) {
       try {
         await deleteRate(tag);
-        setApiRates((prev) => (prev ?? []).filter((r) => r.tag !== tag));
+        setApiRates((prev) =>
+          (prev ?? []).filter((r) => r.tag.toLowerCase() !== tag.toLowerCase()),
+        );
         setRateDraft((prev) => {
           const next = { ...prev };
           delete next[tag];
@@ -371,9 +372,7 @@ function SettingsPageInner() {
                   {tagLabel(rate.tag, locale)}
                 </p>
                 <p className="text-[11px] text-neutral-400">
-                  {rate.tag.toUpperCase() === CL_FR_MONTHLY_TAG
-                    ? t("settings.amountPerMonth")
-                    : t("settings.amountPerDay")}
+                  {t("settings.amountPerDay")}
                 </p>
               </div>
               <div className="relative w-28 shrink-0">

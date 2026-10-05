@@ -51,17 +51,15 @@ except ImportError:
 router = APIRouter()
 
 SETTINGS_WRITE = ("ration", "admin")
-PROTECTED_RATE_TAGS = {"FR", "MS", "FUEL", "CLFR"}
 DEFAULT_RATES = [
-    ("FR", 220, True, True),
-    ("MS", 180, True, True),
+    ("FR", 220, True, False),
+    ("MS", 180, True, False),
     ("CL", 220, True, False),
     ("CD", 220, True, False),
     ("TRG", 220, True, False),
     ("MED", 220, True, False),
     ("RL", 220, True, False),
-    ("FUEL", 50, False, True),
-    ("CLFR", 2500, False, True),
+    ("FUEL", 50, False, False),
 ]
 DEFAULT_SENDERS = [
     {
@@ -187,6 +185,13 @@ def sender_out(row: Sender) -> dict:
 def seed_catalog() -> None:
     db = SessionLocal()
     try:
+        for row in db.query(Rate).all():
+            if row.is_protected:
+                row.is_protected = False
+        clfr = db.get(Rate, "CLFR")
+        if clfr is not None:
+            db.delete(clfr)
+            db.flush()
         if db.query(Rate).count() == 0:
             for tag, amount, builtin, protected in DEFAULT_RATES:
                 db.add(
@@ -624,13 +629,14 @@ def put_rates(
                 tag=tag,
                 amount_per_day=item.amount_per_day,
                 is_builtin=tag in DUTY_TAGS,
-                is_protected=tag in PROTECTED_RATE_TAGS,
+                is_protected=False,
             )
             db.add(row)
         else:
             row.amount_per_day = item.amount_per_day
+            row.is_protected = False
     for row in db.query(Rate).all():
-        if row.tag not in seen and not row.is_protected:
+        if row.tag not in seen:
             db.delete(row)
     db.commit()
     rows = db.query(Rate).order_by(Rate.tag.asc()).all()
@@ -652,7 +658,7 @@ def create_rate(
         tag=tag,
         amount_per_day=body.amount_per_day,
         is_builtin=tag in DUTY_TAGS,
-        is_protected=tag in PROTECTED_RATE_TAGS,
+        is_protected=False,
     )
     db.add(row)
     db.commit()
@@ -670,8 +676,6 @@ def delete_rate(
     row = db.get(Rate, key)
     if row is None:
         raise HTTPException(status_code=404, detail="Rate not found")
-    if row.is_protected:
-        raise HTTPException(status_code=400, detail="Protected rate")
     db.delete(row)
     db.commit()
     return envelope({"tag": key}, "Rate deleted")

@@ -33,6 +33,26 @@ Store the application value in lowercase. Excel `Permanent`, `Permanant`, and `p
 | `Lab Asst` | Force rank `LA` (shown as Lab Assistant). Not an SRB rank. |
 | `Lcpl`, `LCPL`, `Lnk`, `Nayek`, `SEP`, `Sep`, `MLSS`, `MLSSS`, `AB`, `UDC`, `Lro(G)`, `NC(E)` | Leave the SRB rank empty. Do not guess. |
 
+Force-rank cells use the application’s saved rank, ignoring capital letters. Match the Excel text below to that saved rank:
+
+| Excel force rank | Saved as |
+|---|---|
+| `Lcpl`, `LCPL`, `lcpl`, `LCpl` | `L/Cpl` (Lance Corporal) |
+| `NK`, `Nayek`, `NAYEK SIG`, `Naik Asst` | `Naik` |
+| `Con`, `con` | `Constable` |
+| `SNK`, `Snk`, `snk` | `Sainik` |
+| `sep`, `Sep`, `SEP`, `Sep (Asst)` | `Sepoy` |
+| `Lnk Asst`, `LC/NK`, `LNK`, `Lnk` | `Lance Naik` |
+| `AB(TD-2)` | `AB` (Able Seaman) |
+| `Hav` | `Havildar` |
+| `Inspector (TT)` | `Inspector` |
+| `Lab Asst` | `LA` (Lab Assistant) |
+| `LS(TD-II)` | `L/Std` (Leading Steward) |
+| `MASSINGER` | `Msg` (Messenger) |
+| `N/S` | `Nb Subedar` (Naib Subedar) |
+| `PO(Writer)` | `PO` |
+| `SCPOS` | `SCPO` |
+
 ## Force
 
 Match the application force list ignoring capital letters and spaces.
@@ -59,6 +79,8 @@ Ops file, main wing only, no sub-wing: Central Ops, C.ops, Dog Squad, BDU, MT Se
 Legal Media file, main wing `L & M Wg` only, no Br and no Sub Br: Head Clk, Senior DAD, Paper Cutting, CQ, Media Clk, Legal Cell, MT Sec, Media Center, PA, Admin, Accounts, Archive, Admin Clk, IEC, HRC.
 
 TV Monitoring is in the Legal Media workbook and is saved as `Comm & MIS Wg` (Communication & MIS Wing), with Br and Sub Br empty.
+
+Md Akram Hossain, personal no `9515189186`, is in `10. (15) Admin Wing.xlsx` with sub-branch `HQ Mosque`. Do not save that sub-branch. Save wing `Admin` (Admin & Finance Wing) and branch `HQ Br` only. Sub Br stays empty.
 
 Rows that already use a saved short name stay on that name: `Ops Wg`, `Inv Wg`, `R & D Cell`, `Admin`, and the Admin branches that already match.
 

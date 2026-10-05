@@ -84,6 +84,7 @@ export default function RationReportPreviewClient() {
   const month = parseMonthInput(searchParams.get("month") ?? "");
   const tag = parseTag(searchParams.get("tag"));
   const senderId = searchParams.get("sender") ?? "";
+  const memberBank = searchParams.get("bank") ?? "";
   const isAll = tag === "all";
   const isFr = tag === "FR";
 
@@ -92,16 +93,26 @@ export default function RationReportPreviewClient() {
   const staffSheets = useMemo(() => {
     if (loading || !source || !tag || !senderId || isFr) return [];
     return withReportSource(source, () =>
-      buildRationStaffLines(month, senderId, isAll ? undefined : tag),
+      buildRationStaffLines(
+        month,
+        senderId,
+        isAll ? undefined : tag,
+        memberBank,
+      ),
     );
-  }, [source, loading, month, tag, senderId, isAll, isFr]);
+  }, [source, loading, month, tag, senderId, isAll, isFr, memberBank]);
 
   const frSheets = useMemo(() => {
     if (loading || !source || !isFr || !senderId) return [];
     return withReportSource(source, () =>
-      buildFrTransferSheetsByMemberBank(month, senderId, todayISO()),
+      buildFrTransferSheetsByMemberBank(
+        month,
+        senderId,
+        todayISO(),
+        memberBank,
+      ),
     );
-  }, [source, loading, month, senderId, isFr]);
+  }, [source, loading, month, senderId, isFr, memberBank]);
 
   const sender =
     source?.senders?.find((s) => s.id === senderId) ??

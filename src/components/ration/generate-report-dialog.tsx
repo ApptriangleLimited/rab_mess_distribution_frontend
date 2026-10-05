@@ -19,7 +19,7 @@ import { loadLiveReportSource } from "@/lib/api/report-source";
 import { listSenders } from "@/lib/api/settings";
 import { parseMonthInput } from "@/lib/date";
 import { FUEL_RATE_TAG } from "@/lib/constants";
-import { senderForMemberBank } from "@/lib/store/senders";
+import { senderForMemberBank, sendersForReportTag } from "@/lib/store/senders";
 import type { DailyTag, SenderAccount } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
@@ -58,7 +58,7 @@ export function GenerateReportDialog({
   const [memberBank, setMemberBank] = useState("");
   const [liveSenders, setLiveSenders] = useState<SenderAccount[] | null>(null);
   const previewMonth = parseMonthInput(month || defaultMonth);
-  useReportSource({ month: previewMonth });
+  const { source } = useReportSource({ month: previewMonth });
 
   useEffect(() => {
     if (!open) return;
@@ -83,21 +83,28 @@ export function GenerateReportDialog({
   }, [open]);
 
   const memberBanks = state.member_banks;
-  const senderAccounts = liveSenders ?? state.senders;
+  const senderAccounts =
+    (liveSenders && liveSenders.length > 0 ? liveSenders : null) ??
+    (source?.senders?.length ? source.senders : null) ??
+    state.senders;
   const matchedSender = senderForMemberBank(senderAccounts, tag, memberBank);
-  const canGenerate = Boolean(tag && memberBank && matchedSender);
+  const reportSender =
+    matchedSender ??
+    (memberBank ? (sendersForReportTag(senderAccounts, tag)[0] ?? null) : null);
+  const canGenerate = Boolean(tag && memberBank && reportSender);
 
   function onTagChange(nextTag: DailyTag | "all") {
     setTag(nextTag);
   }
 
   function onGenerate() {
-    if (!tag || !memberBank || !matchedSender) return;
+    if (!tag || !memberBank || !reportSender) return;
     const parsed = parseMonthInput(month);
     const qs = new URLSearchParams({
       month: parsed,
       tag,
-      sender: matchedSender.id,
+      sender: reportSender.id,
+      bank: memberBank,
       back: `${pathname}?month=${parsed}`,
     });
     void loadLiveReportSource({ month: parsed });
@@ -118,6 +125,7 @@ export function GenerateReportDialog({
       panelClassName="max-w-[33.6rem]"
       onCancel={onClose}
       onConfirm={onGenerate}
+      confirmDisabled={!canGenerate}
     >
       <div className="grid gap-3">
         <div className="space-y-1.5">

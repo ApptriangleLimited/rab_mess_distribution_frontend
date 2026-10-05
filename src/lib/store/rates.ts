@@ -1,5 +1,6 @@
 import { getState, setState } from "@/lib/store";
 import {
+  CL_FR_MONTHLY_AMOUNT,
   CL_FR_MONTHLY_TAG,
   DAILY_TAGS,
   FR_FUEL_RATE_PER_DAY,
@@ -101,8 +102,7 @@ export function getClFrMonthlyAmount(): number {
     (r) => r.tag.toLowerCase() === CL_FR_MONTHLY_TAG.toLowerCase(),
   );
   if (rate) return parseMoney(rate.amount_per_day);
-  const fallback = RATE_ONLY_TAGS.find((t) => t.code === CL_FR_MONTHLY_TAG);
-  return fallback ? parseMoney(fallback.defaultAmount) : 0;
+  return CL_FR_MONTHLY_AMOUNT;
 }
 
 export function upsertRate(tag: DailyTag, amount_per_day: number): AllowanceRate {
