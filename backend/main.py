@@ -422,6 +422,12 @@ def on_startup() -> None:
     seed_permissions()
     seed_catalog()
     seed_persist()
+    try:
+        from zk_gate import start_periodic_sync
+
+        start_periodic_sync()
+    except Exception:
+        log_event(logging.WARNING, service="api", event="zk_sync_not_started")
     log_event(
         logging.INFO,
         service="api",

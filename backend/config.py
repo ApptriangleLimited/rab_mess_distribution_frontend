@@ -41,6 +41,11 @@ class Settings:
     storage_access_key: str
     storage_secret_key: str
     max_upload_bytes: int
+    zk_enabled: bool
+    zk_host: str
+    zk_port: int
+    zk_timeout: int
+    zk_password: int
 
     def __init__(self) -> None:
         self.app_env = os.getenv("APP_ENV", "development").strip().lower()
@@ -89,6 +94,14 @@ class Settings:
         self.storage_access_key = os.getenv("STORAGE_ACCESS_KEY", "")
         self.storage_secret_key = os.getenv("STORAGE_SECRET_KEY", "")
         self.max_upload_bytes = int(os.getenv("MAX_UPLOAD_BYTES", str(32 * 1024 * 1024)))
+        self.zk_enabled = _flag("ZK_ENABLED", "true")
+        self.zk_host = os.getenv("ZK_HOST", "103.86.200.55").strip()
+        self.zk_port = int(os.getenv("ZK_PORT", "4370") or "4370")
+        self.zk_timeout = int(os.getenv("ZK_TIMEOUT", "10") or "10")
+        try:
+            self.zk_password = int(os.getenv("ZK_PASSWORD", "0") or "0")
+        except ValueError:
+            self.zk_password = 0
 
     @property
     def is_production(self) -> bool:

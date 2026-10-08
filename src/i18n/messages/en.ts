@@ -208,6 +208,7 @@ export const en = {
     reportRequests: "Report request",
     adminTabs: "Admin sections",
     adminUsers: "Users",
+    zkGate: "Device",
     settings: "Settings",
   },
   login: {
@@ -1692,6 +1693,24 @@ export const en = {
     updatedAt: "Updated",
     statAll: "All",
     dutyToday: "Duty today",
+  },
+  zkGate: {
+    title: "Device check-in",
+    subtitle:
+      "The screen turns green when today's status is MS, and red when it is not.",
+    name: "Name",
+    srbId: "SRB ID",
+    time: "Time",
+    result: "Result",
+    positive: "Positive",
+    allowed: "Allowed",
+    notAllowed: "Not allowed",
+    empty: "Waiting for a check-in.",
+    deviceUp: "Device connected",
+    deviceDown: "Device not reachable",
+    syncing: "Sending today's MS members to the device…",
+    enrolled: "{count} members with status MS can check in",
+    refresh: "Refresh",
   },
 } as const;
 

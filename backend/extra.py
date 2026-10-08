@@ -22,6 +22,7 @@ from persist import CATALOG_KEYS
 from schemas import DUTY_TAGS, MemberIn
 from storage import StorageError, checksum, put_bytes, sniff_mime
 from config import settings
+from zk_gate import gate_snapshot, refresh_gate, start_sync
 
 try:
     from auth import normalize_staff_login_id, staff_login_id_from_body
@@ -1020,3 +1021,19 @@ def zk_attendance(_staff: Staff = Depends(current_staff)):
     return envelope(
         {"items": [], "total": 0, "limit": None, "from": None, "to": None}
     )
+
+
+@router.get("/api/v1/zk/gate")
+def zk_gate_list(
+    _staff: Staff = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    return envelope(refresh_gate(db))
+
+
+@router.post("/api/v1/zk/sync")
+def zk_gate_sync(_staff: Staff = Depends(require_roles("admin"))):
+    started = start_sync(SessionLocal)
+    payload = gate_snapshot()
+    payload["started"] = started
+    return envelope(payload)

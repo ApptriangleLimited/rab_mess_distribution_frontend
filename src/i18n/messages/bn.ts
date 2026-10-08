@@ -209,6 +209,7 @@ export const bn = {
     reportRequests: "রিপোর্ট রিকোয়েস্ট",
     adminTabs: "অ্যাডমিন সেকশন",
     adminUsers: "ইউজার",
+    zkGate: "ডিভাইস",
     settings: "সেটিংস",
   },
   login: {
@@ -1695,5 +1696,23 @@ export const bn = {
     updatedAt: "আপডেট",
     statAll: "সব",
     dutyToday: "আজকের ডিউটি",
+  },
+  zkGate: {
+    title: "ডিভাইস চেক-ইন",
+    subtitle:
+      "আজকের স্ট্যাটাস এমএস হলে স্ক্রিন সবুজ হয়, না হলে লাল হয়।",
+    name: "নাম",
+    srbId: "এসআরবি আইডি",
+    time: "সময়",
+    result: "ফলাফল",
+    positive: "পজিটিভ",
+    allowed: "অনুমোদিত",
+    notAllowed: "অনুমতি নেই",
+    empty: "চেক-ইনের অপেক্ষায়।",
+    deviceUp: "ডিভাইস সংযুক্ত",
+    deviceDown: "ডিভাইসে পৌঁছানো যায়নি",
+    syncing: "আজকের এমএস সদস্য ডিভাইসে পাঠানো হচ্ছে…",
+    enrolled: "স্ট্যাটাস এমএস আছে এমন {count} জন চেক-ইন করতে পারবেন",
+    refresh: "রিফ্রেশ",
   },
 };
