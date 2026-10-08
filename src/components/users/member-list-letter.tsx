@@ -1,12 +1,13 @@
 "use client";
 
 import { forwardRef } from "react";
-import { CONSUME_REPORT_META, wingDisplayLabel } from "@/lib/constants";
+import { CONSUME_REPORT_META, wingOfficialName } from "@/lib/constants";
 import { formatDateDisplay, todayISO } from "@/lib/date";
 import {
   memberListFilterChips,
   memberTypeMessageKey,
 } from "@/lib/member-list-report";
+import { formatMemberWing } from "@/lib/store/org-options";
 import type { UserFilters } from "@/lib/store/users";
 import type { User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
@@ -26,7 +27,7 @@ export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
     const useBn = locale === "bn";
     const printedOn = formatDateDisplay(todayISO());
     const wingLabel = (wing: string) =>
-      wing ? wingDisplayLabel(wing, wingLabels) : "—";
+      wing ? wingOfficialName(wing, wingLabels) : "—";
 
     const chips = memberListFilterChips(filters, t, wingLabel);
 
@@ -72,6 +73,9 @@ export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
                 {t("cc.fields.name")}
               </th>
               <th className="border border-neutral-800 px-1.5 py-1 text-left">
+                {t("cc.fields.wing")}
+              </th>
+              <th className="border border-neutral-800 px-1.5 py-1 text-left">
                 {t("cc.fields.memberType")}
               </th>
               <th className="border border-neutral-800 px-1.5 py-1 text-left">
@@ -99,6 +103,9 @@ export const MemberListLetter = forwardRef<HTMLDivElement, Props>(
                 </td>
                 <td className="border border-neutral-800 px-1.5 py-1 font-medium">
                   {user.name}
+                </td>
+                <td className="border border-neutral-800 px-1.5 py-1">
+                  {formatMemberWing(user.wing) || "—"}
                 </td>
                 <td className="border border-neutral-800 px-1.5 py-1">
                   {t(memberTypeMessageKey(user.member_type))}

@@ -19,6 +19,12 @@ import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
+import { useStore } from "@/hooks/use-store";
+import {
+  isAdminRootName,
+  listWingChildrenFrom,
+  memberWingCascade,
+} from "@/lib/store/org-options";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +75,18 @@ export function UserFiltersBar({
   onChange,
 }: Props) {
   const t = useT();
+  const state = useStore();
+  const selectedWing = value.wing && value.wing !== "all" ? value.wing : "";
+  const cascade = memberWingCascade(selectedWing);
+  const mainWing = selectedWing ? cascade.main || selectedWing : "all";
+  const adminOpen = isAdminRootName(mainWing);
+  const subWing = adminOpen ? cascade.sub : "";
+  const branchParent =
+    subWing &&
+    listWingChildrenFrom(state.wings, state.wing_parent, subWing).length > 0
+      ? subWing
+      : "";
+  const branch = branchParent ? cascade.leaf : "";
 
   function patch(partial: Partial<UserFilters>) {
     onChange({ ...value, ...partial });
@@ -151,11 +169,37 @@ export function UserFiltersBar({
           </Select>
         </div>
         <SettingsWingFilter
-          value={value.wing ?? "all"}
+          value={mainWing}
           onChange={(v) => patch({ wing: v })}
+          rootsOnly
+          namesOnly
           className="min-w-0 flex-1"
           triggerClassName={fieldClass}
         />
+        {adminOpen ? (
+          <SettingsWingFilter
+            value={subWing || "all"}
+            onChange={(v) => patch({ wing: v === "all" ? "Admin" : v })}
+            parent="Admin"
+            namesOnly
+            placeholder={t("common.allSubWing")}
+            clearLabel={t("common.allSubWing")}
+            className="min-w-0 flex-1"
+            triggerClassName={fieldClass}
+          />
+        ) : null}
+        {branchParent ? (
+          <SettingsWingFilter
+            value={branch || "all"}
+            onChange={(v) => patch({ wing: v === "all" ? branchParent : v })}
+            parent={branchParent}
+            namesOnly
+            placeholder={t("common.allBranch")}
+            clearLabel={t("common.allBranch")}
+            className="min-w-0 flex-1"
+            triggerClassName={fieldClass}
+          />
+        ) : null}
         <SettingsRankFilter
           value={value.rank ?? "all"}
           onChange={(v) => patch({ rank: v })}

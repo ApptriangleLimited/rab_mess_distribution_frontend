@@ -11,7 +11,7 @@ API_PORT="8000"
 # Host ports owned by other apps — never publish these.
 FORBIDDEN_PORTS="80 443 8888 3000 4000 5000 7000"
 
-if [ ! -f "$REMOTE_TMP/package.json" ] && [ -f /tmp/rab-mess-frontend.tgz ]; then
+if [ -f /tmp/rab-mess-frontend.tgz ]; then
   echo "Extracting /tmp/rab-mess-frontend.tgz -> $REMOTE_TMP"
   rm -rf "$REMOTE_TMP"
   mkdir -p "$REMOTE_TMP"

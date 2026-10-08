@@ -8,6 +8,7 @@ import {
   rankLabelBn,
   rankOfficialName,
   wingDisplayLabel,
+  wingOfficialName,
 } from "@/lib/constants";
 import {
   listOfficialWings,
@@ -25,6 +26,12 @@ type CatalogFilterProps = {
   triggerClassName?: string;
   /** Main wings only. Sub-wings and nested units stay off the list. */
   rootsOnly?: boolean;
+  /** Show the official wing name, without the short code or branch label. */
+  namesOnly?: boolean;
+  /** Children of this wing, instead of the main-wing list. */
+  parent?: string;
+  placeholder?: string;
+  clearLabel?: string;
 };
 
 function settingsRankLabel(
@@ -86,12 +93,22 @@ export function SettingsWingFilter({
   className,
   triggerClassName,
   rootsOnly = false,
+  namesOnly = false,
+  parent,
+  placeholder,
+  clearLabel,
 }: CatalogFilterProps) {
   const t = useT();
   const state = useStore();
   const wings = useMemo(
-    () => (rootsOnly ? listWingChildren(null) : listOfficialWings()),
+    () =>
+      parent
+        ? listWingChildren(parent)
+        : rootsOnly
+          ? listWingChildren(null)
+          : listOfficialWings(),
     [
+      parent,
       rootsOnly,
       state.wings,
       state.wing_parent,
@@ -106,12 +123,16 @@ export function SettingsWingFilter({
         options={wings}
         value={value === ALL ? "" : value}
         onChange={(next) => onChange(next || ALL)}
-        placeholder={t("common.allWing")}
-        clearLabel={t("common.allWing")}
-        getOptionLabel={(wing) => wingDisplayLabel(wing, state.wing_labels)}
+        placeholder={placeholder ?? t("common.allWing")}
+        clearLabel={clearLabel ?? t("common.allWing")}
+        getOptionLabel={(wing) =>
+          namesOnly
+            ? wingOfficialName(wing, state.wing_labels)
+            : wingDisplayLabel(wing, state.wing_labels)
+        }
         triggerClassName={triggerClassName}
         contentClassName="w-auto min-w-[18rem]"
-        ariaLabel={t("cc.fields.wing")}
+        ariaLabel={placeholder ?? t("cc.fields.wing")}
       />
     </div>
   );

@@ -14,7 +14,9 @@ class DummyStaff:
 
 
 def test_password_policy_rejects_short_and_common():
-    assert validate_password("short") 
+    assert validate_password("short")
+    assert validate_password("Ab1cde") is None
+    assert validate_password("abcdef")
     assert validate_password("password123")
     assert validate_password("ccadminpass", "cc@mess.rab")
     assert validate_password("CorrectHorse9") is None

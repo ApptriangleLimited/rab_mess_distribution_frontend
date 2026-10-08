@@ -5,6 +5,7 @@ import {
   isAdminRootName,
   isHqBranchName,
   listMemberBanks,
+  memberMatchesWingFilter,
 } from "@/lib/store/org-options";
 import { getState, setState } from "@/lib/store";
 import { applyStatusToSpans, isMfrLocked, isUserInactiveOnDate, FR_TAG, MFR_TAG } from "@/lib/store/daily";
@@ -427,7 +428,11 @@ export function filterUsers(users: User[], filters: UserFilters) {
       ) {
         return false;
       }
-      if (filters.wing && filters.wing !== "all" && u.wing !== filters.wing) {
+      if (
+        filters.wing &&
+        filters.wing !== "all" &&
+        !memberMatchesWingFilter(u.wing, filters.wing)
+      ) {
         return false;
       }
       if (filters.rank && filters.rank !== "all" && u.rank !== filters.rank) {

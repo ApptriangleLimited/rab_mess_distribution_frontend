@@ -6,6 +6,28 @@ export function todayISO() {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Temporary Daily RR window. Days in this range can be edited even though
+ * they are before today. Clear both strings to lock them again.
+ */
+export const DAILY_RR_OPEN_FROM = "2026-10-01";
+export const DAILY_RR_OPEN_TO = "2026-10-06";
+
+export function isDailyDateEditable(date: string, today = todayISO()): boolean {
+  if (date >= today) return true;
+  return (
+    Boolean(DAILY_RR_OPEN_FROM) &&
+    Boolean(DAILY_RR_OPEN_TO) &&
+    date >= DAILY_RR_OPEN_FROM &&
+    date <= DAILY_RR_OPEN_TO
+  );
+}
+
+export function dailyEditMinDate(today = todayISO()): string {
+  if (!DAILY_RR_OPEN_FROM || DAILY_RR_OPEN_FROM >= today) return today;
+  return DAILY_RR_OPEN_FROM;
+}
+
 export function nowISO() {
   return new Date().toISOString();
 }

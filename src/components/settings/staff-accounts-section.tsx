@@ -11,6 +11,8 @@ import {
 } from "@tabler/icons-react";
 import { CollapsibleSection } from "@/components/shared/collapsible-section";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { StaffPasswordPolicy } from "@/components/settings/staff-password-policy";
+import { staffPasswordReady } from "@/lib/staff-password";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -255,6 +257,10 @@ export function StaffAccountsSection({
       toast(t("profile.passwordMismatch"), "error");
       return;
     }
+    if (form.password && !staffPasswordReady(form.password)) {
+      toast(t("settings.staffPasswordWeak"), "error");
+      return;
+    }
     setBusy(true);
     try {
       if (editing) {
@@ -350,6 +356,10 @@ export function StaffAccountsSection({
     }
     if (newPassword !== confirmNewPassword) {
       toast(t("profile.passwordMismatch"), "error");
+      return;
+    }
+    if (!staffPasswordReady(newPassword)) {
+      toast(t("settings.staffPasswordWeak"), "error");
       return;
     }
     setBusy(true);
@@ -632,9 +642,11 @@ export function StaffAccountsSection({
                 )}
               </button>
             </div>
-            <p className="text-xs text-neutral-500">
-              {editing ? t("profile.passwordHint") : t("settings.staffPasswordHint")}
-            </p>
+            {editing && !form.password ? (
+              <p className="text-xs text-neutral-500">{t("profile.passwordHint")}</p>
+            ) : (
+              <StaffPasswordPolicy password={form.password} />
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="staff-password-confirm">{t("profile.confirmPassword")}</Label>
@@ -761,7 +773,7 @@ export function StaffAccountsSection({
                 )}
               </button>
             </div>
-            <p className="text-xs text-neutral-500">{t("settings.staffPasswordHint")}</p>
+            <StaffPasswordPolicy password={newPassword} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="staff-new-password-confirm">

@@ -58,7 +58,7 @@ const DEFAULT_EQUIV: Record<string, Record<string, string[]>> = {
   Army: {
     DAD: ["SWO", "WO"],
     RT: [],
-    SI: ["Sgt", "Cpl"],
+    SI: ["SI", "Sgt", "Cpl"],
     ASI: ["L/Cpl"],
     Naik: [],
     Constable: ["Sainik"],
@@ -67,10 +67,10 @@ const DEFAULT_EQUIV: Record<string, Record<string, string[]>> = {
     Civil: ["Msg", "MW", "Msl", "Mali", "LA", "WB", "Civ"],
   },
   Navy: {
-    DAD: ["SCPO", "CPO"],
+    DAD: ["SCPO", "CPO", "CEA"],
     RT: [],
-    SI: ["PO", "LS/MA"],
-    ASI: ["AB/MA-1"],
+    SI: ["PO", "LS/MA", "REA-IV", "LEN", "LREN", "LRO(G)", "LSA", "LNP/LPM"],
+    ASI: ["AB/MA-1", "SA-I"],
     Naik: [],
     Constable: ["OD"],
     Cook: ["LCK/CK"],
@@ -141,7 +141,7 @@ const DEFAULT_EQUIV: Record<string, Record<string, string[]>> = {
     Constable: [],
     Cook: [],
     NCE: [],
-    Civil: [],
+    Civil: ["Office Assistant", "UDC"],
   },
 };
 
@@ -156,6 +156,8 @@ const PAPER_CELL_BN: Record<string, string> = {
   sainik: "সৈনিক",
   ck: "কুক",
   nce: "এনসিই",
+  "office assistant": "অফিস সহকারী",
+  udc: "ইউডিসি",
   scpo: "এসসিপিও",
   cpo: "সিপিও",
   po: "পিও",

@@ -1,5 +1,6 @@
 import type { MessageKey } from "@/i18n";
 import { formatDateDisplay } from "@/lib/date";
+import { formatMemberWing } from "@/lib/store/org-options";
 import type { UserFilters } from "@/lib/store/users";
 import type { MemberType, User } from "@/lib/types";
 
@@ -81,6 +82,7 @@ export function memberListTableHeaders(t: Translate): string[] {
     t("cc.fields.rabId"),
     t("cc.fields.rank"),
     t("cc.fields.name"),
+    t("cc.fields.wing"),
     t("cc.fields.memberType"),
     t("cc.fields.phone"),
     t("cc.fields.bloodGroup"),
@@ -94,6 +96,7 @@ export function memberListTableRows(users: User[], t: Translate): string[][] {
     user.rab_id || "—",
     user.rank || "—",
     user.name,
+    formatMemberWing(user.wing) || "—",
     t(memberTypeMessageKey(user.member_type)),
     user.phone || "—",
     user.blood_group || "—",

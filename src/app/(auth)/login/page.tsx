@@ -19,6 +19,8 @@ import { useI18n, useT } from "@/i18n/provider";
 import { roleLabel } from "@/i18n";
 import { ApiClientError } from "@/lib/api/client";
 import { changePasswordAtLogin, loginStaff } from "@/lib/api/auth";
+import { StaffPasswordPolicy } from "@/components/settings/staff-password-policy";
+import { staffPasswordReady } from "@/lib/staff-password";
 import { isApiEnabled, isCcApiEnabled } from "@/lib/api/mode";
 import type { Role } from "@/lib/types";
 
@@ -215,6 +217,10 @@ export default function LoginPage() {
     }
     if (newPassword === currentPassword) {
       toast(t("login.passwordSame"), "error");
+      return;
+    }
+    if (!staffPasswordReady(newPassword)) {
+      toast(t("settings.staffPasswordWeak"), "error");
       return;
     }
     if (!apiOn) {
@@ -439,7 +445,7 @@ export default function LoginPage() {
                   showLabel={t("login.showPassword")}
                   hideLabel={t("login.hidePassword")}
                 />
-                <p className="text-xs text-neutral-400">{t("settings.staffPasswordHint")}</p>
+                <StaffPasswordPolicy password={newPassword} />
               </>
             ) : (
               <PasswordField

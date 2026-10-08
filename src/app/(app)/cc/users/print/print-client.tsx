@@ -19,7 +19,7 @@ import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import { listMembers, memberToUser } from "@/lib/api/members";
-import { CONSUME_REPORT_META, wingDisplayLabel } from "@/lib/constants";
+import { CONSUME_REPORT_META, wingOfficialName } from "@/lib/constants";
 import { formatDateDisplay, todayISO } from "@/lib/date";
 import {
   downloadMemberListExcel,
@@ -68,21 +68,34 @@ export default function CcUsersPrintClient({
     }
     let cancelled = false;
     setLoading(true);
-    listMembers({
+    const query = {
       q: filters.q || undefined,
       status: filters.status,
       approval: filters.approval,
       member_type: filters.member_type,
       wing: filters.wing,
+      wing_family: filters.wing && filters.wing !== "all" ? "1" : undefined,
       rank: filters.rank,
       date_from: filters.date_from || undefined,
       date_to: filters.date_to || undefined,
-      page: 1,
       page_size: 500,
-    })
-      .then((data) => {
+    };
+    listMembers({ ...query, page: 1 })
+      .then(async (first) => {
         if (cancelled) return;
-        setApiUsers(data.items.map(memberToUser));
+        const items = [...(first.items ?? [])];
+        const total = first.total ?? items.length;
+        const pages = Math.min(20, Math.ceil(total / 500) || 1);
+        if (pages > 1) {
+          const rest = await Promise.all(
+            Array.from({ length: pages - 1 }, (_, i) =>
+              listMembers({ ...query, page: i + 2 }),
+            ),
+          );
+          if (cancelled) return;
+          for (const data of rest) items.push(...(data.items ?? []));
+        }
+        setApiUsers(items.map(memberToUser));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -111,7 +124,7 @@ export default function CcUsersPrintClient({
   function reportPayload() {
     const useBn = locale === "bn";
     const wingLabel = (wing: string) =>
-      wing ? wingDisplayLabel(wing, state.wing_labels) : "—";
+      wing ? wingOfficialName(wing, state.wing_labels) : "—";
     return {
       org: useBn ? CONSUME_REPORT_META.orgNameBn : CONSUME_REPORT_META.orgName,
       station: useBn

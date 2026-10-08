@@ -40,6 +40,7 @@ Force-rank cells use the application’s saved rank, ignoring capital letters. M
 | `Lcpl`, `LCPL`, `lcpl`, `LCpl` | `L/Cpl` (Lance Corporal) |
 | `NK`, `Nayek`, `NAYEK SIG`, `Naik Asst` | `Naik` |
 | `Con`, `con` | `Constable` |
+| `SNK`, `Snk`, `snk` on Police | `Constable` |
 | `SNK`, `Snk`, `snk` | `Sainik` |
 | `sep`, `Sep`, `SEP`, `Sep (Asst)` | `Sepoy` |
 | `Lnk Asst`, `LC/NK`, `LNK`, `Lnk` | `Lance Naik` |
@@ -49,9 +50,25 @@ Force-rank cells use the application’s saved rank, ignoring capital letters. M
 | `Lab Asst` | `LA` (Lab Assistant) |
 | `LS(TD-II)` | `L/Std` (Leading Steward) |
 | `MASSINGER` | `Msg` (Messenger) |
-| `N/S` | `Nb Subedar` (Naib Subedar) |
+| `N/S` on BGB | `Nb Sub` (Naib Subedar) |
 | `PO(Writer)` | `PO` |
 | `SCPOS` | `SCPO` |
+| `NCE`, `NC(E)`, `nce` on Army or BGB | `NCE` |
+| `Sub-Inspector` on Police | `SI` |
+| `SI` on Army | `SI` (Sub-Inspector) |
+| `Cook` on BGB | `CK` |
+| `ASI` on Army | `L/Cpl` (Lance Corporal) |
+| `UDC` on Civilian | `UDC` |
+| `Office Assistant` on Civilian | `Office Assistant` |
+| `CEA` on Navy | `CEA`. Army সমমান `SWO`. SRB rank `DAD` |
+| `REA-IV`, `REA-Y` on Navy | `REA-IV`. Army সমমান `Sgt`. SRB rank `SI` |
+| `LEN`, `LREN`, `LSA` on Navy | same text. Army সমমান `Cpl`. SRB rank `SI` |
+| `LRO(G)`, `LRO (G)`, `LROGC` on Navy | `LRO(G)`. Army সমমান `Cpl`. SRB rank `SI` |
+| `LNP`, `LPM`, `LNP/LPM` on Navy | `LNP/LPM`. Army সমমান `Cpl`. SRB rank `SI` |
+| `SA-I` on Navy | `SA-I`. Army সমমান `L/Cpl`. SRB rank `ASI` |
+| `LME` on Navy | `LME` |
+| `NP-1` on Navy | `PM-1` |
+| `MLSSS` on Civilian | `Office Assistant` |
 
 ## Force
 
@@ -104,10 +121,6 @@ Ignore capital letters when matching a bank already stored in the database.
 - `Community Bank` matches `Community bank`.
 - Same idea for Sonali Bank.
 
-Do not add these banks to the database. Wait for the next instruction before deciding what to store on those member rows: Shimanto Bank Plc., Dutch Bangla Bank, Agrani (`Agroni Bank` on Md Arafat Mia personal `90258` and Mamun Mia personal `92163`), and UCB / UCB BANK (United Commercial Bank).
+Leave the bank section empty for the 20 members in `srb_member_data/Bank details still to update.xlsx`, and also for personal no `85026` (Md Sujon Biswas) and `69268` (Md Shahidul Islam). Empty means bank name, account name, account number, routing, branch district, and branch location. Do not add Shimanto, DBBL, Dutch Bangla, UCB, Janata, CBBL, Bangladesh Krisi Bank, or Basic Bank for this import.
 
-Still waiting on the same instruction for these close spellings, which are not in the hold list above:
-
-- `Community` with no word “bank” — 47 people
-- `Trust Bank Ltd` — 3 people
-- `Sonali Bank ltd` — 1 person
+A CC user fills those fields later on the member edit screen. For a permanent member the form does not save until that bank section is filled. The bank dropdown lists only banks already saved in the app: Trust bank, Community bank, and Sonali Bank.

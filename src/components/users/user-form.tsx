@@ -41,7 +41,7 @@ import {
   rankDisplayLabel,
   rankLabelBn,
   rankOfficialName,
-  wingDisplayLabel,
+  wingOfficialName,
 } from "@/lib/constants";
 import { SearchableSelect } from "@/components/shared/searchable-select";
 import type { DailyTag, DocumentMeta, MemberType, User } from "@/lib/types";
@@ -272,7 +272,7 @@ export function UserForm({
             wing: isAdminRootName(v) ? "Admin" : v,
           }))
         }
-        getOptionLabel={(wing) => wingDisplayLabel(wing, wing_labels)}
+        getOptionLabel={(wing) => wingOfficialName(wing, wing_labels)}
         placeholder={t("cc.selectWing")}
         triggerClassName={selectTriggerClass}
       />

@@ -40,7 +40,13 @@ from cache import (
     revoke_token,
     worker_up,
 )
-from daily import can_assign, each_date, router as daily_router, upsert_assignment
+from daily import (
+    can_assign,
+    daily_day_writable,
+    each_date,
+    router as daily_router,
+    upsert_assignment,
+)
 from extra import router as extra_router, seed_catalog
 from persist import router as persist_router, seed_persist
 from account import router as account_router
@@ -553,6 +559,7 @@ def list_members(
     status: str | None = None,
     approval: str | None = None,
     wing: str | None = None,
+    wing_family: str | None = None,
     rank: str | None = None,
     member_type: str | None = None,
     date_from: date | None = None,
@@ -580,7 +587,10 @@ def list_members(
     if approval and approval != "all":
         query = query.filter(Member.approval_status == normalize_approval(approval, approval))
     if wing and wing != "all":
-        query = query.filter(Member.wing == wing)
+        if str(wing_family or "").lower() in {"1", "true", "yes"}:
+            query = query.filter(Member.wing.in_(wing_family_names(db, wing)))
+        else:
+            query = query.filter(Member.wing == wing)
     if rank and rank != "all":
         query = query.filter(Member.rank == rank)
     if member_type and member_type != "all":
@@ -600,6 +610,7 @@ def list_members(
         status=status,
         approval=approval,
         wing=wing,
+        wing_family=wing_family,
         rank=rank,
         member_type=member_type,
         date_from=str(date_from) if date_from else None,
@@ -1114,12 +1125,9 @@ def accept_tag_request(
     end = row.to_date or start
     if end < start:
         start, end = end, start
-    today = date.today()
-    if start < today:
-        start = today
     wrote = 0
     for day in each_date(start, end):
-        if day < today:
+        if not daily_day_writable(day):
             continue
         if not can_assign(row.member, day):
             continue

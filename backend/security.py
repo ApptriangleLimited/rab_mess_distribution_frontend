@@ -44,8 +44,8 @@ def new_id(prefix: str) -> str:
 
 
 def validate_password(password: str, email: str = "") -> str | None:
-    if len(password) < 10:
-        return "Password must be at least 10 characters"
+    if len(password) < 6:
+        return "Password must be at least 6 characters"
     if password.lower() in COMMON_PASSWORDS:
         return "Password is too common"
     if email:

@@ -12,7 +12,18 @@ from models import Assignment, BoroKhanaDay, DayLock, Member, Staff, SuppressedC
 from schemas import normalize_tag
 
 DAILY_WRITE = ("daily", "admin")
+# Temporary. Daily RR may edit these past days. Set both to None to lock them again.
+DAILY_RR_OPEN_FROM = date(2026, 10, 1)
+DAILY_RR_OPEN_TO = date(2026, 10, 6)
 router = APIRouter()
+
+
+def daily_day_writable(day: date) -> bool:
+    if day >= date.today():
+        return True
+    if DAILY_RR_OPEN_FROM is None or DAILY_RR_OPEN_TO is None:
+        return False
+    return DAILY_RR_OPEN_FROM <= day <= DAILY_RR_OPEN_TO
 
 
 def utcnow() -> datetime:
@@ -530,7 +541,7 @@ def put_assignment(
         tag = normalize_tag(body.tag)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if day < date.today():
+    if not daily_day_writable(day):
         raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if not can_write_tag(member, day, tag):
         raise HTTPException(status_code=409, detail="Cannot assign tag on this date")
@@ -567,7 +578,7 @@ def delete_assignment(
     if member is None:
         raise HTTPException(status_code=404, detail="User not found")
     target = parse_day(day)
-    if target < date.today():
+    if not daily_day_writable(target):
         raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if is_mfr_locked(member):
         raise HTTPException(status_code=409, detail="Cannot clear an MFR-locked member")
@@ -614,11 +625,10 @@ def put_assignment_range(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     items = []
     updated = 0
-    today = date.today()
     write_days = []
     for raw in body.dates:
         day = parse_day(raw)
-        if day < today:
+        if not daily_day_writable(day):
             continue
         write_days.append(day)
     for day in write_days:

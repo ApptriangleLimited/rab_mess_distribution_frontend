@@ -36,7 +36,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { FormattedDateInput } from "@/components/shared/date-picker";
-import { dateInMonth, eachISODate, formatDateDisplay, formatDateLong } from "@/lib/date";
+import {
+  dailyEditMinDate,
+  dateInMonth,
+  eachISODate,
+  formatDateDisplay,
+  formatDateLong,
+  isDailyDateEditable,
+} from "@/lib/date";
 import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
@@ -300,7 +307,7 @@ export function RegisterBoard({
           ? stroke.endDate
           : stroke.startDate;
       const dates = eachISODate(lo, hi).filter(
-        (date) => date >= todayISO && canAssignOnDate(user, date),
+        (date) => isDailyDateEditable(date, todayISO) && canAssignOnDate(user, date),
       );
       if (dates.length === 0) {
         setDrag(null);
@@ -308,7 +315,8 @@ export function RegisterBoard({
       }
 
       const selected =
-        stroke.startDate >= todayISO && canAssignOnDate(user, stroke.startDate)
+        isDailyDateEditable(stroke.startDate, todayISO) &&
+        canAssignOnDate(user, stroke.startDate)
           ? stroke.startDate
           : dates[0];
       const menuDate = dates.includes(stroke.endDate)
@@ -386,7 +394,7 @@ export function RegisterBoard({
       const userId = cell.dataset.regUser;
       const date = cell.dataset.regDate;
       if (!userId || !date || userId !== stroke.userId) return;
-      if (date < todayISO) return;
+      if (!isDailyDateEditable(date, todayISO)) return;
       if (stroke.endDate === date) return;
       const next = { ...stroke, endDate: date };
       dragRef.current = next;
@@ -418,7 +426,7 @@ export function RegisterBoard({
 
   function startDrag(userId: string, date: string) {
     if (rangeMenu) return;
-    if (date < todayISO) return;
+    if (!isDailyDateEditable(date, todayISO)) return;
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
     const stroke: DragStroke = {
@@ -510,7 +518,9 @@ export function RegisterBoard({
     const from = rangeMenu.fromDate || rangeMenu.anchorDate;
     const to = rangeMenu.toDate || from;
     const dates = eachISODate(from, to).filter(
-      (date) => date >= todayISO && (!user || canAssignOnDate(user, date)),
+      (date) =>
+        isDailyDateEditable(date, todayISO) &&
+        (!user || canAssignOnDate(user, date)),
     );
     if (dates.length === 0) return;
     if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
@@ -553,7 +563,9 @@ export function RegisterBoard({
   ) {
     const user = users.find((u) => u.id === userId);
     const dates = eachISODate(fromDate, toDate).filter(
-      (date) => date >= todayISO && (!user || canAssignOnDate(user, date)),
+      (date) =>
+        isDailyDateEditable(date, todayISO) &&
+        (!user || canAssignOnDate(user, date)),
     );
     if (dates.length === 0) return;
     if (dates.length === 1) {
@@ -695,7 +707,7 @@ export function RegisterBoard({
                 </th>
                 {columnDates.map((date, i) => {
                   const isToday = date === todayISO;
-                  const past = date < todayISO;
+                  const past = !isDailyDateEditable(date, todayISO);
                   const isBk = bkDates.has(date);
                   const dayNum = Number(date.slice(8, 10));
                   const showMonth =
@@ -992,7 +1004,7 @@ export function RegisterBoard({
                       const inactive = inactiveOnDate;
                       const pending = Boolean(pendingTag);
                       const preview = inDragPreview(user.id, date);
-                      const locked = afterOut || date < todayISO;
+                      const locked = afterOut || !isDailyDateEditable(date, todayISO);
                       let tag = stored;
                       let isGhost = false;
                       if (stored) {
@@ -1052,7 +1064,11 @@ export function RegisterBoard({
                           mfrLocked={mfrLocked}
                           contL={contL}
                           contR={contR}
-                          preview={preview && date >= todayISO && !afterOut}
+                          preview={
+                            preview &&
+                            isDailyDateEditable(date, todayISO) &&
+                            !afterOut
+                          }
                           locale={locale}
                           onDragStart={() => startDrag(user.id, date)}
                         />
@@ -1145,7 +1161,7 @@ export function RegisterBoard({
               allowClear={!rangeMfrLocked}
               fromDate={rangeMenu.fromDate}
               toDate={rangeMenu.toDate}
-              minDate={todayISO}
+              minDate={dailyEditMinDate(todayISO)}
               onFromDate={(fromDate) =>
                 setRangeMenu((cur) => (cur ? { ...cur, fromDate } : cur))
               }

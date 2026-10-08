@@ -1,4 +1,4 @@
-import { eachISODate, nowISO, todayISO } from "@/lib/date";
+import { eachISODate, isDailyDateEditable, nowISO, todayISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import {
   canAssignOnDate,
@@ -51,7 +51,7 @@ function canWriteTag(
   date: string,
   tag: DailyTag | "",
 ): boolean {
-  if (date < todayISO()) return false;
+  if (!isDailyDateEditable(date)) return false;
   const user = findUser(userId);
   if (!user || !isCockpitMember(user) || !canAssignOnDate(user, date)) return false;
   if (isMfrLocked(user) && !isMfrTag(tag) && !canWriteMfrLockedTag(tag)) {

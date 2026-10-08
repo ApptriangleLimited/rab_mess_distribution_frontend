@@ -65,6 +65,7 @@ export default function RosterPage() {
       approval: filters.approval,
       member_type: filters.member_type,
       wing: filters.wing,
+      wing_family: filters.wing && filters.wing !== "all" ? "1" : undefined,
       rank: filters.rank,
       date_from: filters.date_from || undefined,
       date_to: filters.date_to || undefined,
