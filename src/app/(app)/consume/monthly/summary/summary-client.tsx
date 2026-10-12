@@ -15,9 +15,14 @@ import { PagePane } from "@/components/shared/page-pane";
 import { MonthNav } from "@/components/shared/month-nav";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { Button } from "@/components/ui/button";
+import { ConsumeMemberTypeSelect } from "@/components/consume/consume-member-type-select";
 import { OfficialConsumeLetter } from "@/components/consume/official-consume-letter";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
+import {
+  parseConsumeMemberType,
+  type ConsumeMemberTypeFilter,
+} from "@/lib/consume-filters";
 import {
   buildOfficialConsumePack,
   parseOfficialSheet,
@@ -51,18 +56,27 @@ export default function ConsumeSummaryClient() {
   }, [rawMonth, defaultMonth, pathname, router, searchParams]);
 
   const sheet = parseOfficialSheet(searchParams.get("sheet"));
+  const memberType = parseConsumeMemberType(searchParams.get("member_type"));
   const { source, loading } = useReportSource({ month });
   const pack = useMemo(
     () =>
-      withReportSource(source, () => buildOfficialConsumePack(month, sheet)),
-    [state.assignments, state.users, state.rates, month, sheet, source],
+      withReportSource(source, () =>
+        buildOfficialConsumePack(month, sheet, memberType),
+      ),
+    [state.assignments, state.users, state.rates, month, sheet, memberType, source],
   );
   const report = pack.summary;
 
-  function patchQuery(next: { month?: string; sheet?: ConsumeOfficialSheet }) {
+  function patchQuery(next: {
+    month?: string;
+    sheet?: ConsumeOfficialSheet;
+    memberType?: ConsumeMemberTypeFilter;
+  }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next.month) params.set("month", next.month);
     if (next.sheet) params.set("sheet", next.sheet);
+    if (next.memberType === "all") params.delete("member_type");
+    else if (next.memberType) params.set("member_type", next.memberType);
     router.replace(`${pathname}?${params.toString()}`);
   }
 
@@ -71,7 +85,10 @@ export default function ConsumeSummaryClient() {
     patchQuery({ month: next });
   }
 
-  const printHref = `/consume/monthly/summary/print?month=${month}&sheet=${sheet}`;
+  const printHref =
+    memberType === "all"
+      ? `/consume/monthly/summary/print?month=${month}&sheet=${sheet}`
+      : `/consume/monthly/summary/print?month=${month}&sheet=${sheet}&member_type=${memberType}`;
 
   return (
     <PagePane className="gap-5">
@@ -116,6 +133,11 @@ export default function ConsumeSummaryClient() {
         <div className="rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 p-2.5 shadow-sm dark:border-neutral-700 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900">
           <div className="flex w-full min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto">
             <MonthNav month={month} onChange={setMonth} />
+            <ConsumeMemberTypeSelect
+              value={memberType}
+              onChange={(next) => patchQuery({ memberType: next })}
+              className="h-10 w-[11rem] shrink-0 rounded-xl"
+            />
             <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5">
               <StatChip
                 icon={<IconBuilding className="h-3.5 w-3.5" />}

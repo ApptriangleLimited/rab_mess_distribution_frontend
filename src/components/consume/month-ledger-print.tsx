@@ -32,6 +32,10 @@ type Props = {
   wingTitle?: string;
   /** Start this wing's ledger on a new printed page. */
   pageBreak?: boolean;
+  /** Repeat the sign-off under every page instead of only the last. */
+  signEveryPage?: boolean;
+  /** Add a page total row under every page; the last page also keeps the grand total. */
+  totalEveryPage?: boolean;
 };
 
 /** Landscape Forces Mess consume ledger — matches BN register print. */
@@ -49,6 +53,8 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
       showSrbNo = false,
       wingTitle,
       pageBreak = false,
+      signEveryPage = false,
+      totalEveryPage = false,
     },
     ref,
   ) {
@@ -68,7 +74,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           dayNum,
         }));
     const monthEn = formatMonthLong(month, "en-US");
-    const campEn = `${CONSUME_REPORT_META.orgName} Camp, ${CONSUME_REPORT_META.station}`;
+    const campEn = `${CONSUME_REPORT_META.orgName}, ${CONSUME_REPORT_META.station}`;
     const wingHeading = (wingTitle || CONSUME_REPORT_META.wing).toUpperCase();
     const pages = chunkBillRows(rows);
 
@@ -82,6 +88,52 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
       ]),
     ) as Partial<Record<DailyTag, number>>;
     const grandDays = rows.reduce((s, r) => s + r.totalDays, 0);
+    const multiPage = pages.length > 1;
+
+    const totalRow = (
+      key: string,
+      label: string,
+      sourceRows: LedgerRow[],
+      emphasis: "page" | "grand",
+    ) => {
+      const counts = Object.fromEntries(
+        tagCodes.map((code) => [
+          code,
+          sourceRows.reduce((s, r) => s + (r.tagCounts[code] ?? 0), 0),
+        ]),
+      ) as Partial<Record<DailyTag, number>>;
+      const days = sourceRows.reduce((s, r) => s + r.totalDays, 0);
+      return (
+        <tr
+          key={key}
+          className={cn(
+            "border border-black font-semibold",
+            emphasis === "grand" && "font-bold",
+          )}
+        >
+          {Array.from({ length: identityColCount - 1 }, (_, i) => (
+            <td key={`id-${i}`} className="border border-black px-0.5 py-1" />
+          ))}
+          <td className="ledger-name border border-black px-0.5 py-1 text-center">
+            {label}
+          </td>
+          {columns.map(({ date }) => (
+            <td key={date} className="border border-black px-0 py-1" />
+          ))}
+          {tagCodes.map((code) => (
+            <td
+              key={code}
+              className="border border-black px-0.5 py-1 text-center tabular-nums"
+            >
+              {counts[code] || ""}
+            </td>
+          ))}
+          <td className="border border-black px-0.5 py-1 text-center tabular-nums">
+            {days || ""}
+          </td>
+        </tr>
+      );
+    };
 
     /** Inside the preview padding and the 8mm print margin, so the last column stays on the sheet. */
     const pageMm = english ? 270 : 291;
@@ -280,7 +332,16 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               </tr>
             ))}
           </tbody>
-          {lastPage ? (
+          {totalEveryPage ? (
+          <tfoot>
+            {multiPage
+              ? totalRow("page", t("consume.colPageTotal"), pageRows, "page")
+              : null}
+            {lastPage
+              ? totalRow("grand", t("consume.colGrandTotal"), rows, "grand")
+              : null}
+          </tfoot>
+          ) : lastPage ? (
           <tfoot>
             <tr className="border border-black font-semibold">
               <td
@@ -306,10 +367,11 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         </table>
         </div>
 
-        {lastPage ? (
+        {lastPage || signEveryPage ? (
         <div className="consume-bill-signs">
         <ConsumeSignOff
           className="mt-0 text-[8px]"
+          centerAll={signEveryPage}
           labels={(
             [
               "consume.signDailySi",

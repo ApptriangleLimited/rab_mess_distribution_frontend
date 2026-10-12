@@ -4,7 +4,11 @@ import {
   HQ_SUB_WINGS,
   wingOfficialName,
 } from "@/lib/constants";
-import { countedDaysInMonth, formatMonthDash } from "@/lib/date";
+import {
+  memberMatchesTypeFilter,
+  type ConsumeMemberTypeFilter,
+} from "@/lib/consume-filters";
+import { countedDaysInMonth, formatMonthDash, formatMonthLong } from "@/lib/date";
 import { buildConsumeMonth } from "@/lib/reports";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { compareUsers } from "@/lib/store/users";
@@ -236,10 +240,22 @@ function emptyBucket() {
   return { userIds: new Set<string>(), tagDays: {} as Partial<Record<DailyTag, number>> };
 }
 
-function bucketsFromMonth(month: string) {
-  const consume = buildConsumeMonth(month);
+function consumeMonthRows(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+) {
+  return buildConsumeMonth(month).rows.filter((row) =>
+    memberMatchesTypeFilter(row.user.member_type, memberType),
+  );
+}
+
+function bucketsFromMonth(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+) {
+  const rows = consumeMonthRows(month, memberType);
   const buckets = new Map(WING_DEFS.map((d) => [d.id, emptyBucket()]));
-  for (const row of consume.rows) {
+  for (const row of rows) {
     const id = officialRowId(row.user);
     const cur = buckets.get(id) ?? emptyBucket();
     cur.userIds.add(row.user.id);
@@ -322,11 +338,14 @@ export function groupRowsByOfficialWing<T extends { user: User }>(rows: T[]) {
   });
 }
 
-function membersByWing(month: string) {
-  const consume = buildConsumeMonth(month);
-  const byWing = new Map<string, typeof consume.rows>();
+function membersByWing(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+) {
+  const rows = consumeMonthRows(month, memberType);
+  const byWing = new Map<string, typeof rows>();
   for (const def of WING_DEFS) byWing.set(def.id, []);
-  for (const row of consume.rows) {
+  for (const row of rows) {
     const id = officialRowId(row.user);
     const list = byWing.get(id) ?? [];
     list.push(row);
@@ -361,9 +380,12 @@ function monthLabelEn(month: string) {
   return formatMonthDash(month);
 }
 
-export function buildOfficialWingConsume(month: string): OfficialConsumeReport {
-  const buckets = bucketsFromMonth(month);
-  const byWing = membersByWing(month);
+export function buildOfficialWingConsume(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+): OfficialConsumeReport {
+  const buckets = bucketsFromMonth(month, memberType);
+  const byWing = membersByWing(month, memberType);
   const rows = WING_DEFS.map((def, i) =>
     rowFromBucket(
       def,
@@ -375,14 +397,17 @@ export function buildOfficialWingConsume(month: string): OfficialConsumeReport {
   return {
     month,
     monthLabelBn: officialMonthLabelBn(month),
-    title: `Consume summary by wing — ${monthLabelEn(month)}`,
+    title: `All WING CONSUME BILL SUMMARY - ${formatMonthLong(month)}`,
     rows,
     totals: totalsRow(rows),
   };
 }
 
-export function buildOfficialCampConsume(month: string): OfficialConsumeReport {
-  const wings = buildOfficialWingConsume(month);
+export function buildOfficialCampConsume(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+): OfficialConsumeReport {
+  const wings = buildOfficialWingConsume(month, memberType);
   const hq = wings.rows.filter((r) => r.id === "admin");
   const ashkona = wings.rows.filter((r) => r.id !== "admin");
   const rows: OfficialConsumeRow[] = [
@@ -398,38 +423,48 @@ export function buildOfficialCampConsume(month: string): OfficialConsumeReport {
   };
 }
 
-export function buildOfficialFrBill(month: string): OfficialConsumeReport {
-  const wings = buildOfficialWingConsume(month);
+export function buildOfficialFrBill(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+): OfficialConsumeReport {
+  const wings = buildOfficialWingConsume(month, memberType);
   return {
     ...wings,
-    title: `FR bill summary by wing — ${monthLabelEn(month)}`,
+    title: `All WING FR BILL SUMMARY - ${formatMonthLong(month)}`,
   };
 }
 
-export function buildOfficialCdBill(month: string): OfficialConsumeReport {
-  const wings = buildOfficialWingConsume(month);
+export function buildOfficialCdBill(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+): OfficialConsumeReport {
+  const wings = buildOfficialWingConsume(month, memberType);
   return {
     ...wings,
-    title: `CD bill summary by wing — ${monthLabelEn(month)}`,
+    title: `All WING CD BILL SUMMARY - ${formatMonthLong(month)}`,
   };
 }
 
-export function buildOfficialLeaveBill(month: string): OfficialConsumeReport {
-  const wings = buildOfficialWingConsume(month);
+export function buildOfficialLeaveBill(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+): OfficialConsumeReport {
+  const wings = buildOfficialWingConsume(month, memberType);
   return {
     ...wings,
-    title: `CL, PL, Training, WT, MED, BGH and LNK bill summary by wing — ${monthLabelEn(month)}`,
+    title: `All WING CL, PL, Training, WT, MED, BGH and LNK BILL SUMMARY - ${formatMonthLong(month)}`,
   };
 }
 
 export function buildOfficialConsumeSheet(
   month: string,
   sheet: ConsumeOfficialSheet,
+  memberType: ConsumeMemberTypeFilter = "all",
 ): OfficialConsumeReport {
-  if (sheet === "fr") return buildOfficialFrBill(month);
-  if (sheet === "cd") return buildOfficialCdBill(month);
-  if (sheet === "leave") return buildOfficialLeaveBill(month);
-  return buildOfficialWingConsume(month);
+  if (sheet === "fr") return buildOfficialFrBill(month, memberType);
+  if (sheet === "cd") return buildOfficialCdBill(month, memberType);
+  if (sheet === "leave") return buildOfficialLeaveBill(month, memberType);
+  return buildOfficialWingConsume(month, memberType);
 }
 
 export function officialLeaveTotal(tagDays: Partial<Record<DailyTag, number>>) {
@@ -571,41 +606,46 @@ function oneTablePages(
   }));
 }
 
-function wingCampLine(wingId: string) {
-  if (wingId === "admin") {
-    return `SRB HQ Camp, ${CONSUME_REPORT_META.orgName}`;
-  }
-  return `Ashkona Camp, ${CONSUME_REPORT_META.orgName}`;
+
+function hasOfficialData(row: OfficialConsumeRow) {
+  return row.manpower > 0 || row.totalDays > 0;
 }
 
 export function buildOfficialConsumePack(
   month: string,
   sheet: ConsumeOfficialSheet,
+  memberType: ConsumeMemberTypeFilter = "all",
 ): OfficialConsumePack {
   const monthLabelBn = officialMonthLabelBn(month);
   const monthLabel = monthLabelEn(month);
   const org = orgLine();
-  const wings = buildOfficialWingConsume(month);
-  const byWing = membersByWing(month);
+  const wings = buildOfficialWingConsume(month, memberType);
+  const byWing = membersByWing(month, memberType);
 
   if (sheet === "fr" || sheet === "cd") {
     const tagLabel = sheet === "fr" ? "Total FR" : "Total CD";
     const word = sheet === "fr" ? "FR" : "CD";
-    const summary = sheet === "fr" ? buildOfficialFrBill(month) : buildOfficialCdBill(month);
-    const perWing = WING_DEFS.map((def) => {
+    const summary =
+      sheet === "fr"
+        ? buildOfficialFrBill(month, memberType)
+        : buildOfficialCdBill(month, memberType);
+    const perWing = WING_DEFS.flatMap((def) => {
       const row = wings.rows.find((r) => r.id === def.id) ?? rowFromBucket(def, 1, emptyBucket());
-      return consumeTable(
-        `${word} bill — ${def.label} — ${monthLabel}`,
-        [org],
-        [{ ...row, sl: 1 }],
-        {
-          kind: "tag",
-          showPageNo: true,
-          remarks: true,
-          tagLabel,
-          totals: { ...row, id: "total", sl: 0, label: "Total", pageNo: "" },
-        },
-      );
+      if (memberType !== "all" && !hasOfficialData(row)) return [];
+      return [
+        consumeTable(
+          `${word} bill — ${def.label} — ${monthLabel}`,
+          [org],
+          [{ ...row, sl: 1 }],
+          {
+            kind: "tag",
+            showPageNo: true,
+            remarks: true,
+            tagLabel,
+            totals: { ...row, id: "total", sl: 0, label: "Total", pageNo: "" },
+          },
+        ),
+      ];
     });
     return {
       month,
@@ -631,21 +671,24 @@ export function buildOfficialConsumePack(
   }
 
   if (sheet === "leave") {
-    const summary = buildOfficialLeaveBill(month);
-    const perWing = WING_DEFS.map((def) => {
+    const summary = buildOfficialLeaveBill(month, memberType);
+    const perWing = WING_DEFS.flatMap((def) => {
       const row = wings.rows.find((r) => r.id === def.id) ?? rowFromBucket(def, 1, emptyBucket());
-      return consumeTable(
-        `CL, PL, Training, WT, MED, BGH and LNK bill — ${def.label} — ${monthLabel}`,
-        [org],
-        [{ ...row, sl: 1 }],
-        {
-          kind: "leave",
-          showPageNo: true,
-          showManpower: true,
-          remarks: true,
-          totals: { ...row, id: "total", sl: 0, label: "Total", pageNo: "" },
-        },
-      );
+      if (memberType !== "all" && !hasOfficialData(row)) return [];
+      return [
+        consumeTable(
+          `CL, PL, Training, WT, MED, BGH and LNK bill — ${def.label} — ${monthLabel}`,
+          [org],
+          [{ ...row, sl: 1 }],
+          {
+            kind: "leave",
+            showPageNo: true,
+            showManpower: true,
+            remarks: true,
+            totals: { ...row, id: "total", sl: 0, label: "Total", pageNo: "" },
+          },
+        ),
+      ];
     });
     return {
       month,
@@ -670,7 +713,7 @@ export function buildOfficialConsumePack(
     };
   }
 
-  const camp = buildOfficialCampConsume(month);
+  const camp = buildOfficialCampConsume(month, memberType);
   const admin = wings.rows.find((r) => r.id === "admin");
   const ashkona = wings.rows.filter((r) => r.id !== "admin");
   const hqRows = admin
@@ -701,7 +744,7 @@ export function buildOfficialConsumePack(
     {
       id: "monthly-hq",
       tables: [
-        consumeTable(`Consume account by wing — ${monthLabel}`, [org, "SRB HQ Camp"], hqRows, {
+        consumeTable(`Consume account by wing — ${monthLabel}`, [org], hqRows, {
           showPageNo: false,
           remarks: true,
         }),
@@ -712,32 +755,36 @@ export function buildOfficialConsumePack(
       tables: [
         consumeTable(
           `Consume account by wing — ${monthLabel}`,
-          [org, "Ashkona Camp"],
+          [org],
           ashkona.map((row, i) => ({ ...row, sl: i + 1, pageNo: "" })),
           { showPageNo: false, remarks: true },
         ),
       ],
     },
-    ...WING_DEFS.map((def) => {
-      const rows = wingPageRows(def.id, byWing.get(def.id) ?? [], {
+    ...WING_DEFS.flatMap((def) => {
+      const members = byWing.get(def.id) ?? [];
+      if (memberType !== "all" && members.length === 0) return [];
+      const rows = wingPageRows(def.id, members, {
         english: true,
       });
-      return {
-        id: `monthly-pages-${def.id}`,
-        tables: [
-          consumeTable(
-            `Consume account by wing — ${monthLabel} (${def.label})`,
-            [wingCampLine(def.id)],
-            rows,
-            {
-              kind: "consume-pages",
-              showPageNo: false,
-              remarks: true,
-              totals: { ...totalsRow(rows), label: "Total" },
-            },
-          ),
-        ],
-      };
+      return [
+        {
+          id: `monthly-pages-${def.id}`,
+          tables: [
+            consumeTable(
+              `Consume account by wing — ${monthLabel} (${def.label})`,
+              [org],
+              rows,
+              {
+                kind: "consume-pages",
+                showPageNo: false,
+                remarks: true,
+                totals: { ...totalsRow(rows), label: "Total" },
+              },
+            ),
+          ],
+        },
+      ];
     }),
   ];
 

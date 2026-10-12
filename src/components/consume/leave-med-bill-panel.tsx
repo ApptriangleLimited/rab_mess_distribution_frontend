@@ -14,7 +14,12 @@ import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
-import { LEAVE_MED_BILL_TAGS } from "@/lib/consume-filters";
+import { ConsumeMemberTypeSelect } from "@/components/consume/consume-member-type-select";
+import {
+  LEAVE_MED_BILL_TAGS,
+  memberMatchesTypeFilter,
+  type ConsumeMemberTypeFilter,
+} from "@/lib/consume-filters";
 import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
 import type { DailyTag } from "@/lib/types";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
@@ -32,6 +37,8 @@ type Props = {
   onMonthChange: (month: string) => void;
   tiles?: ReactNode;
   source?: ReportSource;
+  memberType?: ConsumeMemberTypeFilter;
+  onMemberTypeChange?: (value: ConsumeMemberTypeFilter) => void;
 };
 
 export function LeaveMedBillPanel({
@@ -39,6 +46,8 @@ export function LeaveMedBillPanel({
   onMonthChange,
   tiles,
   source,
+  memberType = "all",
+  onMemberTypeChange,
 }: Props) {
   const t = useT();
   const state = useStore();
@@ -60,6 +69,7 @@ export function LeaveMedBillPanel({
     return bill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
+      if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
       if (!query) return true;
       return [
         row.user.name,
@@ -72,7 +82,7 @@ export function LeaveMedBillPanel({
         .toLowerCase()
         .includes(query);
     });
-  }, [bill.rows, q, rank, wing]);
+  }, [bill.rows, q, rank, wing, memberType]);
 
   const wingBills = useMemo(
     () =>
@@ -127,6 +137,12 @@ export function LeaveMedBillPanel({
             onChange={setWing}
             rootsOnly
             className="w-[7.25rem] shrink"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <ConsumeMemberTypeSelect
+            value={memberType}
+            onChange={onMemberTypeChange ?? (() => {})}
+            className="w-[9.5rem] shrink"
             triggerClassName={cn(fieldClass, "w-full")}
           />
           <WingSummaryButton

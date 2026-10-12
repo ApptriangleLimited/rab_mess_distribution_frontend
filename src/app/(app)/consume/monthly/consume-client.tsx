@@ -26,8 +26,11 @@ import {
   CONSUME_FILTER_TAGS,
   consumeFilterLabel,
   consumeFiltersForRole,
+  memberMatchesTypeFilter,
   parseConsumeFilter,
+  parseConsumeMemberType,
   type ConsumeFilter,
+  type ConsumeMemberTypeFilter,
 } from "@/lib/consume-filters";
 import { monthKey } from "@/lib/date";
 import {
@@ -59,6 +62,7 @@ export default function ConsumeMonthlyClient() {
 
   const { source, loading } = useReportSource({ month });
   const filter = parseConsumeFilter(searchParams.get("tag"));
+  const memberType = parseConsumeMemberType(searchParams.get("member_type"));
   const filterTags = CONSUME_FILTER_TAGS[filter];
   const filterLabel = consumeFilterLabel(filter);
 
@@ -108,33 +112,44 @@ export default function ConsumeMonthlyClient() {
     const fuel = withReportSource(source, () =>
       buildTagBill(month, CONSUME_FILTER_TAGS.fuel),
     );
+    const match = <T extends { user: { member_type: string } }>(rows: T[]) =>
+      rows.filter((row) =>
+        memberMatchesTypeFilter(row.user.member_type, memberType),
+      );
     return {
-      "fr-mfr": fr.rows.length,
-      cd: cd.rows.length,
-      "leave-med": leave.rows.length,
-      fuel: fuel.rows.length,
+      "fr-mfr": match(fr.rows).length,
+      cd: match(cd.rows).length,
+      "leave-med": match(leave.rows).length,
+      fuel: match(fuel.rows).length,
     } satisfies Record<ConsumeFilter, number>;
-  }, [state.assignments, state.users, state.rates, month, source]);
+  }, [state.assignments, state.users, state.rates, month, source, memberType]);
 
   const headerStats = useMemo(() => {
     if (leaveBill) {
+      const rows = leaveBill.rows.filter((row) =>
+        memberMatchesTypeFilter(row.user.member_type, memberType),
+      );
+      const days = rows.reduce((s, row) => s + row.totalDays, 0);
       return {
-        days: leaveBill.totalDays,
-        members: leaveBill.rows.length,
-        allowance: leaveBill.totalDays,
-        amount: leaveBill.totalAmount,
+        days,
+        members: rows.length,
+        allowance: days,
+        amount: rows.reduce((s, row) => s + row.amount, 0),
       };
     }
+    const rows = (tagBill?.rows ?? []).filter((row) =>
+      memberMatchesTypeFilter(row.user.member_type, memberType),
+    );
     return {
-      days: tagBill?.totalDays ?? 0,
-      members: tagBill?.rows.length ?? 0,
-      allowance: tagBill?.totalDays ?? 0,
-      amount:
-        filter === "fuel"
-          ? (tagBill?.totalFuel ?? 0)
-          : (tagBill?.grandTotal ?? 0),
+      days: rows.reduce((s, row) => s + row.days, 0),
+      members: rows.length,
+      allowance: rows.reduce((s, row) => s + row.days, 0),
+      amount: rows.reduce(
+        (s, row) => s + (filter === "fuel" ? row.fuelAmount : row.grandTotal),
+        0,
+      ),
     };
-  }, [leaveBill, tagBill]);
+  }, [leaveBill, tagBill, filter, memberType]);
 
   function patchQuery(patch: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -151,7 +166,17 @@ export default function ConsumeMonthlyClient() {
     patchQuery({ tag: next });
   }
 
-  const printHref = `/consume/monthly/print?month=${month}&tag=${filter}`;
+  function setMemberType(next: ConsumeMemberTypeFilter) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "all") params.delete("member_type");
+    else params.set("member_type", next);
+    router.replace(`${pathname}?${params.toString()}`);
+  }
+
+  const printHref =
+    memberType === "all"
+      ? `/consume/monthly/print?month=${month}&tag=${filter}`
+      : `/consume/monthly/print?month=${month}&tag=${filter}&member_type=${memberType}`;
   const exportDisabled = headerStats.members === 0;
   const amountLabel =
     filter === "fr-mfr" || filter === "fuel"
@@ -258,6 +283,8 @@ export default function ConsumeMonthlyClient() {
                 key={`${month}-leave-med`}
                 month={month}
                 onMonthChange={setMonth}
+                memberType={memberType}
+                onMemberTypeChange={setMemberType}
                 tiles={statsTiles}
                 source={source}
               />
@@ -268,6 +295,8 @@ export default function ConsumeMonthlyClient() {
                 tag={filterTags}
                 displayTag={filter === "fuel" ? "FR+MFR" : filterLabel}
                 onMonthChange={setMonth}
+                memberType={memberType}
+                onMemberTypeChange={setMemberType}
                 tiles={statsTiles}
                 source={source}
                 fuelOnly={filter === "fuel"}

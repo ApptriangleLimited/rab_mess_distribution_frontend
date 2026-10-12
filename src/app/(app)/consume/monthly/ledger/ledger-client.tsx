@@ -18,6 +18,13 @@ import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
@@ -52,6 +59,7 @@ export default function ConsumeLedgerClient() {
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
+  const [memberType, setMemberType] = useState("all");
   const [reportOpen, setReportOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
@@ -112,13 +120,14 @@ export default function ConsumeLedgerClient() {
     return ledger.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
+      if (memberType !== "all" && row.user.member_type !== memberType) return false;
       if (!query) return true;
       return [row.user.name, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing, state.wing_parent]);
+  }, [ledger.rows, q, rank, wing, memberType, state.wing_parent]);
 
   const printHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -128,8 +137,9 @@ export default function ConsumeLedgerClient() {
     if (q.trim()) params.set("q", q.trim());
     if (rank !== "all") params.set("rank", rank);
     if (wing !== "all") params.set("wing", wing);
+    if (memberType !== "all") params.set("member_type", memberType);
     return `/consume/monthly/ledger/print?${params.toString()}`;
-  }, [month, q, rank, wing, dateFrom, dateTo]);
+  }, [month, q, rank, wing, memberType, dateFrom, dateTo]);
 
   const fieldClass = searchFilterFieldClass;
   const printBtn =
@@ -228,6 +238,19 @@ export default function ConsumeLedgerClient() {
             className="w-[9rem] shrink-0"
             triggerClassName={cn(fieldClass, "w-full")}
           />
+          <Select value={memberType} onValueChange={setMemberType}>
+            <SelectTrigger
+              className={cn(fieldClass, "w-[11rem] shrink-0")}
+              aria-label={t("cc.fields.memberType")}
+            >
+              <SelectValue placeholder={t("common.allMemberType")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.allMemberType")}</SelectItem>
+              <SelectItem value="attached">{t("cc.memberTypes.attached")}</SelectItem>
+              <SelectItem value="new">{t("cc.memberTypes.new")}</SelectItem>
+            </SelectContent>
+          </Select>
           <WingSummaryButton
             month={month}
             wing={wing}

@@ -284,15 +284,36 @@ function letterSheetCss() {
   }
   .official-consume-letter .official-consume-page,
   .official-consume-letter .print-page {
+    display: block !important;
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
     min-height: 0 !important;
     height: auto !important;
+    max-height: none !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: auto !important;
     break-inside: auto !important;
+  }
+  .official-consume-letter thead {
+    display: table-header-group !important;
+  }
+  .official-consume-letter thead tr.official-title-row th,
+  .official-consume-letter .official-title-cell {
+    border: none !important;
+    background: #fff !important;
+    text-align: center !important;
+    padding: 0 0 8px 0 !important;
+    font-weight: 700 !important;
+  }
+  .official-consume-letter .consume-bill-signs,
+  .official-consume-letter .consume-sign-off {
+    margin-top: 16mm !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
   .official-consume-letter .official-consume-page:last-child,
   .official-consume-letter .print-page:last-child {
@@ -411,6 +432,9 @@ function letterSheetCss() {
     border: none !important;
     margin-top: 28px !important;
   }
+  .official-consume-letter .consume-bill-signs .consume-sign-off {
+    margin-top: 0 !important;
+  }
   .consume-sign-off td,
   .consume-sign-off .consume-sign-cell {
     border: none !important;
@@ -460,8 +484,8 @@ function letterSheetCss() {
   .staff-payout-print td,
   .mess-reports-letter th,
   .mess-reports-letter td,
-  .official-consume-letter th,
-  .official-consume-letter td,
+  .official-consume-letter table:not(.consume-sign-off) th,
+  .official-consume-letter table:not(.consume-sign-off) td,
   .wing-summary-print th,
   .wing-summary-print td {
     font-size: 10px !important;
@@ -476,13 +500,80 @@ function letterSheetCss() {
   .consume-bill-page {
     display: flex !important;
     flex-direction: column !important;
-    min-height: 262mm !important;
+    min-height: 0 !important;
+    height: auto !important;
     box-sizing: border-box !important;
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
   }
-  .consume-bill-page .consume-bill-signs,
+  .tag-bill-print .consume-bill-page--signed,
+  .leave-med-bill-print .consume-bill-page--signed {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  .tag-bill-print thead,
+  .leave-med-bill-print thead {
+    display: table-row-group !important;
+  }
+  .tag-bill-print thead tr.consume-bill-title-row th,
+  .leave-med-bill-print thead tr.consume-bill-title-row th,
+  .tag-bill-print .consume-bill-title-cell,
+  .leave-med-bill-print .consume-bill-title-cell {
+    border: none !important;
+    background: #fff !important;
+    padding: 0 0 4px 0 !important;
+    text-align: center !important;
+  }
+  .tag-bill-print .letter-masthead,
+  .leave-med-bill-print .letter-masthead {
+    margin-bottom: 3mm !important;
+  }
+  .consume-bill-sheet {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  .tag-bill-print .consume-bill-signs,
+  .leave-med-bill-print .consume-bill-signs {
+    margin-top: 10mm !important;
+    page-break-before: avoid !important;
+    break-before: avoid-page !important;
+    flex-shrink: 0 !important;
+  }
+  .tag-bill-print .consume-masthead,
+  .leave-med-bill-print .consume-masthead,
+  .consume-bill-page--full .consume-masthead {
+    margin-bottom: 3mm !important;
+  }
+  .tag-bill-print .consume-masthead p,
+  .leave-med-bill-print .consume-masthead p,
+  .consume-bill-page--full .consume-masthead p {
+    margin-top: 0 !important;
+  }
+  .tag-bill-print table th,
+  .tag-bill-print table td,
+  .leave-med-bill-print table th,
+  .leave-med-bill-print table td,
+  .consume-bill-page--full table th,
+  .consume-bill-page--full table td {
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+  }
+  .tag-bill-print .consume-sign-off,
+  .leave-med-bill-print .consume-sign-off,
+  .consume-bill-page--full .consume-sign-off {
+    margin-top: 0 !important;
+  }
+  .tag-bill-print .consume-sign-cell,
+  .leave-med-bill-print .consume-sign-cell,
+  .consume-bill-page--full .consume-sign-cell {
+    padding-top: 8px !important;
+  }
   .consume-ledger-page .consume-bill-signs {
     margin-top: auto !important;
   }
@@ -508,11 +599,12 @@ function letterSheetCss() {
   .leave-med-bill-print tbody td.consume-sl {
     text-align: center !important;
   }
-  .tag-bill-print td.consume-money {
+  .tag-bill-print td.consume-money,
+  .tag-bill-print td.consume-num,
+  .tag-bill-print td.consume-days,
+  .leave-med-bill-print td.consume-money,
+  .leave-med-bill-print td.consume-num {
     text-align: right !important;
-  }
-  .tag-bill-print td.consume-days {
-    text-align: center !important;
   }
   .official-consume-letter td.consume-page-no {
     text-align: center !important;

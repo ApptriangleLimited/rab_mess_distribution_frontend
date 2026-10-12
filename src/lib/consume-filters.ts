@@ -39,3 +39,22 @@ export function parseConsumeFilter(raw: string | null): ConsumeFilter {
 export function consumeFilterLabel(filter: ConsumeFilter) {
   return CONSUME_FILTER_TAGS[filter].join("+");
 }
+
+export const CONSUME_MEMBER_TYPE_FILTERS = ["all", "attached", "new"] as const;
+
+export type ConsumeMemberTypeFilter =
+  (typeof CONSUME_MEMBER_TYPE_FILTERS)[number];
+
+export function parseConsumeMemberType(
+  raw: string | null | undefined,
+): ConsumeMemberTypeFilter {
+  if (raw === "attached" || raw === "new") return raw;
+  return "all";
+}
+
+export function memberMatchesTypeFilter(
+  memberType: string | undefined,
+  filter: ConsumeMemberTypeFilter,
+) {
+  return filter === "all" || memberType === filter;
+}

@@ -86,6 +86,7 @@ export default function ConsumeLedgerPrintClient() {
   const q = searchParams.get("q") ?? "";
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
+  const memberType = searchParams.get("member_type") ?? "all";
   const dateFrom = searchParams.get("from") ?? "";
   const dateTo = searchParams.get("to") ?? "";
 
@@ -148,13 +149,14 @@ export default function ConsumeLedgerPrintClient() {
     return ledger.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
+      if (memberType !== "all" && row.user.member_type !== memberType) return false;
       if (!query) return true;
       return [row.user.name, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing]);
+  }, [ledger.rows, q, rank, wing, memberType]);
 
   const backHref = useMemo(() => {
     const back = searchParams.get("back")?.trim();
@@ -162,11 +164,12 @@ export default function ConsumeLedgerPrintClient() {
     params.set("month", month);
     if (dateFrom) params.set("from", dateFrom);
     if (dateTo) params.set("to", dateTo);
+    if (memberType !== "all") params.set("member_type", memberType);
     if (back?.startsWith("/ration/monthly")) {
       return `${back}${back.includes("?") ? "&" : "?"}${params.toString()}`;
     }
     return `/consume/monthly/ledger?${params.toString()}`;
-  }, [month, dateFrom, dateTo, searchParams]);
+  }, [month, dateFrom, dateTo, memberType, searchParams]);
 
   const wingLedgers = useMemo(() => groupRowsByOfficialWing(rows), [rows]);
 
@@ -274,6 +277,8 @@ export default function ConsumeLedgerPrintClient() {
                 preview
                 reportLang="en"
                 showSrbNo
+                signEveryPage
+                totalEveryPage
               />
             ))}
           </div>

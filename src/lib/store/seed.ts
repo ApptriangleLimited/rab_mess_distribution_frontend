@@ -396,6 +396,15 @@ function buildMemberPlans(users: User[]): MemberPlan[] {
       });
     }
 
+    // Dedicated CD / leave-med blocks so those consume bills have rows.
+    if (i % 5 === 1) {
+      spans.unshift({ tag: "CD", from: 1, to: 6 });
+    } else if (i % 5 === 2) {
+      spans.unshift({ tag: "CL", from: 2, to: 7 });
+    } else if (i % 5 === 3) {
+      spans.unshift({ tag: "PL", from: 3, to: 8 });
+    }
+
     return { user_id: u.id, base, spans: spans.length ? spans : undefined };
   });
 }
@@ -585,7 +594,7 @@ function seedGuestMeals(users: User[]): GuestMeal[] {
 }
 
 /** Bump → auto wipe localStorage + reseed on next load. */
-export const SEED_VERSION = 32;
+export const SEED_VERSION = 33;
 
 /** Catalog/rates only — no demo members, assignments, requests, or Pritibhoj. */
 export function createLiveCatalogState(): AppState {

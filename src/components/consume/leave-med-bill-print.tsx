@@ -47,6 +47,7 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
       tagTotals,
       totalDays,
       totalAmount,
+      rate,
       wingLabel,
       pageBreak = false,
       preview = false,
@@ -72,22 +73,30 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
         <section
           key={pageIndex}
           className={cn(
-            "consume-bill-page",
+            "consume-bill-page consume-bill-page--full",
+            lastPage && "consume-bill-page--signed",
             pageIndex > 0 && "consume-wing-break",
             preview &&
               "overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700",
           )}
         >
-        <div>
-        <ConsumeReportMasthead
-          title={t("consume.leaveMedBillTitle", {
-            wing: (wingLabel ?? "").trim().toUpperCase(),
-            month: monthLabel.toUpperCase(),
-          })}
-        />
-
+        <div className="consume-bill-sheet">
         <table className="w-full border-collapse text-[10px] text-black">
           <thead>
+            <tr className="consume-bill-title-row">
+              <th
+                colSpan={7 + tags.length}
+                className="consume-bill-title-cell border-0 bg-white pb-2 text-center"
+              >
+                <ConsumeReportMasthead
+                  title={t("consume.leaveMedBillTitle", {
+                    wing: (wingLabel ?? "").trim().toUpperCase(),
+                    month: monthLabel.toUpperCase(),
+                  })}
+                  className="mb-0"
+                />
+              </th>
+            </tr>
             <tr className="consume-col-titles border border-black bg-neutral-100">
               <th className="border border-black px-1 py-1">SL</th>
               <th className="border border-black px-1 py-1">{t("consume.colId")}</th>
@@ -100,7 +109,9 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
               ))}
               <th className="border border-black px-1 py-1">Total</th>
               <th className="border border-black px-1 py-1 leading-tight">
-                Fresh money babod taka
+                {t("consume.colFreshMoneyRate", {
+                  rate: formatBdtAmount(rate),
+                })}
               </th>
               <th className="border border-black px-1 py-1">Remarks</th>
             </tr>
@@ -123,23 +134,21 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
                 {tags.map((code) => (
                   <td
                     key={code}
-                    className="border border-black px-1 py-0.5 tabular-nums"
+                    className="consume-num border border-black px-1 py-0.5 text-right tabular-nums"
                   >
                     {cell(row.tagDays[code] ?? 0)}
                   </td>
                 ))}
-                <td className="border border-black px-1 py-0.5 tabular-nums">
+                <td className="consume-num border border-black px-1 py-0.5 text-right tabular-nums">
                   {cell(row.totalDays)}
                 </td>
-                <td className="border border-black px-1 py-0.5 tabular-nums">
+                <td className="consume-money consume-num border border-black px-1 py-0.5 text-right tabular-nums">
                   {formatBdtAmount(row.amount)}
                 </td>
                 <td className="border border-black px-1 py-0.5">{row.remarks}</td>
               </tr>
             ))}
-          </tbody>
-          {lastPage ? (
-          <tfoot>
+            {lastPage ? (
             <tr className="border border-black font-semibold">
               <td
                 colSpan={4}
@@ -150,23 +159,22 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
               {tags.map((code) => (
                 <td
                   key={code}
-                  className="border border-black px-1 py-1 tabular-nums"
+                  className="consume-num border border-black px-1 py-1 text-right tabular-nums"
                 >
                   {cell(tagTotals[code] ?? 0)}
                 </td>
               ))}
-              <td className="border border-black px-1 py-1 tabular-nums">
+              <td className="consume-num border border-black px-1 py-1 text-right tabular-nums">
                 {cell(totalDays)}
               </td>
-              <td className="border border-black px-1 py-1 tabular-nums">
+              <td className="consume-money consume-num border border-black px-1 py-1 text-right tabular-nums">
                 {formatBdtAmount(totalAmount)}
               </td>
               <td className="border border-black px-1 py-1" />
             </tr>
-          </tfoot>
-          ) : null}
+            ) : null}
+          </tbody>
         </table>
-        </div>
 
         {lastPage ? (
         <div className="consume-bill-signs">
@@ -176,6 +184,7 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
         />
         </div>
         ) : null}
+        </div>
         </section>
           );
         })}

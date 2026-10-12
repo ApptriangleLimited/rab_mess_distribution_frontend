@@ -14,6 +14,7 @@ import {
   type OfficialConsumeRow,
   type OfficialConsumeTable,
 } from "@/lib/consume-official-reports";
+import { consumeHqLine } from "@/components/consume/consume-report-masthead";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { cn } from "@/lib/utils";
 
@@ -36,28 +37,42 @@ function cell(n: number) {
 }
 
 function Signs() {
-  return <ConsumeSignOff labels={SIGNS} className="text-[9px]" />;
+  return (
+    <ConsumeSignOff labels={SIGNS} className="mt-0 text-[9px]" centerAll />
+  );
 }
 
-function Header({ table }: { table: OfficialConsumeTable }) {
-  const [first, ...rest] = table.lines;
+function tableColCount(table: OfficialConsumeTable) {
+  if (table.kind === "tag") {
+    return 4 + (table.showPageNo ? 1 : 0) + (table.remarks ? 1 : 0);
+  }
+  if (table.kind === "leave") {
+    return (
+      10 +
+      (table.showPageNo ? 1 : 0) +
+      (table.showManpower ? 1 : 0) +
+      (table.remarks ? 1 : 0)
+    );
+  }
+  const pageCol = table.kind !== "consume-pages" && table.showPageNo;
+  return 15 + (pageCol ? 1 : 0) + (table.remarks ? 1 : 0);
+}
+
+function TitleHead({ table }: { table: OfficialConsumeTable }) {
   return (
-    <header className="consume-masthead letter-masthead mb-10 text-center">
-      <p className="text-[16px] font-bold leading-snug">{table.title}</p>
-      {first ? (
-        <p className="mt-1.5 text-[9px] font-normal leading-snug text-neutral-400">
-          {first}
-        </p>
-      ) : null}
-      {rest.map((line) => (
-        <p
-          key={line}
-          className="text-[9px] font-normal leading-snug text-neutral-400"
-        >
-          {line}
-        </p>
-      ))}
-    </header>
+    <tr className="official-title-row">
+      <th
+        colSpan={tableColCount(table)}
+        className="official-title-cell border-0 bg-white pb-3 text-center"
+      >
+        <div className="consume-masthead letter-masthead">
+          <p className="text-[16px] font-bold leading-snug">{table.title}</p>
+          <p className="mt-1.5 text-[9px] font-normal leading-snug text-neutral-400">
+            {consumeHqLine()}
+          </p>
+        </div>
+      </th>
+    </tr>
   );
 }
 
@@ -67,6 +82,7 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
   return (
     <table className="w-full border-collapse text-[9px] text-black">
       <thead>
+        <TitleHead table={table} />
         <tr className="consume-col-titles">
           <th className="border border-black px-1 py-1 align-bottom">SL</th>
           <th className="border border-black px-1 py-1 align-bottom">
@@ -162,6 +178,7 @@ function TagTable({ table }: { table: OfficialConsumeTable }) {
   return (
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
+        <TitleHead table={table} />
         <tr className="consume-col-titles">
           <th className="border border-black px-1.5 py-1 align-bottom">SL</th>
           <th className="border border-black px-1.5 py-1 align-bottom">
@@ -211,6 +228,7 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
   return (
     <table className="w-full border-collapse text-[10px] text-black">
       <thead>
+        <TitleHead table={table} />
         <tr className="consume-col-titles">
           <th className="border border-black px-1 py-1 align-bottom">SL</th>
           <th className="border border-black px-1 py-1 align-bottom">
@@ -361,21 +379,24 @@ export const OfficialConsumeLetter = forwardRef<HTMLDivElement, Props>(
           <section
             key={page.id}
             className={cn(
-              "official-consume-page bg-white text-black",
+              "official-consume-page flex flex-col bg-white text-black",
               preview &&
-                "rounded-xl border border-neutral-200 p-5 shadow-sm dark:border-neutral-700",
+                "min-h-[277mm] rounded-xl border border-neutral-200 p-5 shadow-sm dark:border-neutral-700",
             )}
           >
-            {page.tables.map((table, tableIndex) => (
-              <div
-                key={`${page.id}-${tableIndex}-${table.rows[0]?.id ?? table.title}`}
-                className="mb-8 last:mb-0"
-              >
-                <Header table={table} />
-                <SheetTable table={table} />
-                <Signs />
-              </div>
-            ))}
+            <div className="min-w-0 flex-1">
+              {page.tables.map((table, tableIndex) => (
+                <div
+                  key={`${page.id}-${tableIndex}-${table.rows[0]?.id ?? table.title}`}
+                  className="mb-8 last:mb-0"
+                >
+                  <SheetTable table={table} />
+                </div>
+              ))}
+            </div>
+            <div className="consume-bill-signs">
+              <Signs />
+            </div>
           </section>
         ))}
       </div>

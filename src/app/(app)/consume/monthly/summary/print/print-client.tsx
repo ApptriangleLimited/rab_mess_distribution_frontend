@@ -10,6 +10,7 @@ import { OfficialConsumeLetter } from "@/components/consume/official-consume-let
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
+import { parseConsumeMemberType } from "@/lib/consume-filters";
 import {
   buildOfficialConsumePack,
   officialSheetOrientation,
@@ -32,15 +33,21 @@ export default function ConsumeSummaryPrintClient() {
   const rawMonth = searchParams.get("month");
   const month = rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : monthKey();
   const sheet = parseOfficialSheet(searchParams.get("sheet"));
+  const memberType = parseConsumeMemberType(searchParams.get("member_type"));
 
   const { source, loading } = useReportSource({ month });
   const pack = useMemo(
     () =>
-      withReportSource(source, () => buildOfficialConsumePack(month, sheet)),
-    [state.assignments, state.users, state.rates, month, sheet, source],
+      withReportSource(source, () =>
+        buildOfficialConsumePack(month, sheet, memberType),
+      ),
+    [state.assignments, state.users, state.rates, month, sheet, memberType, source],
   );
 
-  const backHref = `/consume/monthly/summary?month=${month}&sheet=${sheet}`;
+  const backHref =
+    memberType === "all"
+      ? `/consume/monthly/summary?month=${month}&sheet=${sheet}`
+      : `/consume/monthly/summary?month=${month}&sheet=${sheet}&member_type=${memberType}`;
 
   async function onPrint() {
     const el = printRef.current;

@@ -3,9 +3,11 @@ import { cn } from "@/lib/utils";
 type Props = {
   labels: readonly string[];
   className?: string;
+  /** Center every signature, including the last two. */
+  centerAll?: boolean;
 };
 
-export function ConsumeSignOff({ labels, className }: Props) {
+export function ConsumeSignOff({ labels, className, centerAll = false }: Props) {
   const colPct = `${100 / Math.max(labels.length, 1)}%`;
 
   return (
@@ -18,7 +20,7 @@ export function ConsumeSignOff({ labels, className }: Props) {
       <tbody>
         <tr>
           {labels.map((label, i) => {
-            const left = i >= labels.length - 2;
+            const left = !centerAll && i >= labels.length - 2;
             return (
             <td
               key={`${i}-${label}`}

@@ -75,7 +75,7 @@ export function downloadConsumeLedgerPdf({
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.text(
-        `${CONSUME_REPORT_META.orgName} Camp, ${CONSUME_REPORT_META.station}`,
+        `${CONSUME_REPORT_META.orgName}, ${CONSUME_REPORT_META.station}`,
         pageW / 2,
         y,
         { align: "center" },

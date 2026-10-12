@@ -19,7 +19,9 @@ import { useStore } from "@/hooks/use-store";
 import {
   CONSUME_FILTER_TAGS,
   consumeFilterLabel,
+  memberMatchesTypeFilter,
   parseConsumeFilter,
+  parseConsumeMemberType,
 } from "@/lib/consume-filters";
 import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
 import { formatMonthLong, monthKey } from "@/lib/date";
@@ -54,6 +56,7 @@ export default function ConsumeTagBillPrintClient() {
   const q = searchParams.get("q") ?? "";
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
+  const memberType = parseConsumeMemberType(searchParams.get("member_type"));
 
   const { source, loading } = useReportSource({ month });
 
@@ -79,6 +82,7 @@ export default function ConsumeTagBillPrintClient() {
     return tagBill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
+      if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
       if (!query) return true;
       return [
         row.user.name,
@@ -91,7 +95,7 @@ export default function ConsumeTagBillPrintClient() {
         .toLowerCase()
         .includes(query);
     });
-  }, [tagBill, q, rank, wing]);
+  }, [tagBill, q, rank, wing, memberType]);
 
   const leaveRows = useMemo(() => {
     if (!leaveBill) return [];
@@ -99,6 +103,7 @@ export default function ConsumeTagBillPrintClient() {
     return leaveBill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
+      if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
       if (!query) return true;
       return [
         row.user.name,
@@ -111,7 +116,7 @@ export default function ConsumeTagBillPrintClient() {
         .toLowerCase()
         .includes(query);
     });
-  }, [leaveBill, q, rank, wing]);
+  }, [leaveBill, q, rank, wing, memberType]);
 
   const tagWingBills = useMemo(
     () =>
@@ -151,7 +156,10 @@ export default function ConsumeTagBillPrintClient() {
   const showFuel = Boolean(
     tagBill && (fuelOnly || tagBill.tags.includes("FR") || tagBill.fuelRate > 0),
   );
-  const backHref = `/consume/monthly?month=${month}&tag=${filter}`;
+  const backHref =
+    memberType === "all"
+      ? `/consume/monthly?month=${month}&tag=${filter}`
+      : `/consume/monthly?month=${month}&tag=${filter}&member_type=${memberType}`;
   const canAct =
     filter === "leave-med" ? leaveRows.length > 0 : tagRows.length > 0;
   const rowCount = filter === "leave-med" ? leaveRows.length : tagRows.length;
@@ -166,6 +174,7 @@ export default function ConsumeTagBillPrintClient() {
         tagTotals: {},
         totalDays: 0,
         totalAmount: 0,
+        allowanceRate: leaveBill.rate,
         sections: leaveWingBills.map((group) => ({
           wingLabel: group.label,
           rows: group.rows,
@@ -192,6 +201,8 @@ export default function ConsumeTagBillPrintClient() {
       totalFuel: 0,
       grandTotal: 0,
       fuelOnly,
+      allowanceRate: tagBill.rate,
+      fuelRate: tagBill.fuelRate,
       sections: tagWingBills.map((group) => ({
         wingLabel: group.label,
         rows: group.rows,
@@ -306,6 +317,8 @@ export default function ConsumeTagBillPrintClient() {
               totalAmount={group.totalAmount}
               totalFuel={group.totalFuel}
               grandTotal={fuelOnly ? group.totalFuel : group.grandTotal}
+              allowanceRate={tagBill.rate}
+              fuelRate={tagBill.fuelRate}
               showFuel={showFuel}
               fuelOnly={fuelOnly}
               wingLabel={group.label}

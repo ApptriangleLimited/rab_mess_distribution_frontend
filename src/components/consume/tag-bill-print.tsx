@@ -3,6 +3,7 @@
 import { forwardRef } from "react";
 import { ConsumeReportMasthead } from "@/components/consume/consume-report-masthead";
 import { formatMonthDash } from "@/lib/date";
+import { formatBdtAmount } from "@/lib/money";
 import { formatBdt, type TagBillRow } from "@/lib/reports";
 import type { DailyTag } from "@/lib/types";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
@@ -20,6 +21,10 @@ type Props = {
   totalAmount: number;
   totalFuel: number;
   grandTotal: number;
+  /** Settings daily allowance rate shown in the column title. */
+  allowanceRate?: number;
+  /** Settings daily fuel rate shown in the column title. */
+  fuelRate?: number;
   showFuel: boolean;
   /** Fuel bill: FR+MFR days, Fuel ৳, grand total = fuel. No allowance column. */
   fuelOnly?: boolean;
@@ -42,6 +47,8 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       totalAmount,
       totalFuel,
       grandTotal,
+      allowanceRate,
+      fuelRate,
       showFuel,
       fuelOnly = false,
       wingLabel,
@@ -63,6 +70,8 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       ? t("consume.cdBillTitle", titleParts)
       : t("consume.frBillTitle", titleParts);
   const pages = chunkBillRows(rows);
+  const colCount =
+    7 + (showAllowance ? 1 : 0) + (showFuel || fuelOnly ? 1 : 0);
 
   return (
     <div
@@ -75,21 +84,29 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
     >
       {pages.map((pageRows, pageIndex) => {
         const lastPage = pageIndex === pages.length - 1;
+        const signed = lastPage && !fuelOnly;
         return (
       <section
         key={pageIndex}
         className={cn(
-          "consume-bill-page",
+          "consume-bill-page consume-bill-page--full",
+          signed && "consume-bill-page--signed",
           pageIndex > 0 && "consume-wing-break",
           preview &&
             "overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700",
         )}
       >
-      <div>
-      <ConsumeReportMasthead title={title} />
-
+      <div className="consume-bill-sheet">
       <table className="w-full border-collapse text-[11px] text-black">
         <thead>
+          <tr className="consume-bill-title-row">
+            <th
+              colSpan={colCount}
+              className="consume-bill-title-cell border-0 bg-white pb-2 text-center"
+            >
+              <ConsumeReportMasthead title={title} className="mb-0" />
+            </th>
+          </tr>
           <tr className="consume-col-titles border border-black bg-neutral-100">
             <th className="border border-black px-1.5 py-1">
               {fuelOnly ? "SI" : t("consume.colSl")}
@@ -103,13 +120,17 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
             </th>
             <th className="border border-black px-1.5 py-1">{tag}</th>
             {showAllowance ? (
-              <th className="border border-black px-1.5 py-1">
-                {t("consume.colFreshAmount")}
+              <th className="border border-black px-1.5 py-1 leading-tight">
+                {t("consume.colFreshAmountRate", {
+                  rate: formatBdtAmount(allowanceRate ?? rows[0]?.rate ?? 0),
+                })}
               </th>
             ) : null}
             {showFuel || fuelOnly ? (
-              <th className="border border-black px-1.5 py-1">
-                {t("consume.colFuelAmount")}
+              <th className="border border-black px-1.5 py-1 leading-tight">
+                {t("consume.colFuelAmountRate", {
+                  rate: formatBdtAmount(fuelRate ?? rows[0]?.fuelRate ?? 0),
+                })}
               </th>
             ) : null}
             <th className="border border-black px-1.5 py-1">
@@ -135,20 +156,20 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
               <td className="border border-black px-1.5 py-1">
                 {row.user.name}
               </td>
-              <td className="border border-black px-1.5 py-1 tabular-nums">
+              <td className="consume-num border border-black px-1.5 py-1 text-right tabular-nums">
                 {row.days}
               </td>
               {showAllowance ? (
-                <td className="consume-money border border-black px-1.5 py-1 tabular-nums">
+                <td className="consume-money consume-num border border-black px-1.5 py-1 text-right tabular-nums">
                   {formatBdt(row.amount)}
                 </td>
               ) : null}
               {showFuel || fuelOnly ? (
-                <td className="consume-money border border-black px-1.5 py-1 tabular-nums">
+                <td className="consume-money consume-num border border-black px-1.5 py-1 text-right tabular-nums">
                   {formatBdt(row.fuelAmount)}
                 </td>
               ) : null}
-              <td className="consume-money border border-black px-1.5 py-1 tabular-nums font-medium">
+              <td className="consume-money consume-num border border-black px-1.5 py-1 text-right tabular-nums font-medium">
                 {formatBdt(fuelOnly ? row.fuelAmount : row.grandTotal)}
               </td>
               <td className="border border-black px-1.5 py-1">
@@ -156,9 +177,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
               </td>
             </tr>
           ))}
-        </tbody>
-        {lastPage ? (
-        <tfoot>
+          {lastPage ? (
           <tr className="border border-black font-semibold">
             <td
               colSpan={4}
@@ -166,30 +185,29 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
             >
               {t("consume.billTotal")}
             </td>
-            <td className="border border-black px-1.5 py-1.5 tabular-nums">
+            <td className="consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
               {totalDays}
             </td>
             {showAllowance ? (
-              <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
+              <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
                 {formatBdt(totalAmount)}
               </td>
             ) : null}
             {showFuel || fuelOnly ? (
-              <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
+              <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
                 {formatBdt(totalFuel)}
               </td>
             ) : null}
-            <td className="consume-money border border-black px-1.5 py-1.5 tabular-nums">
+            <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
               {formatBdt(fuelOnly ? totalFuel : grandTotal)}
             </td>
             <td className="border border-black px-1.5 py-1.5" />
           </tr>
-        </tfoot>
-        ) : null}
+          ) : null}
+        </tbody>
       </table>
-      </div>
 
-      {lastPage && !fuelOnly ? (
+      {signed ? (
       <div className="consume-bill-signs">
       <ConsumeSignOff
         className="mt-0 grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
@@ -206,6 +224,7 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       />
       </div>
       ) : null}
+      </div>
       </section>
         );
       })}

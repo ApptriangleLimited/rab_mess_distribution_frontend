@@ -14,6 +14,11 @@ import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
+import { ConsumeMemberTypeSelect } from "@/components/consume/consume-member-type-select";
+import {
+  memberMatchesTypeFilter,
+  type ConsumeMemberTypeFilter,
+} from "@/lib/consume-filters";
 import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
 import {
   buildTagBill,
@@ -33,6 +38,8 @@ type Props = {
   onMonthChange: (month: string) => void;
   tiles?: ReactNode;
   source?: ReportSource;
+  memberType?: ConsumeMemberTypeFilter;
+  onMemberTypeChange?: (value: ConsumeMemberTypeFilter) => void;
   /** Fuel (FR+MFR) bill: no allowance column, grand total is the fuel. */
   fuelOnly?: boolean;
 };
@@ -45,6 +52,8 @@ export function TagBillPanel({
   onMonthChange,
   tiles,
   source,
+  memberType = "all",
+  onMemberTypeChange,
   fuelOnly = false,
 }: Props) {
   const t = useT();
@@ -64,13 +73,14 @@ export function TagBillPanel({
     return bill.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
+      if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.wing, row.user.rank]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [bill.rows, q, rank, wing]);
+  }, [bill.rows, q, rank, wing, memberType]);
 
   const tagKey = typeof tag === "string" ? tag : tag.join("+");
   const dayHeader = displayTag || tagKey;
@@ -123,6 +133,12 @@ export function TagBillPanel({
             className="w-[7.25rem] shrink"
             triggerClassName={cn(fieldClass, "w-full")}
           />
+          <ConsumeMemberTypeSelect
+            value={memberType}
+            onChange={onMemberTypeChange ?? (() => {})}
+            className="w-[9.5rem] shrink"
+            triggerClassName={cn(fieldClass, "w-full")}
+          />
           <WingSummaryButton
             month={month}
             wing={wing}
@@ -147,6 +163,8 @@ export function TagBillPanel({
                 totalAmount={group.totalAmount}
                 totalFuel={group.totalFuel}
                 grandTotal={fuelOnly ? group.totalFuel : group.grandTotal}
+                allowanceRate={bill.rate}
+                fuelRate={bill.fuelRate}
                 showFuel={showFuel}
                 fuelOnly={fuelOnly}
                 wingLabel={group.label}

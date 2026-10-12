@@ -5,6 +5,7 @@ import {
   officialFrDays,
   type OfficialConsumeTable,
 } from "@/lib/consume-official-reports";
+import { consumeHqLine } from "@/components/consume/consume-report-masthead";
 import { ConsumeSignOff } from "@/components/consume/consume-sign-off";
 import { cn } from "@/lib/utils";
 
@@ -49,11 +50,9 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
               {table.lines[0]}
             </p>
           ) : null}
-          {table.lines[1] ? (
-            <p className="wing-food-hq mt-1.5 text-[9px] font-normal leading-snug text-neutral-400">
-              {table.lines[1]}
-            </p>
-          ) : null}
+          <p className="wing-food-hq mt-1.5 text-[9px] font-normal leading-snug text-neutral-400">
+            {consumeHqLine()}
+          </p>
         </header>
 
         <table className="w-full border-collapse text-[10px] text-black">

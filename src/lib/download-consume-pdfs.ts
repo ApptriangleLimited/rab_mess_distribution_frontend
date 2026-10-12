@@ -214,6 +214,8 @@ export function downloadTagBillPdf(args: {
   totalAmount: number;
   totalFuel: number;
   grandTotal: number;
+  allowanceRate?: number;
+  fuelRate?: number;
   /** FR+MFR fuel bill: no allowance column, grand total is the fuel figure. */
   fuelOnly?: boolean;
   /** One bill per official wing. Each section keeps the same columns. */
@@ -238,6 +240,8 @@ export function downloadTagBillPdf(args: {
     totalFuel,
     grandTotal,
     fuelOnly = false,
+    allowanceRate,
+    fuelRate,
     sections,
     filename,
   } = args;
@@ -283,16 +287,18 @@ export function downloadTagBillPdf(args: {
     doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
     y += 16;
 
+    const dailyAllowance = amt(allowanceRate ?? section.rows[0]?.rate ?? 0);
+    const dailyFuel = amt(fuelRate ?? section.rows[0]?.fuelRate ?? 0);
     const head = fuelOnly
-      ? ["SI", "ID", "Rank", "Name", tag, "Fuel ৳", "Grand total", "Remarks"]
+      ? ["SI", "ID", "Rank", "Name", tag, `Fuel ৳${dailyFuel}`, "Grand total", "Remarks"]
       : [
           "SL",
           "Personal No",
           "Rank",
           "Name",
           tag,
-          "Allowance",
-          ...(showFuel ? ["Fuel"] : []),
+          `Allowance ৳${dailyAllowance}`,
+          ...(showFuel ? [`Fuel ৳${dailyFuel}`] : []),
           "Grand total",
           "Remarks",
         ];
@@ -329,6 +335,8 @@ export function downloadTagBillPdf(args: {
         cellPadding: 1.2,
         halign: "left",
         valign: "middle",
+        lineColor: [0, 0, 0],
+        lineWidth: 0.2,
       },
       headStyles: {
         fillColor: [235, 235, 235],
@@ -336,16 +344,19 @@ export function downloadTagBillPdf(args: {
         fontStyle: "bold",
         halign: "center",
         valign: "middle",
+        lineColor: [0, 0, 0],
+        lineWidth: 0.2,
       },
       theme: "grid",
       margin: { left: 12, right: 12, bottom: 28 },
       didParseCell: (data) => {
-        if (data.section === "body" && data.column.index === 0) {
-          data.cell.styles.halign = "center";
-        }
         if (data.section === "head") return;
-        const moneyCols = fuelOnly ? [5, 6] : showFuel ? [5, 6, 7] : [5, 6];
-        if (moneyCols.includes(data.column.index)) {
+        if (data.column.index === 0) {
+          data.cell.styles.halign = "center";
+          return;
+        }
+        const last = data.table.columns.length - 1;
+        if (data.column.index >= 4 && data.column.index < last) {
           data.cell.styles.halign = "right";
         }
       },
@@ -361,14 +372,14 @@ export function downloadTagBillPdf(args: {
       fuelOnly
         ? [
             { text: "Total", colSpan: 4, align: "left" },
-            { text: String(section.totalDays), align: "left" },
+            { text: String(section.totalDays), align: "right" },
             { text: amt(section.totalFuel), align: "right" },
             { text: amt(section.totalFuel), align: "right" },
             { text: "" },
           ]
         : [
             { text: "Total", colSpan: 4, align: "left" },
-            { text: String(section.totalDays), align: "left" },
+            { text: String(section.totalDays), align: "right" },
             { text: amt(section.totalAmount), align: "right" },
             ...(showFuel
               ? [{ text: amt(section.totalFuel), align: "right" as const }]
@@ -391,6 +402,7 @@ export function downloadLeaveMedBillPdf(args: {
   tagTotals: Partial<Record<DailyTag, number>>;
   totalDays: number;
   totalAmount: number;
+  allowanceRate?: number;
   sections?: {
     wingLabel: string;
     rows: LeaveMedBillRow[];
@@ -400,7 +412,7 @@ export function downloadLeaveMedBillPdf(args: {
   }[];
   filename?: string;
 }) {
-  const { month, tags, rows, tagTotals, totalDays, totalAmount, sections, filename } =
+  const { month, tags, rows, tagTotals, totalDays, totalAmount, allowanceRate, sections, filename } =
     args;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -439,7 +451,7 @@ export function downloadLeaveMedBillPdf(args: {
       "Name",
       ...tags,
       "Total",
-      "Fresh money babod taka",
+      `Fresh money ৳${amt(allowanceRate ?? section.rows[0]?.rate ?? 0)}`,
       "Remarks",
     ];
     const body = pageRows.map((r) => [
@@ -461,6 +473,8 @@ export function downloadLeaveMedBillPdf(args: {
         cellPadding: 1,
         halign: "left",
         valign: "middle",
+        lineColor: [0, 0, 0],
+        lineWidth: 0.2,
       },
       headStyles: {
         fillColor: [235, 235, 235],
@@ -468,12 +482,20 @@ export function downloadLeaveMedBillPdf(args: {
         fontStyle: "bold",
         halign: "center",
         valign: "middle",
+        lineColor: [0, 0, 0],
+        lineWidth: 0.2,
       },
       theme: "grid",
       margin: { left: 10, right: 10, bottom: 28 },
       didParseCell: (data) => {
-        if (data.section === "body" && data.column.index === 0) {
+        if (data.section === "head") return;
+        if (data.column.index === 0) {
           data.cell.styles.halign = "center";
+          return;
+        }
+        const last = data.table.columns.length - 1;
+        if (data.column.index >= 4 && data.column.index < last) {
+          data.cell.styles.halign = "right";
         }
       },
       didDrawCell: (data) => {
@@ -487,10 +509,10 @@ export function downloadLeaveMedBillPdf(args: {
       { text: "Total", colSpan: 4, align: "left" },
       ...tags.map((code) => ({
         text: section.tagTotals[code] ? String(section.tagTotals[code]) : "",
-        align: "left" as const,
+        align: "right" as const,
       })),
-      { text: section.totalDays ? String(section.totalDays) : "", align: "left" },
-      { text: amt(section.totalAmount), align: "left" },
+      { text: section.totalDays ? String(section.totalDays) : "", align: "right" },
+      { text: amt(section.totalAmount), align: "right" },
       { text: "" },
     ]);
     drawConsumeBillSigns(doc, afterTable + 12, true);
