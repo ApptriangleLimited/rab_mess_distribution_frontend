@@ -441,7 +441,7 @@ function letterSheetCss() {
     background: transparent !important;
     text-align: center !important;
     vertical-align: top !important;
-    width: 16.66% !important;
+    width: 20% !important;
     padding: 24px 6px 0 !important;
     white-space: normal !important;
     word-break: normal !important;

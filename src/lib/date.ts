@@ -6,26 +6,22 @@ export function todayISO() {
   return `${y}-${m}-${day}`;
 }
 
-/**
- * Temporary Daily RR window. Days in this range can be edited even though
- * they are before today. Clear both strings to lock them again.
- */
-export const DAILY_RR_OPEN_FROM = "2026-10-01";
-export const DAILY_RR_OPEN_TO = "2026-10-06";
+/** First day of `today`'s calendar month (`YYYY-MM-01`). */
+export function monthStartISO(today = todayISO()): string {
+  return `${today.slice(0, 7)}-01`;
+}
 
+/**
+ * Daily RR: today and future stay open. Past days stay open only in the
+ * current calendar month (so October 1–today can still be painted).
+ */
 export function isDailyDateEditable(date: string, today = todayISO()): boolean {
   if (date >= today) return true;
-  return (
-    Boolean(DAILY_RR_OPEN_FROM) &&
-    Boolean(DAILY_RR_OPEN_TO) &&
-    date >= DAILY_RR_OPEN_FROM &&
-    date <= DAILY_RR_OPEN_TO
-  );
+  return date.slice(0, 7) === today.slice(0, 7);
 }
 
 export function dailyEditMinDate(today = todayISO()): string {
-  if (!DAILY_RR_OPEN_FROM || DAILY_RR_OPEN_FROM >= today) return today;
-  return DAILY_RR_OPEN_FROM;
+  return monthStartISO(today);
 }
 
 export function nowISO() {

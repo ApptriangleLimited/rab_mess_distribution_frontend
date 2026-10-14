@@ -117,12 +117,11 @@ export const WingSummaryPrint = forwardRef<HTMLDivElement, Props>(
       </table>
 
       <ConsumeSignOff
-        className="grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
+        className="grid-cols-2 gap-4 text-[11px] sm:grid-cols-5"
         labels={(
           [
             "consume.signDailySi",
             "consume.signConsumeSi",
-            "consume.signScheduleSi",
             "consume.signSeniorDad",
             "consume.signMessPresident",
             "consume.signLastOfficer",

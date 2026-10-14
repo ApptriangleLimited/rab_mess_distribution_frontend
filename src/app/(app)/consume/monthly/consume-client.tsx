@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   IconCalendarStats,
   IconCoin,
+  IconDownload,
   IconPrinter,
   IconUserCheck,
   IconUsers,
@@ -32,6 +33,11 @@ import {
   type ConsumeFilter,
   type ConsumeMemberTypeFilter,
 } from "@/lib/consume-filters";
+import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
+import {
+  downloadLeaveMedBillPdf,
+  downloadTagBillPdf,
+} from "@/lib/download-consume-pdfs";
 import { monthKey } from "@/lib/date";
 import {
   buildLeaveMedBill,
@@ -39,6 +45,7 @@ import {
   formatBdt,
   withReportSource,
 } from "@/lib/reports";
+import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -178,6 +185,74 @@ export default function ConsumeMonthlyClient() {
       ? `/consume/monthly/print?month=${month}&tag=${filter}`
       : `/consume/monthly/print?month=${month}&tag=${filter}&member_type=${memberType}`;
   const exportDisabled = headerStats.members === 0;
+
+  function onDownload() {
+    if (exportDisabled) return;
+    if (filter === "leave-med" && leaveBill) {
+      const rows = leaveBill.rows.filter((row) =>
+        memberMatchesTypeFilter(row.user.member_type, memberType),
+      );
+      downloadLeaveMedBillPdf({
+        month,
+        tags: filterTags,
+        rows,
+        tagTotals: {},
+        totalDays: 0,
+        totalAmount: 0,
+        allowanceRate: leaveBill.rate,
+        sections: groupRowsByOfficialWing(rows).map((group) => {
+          const tagTotals: Partial<Record<DailyTag, number>> = {};
+          for (const code of filterTags) {
+            tagTotals[code] = group.rows.reduce(
+              (s, r) => s + (r.tagDays[code] ?? 0),
+              0,
+            );
+          }
+          return {
+            wingLabel: group.label,
+            rows: group.rows,
+            tagTotals,
+            totalDays: group.rows.reduce((s, r) => s + r.totalDays, 0),
+            totalAmount: group.rows.reduce((s, r) => s + r.amount, 0),
+          };
+        }),
+        filename: `consume-bill-${month}-${filter}.pdf`,
+      });
+      return;
+    }
+    if (!tagBill) return;
+    const rows = tagBill.rows.filter((row) =>
+      memberMatchesTypeFilter(row.user.member_type, memberType),
+    );
+    const fuelOnly = filter === "fuel";
+    const showFuel = fuelOnly || tagBill.tags.includes("FR") || tagBill.fuelRate > 0;
+    downloadTagBillPdf({
+      month,
+      tag: filterLabel,
+      tagLabel: filterLabel,
+      rows,
+      showFuel,
+      totalDays: 0,
+      totalAmount: 0,
+      totalFuel: 0,
+      grandTotal: 0,
+      fuelOnly,
+      allowanceRate: tagBill.rate,
+      fuelRate: tagBill.fuelRate,
+      sections: groupRowsByOfficialWing(rows).map((group) => ({
+        wingLabel: group.label,
+        rows: group.rows,
+        totalDays: group.rows.reduce((s, r) => s + r.days, 0),
+        totalAmount: group.rows.reduce((s, r) => s + r.amount, 0),
+        totalFuel: group.rows.reduce((s, r) => s + r.fuelAmount, 0),
+        grandTotal: group.rows.reduce(
+          (s, r) => s + (fuelOnly ? r.fuelAmount : r.grandTotal),
+          0,
+        ),
+      })),
+      filename: `consume-bill-${month}-${filter}.pdf`,
+    });
+  }
   const amountLabel =
     filter === "fr-mfr" || filter === "fuel"
       ? t("consume.colGrandTotal")
@@ -236,6 +311,17 @@ export default function ConsumeMonthlyClient() {
               center={<ConsumePanelTabs />}
               actions={
                 <div className="flex flex-wrap items-center gap-2 no-print">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-xl"
+                    disabled={exportDisabled}
+                    onClick={onDownload}
+                  >
+                    <IconDownload className="h-3.5 w-3.5" />
+                    {t("consume.exportPdf")}
+                  </Button>
                   {!exportDisabled ? (
                     <Button
                       asChild

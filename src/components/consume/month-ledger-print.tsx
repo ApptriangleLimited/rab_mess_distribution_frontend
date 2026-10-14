@@ -371,12 +371,10 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
         <div className="consume-bill-signs">
         <ConsumeSignOff
           className="mt-0 text-[8px]"
-          centerAll={signEveryPage}
           labels={(
             [
               "consume.signDailySi",
               "consume.signConsumeSi",
-              "consume.signScheduleSi",
               "consume.signSeniorDad",
               "consume.signMessPresident",
               "consume.signLastOfficer",

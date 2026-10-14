@@ -6,6 +6,7 @@ import type { DailyTag } from "@/lib/types";
 import type { LedgerRow } from "@/lib/reports";
 import { chunkBillRows, CONSUME_BILL_ROWS_PER_PAGE } from "@/lib/consume-bill-pages";
 import { consumeRankShort } from "@/lib/consume-rank-short";
+import { drawConsumeReportSigns, drawUnderlinedCenter } from "@/lib/consume-pdf-signs";
 import { tagPrintFill } from "@/lib/tag-colors";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 
@@ -29,6 +30,10 @@ type Args = {
   /** One ledger per official wing. Each copy keeps the same columns. */
   sections?: { wingLabel: string; rows: LedgerRow[] }[];
   filename?: string;
+  /** Consume print preview: signs under every page, not only the last. */
+  signEveryPage?: boolean;
+  /** Consume print preview: page total on every page; grand total on the last. */
+  totalEveryPage?: boolean;
 };
 
 export function downloadConsumeLedgerPdf({
@@ -40,10 +45,11 @@ export function downloadConsumeLedgerPdf({
   columnDates,
   sections,
   filename,
+  signEveryPage = false,
+  totalEveryPage = false,
 }: Args) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
   const monthLabel = formatMonthLong(month).toUpperCase();
   const rangeMode = Boolean(columnDates?.length);
   const dayHeaders = columnDates?.length
@@ -62,25 +68,25 @@ export function downloadConsumeLedgerPdf({
       const lastPage = pageIndex === pageGroups.length - 1;
       let y = 8;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text(section.wingLabel.toUpperCase(), pageW / 2, y, { align: "center" });
-      y += 4.2;
-      doc.text(
+      doc.setFontSize(11);
+      drawUnderlinedCenter(doc, section.wingLabel.toUpperCase(), pageW, y);
+      y += 5.2;
+      drawUnderlinedCenter(
+        doc,
         `FORCES MESS FOOD CONSUMPTION LIST — ${monthLabel}`,
-        pageW / 2,
+        pageW,
         y,
-        { align: "center" },
       );
-      y += 3.6;
+      y += 5;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.text(
-        `${CONSUME_REPORT_META.orgName}, ${CONSUME_REPORT_META.station}`,
-        pageW / 2,
+      drawUnderlinedCenter(
+        doc,
+        `${CONSUME_REPORT_META.orgName}, ${CONSUME_REPORT_META.station}`.toUpperCase(),
+        pageW,
         y,
-        { align: "center" },
       );
-      y += 8;
+      y += 7;
 
       const head = [
         "SL",
@@ -107,24 +113,42 @@ export function downloadConsumeLedgerPdf({
         ),
         row.totalDays ? String(row.totalDays) : "",
       ]);
-      const tagTotals = tagCodes.map((code) =>
-        String(
-          section.rows.reduce((s, r) => s + (r.tagCounts[code] ?? 0), 0) || "",
+      const totalFoot = (label: string, sourceRows: LedgerRow[]) => [
+        "",
+        "",
+        "",
+        "",
+        label,
+        ...Array.from({ length: dayHeaders.length }, () => ""),
+        ...tagCodes.map((code) =>
+          String(sourceRows.reduce((s, r) => s + (r.tagCounts[code] ?? 0), 0) || ""),
         ),
-      );
-      const grandDays = section.rows.reduce((s, r) => s + r.totalDays, 0);
-      const foot = [
-        "Grand total",
-        ...Array.from({ length: 4 + dayHeaders.length }, () => ""),
-        ...tagTotals,
-        String(grandDays || ""),
+        String(sourceRows.reduce((s, r) => s + r.totalDays, 0) || ""),
       ];
+      const multiPage = pageGroups.length > 1;
+      const foot: string[][] = [];
+      if (totalEveryPage) {
+        if (multiPage) foot.push(totalFoot("Page total", pageRows));
+        if (lastPage) foot.push(totalFoot("Grand total", section.rows));
+      } else if (lastPage) {
+        foot.push([
+          "Grand total",
+          ...Array.from({ length: 4 + dayHeaders.length }, () => ""),
+          ...tagCodes.map((code) =>
+            String(
+              section.rows.reduce((s, r) => s + (r.tagCounts[code] ?? 0), 0) || "",
+            ),
+          ),
+          String(section.rows.reduce((s, r) => s + r.totalDays, 0) || ""),
+        ]);
+      }
+      const showSigns = lastPage || signEveryPage;
 
       autoTable(doc, {
         startY: y,
         head: [head],
         body,
-        foot: lastPage ? [foot] : undefined,
+        foot: foot.length ? foot : undefined,
         styles: {
           fontSize: 6.5,
           cellPadding: 0.8,
@@ -161,7 +185,7 @@ export function downloadConsumeLedgerPdf({
           4: { cellWidth: 36, halign: "left", overflow: "linebreak" },
         },
         theme: "grid",
-        margin: { left: 6, right: 6, bottom: lastPage ? 28 : 10 },
+        margin: { left: 6, right: 6, bottom: showSigns ? 28 : 10 },
         tableWidth: "auto",
         didParseCell: (data) => {
           if (data.section === "body" && data.column.index === 0) {
@@ -170,9 +194,13 @@ export function downloadConsumeLedgerPdf({
           if (data.section === "body" && data.column.index >= 5) {
             data.cell.styles.halign = "center";
           }
-          if (data.section === "foot" && data.column.index === 0) {
-            data.cell.colSpan = 5 + dayHeaders.length;
-            data.cell.styles.halign = "left";
+          if (data.section === "foot") {
+            if (totalEveryPage) {
+              if (data.column.index === 4) data.cell.styles.halign = "center";
+            } else if (data.column.index === 0) {
+              data.cell.colSpan = 5 + dayHeaders.length;
+              data.cell.styles.halign = "left";
+            }
           }
           if (data.section !== "body" || data.column.index < 5) return;
           if (data.column.index >= 5 + dayHeaders.length) return;
@@ -189,32 +217,8 @@ export function downloadConsumeLedgerPdf({
         },
       });
 
-      if (!lastPage) return;
-
-      const signs = [
-        ["Daily SI"],
-        ["Consume SI"],
-        ["Mess CQ SI"],
-        ["Senior DAD (Admin)"],
-        ["President", "Mess Committee, Forces Mess"],
-        ["Major", "Deputy Director (HQ)", "SRB Forces Headquarters"],
-      ];
-      const signBlockH = 18;
-      const after = pageH - 8 - signBlockH;
-      const gap = pageW / signs.length;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.5);
-      signs.forEach((lines, i) => {
-        const leftAlign = i >= signs.length - 2;
-        const x = leftAlign ? gap * i + 4 : gap * i + gap / 2;
-        if (leftAlign) doc.line(x, after, x + 32, after);
-        else doc.line(x - 16, after, x + 16, after);
-        lines.forEach((line, li) => {
-          doc.text(line, x, after + 3.6 + li * 3.1, {
-            align: leftAlign ? "left" : "center",
-          });
-        });
-      });
+      if (!showSigns) return;
+      drawConsumeReportSigns(doc, { pinToPageEnd: true, marginX: 6 });
     });
   });
 

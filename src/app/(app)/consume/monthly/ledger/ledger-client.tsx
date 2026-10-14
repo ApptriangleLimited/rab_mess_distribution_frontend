@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { IconFileAnalytics, IconPrinter } from "@tabler/icons-react";
+import { IconDownload, IconFileAnalytics, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
@@ -32,7 +32,12 @@ import { useReportSource } from "@/hooks/use-report-source";
 import { useSession } from "@/hooks/use-session";
 import { useStore } from "@/hooks/use-store";
 
-import { CONSUME_LEDGER_SOURCE_TAGS } from "@/lib/constants";
+import {
+  CONSUME_REPORT_LEDGER_SOURCE_TAGS,
+  CONSUME_REPORT_LEDGER_TAGS,
+} from "@/lib/constants";
+import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
+import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { monthDateBounds } from "@/lib/date";
 import {
@@ -94,9 +99,10 @@ export default function ConsumeLedgerClient() {
         buildRangeLedger(
           rangeBounds.from,
           rangeBounds.to,
-          CONSUME_LEDGER_SOURCE_TAGS,
+          CONSUME_REPORT_LEDGER_SOURCE_TAGS,
           { carry: true },
         ),
+        CONSUME_REPORT_LEDGER_TAGS,
       ),
     );
     return {
@@ -142,6 +148,24 @@ export default function ConsumeLedgerClient() {
   }, [month, q, rank, wing, memberType, dateFrom, dateTo]);
 
   const fieldClass = searchFilterFieldClass;
+  function onDownload() {
+    if (rows.length === 0) return;
+    downloadConsumeLedgerPdf({
+      month,
+      dayCount: ledger.dayCount,
+      tagCodes: ledger.tagCodes,
+      rows,
+      columnDates: ledger.columnDates,
+      sections: groupRowsByOfficialWing(rows).map((group) => ({
+        wingLabel: group.label,
+        rows: group.rows,
+      })),
+      filename: `consume-ledger-${month}.pdf`,
+      signEveryPage: true,
+      totalEveryPage: true,
+    });
+  }
+
   const printBtn =
     rows.length > 0 ? (
       <Button
@@ -202,6 +226,17 @@ export default function ConsumeLedgerClient() {
           }
           trailing={
             <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 shrink-0 rounded-xl px-3"
+                disabled={rows.length === 0}
+                onClick={onDownload}
+              >
+                <IconDownload className="h-4 w-4" />
+                {t("consume.exportPdf")}
+              </Button>
               {printBtn}
               {canGenerateReport ? (
                 <Button

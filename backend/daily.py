@@ -12,18 +12,15 @@ from models import Assignment, BoroKhanaDay, DayLock, Member, Staff, SuppressedC
 from schemas import normalize_tag
 
 DAILY_WRITE = ("daily", "admin")
-# Temporary. Daily RR may edit these past days. Set both to None to lock them again.
-DAILY_RR_OPEN_FROM = date(2026, 10, 1)
-DAILY_RR_OPEN_TO = date(2026, 10, 6)
 router = APIRouter()
 
 
 def daily_day_writable(day: date) -> bool:
-    if day >= date.today():
+    """Today/future always writable. Past days only in the current month."""
+    today = date.today()
+    if day >= today:
         return True
-    if DAILY_RR_OPEN_FROM is None or DAILY_RR_OPEN_TO is None:
-        return False
-    return DAILY_RR_OPEN_FROM <= day <= DAILY_RR_OPEN_TO
+    return day.year == today.year and day.month == today.month
 
 
 def utcnow() -> datetime:

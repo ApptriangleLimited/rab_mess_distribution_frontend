@@ -15,7 +15,7 @@ export const JL_TAG = "JL" as const;
 
 /** After Daily assigns MFR, the member stays MFR while active. */
 export function isMfrLocked(user: Pick<User, "default_tag">): boolean {
-  return (user.default_tag ?? "").toUpperCase() === MFR_TAG;
+  return (user.default_tag ?? "").trim().toUpperCase() === MFR_TAG;
 }
 
 export function isMfrTag(tag: DailyTag | "" | undefined): boolean {

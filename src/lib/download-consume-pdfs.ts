@@ -3,6 +3,10 @@ import autoTable from "jspdf-autotable";
 import { consumeHqLine } from "@/components/consume/consume-report-masthead";
 import { chunkBillRows } from "@/lib/consume-bill-pages";
 import { consumeRankShort } from "@/lib/consume-rank-short";
+import {
+  drawConsumeReportSigns,
+  drawUnderlinedCenter,
+} from "@/lib/consume-pdf-signs";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import { formatMonthDash, formatMonthLong } from "@/lib/date";
 import type { DailyTag } from "@/lib/types";
@@ -17,41 +21,15 @@ function consumeWingBillTitle(head: string, wing: string, monthLabel: string) {
   const wingPart = wing.trim().toUpperCase();
   const monthPart = monthLabel.toUpperCase();
   return wingPart
-    ? `${head} – ${wingPart} – ${monthPart}`
-    : `${head} – ${monthPart}`;
+    ? `${head} - ${wingPart} - ${monthPart}`
+    : `${head} - ${monthPart}`;
 }
 
-const CONSUME_BILL_SIGNS = [
-  ["Daily SI"],
-  ["Consume SI"],
-  ["Mess CQ SI"],
-  ["Senior DAD (Admin)"],
-  ["President", "Mess Committee, Forces Mess"],
-  ["Major", "Deputy Director (HQ)", "SRB Forces Headquarters"],
-] as const;
-
 function drawConsumeBillSigns(doc: jsPDF, afterY: number, pinToPageEnd = false) {
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const signBlockH = 24;
-  let after = pinToPageEnd ? pageH - 10 - signBlockH : afterY;
-  if (!pinToPageEnd && after + signBlockH > pageH - 8) {
-    doc.addPage();
-    after = 16;
-  }
-  const gap = pageW / CONSUME_BILL_SIGNS.length;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  CONSUME_BILL_SIGNS.forEach((lines, i) => {
-    const leftAlign = i >= CONSUME_BILL_SIGNS.length - 2;
-    const x = leftAlign ? gap * i + 3 : gap * i + gap / 2;
-    if (leftAlign) doc.line(x, after, x + 28, after);
-    else doc.line(x - 14, after, x + 14, after);
-    lines.forEach((line, li) => {
-      doc.text(line, x, after + 3.8 + li * 3.2, {
-        align: leftAlign ? "left" : "center",
-      });
-    });
+  drawConsumeReportSigns(doc, {
+    afterY: pinToPageEnd ? undefined : afterY,
+    pinToPageEnd,
+    marginX: 10,
   });
 }
 
@@ -277,28 +255,25 @@ export function downloadTagBillPdf(args: {
     const title = consumeWingBillTitle(titleHead, section.wingLabel, monthLabel);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(title, pageW / 2, y, { align: "center" });
-    const titleW = doc.getTextWidth(title);
-    doc.setLineWidth(0.35);
-    doc.line((pageW - titleW) / 2, y + 1.2, (pageW + titleW) / 2, y + 1.2);
-    y += 6;
+    drawUnderlinedCenter(doc, title.toUpperCase(), pageW, y);
+    y += 6.2;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
-    y += 16;
+    doc.setFontSize(8);
+    drawUnderlinedCenter(doc, consumeHqLine().toUpperCase(), pageW, y);
+    y += 10;
 
     const dailyAllowance = amt(allowanceRate ?? section.rows[0]?.rate ?? 0);
     const dailyFuel = amt(fuelRate ?? section.rows[0]?.fuelRate ?? 0);
     const head = fuelOnly
-      ? ["SI", "ID", "Rank", "Name", tag, `Fuel ৳${dailyFuel}`, "Grand total", "Remarks"]
+      ? ["SI", "ID", "Rank", "Name", tag, `Fuel Tk ${dailyFuel}`, "Grand total", "Remarks"]
       : [
           "SL",
           "Personal No",
           "Rank",
           "Name",
           tag,
-          `Allowance ৳${dailyAllowance}`,
-          ...(showFuel ? [`Fuel ৳${dailyFuel}`] : []),
+          `Allowance Tk ${dailyAllowance}`,
+          ...(showFuel ? [`Fuel Tk ${dailyFuel}`] : []),
           "Grand total",
           "Remarks",
         ];
@@ -434,15 +409,12 @@ export function downloadLeaveMedBillPdf(args: {
     const title = consumeWingBillTitle(titleHead, section.wingLabel, monthLabel);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(title, pageW / 2, y, { align: "center" });
-    const titleW = doc.getTextWidth(title);
-    doc.setLineWidth(0.35);
-    doc.line((pageW - titleW) / 2, y + 1.2, (pageW + titleW) / 2, y + 1.2);
-    y += 6;
+    drawUnderlinedCenter(doc, title.toUpperCase(), pageW, y);
+    y += 6.2;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(consumeHqLine(), pageW / 2, y, { align: "center" });
-    y += 16;
+    doc.setFontSize(8);
+    drawUnderlinedCenter(doc, consumeHqLine().toUpperCase(), pageW, y);
+    y += 10;
 
     const head = [
       "SL",
@@ -451,7 +423,7 @@ export function downloadLeaveMedBillPdf(args: {
       "Name",
       ...tags,
       "Total",
-      `Fresh money ৳${amt(allowanceRate ?? section.rows[0]?.rate ?? 0)}`,
+      `Fresh money Tk ${amt(allowanceRate ?? section.rows[0]?.rate ?? 0)}`,
       "Remarks",
     ];
     const body = pageRows.map((r) => [

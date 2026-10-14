@@ -181,7 +181,7 @@ export default function TagsPageClient() {
     () => assignmentMonths.flatMap((m) => listByMonth(m)),
     [state.assignments, assignmentMonths],
   );
-  const assignments = apiOn ? cockpit.assignments : demoAssignments;
+  const assignments = apiOn ? cockpit.displayAssignments : demoAssignments;
 
   const demoPriorByUser = useMemo(() => {
     const map = new Map<string, DailyTag>();
@@ -389,6 +389,7 @@ export default function TagsPageClient() {
                   <SettingsWingFilter
                     value={wing}
                     onChange={setWing}
+                    rootsOnly
                     className="w-[7.25rem] shrink-0"
                     triggerClassName={cn(fieldClass, "h-9 w-full rounded-xl")}
                   />

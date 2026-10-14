@@ -510,7 +510,7 @@ export function buildTagBill(
 
 export function buildLeaveMedBill(
   month: string,
-  tags: readonly DailyTag[] = ["CL", "PL", "TRG", "WIT", "MED", "BGH", "LNK"],
+  tags: readonly DailyTag[] = ["CL", "JL", "TRG", "WIT", "MED", "BGH", "LNK"],
 ): {
   month: string;
   tags: DailyTag[];
@@ -834,10 +834,10 @@ export function buildRangeLedger(
 /** FR result column = FR + MFR. Display columns hide the separate MFR header. */
 export function presentConsumeLedger<
   T extends { tagCodes: DailyTag[]; rows: LedgerRow[] },
->(built: T): T {
+>(built: T, displayTags: readonly DailyTag[] = CONSUME_LEDGER_TAGS): T {
   return {
     ...built,
-    tagCodes: [...CONSUME_LEDGER_TAGS],
+    tagCodes: [...displayTags],
     rows: built.rows.map((row) => {
       const mfr = row.tagCounts.MFR ?? 0;
       if (!mfr) return row;

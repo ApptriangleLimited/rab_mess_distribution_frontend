@@ -17,7 +17,6 @@ type Props = {
 const SIGNS = [
   "Daily SI",
   "Consume SI",
-  "Mess CQ SI",
   "Senior DAD (Admin)",
   "President\nMess Committee, Forces Mess",
   "Major\nDeputy Director (HQ)\nSRB Forces Headquarters",
@@ -64,7 +63,7 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
               <th className="border border-black px-1 py-1">MS</th>
               <th className="border border-black px-1 py-1">FR</th>
               <th className="border border-black px-1 py-1">CL</th>
-              <th className="border border-black px-1 py-1">PL</th>
+              <th className="border border-black px-1 py-1">JL</th>
               <th className="border border-black px-1 py-1">CD</th>
               <th className="border border-black px-1 py-1">TRG</th>
               <th className="border border-black px-1 py-1">WT</th>
@@ -111,7 +110,7 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
                   {cell(row.tagDays.CL ?? 0)}
                 </td>
                 <td className="border border-black px-1 py-0.5 text-center tabular-nums">
-                  {cell(row.tagDays.PL ?? 0)}
+                  {cell(row.tagDays.JL ?? 0)}
                 </td>
                 <td className="border border-black px-1 py-0.5 text-center tabular-nums">
                   {cell(row.tagDays.CD ?? 0)}
@@ -143,7 +142,7 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
         </table>
 
         <ConsumeSignOff
-          className="grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
+          className="grid-cols-2 gap-4 text-[11px] sm:grid-cols-5"
           labels={[...SIGNS]}
         />
       </div>

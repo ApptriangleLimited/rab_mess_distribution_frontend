@@ -5,6 +5,7 @@ import { ApiClientError } from "@/lib/api/client";
 import {
   assignmentSummary,
   cellsToAssignments,
+  cellsToCountedAssignments,
   cellsToSuppressed,
   deleteAssignment,
   listAssignments,
@@ -153,6 +154,12 @@ export function useDailyCockpit({
     [cells],
   );
 
+  /** Stored + carry — Daily RR must show default MFR, not only saved paints. */
+  const displayAssignments = useMemo(
+    () => cellsToCountedAssignments(cells),
+    [cells],
+  );
+
   const suppressedCarries = useMemo(
     () => cellsToSuppressed(cells),
     [cells],
@@ -290,6 +297,7 @@ export function useDailyCockpit({
     users,
     cells,
     assignments,
+    displayAssignments,
     suppressedCarries,
     boroKhanaDates,
     approvedDates,

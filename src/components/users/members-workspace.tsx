@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { IconPlus, IconPrinter } from "@tabler/icons-react";
+import { IconClipboardList, IconPlus, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { IconTip } from "@/components/shared/icon-tip";
@@ -102,7 +102,9 @@ export function MembersWorkspace({ tabs }: { tabs: ReactNode }) {
   const users = apiOn ? apiUsers : demoUsers;
 
   const subtitleCount = apiOn ? apiTotal : demoUsers.length;
-  const printHref = `/cc/users/print?${userFiltersToSearchParams(filters).toString()}`;
+  const filterQuery = userFiltersToSearchParams(filters).toString();
+  const printHref = `/cc/users/print?${filterQuery}`;
+  const listReportHref = `/cc/users/list-report?${filterQuery}`;
   const canPrint = apiOn ? apiTotal > 0 : demoUsers.length > 0;
 
   function setFiltersAndResetPage(next: UserFilters) {
@@ -162,6 +164,37 @@ export function MembersWorkspace({ tabs }: { tabs: ReactNode }) {
                       >
                         <IconPrinter className="h-3.5 w-3.5" />
                         {t("mess.print")}
+                      </Button>
+                    </IconTip>
+                  )}
+                  {canPrint ? (
+                    <IconTip label={t("cc.fullMemberListReportTitle")}>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                      >
+                        <Link
+                          href={listReportHref}
+                          title={t("cc.fullMemberListReportTitle")}
+                        >
+                          <IconClipboardList className="h-3.5 w-3.5" />
+                          {t("cc.fullMemberListReportTitle")}
+                        </Link>
+                      </Button>
+                    </IconTip>
+                  ) : (
+                    <IconTip label={t("cc.fullMemberListReportTitle")}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        disabled
+                        title={t("cc.fullMemberListReportTitle")}
+                      >
+                        <IconClipboardList className="h-3.5 w-3.5" />
+                        {t("cc.fullMemberListReportTitle")}
                       </Button>
                     </IconTip>
                   )}

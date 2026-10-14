@@ -65,6 +65,21 @@ export const CONSUME_LEDGER_TAGS: DailyTag[] = [
   "WR",
 ];
 
+/** Consume-user reports only — JL column and JL days, not PL. */
+export const CONSUME_REPORT_LEDGER_TAGS: DailyTag[] = [
+  "MS",
+  "FR",
+  "CL",
+  "JL",
+  "CD",
+  "TRG",
+  "WIT",
+  "MED",
+  "BGH",
+  "LNK",
+  "WR",
+];
+
 /** Day marks included in the consume ledger. MFR days roll into the FR column. */
 export const CONSUME_LEDGER_SOURCE_TAGS: DailyTag[] = [
   "MS",
@@ -72,6 +87,22 @@ export const CONSUME_LEDGER_SOURCE_TAGS: DailyTag[] = [
   "MFR",
   "CL",
   "PL",
+  "CD",
+  "TRG",
+  "WIT",
+  "MED",
+  "BGH",
+  "LNK",
+  "WR",
+];
+
+/** Consume-user ledger source — counts JL days, ignores PL. */
+export const CONSUME_REPORT_LEDGER_SOURCE_TAGS: DailyTag[] = [
+  "MS",
+  "FR",
+  "MFR",
+  "CL",
+  "JL",
   "CD",
   "TRG",
   "WIT",

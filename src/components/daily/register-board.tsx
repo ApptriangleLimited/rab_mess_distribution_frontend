@@ -53,6 +53,7 @@ import { useStore } from "@/hooks/use-store";
 import {
   canAssignOnDate,
   canWriteMfrLockedTag,
+  isFrTag,
   isMfrLocked,
   isUserInactiveOnDate,
   FR_TAG,
@@ -827,9 +828,10 @@ export function RegisterBoard({
                     continue;
                   }
                   if (mfrLocked) {
+                    const painted = byUserDate.get(`${user.id}|${date}`)?.tag;
                     rowMeta.push({
                       date,
-                      stored: MFR_TAG,
+                      stored: isFrTag(painted) ? painted : MFR_TAG,
                       ghost: undefined,
                       afterOut: false,
                       inactiveOnDate: false,

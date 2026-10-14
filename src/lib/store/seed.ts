@@ -402,7 +402,7 @@ function buildMemberPlans(users: User[]): MemberPlan[] {
     } else if (i % 5 === 2) {
       spans.unshift({ tag: "CL", from: 2, to: 7 });
     } else if (i % 5 === 3) {
-      spans.unshift({ tag: "PL", from: 3, to: 8 });
+      spans.unshift({ tag: "JL", from: 3, to: 8 });
     }
 
     return { user_id: u.id, base, spans: spans.length ? spans : undefined };
@@ -594,7 +594,7 @@ function seedGuestMeals(users: User[]): GuestMeal[] {
 }
 
 /** Bump → auto wipe localStorage + reseed on next load. */
-export const SEED_VERSION = 33;
+export const SEED_VERSION = 34;
 
 /** Catalog/rates only — no demo members, assignments, requests, or Pritibhoj. */
 export function createLiveCatalogState(): AppState {

@@ -210,12 +210,11 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       {signed ? (
       <div className="consume-bill-signs">
       <ConsumeSignOff
-        className="mt-0 grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
+        className="mt-0 grid-cols-2 gap-4 text-[11px] sm:grid-cols-5"
         labels={(
           [
             "consume.signDailySi",
             "consume.signConsumeSi",
-            "consume.signScheduleSi",
             "consume.signSeniorDad",
             "consume.signMessPresident",
             "consume.signLastOfficer",

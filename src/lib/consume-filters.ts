@@ -16,7 +16,7 @@ export function consumeFiltersForRole(ration: boolean): ConsumeFilter[] {
 export const CONSUME_FILTER_TAGS: Record<ConsumeFilter, readonly DailyTag[]> = {
   "fr-mfr": ["FR", "MFR"],
   cd: ["CD"],
-  "leave-med": ["CL", "PL", "TRG", "WIT", "MED", "BGH", "LNK"],
+  "leave-med": ["CL", "JL", "TRG", "WIT", "MED", "BGH", "LNK"],
   fuel: ["FR", "MFR"],
 };
 
@@ -32,7 +32,7 @@ export function parseConsumeFilter(raw: string | null): ConsumeFilter {
   const tag = (raw ?? "").toUpperCase();
   if (tag === "FR" || tag === "MFR") return "fr-mfr";
   if (tag === "CD") return "cd";
-  if (LEAVE_MED_SET.has(tag)) return "leave-med";
+  if (LEAVE_MED_SET.has(tag) || tag === "PL") return "leave-med";
   return "fr-mfr";
 }
 

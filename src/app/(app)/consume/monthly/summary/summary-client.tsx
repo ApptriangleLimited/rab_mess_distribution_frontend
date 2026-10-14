@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   IconBuilding,
   IconCalendarStats,
+  IconDownload,
   IconPrinter,
   IconUsers,
 } from "@tabler/icons-react";
@@ -28,6 +29,7 @@ import {
   parseOfficialSheet,
   type ConsumeOfficialSheet,
 } from "@/lib/consume-official-reports";
+import { downloadOfficialConsumePdf } from "@/lib/download-official-consume-pdf";
 import { withReportSource } from "@/lib/reports";
 import { monthKey } from "@/lib/date";
 import { useT } from "@/i18n/provider";
@@ -113,6 +115,22 @@ export default function ConsumeSummaryClient() {
               center={<ConsumePanelTabs />}
               actions={
                 <div className="flex flex-wrap items-center gap-2 no-print">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-xl"
+                    disabled={loading || pack.pages.length === 0}
+                    onClick={() =>
+                      downloadOfficialConsumePdf({
+                        pack,
+                        filename: `consume-summary-${sheet}-${month}.pdf`,
+                      })
+                    }
+                  >
+                    <IconDownload className="h-3.5 w-3.5" />
+                    {t("consume.exportPdf")}
+                  </Button>
                   <Button
                     asChild
                     variant="cta"

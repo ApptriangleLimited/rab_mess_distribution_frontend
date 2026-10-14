@@ -28,7 +28,6 @@ type Props = {
 const SIGNS = [
   "Daily SI",
   "Consume SI",
-  "Mess CQ SI",
   "Senior DAD (Admin)",
   "President\nMess Committee, Forces Mess",
   "Major\nDeputy Director (HQ)\nSRB Forces Headquarters",
@@ -179,7 +178,7 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
         {lastPage ? (
         <div className="consume-bill-signs">
         <ConsumeSignOff
-          className="mt-0 grid-cols-2 gap-4 text-[11px] sm:grid-cols-6"
+          className="mt-0 grid-cols-2 gap-4 text-[11px] sm:grid-cols-5"
           labels={[...SIGNS]}
         />
         </div>

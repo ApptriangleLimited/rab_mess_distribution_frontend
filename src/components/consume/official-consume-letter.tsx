@@ -26,7 +26,6 @@ type Props = {
 const SIGNS = [
   "Daily SI",
   "Consume SI",
-  "Mess CQ SI",
   "Senior DAD (Admin)",
   "President\nMess Committee, Forces Mess",
   "Major\nDeputy Director (HQ)\nSRB Forces Headquarters",
@@ -38,7 +37,7 @@ function cell(n: number) {
 
 function Signs() {
   return (
-    <ConsumeSignOff labels={SIGNS} className="mt-0 text-[9px]" centerAll />
+    <ConsumeSignOff labels={SIGNS} className="mt-0 text-[9px]" />
   );
 }
 
@@ -99,7 +98,7 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
           <th className="border border-black px-1 py-1 align-bottom">MS</th>
           <th className="border border-black px-1 py-1 align-bottom">FR</th>
           <th className="border border-black px-1 py-1 align-bottom">CL</th>
-          <th className="border border-black px-1 py-1 align-bottom">PL</th>
+          <th className="border border-black px-1 py-1 align-bottom">JL</th>
           <th className="border border-black px-1 py-1 align-bottom">CD</th>
           <th className="border border-black px-1 py-1 align-bottom">TRG</th>
           <th className="border border-black px-1 py-1 align-bottom">WT</th>
@@ -139,7 +138,7 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
               {cell(row.tagDays.CL ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(row.tagDays.PL ?? 0)}
+              {cell(row.tagDays.JL ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.CD ?? 0)}
@@ -245,7 +244,7 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
             </th>
           ) : null}
           <th className="border border-black px-1 py-1 align-bottom">CL</th>
-          <th className="border border-black px-1 py-1 align-bottom">PL</th>
+          <th className="border border-black px-1 py-1 align-bottom">JL</th>
           <th className="border border-black px-1 py-1 align-bottom">TRG</th>
           <th className="border border-black px-1 py-1 align-bottom">WT</th>
           <th className="border border-black px-1 py-1 align-bottom">MED</th>
@@ -276,7 +275,7 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
               {cell(row.tagDays.CL ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
-              {cell(row.tagDays.PL ?? 0)}
+              {cell(row.tagDays.JL ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.TRG ?? 0)}

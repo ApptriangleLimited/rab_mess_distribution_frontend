@@ -15,7 +15,10 @@ import { MonthLedgerPrint } from "@/components/consume/month-ledger-print";
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
 import { useStore } from "@/hooks/use-store";
-import { CONSUME_LEDGER_SOURCE_TAGS } from "@/lib/constants";
+import {
+  CONSUME_REPORT_LEDGER_SOURCE_TAGS,
+  CONSUME_REPORT_LEDGER_TAGS,
+} from "@/lib/constants";
 import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { formatMonthLong, monthKey } from "@/lib/date";
@@ -116,9 +119,10 @@ export default function ConsumeLedgerPrintClient() {
           buildRangeLedger(
             rangeBounds.from,
             rangeBounds.to,
-            CONSUME_LEDGER_SOURCE_TAGS,
+            CONSUME_REPORT_LEDGER_SOURCE_TAGS,
             { carry: true },
           ),
+          CONSUME_REPORT_LEDGER_TAGS,
         );
         return {
           month,
@@ -129,9 +133,10 @@ export default function ConsumeLedgerPrintClient() {
         };
       }
       const monthLedger = presentConsumeLedger(
-        buildMonthLedger(month, CONSUME_LEDGER_SOURCE_TAGS, {
+        buildMonthLedger(month, CONSUME_REPORT_LEDGER_SOURCE_TAGS, {
           carry: true,
         }),
+        CONSUME_REPORT_LEDGER_TAGS,
       );
       return { ...monthLedger, columnDates: undefined as string[] | undefined };
     });
@@ -191,6 +196,8 @@ export default function ConsumeLedgerPrintClient() {
         rows: group.rows,
       })),
       filename: `consume-ledger-${month}.pdf`,
+      signEveryPage: true,
+      totalEveryPage: true,
     });
   }
 

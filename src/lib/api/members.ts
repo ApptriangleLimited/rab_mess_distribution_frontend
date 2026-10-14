@@ -123,7 +123,7 @@ export function memberToUser(row: MemberApiRow): User {
     joining_date: row.joining_date ?? "",
     duty_start: row.duty_start ?? "",
     out_date: row.out_date ?? "",
-    default_tag: ((row.default_tag || "").toUpperCase() || "") as DailyTag,
+    default_tag: ((row.default_tag || "").trim().toUpperCase() || "") as DailyTag,
     jl_end_date:
       (row as MemberApiRow & { jl_end_date?: string }).jl_end_date ?? "",
     inactive_spans: Array.isArray(

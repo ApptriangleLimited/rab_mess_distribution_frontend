@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { IconArrowLeft, IconPrinter } from "@tabler/icons-react";
+import { IconArrowLeft, IconDownload, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { OfficialConsumeLetter } from "@/components/consume/official-consume-letter";
@@ -18,6 +18,7 @@ import {
 } from "@/lib/consume-official-reports";
 import { withReportSource } from "@/lib/reports";
 import { formatMonthLong, monthKey } from "@/lib/date";
+import { downloadOfficialConsumePdf } from "@/lib/download-official-consume-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { useT } from "@/i18n/provider";
 
@@ -87,17 +88,35 @@ export default function ConsumeSummaryPrintClient() {
             </Button>
           }
           actions={
-            <Button
-              type="button"
-              size="sm"
-              variant="cta"
-              className="rounded-lg"
-              disabled={printing || loading}
-              onClick={() => void onPrint()}
-            >
-              <IconPrinter className="h-3.5 w-3.5" />
-              {printing ? t("common.loading") : t("mess.print")}
-            </Button>
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-lg"
+                disabled={loading || pack.pages.length === 0}
+                onClick={() =>
+                  downloadOfficialConsumePdf({
+                    pack,
+                    filename: `consume-summary-${sheet}-${month}.pdf`,
+                  })
+                }
+              >
+                <IconDownload className="h-3.5 w-3.5" />
+                {t("consume.exportPdf")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="cta"
+                className="rounded-lg"
+                disabled={printing || loading}
+                onClick={() => void onPrint()}
+              >
+                <IconPrinter className="h-3.5 w-3.5" />
+                {printing ? t("common.loading") : t("mess.print")}
+              </Button>
+            </>
           }
         />
       </div>

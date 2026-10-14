@@ -119,7 +119,7 @@ export function officialConsumeTotal(tagDays: Partial<Record<DailyTag, number>>)
     officialMsDays(tagDays) +
     officialFrDays(tagDays) +
     (tagDays.CL ?? 0) +
-    (tagDays.PL ?? 0) +
+    (tagDays.JL ?? 0) +
     (tagDays.CD ?? 0) +
     (tagDays.TRG ?? 0) +
     officialWitDays(tagDays) +
@@ -452,7 +452,7 @@ export function buildOfficialLeaveBill(
   const wings = buildOfficialWingConsume(month, memberType);
   return {
     ...wings,
-    title: `All WING CL, PL, Training, WT, MED, BGH and LNK BILL SUMMARY - ${formatMonthLong(month)}`,
+    title: `All WING CL, JL, Training, WT, MED, BGH and LNK BILL SUMMARY - ${formatMonthLong(month)}`,
   };
 }
 
@@ -470,7 +470,7 @@ export function buildOfficialConsumeSheet(
 export function officialLeaveTotal(tagDays: Partial<Record<DailyTag, number>>) {
   return (
     (tagDays.CL ?? 0) +
-    (tagDays.PL ?? 0) +
+    (tagDays.JL ?? 0) +
     (tagDays.TRG ?? 0) +
     officialWitDays(tagDays) +
     officialMedDays(tagDays) +
@@ -677,7 +677,7 @@ export function buildOfficialConsumePack(
       if (memberType !== "all" && !hasOfficialData(row)) return [];
       return [
         consumeTable(
-          `CL, PL, Training, WT, MED, BGH and LNK bill — ${def.label} — ${monthLabel}`,
+          `CL, JL, Training, WT, MED, BGH and LNK bill — ${def.label} — ${monthLabel}`,
           [org],
           [{ ...row, sl: 1 }],
           {
