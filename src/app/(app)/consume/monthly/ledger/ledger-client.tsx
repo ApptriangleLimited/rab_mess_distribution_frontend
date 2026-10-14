@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import {
   SearchFilterBar,
   searchFilterFieldClass,
@@ -88,7 +89,7 @@ export default function ConsumeLedgerClient() {
       : { from: dateTo, to: dateFrom };
   }, [dateFrom, dateTo]);
 
-  const { source } = useReportSource({
+  const { source, loading, refreshing } = useReportSource({
     from: rangeBounds.from,
     to: rangeBounds.to,
   });
@@ -294,21 +295,26 @@ export default function ConsumeLedgerClient() {
           />
         </SearchFilterBar>
 
-        {ledger.rows.length === 0 ? (
-          <EmptyState title={t("consume.ledgerEmpty")} />
-        ) : rows.length === 0 ? (
-          <EmptyState title={t("common.noResults")} />
-        ) : (
-          <MonthLedgerBoard
-            month={month}
-            dayCount={ledger.dayCount}
-            tagCodes={ledger.tagCodes}
-            rows={rows}
-            columnDates={ledger.columnDates}
-            showSrbNo
-            centerColumnTitles
-          />
-        )}
+        <div className="relative">
+          {loading ? (
+            <LoadingScreen />
+          ) : ledger.rows.length === 0 ? (
+            <EmptyState title={t("consume.ledgerEmpty")} />
+          ) : rows.length === 0 ? (
+            <EmptyState title={t("common.noResults")} />
+          ) : (
+            <MonthLedgerBoard
+              month={month}
+              dayCount={ledger.dayCount}
+              tagCodes={ledger.tagCodes}
+              rows={rows}
+              columnDates={ledger.columnDates}
+              showSrbNo
+              centerColumnTitles
+            />
+          )}
+          {!loading && refreshing ? <LoadingScreen overlay /> : null}
+        </div>
       </motion.div>
     </PagePane>
   );

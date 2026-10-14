@@ -38,7 +38,6 @@ export function useReportSource(params: {
         { allowStale: true },
       ),
   );
-  const [focusTick, setFocusTick] = useState(0);
   const sourceRef = useRef(source);
   sourceRef.current = source;
 
@@ -62,17 +61,6 @@ export function useReportSource(params: {
     prevRatesKey.current = ratesKey;
     setSource((prev) => (prev ? { ...prev, rates } : prev));
   }, [rates, ratesKey]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const onVis = () => {
-      if (document.visibilityState === "visible") {
-        setFocusTick((n) => n + 1);
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
 
   useEffect(() => {
     if (!apiOn || !rangeKey) {
@@ -119,11 +107,12 @@ export function useReportSource(params: {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiOn, rangeKey, ratesKey, focusTick, toast]);
+  }, [apiOn, rangeKey, toast]);
 
   return {
     apiOn,
     loading: apiOn && loading && !source,
+    refreshing: apiOn && loading && !!source,
     source: apiOn ? source : undefined,
   };
 }

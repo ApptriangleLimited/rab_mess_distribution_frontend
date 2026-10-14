@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { MonthNav } from "@/components/shared/month-nav";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ export default function ConsumeSummaryClient() {
 
   const sheet = parseOfficialSheet(searchParams.get("sheet"));
   const memberType = parseConsumeMemberType(searchParams.get("member_type"));
-  const { source, loading } = useReportSource({ month });
+  const { source, loading, refreshing } = useReportSource({ month });
   const pack = useMemo(
     () =>
       withReportSource(source, () =>
@@ -205,11 +206,14 @@ export default function ConsumeSummaryClient() {
           ))}
         </div>
 
-        {loading ? (
-          <p className="text-sm text-neutral-500">{t("common.loading")}</p>
-        ) : (
-          <OfficialConsumeLetter pack={pack} preview />
-        )}
+        <div className="relative">
+          {loading ? (
+            <LoadingScreen />
+          ) : (
+            <OfficialConsumeLetter pack={pack} preview />
+          )}
+          {!loading && refreshing ? <LoadingScreen overlay /> : null}
+        </div>
       </motion.div>
     </PagePane>
   );

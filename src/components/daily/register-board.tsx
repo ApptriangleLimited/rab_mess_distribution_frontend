@@ -63,6 +63,7 @@ import { setBoroKhana } from "@/lib/store/boro-khana";
 import { getProjectedTagMembers } from "@/lib/store/mess";
 import { listAllTags } from "@/lib/store/rates";
 import { countRegisterTags } from "@/lib/store/register-totals";
+import { formatMemberWing } from "@/lib/store/org-options";
 import { compareUsers } from "@/lib/store/users";
 import { downloadDayMsCdPdf } from "@/lib/download-day-ms-cd-pdf";
 import { TAG_CELL, tagCellClass } from "@/lib/tag-colors";
@@ -1312,7 +1313,14 @@ function DayMsCdPeek({
     return tagged.filter(({ user, tag }) => {
       if (peekFilter !== "all" && tag !== peekFilter) return false;
       if (!query) return true;
-      return [user.name, user.personal_id, user.rab_id, user.rank, user.wing]
+      return [
+        user.name,
+        user.personal_id,
+        user.rab_id,
+        user.rank,
+        user.wing,
+        formatMemberWing(user.wing),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -1663,7 +1671,9 @@ function DayMsCdRow({
         <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-neutral-400">
           <span className="font-mono">{user.personal_id || "—"}</span>
           {user.rank ? ` · ${user.rank}` : null}
-          {user.wing ? ` · ${user.wing}` : null}
+          {user.wing
+            ? ` · ${formatMemberWing(user.wing) || user.wing}`
+            : null}
         </p>
       </div>
     </div>

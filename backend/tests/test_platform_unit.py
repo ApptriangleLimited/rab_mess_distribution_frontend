@@ -1,6 +1,6 @@
 from permissions import filter_snapshot_body
 from security import hash_token, validate_password, verify_login_mfa
-from storage import StorageError, sniff_mime
+from storage import StorageError, sniff_image_mime, sniff_mime
 from cache import redis_log_target
 from config import Settings
 
@@ -68,6 +68,19 @@ def test_sniff_rejects_extension_mismatch_and_traversal_names():
     ext, mime = sniff_mime(b"%PDF-1.4", "../../secret.pdf", "application/octet-stream")
     assert ext == ".pdf"
     assert mime == "application/pdf"
+
+
+def test_sniff_image_accepts_jpeg_and_rejects_documents():
+    jpeg = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+    ext, mime = sniff_image_mime(jpeg, "image", "application/octet-stream")
+    assert ext == ".jpg"
+    assert mime == "image/jpeg"
+    try:
+        sniff_image_mime(b"%PDF-1.4", "note.pdf", "application/pdf")
+        raised = False
+    except StorageError:
+        raised = True
+    assert raised
 
 
 def test_redis_log_target_hides_password(monkeypatch):

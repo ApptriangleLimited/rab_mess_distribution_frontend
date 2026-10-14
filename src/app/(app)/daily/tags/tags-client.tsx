@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { searchFilterFieldClass } from "@/components/shared/search-filter-bar";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ import {
 } from "@/lib/store/daily";
 import { countRegisterTags } from "@/lib/store/register-totals";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import {
   SettingsRankFilter,
   SettingsWingFilter,
@@ -160,7 +162,8 @@ export default function TagsPageClient() {
         if (u.status !== memberStatus) return false;
         if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
-        if (wing !== "all" && u.wing !== wing) return false;
+        if (wing !== "all" && !memberMatchesWingFilter(u.wing, wing))
+          return false;
         if (!query) return true;
         return [u.name, u.personal_id, u.rab_id, u.wing, u.rank]
           .join(" ")
@@ -221,11 +224,7 @@ export default function TagsPageClient() {
       ) as Record<string, number>,
     [allTags, tagMemberIds],
   );
-  const allTagMemberCount = useMemo(
-    () =>
-      allTags.reduce((sum, tag) => sum + (tagMemberCounts[tag] ?? 0), 0),
-    [allTags, tagMemberCounts],
-  );
+  const allTagMemberCount = users.length;
 
   const boardUsers = useMemo(() => {
     if (tagFilter === "all") return users;
@@ -290,6 +289,7 @@ export default function TagsPageClient() {
   }
 
   const loading = apiOn && cockpit.loading;
+  const refreshing = apiOn && cockpit.refreshing;
 
   const fieldClass = searchFilterFieldClass;
 
@@ -433,10 +433,8 @@ export default function TagsPageClient() {
           </EqualTagRows>
         </div>
 
-        {loading ? (
-          <p className="py-10 text-center text-sm text-neutral-500">
-            {t("common.loading")}
-          </p>
+        {loading && users.length === 0 ? (
+          <LoadingScreen />
         ) : users.length === 0 ? (
           <div className="flex flex-col gap-3">
             <div className="flex justify-end">
@@ -458,32 +456,35 @@ export default function TagsPageClient() {
             <EmptyState title={t("common.noResults")} />
           </div>
         ) : (
-          <RegisterBoard
-            users={boardUsers}
-            month={month}
-            dayCount={dayCount}
-            assignments={assignments}
-            todayISO={today}
-            paintTag={paintTag}
-            onPaintTagChange={setPaintTag}
-            onTagChange={onTagChange}
-            onPaintRange={onPaintRange}
-            priorByUser={priorByUserFiltered}
-            suppressedCarries={suppressedCarries}
-            boroKhanaDates={apiOn ? cockpit.boroKhanaDates : undefined}
-            onBoroKhanaToggle={apiOn ? cockpit.onBoroKhanaToggle : undefined}
-            projectedTagMembers={
-              apiOn ? cockpit.projectedTagMembers : undefined
-            }
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            toolbarEnd={
-              <ActiveInactiveToggle
-                value={memberStatus}
-                onChange={setMemberStatus}
-              />
-            }
-          />
+          <div className="relative">
+            <RegisterBoard
+              users={boardUsers}
+              month={month}
+              dayCount={dayCount}
+              assignments={assignments}
+              todayISO={today}
+              paintTag={paintTag}
+              onPaintTagChange={setPaintTag}
+              onTagChange={onTagChange}
+              onPaintRange={onPaintRange}
+              priorByUser={priorByUserFiltered}
+              suppressedCarries={suppressedCarries}
+              boroKhanaDates={apiOn ? cockpit.boroKhanaDates : undefined}
+              onBoroKhanaToggle={apiOn ? cockpit.onBoroKhanaToggle : undefined}
+              projectedTagMembers={
+                apiOn ? cockpit.projectedTagMembers : undefined
+              }
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              toolbarEnd={
+                <ActiveInactiveToggle
+                  value={memberStatus}
+                  onChange={setMemberStatus}
+                />
+              }
+            />
+            {refreshing ? <LoadingScreen overlay /> : null}
+          </div>
         )}
       </motion.div>
     </PagePane>

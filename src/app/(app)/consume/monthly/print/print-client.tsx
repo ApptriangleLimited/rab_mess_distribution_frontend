@@ -11,6 +11,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { LeaveMedBillPrint } from "@/components/consume/leave-med-bill-print";
 import { TagBillPrint } from "@/components/consume/tag-bill-print";
 import { Button } from "@/components/ui/button";
@@ -283,7 +284,7 @@ export default function ConsumeTagBillPrintClient() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+        <LoadingScreen />
       ) : !canAct ? (
         <EmptyState title={t("common.noResults")} />
       ) : filter === "leave-med" && leaveBill ? (

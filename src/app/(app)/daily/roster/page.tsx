@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { IconClipboardList, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { IconTip } from "@/components/shared/icon-tip";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { Button } from "@/components/ui/button";
@@ -210,9 +211,7 @@ export default function RosterPage() {
           onChange={setFiltersAndResetPage}
         />
         {loading ? (
-          <p className="py-10 text-center text-sm text-neutral-500">
-            {t("common.loading")}
-          </p>
+          <LoadingScreen />
         ) : (
           <UserTable
             users={users}

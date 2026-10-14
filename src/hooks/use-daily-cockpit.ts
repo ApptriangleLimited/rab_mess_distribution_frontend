@@ -1,6 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+function useDebouncedValue<T>(value: T, ms: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(value), ms);
+    return () => window.clearTimeout(id);
+  }, [value, ms]);
+  return debounced;
+}
 import { ApiClientError } from "@/lib/api/client";
 import {
   assignmentSummary,
@@ -15,7 +24,7 @@ import {
 } from "@/lib/api/assignments";
 import { approveDay, listLockedDates } from "@/lib/api/days";
 import { listBoroKhanaDates, setBoroKhanaDate } from "@/lib/api/boro-khana";
-import { listMembers, memberToUser } from "@/lib/api/members";
+import { listMembersAllPages, memberToUser } from "@/lib/api/members";
 import { isDailyApiEnabled } from "@/lib/api/mode";
 import { onCcDataChange } from "@/lib/api/cc-events";
 import { listTagRequests, requestToTagRequest } from "@/lib/api/tag-requests";
@@ -62,6 +71,7 @@ export function useDailyCockpit({
 }: Params) {
   const apiOn = isDailyApiEnabled();
   const { toast } = useToast();
+  const qDebounced = useDebouncedValue(q, 280);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [cells, setCells] = useState<AssignmentCell[]>([]);
@@ -76,31 +86,35 @@ export function useDailyCockpit({
     }
     setLoading(true);
     try {
+      const wingFilter = wing !== "all" ? wing : undefined;
+      const wingFamily = wingFilter ? "1" : undefined;
       const [memberRes, assignRes, summaryRes, bkRes, locksRes, requestRes] =
         await Promise.all([
-        listMembers({
+        listMembersAllPages({
           approval: "approved",
-          q: q.trim() || undefined,
+          q: qDebounced.trim() || undefined,
           rank: rank !== "all" ? rank : undefined,
-          wing: wing !== "all" ? wing : undefined,
+          wing: wingFilter,
+          wing_family: wingFamily,
           member_type: memberType !== "all" ? memberType : undefined,
           status,
-          page: 1,
           page_size: 500,
         }),
         listAssignments({
           from: dateFrom,
           to: dateTo,
-          q: q.trim() || undefined,
+          q: qDebounced.trim() || undefined,
           rank: rank !== "all" ? rank : undefined,
-          wing: wing !== "all" ? wing : undefined,
+          wing: wingFilter,
+          wing_family: wingFamily,
         }),
         assignmentSummary({
           from: dateFrom,
           to: dateTo,
-          q: q.trim() || undefined,
+          q: qDebounced.trim() || undefined,
           rank: rank !== "all" ? rank : undefined,
-          wing: wing !== "all" ? wing : undefined,
+          wing: wingFilter,
+          wing_family: wingFamily,
         }),
         listBoroKhanaDates(dateFrom, dateTo),
         listLockedDates(dateFrom, dateTo),
@@ -141,7 +155,7 @@ export function useDailyCockpit({
     } finally {
       setLoading(false);
     }
-  }, [apiOn, dateFrom, dateTo, q, rank, wing, memberType, status, toast]);
+  }, [apiOn, dateFrom, dateTo, qDebounced, rank, wing, memberType, status, toast]);
 
   useEffect(() => {
     void load();
@@ -294,6 +308,7 @@ export function useDailyCockpit({
 
   return {
     loading,
+    refreshing: loading && users.length > 0,
     users,
     cells,
     assignments,

@@ -1,12 +1,7 @@
-import {
-  ADMIN_SUB_WINGS,
-  HQ_SUB_WINGS,
-  WINGS,
-  wingOfficialSerial,
-} from "@/lib/constants";
+import { WINGS, wingOfficialSerial } from "@/lib/constants";
 import type { LedgerRow } from "@/lib/reports";
 import { getState } from "@/lib/store";
-import { listWingChildrenFrom } from "@/lib/store/org-options";
+import { formatMemberWing, listWingChildrenFrom } from "@/lib/store/org-options";
 import { compareUsersByRankSerial } from "@/lib/store/users";
 
 /**
@@ -14,23 +9,15 @@ import { compareUsersByRankSerial } from "@/lib/store/users";
  */
 export const DAILY_REGISTER_WING_SERIAL: string[] = [...WINGS];
 
-const ADMIN_GROUP = new Set<string>([
-  "Admin",
-  ...ADMIN_SUB_WINGS,
-  ...HQ_SUB_WINGS,
-]);
-
 export type RegisterWingBlock = {
   key: string;
   label: string;
   rows: LedgerRow[];
 };
 
-/** Collapse Admin + admin sub-wings onto one Admin page. */
+/** Collapse sub-wings / branches onto their main wing for print. */
 export function registerWingGroup(wing: string): string {
-  const key = wing.trim() || "—";
-  if (ADMIN_GROUP.has(key)) return "Admin";
-  return key;
+  return formatMemberWing(wing) || wing.trim() || "—";
 }
 
 /** Short name under Daily SI, e.g. Admin Wing / Int Wing. */

@@ -110,10 +110,13 @@ def test_permissions_and_notifications():
 
 def test_file_upload_and_forbidden_type():
     token = _login("SRB-CC")["access_token"]
+    jpeg = (
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+    )
     ok = httpx.post(
         f"{BASE}/api/v1/files",
         headers=_auth(token),
-        files={"upload": ("note.txt", io.BytesIO(b"hello mess"), "text/plain")},
+        files={"upload": ("photo.jpg", io.BytesIO(jpeg), "image/jpeg")},
         data={"entity_type": "member", "entity_id": "demo"},
         timeout=10,
     )
@@ -124,10 +127,17 @@ def test_file_upload_and_forbidden_type():
     bad = httpx.post(
         f"{BASE}/api/v1/files",
         headers=_auth(token),
-        files={"upload": ("hack.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+        files={"upload": ("note.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
         timeout=10,
     )
     assert bad.status_code == 400
+    exe = httpx.post(
+        f"{BASE}/api/v1/files",
+        headers=_auth(token),
+        files={"upload": ("hack.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+        timeout=10,
+    )
+    assert exe.status_code == 400
     traversal = httpx.get(
         f"{BASE}/api/v1/files/../secret",
         headers=_auth(token),

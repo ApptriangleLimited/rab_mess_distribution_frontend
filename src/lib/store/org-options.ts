@@ -14,6 +14,7 @@ import {
   WING_CATALOG_SERIALS,
   WINGS,
   canonicalWingName,
+  DEFAULT_WING_PARENT,
   forceOfficialSerial,
   rankOfficialSerial,
   wingOfficialName,
@@ -68,6 +69,9 @@ function lookupParent(
   const key = wing.trim().toLowerCase();
   for (const [child, parent] of Object.entries(wingParent)) {
     if (child.trim().toLowerCase() === key) return parent;
+  }
+  if (wingParent !== DEFAULT_WING_PARENT) {
+    return lookupParent(DEFAULT_WING_PARENT, wing);
   }
   return "";
 }
@@ -166,8 +170,19 @@ export function listWingDescendants(parent: string): string[] {
 }
 
 /**
- * True when a member's stored wing is the filter, or sits under it.
- * Selecting a main wing includes its sub-wings.
+ * Main wing from the member create/edit form (first Wing dropdown).
+ * Admin still stores the selected sub-wing / HQ branch in `user.wing`;
+ * this returns Admin so Daily RR and the form stay on the same value.
+ */
+export function memberFormWing(storedWing: string): string {
+  const { main } = memberWingCascade(storedWing);
+  return canonicalWingName(main || storedWing);
+}
+
+/**
+ * True when the member's form wing matches the filter.
+ * A main-wing filter (Admin, Ops Wg, …) includes everyone created under it.
+ * A sub-wing filter still matches that exact unit.
  */
 export function memberMatchesWingFilter(
   storedWing: string,
@@ -175,6 +190,7 @@ export function memberMatchesWingFilter(
 ): boolean {
   const want = canonicalWingName(normalizeLabel(filterWing)).toLowerCase();
   if (!want || want === "all") return true;
+  if (memberFormWing(storedWing).toLowerCase() === want) return true;
   let cur = normalizeLabel(storedWing);
   if (!cur) return false;
   const { wing_parent } = getState();

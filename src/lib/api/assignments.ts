@@ -35,6 +35,7 @@ export type AssignmentQuery = {
   member_id?: string;
   rank?: string;
   wing?: string;
+  wing_family?: string;
   q?: string;
 };
 

@@ -46,7 +46,15 @@ from security import (
     utcnow,
     validate_password,
 )
-from storage import StorageError, checksum, delete_key, get_bytes, put_bytes, sniff_mime
+from storage import (
+    IMAGE_MAX_BYTES,
+    StorageError,
+    checksum,
+    delete_key,
+    get_bytes,
+    put_bytes,
+    sniff_image_mime,
+)
 
 router = APIRouter()
 logger = logging.getLogger("rab.api")
@@ -458,13 +466,13 @@ async def upload_file(
     db: Session = Depends(get_db),
 ):
     data = await upload.read()
-    if len(data) > settings.max_upload_bytes:
-        raise HTTPException(status_code=413, detail="File is too large")
+    if len(data) > IMAGE_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Photo is too large. Use an image up to 2.5 MB.")
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
     try:
-        _ext, mime = sniff_mime(data, upload.filename or "file", upload.content_type)
-        key = put_bytes(data, upload.filename or "file")
+        _ext, mime = sniff_image_mime(data, upload.filename or "photo", upload.content_type)
+        key = put_bytes(data, upload.filename or "photo")
     except StorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     row = FileObject(

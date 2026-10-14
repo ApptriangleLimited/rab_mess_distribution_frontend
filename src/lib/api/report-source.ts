@@ -85,7 +85,16 @@ export function reportSourceFromApi(data: ReportSourceApi): ReportSource {
   };
 }
 
-const LIVE_SOURCE_TTL_MS = 60_000;
+const LIVE_SOURCE_TTL_MS = 5 * 60_000;
+const MEMBERS_TTL_MS = 5 * 60_000;
+const RATES_TTL_MS = 5 * 60_000;
+
+let membersCache: { at: number; users: User[] } | null = null;
+let ratesCache: {
+  at: number;
+  rates: AllowanceRate[];
+  senders: SenderAccount[];
+} | null = null;
 
 type LiveSourceCache = {
   key: string;
@@ -118,6 +127,30 @@ export function peekLiveReportSource(
   return liveSourceCache.data;
 }
 
+async function loadCachedMembers() {
+  if (membersCache && Date.now() - membersCache.at < MEMBERS_TTL_MS) {
+    return membersCache.users;
+  }
+  const rows = await listAllApprovedMembers({ status: "all" });
+  const users = rows.map(memberToUser);
+  membersCache = { at: Date.now(), users };
+  return users;
+}
+
+async function loadCachedRates() {
+  if (ratesCache && Date.now() - ratesCache.at < RATES_TTL_MS) {
+    return ratesCache;
+  }
+  const [rateRes, senderRes] = await Promise.all([listRates(), listSenders()]);
+  const next = {
+    at: Date.now(),
+    rates: (rateRes.items ?? []).map(rateApiToAllowanceRate),
+    senders: senderRes.items ?? [],
+  };
+  ratesCache = next;
+  return next;
+}
+
 async function fetchLiveReportSource(params: {
   month?: string;
   from?: string;
@@ -127,11 +160,10 @@ async function fetchLiveReportSource(params: {
     ? { month: params.month }
     : { from: params.from, to: params.to };
 
-  const [assignRes, memberRes, rateRes, senderRes] = await Promise.allSettled([
+  const [assignRes, memberRes, extrasRes] = await Promise.allSettled([
     listAssignments(assignQuery),
-    listAllApprovedMembers({ status: "all" }),
-    listRates(),
-    listSenders(),
+    loadCachedMembers(),
+    loadCachedRates(),
   ]);
 
   let users: User[] = [];
@@ -141,24 +173,22 @@ async function fetchLiveReportSource(params: {
   let suppressed: string[] = [];
 
   if (memberRes.status === "fulfilled") {
-    users = memberRes.value.map(memberToUser);
+    users = memberRes.value;
   }
   if (assignRes.status === "fulfilled") {
     const items = assignRes.value.items ?? [];
     assignments = cellsToCountedAssignments(items);
     suppressed = cellsToSuppressed(items);
   }
-  if (rateRes.status === "fulfilled") {
-    rates = (rateRes.value.items ?? []).map(rateApiToAllowanceRate);
-  }
-  if (senderRes.status === "fulfilled") {
-    senders = senderRes.value.items ?? [];
+  if (extrasRes.status === "fulfilled") {
+    rates = extrasRes.value.rates;
+    senders = extrasRes.value.senders;
   }
 
   const fetchFailed =
     assignRes.status === "rejected" ||
     memberRes.status === "rejected" ||
-    rateRes.status === "rejected";
+    extrasRes.status === "rejected";
   if (fetchFailed && !isApiFeatureMissing("snapshot")) {
     try {
       const snap = reportSourceFromApi(await fetchReportSource(params));

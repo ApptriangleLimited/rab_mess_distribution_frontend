@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
@@ -14,6 +14,7 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { LeaveMedBillPanel } from "@/components/consume/leave-med-bill-panel";
 import { TagBillPanel } from "@/components/consume/tag-bill-panel";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
@@ -67,7 +68,8 @@ export default function ConsumeMonthlyClient() {
   const month =
     rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : defaultMonth;
 
-  const { source, loading } = useReportSource({ month });
+  const { source, loading, refreshing } = useReportSource({ month });
+  const [filterPending, startFilterTransition] = useTransition();
   const filter = parseConsumeFilter(searchParams.get("tag"));
   const memberType = parseConsumeMemberType(searchParams.get("member_type"));
   const filterTags = CONSUME_FILTER_TAGS[filter];
@@ -106,30 +108,35 @@ export default function ConsumeMonthlyClient() {
     [state.assignments, state.users, state.rates, month, filter, filterTags, source],
   );
 
+  const allBills = useMemo(() => {
+    return {
+      fr: withReportSource(source, () =>
+        buildTagBill(month, CONSUME_FILTER_TAGS["fr-mfr"]),
+      ),
+      cd: withReportSource(source, () =>
+        buildTagBill(month, CONSUME_FILTER_TAGS.cd),
+      ),
+      leave: withReportSource(source, () =>
+        buildLeaveMedBill(month, CONSUME_FILTER_TAGS["leave-med"]),
+      ),
+      fuel: withReportSource(source, () =>
+        buildTagBill(month, CONSUME_FILTER_TAGS.fuel),
+      ),
+    };
+  }, [state.assignments, state.users, state.rates, month, source]);
+
   const counts = useMemo(() => {
-    const fr = withReportSource(source, () =>
-      buildTagBill(month, CONSUME_FILTER_TAGS["fr-mfr"]),
-    );
-    const cd = withReportSource(source, () =>
-      buildTagBill(month, CONSUME_FILTER_TAGS.cd),
-    );
-    const leave = withReportSource(source, () =>
-      buildLeaveMedBill(month, CONSUME_FILTER_TAGS["leave-med"]),
-    );
-    const fuel = withReportSource(source, () =>
-      buildTagBill(month, CONSUME_FILTER_TAGS.fuel),
-    );
     const match = <T extends { user: { member_type: string } }>(rows: T[]) =>
       rows.filter((row) =>
         memberMatchesTypeFilter(row.user.member_type, memberType),
       );
     return {
-      "fr-mfr": match(fr.rows).length,
-      cd: match(cd.rows).length,
-      "leave-med": match(leave.rows).length,
-      fuel: match(fuel.rows).length,
+      "fr-mfr": match(allBills.fr.rows).length,
+      cd: match(allBills.cd.rows).length,
+      "leave-med": match(allBills.leave.rows).length,
+      fuel: match(allBills.fuel.rows).length,
     } satisfies Record<ConsumeFilter, number>;
-  }, [state.assignments, state.users, state.rates, month, source, memberType]);
+  }, [allBills, memberType]);
 
   const headerStats = useMemo(() => {
     if (leaveBill) {
@@ -170,14 +177,16 @@ export default function ConsumeMonthlyClient() {
   }
 
   function setFilter(next: ConsumeFilter) {
-    patchQuery({ tag: next });
+    startFilterTransition(() => patchQuery({ tag: next }));
   }
 
   function setMemberType(next: ConsumeMemberTypeFilter) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next === "all") params.delete("member_type");
-    else params.set("member_type", next);
-    router.replace(`${pathname}?${params.toString()}`);
+    startFilterTransition(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next === "all") params.delete("member_type");
+      else params.set("member_type", next);
+      router.replace(`${pathname}?${params.toString()}`);
+    });
   }
 
   const printHref =
@@ -361,9 +370,9 @@ export default function ConsumeMonthlyClient() {
             />
           </div>
 
-          <div className="p-4 sm:p-5">
+          <div className="relative p-4 sm:p-5">
             {loading ? (
-              <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+              <LoadingScreen />
             ) : filter === "leave-med" ? (
               <LeaveMedBillPanel
                 key={`${month}-leave-med`}
@@ -388,6 +397,9 @@ export default function ConsumeMonthlyClient() {
                 fuelOnly={filter === "fuel"}
               />
             )}
+            {!loading && (refreshing || filterPending) ? (
+              <LoadingScreen overlay />
+            ) : null}
           </div>
         </section>
       </motion.div>

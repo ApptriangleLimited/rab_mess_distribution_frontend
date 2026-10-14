@@ -141,6 +141,24 @@ export function memberToUser(row: MemberApiRow): User {
   };
 }
 
+/** Page through `/api/v1/members` until every matching row is loaded. */
+export async function listMembersAllPages(params: MemberListParams = {}) {
+  const pageSize = Math.min(params.page_size ?? 500, 500);
+  const query = { ...params, page_size: pageSize };
+  const first = await listMembers({ ...query, page: 1 });
+  const items = [...(first.items ?? [])];
+  const total = first.total ?? items.length;
+  const pages = Math.min(50, Math.ceil(total / pageSize) || 1);
+  if (pages <= 1) return { ...first, items, total };
+  const rest = await Promise.all(
+    Array.from({ length: pages - 1 }, (_, i) =>
+      listMembers({ ...query, page: i + 2 }),
+    ),
+  );
+  for (const data of rest) items.push(...(data.items ?? []));
+  return { ...first, items, total };
+}
+
 /** Every member (all approval states), paging past the first 500. */
 export async function listAllMembers() {
   const pageSize = 500;

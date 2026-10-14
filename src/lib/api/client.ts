@@ -157,7 +157,7 @@ export async function apiJson<T>(path: string, init?: RequestInit, retried = fal
       res.status,
       problem.code ?? "INTERNAL_ERROR",
       res.status === 413
-        ? "File is too large. PNG or JPG up to 2.5 MB is allowed."
+        ? "Photo is too large. Use an image up to 2.5 MB."
         : (problem.detail ?? problem.message ?? "Request failed"),
       problem.errors ?? [],
     );

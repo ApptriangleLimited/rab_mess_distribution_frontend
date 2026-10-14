@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { IconArrowLeft, IconDownload, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { OfficialConsumeLetter } from "@/components/consume/official-consume-letter";
 import { Button } from "@/components/ui/button";
 import { useReportSource } from "@/hooks/use-report-source";
@@ -122,7 +123,7 @@ export default function ConsumeSummaryPrintClient() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-neutral-500">{t("common.loading")}</p>
+        <LoadingScreen />
       ) : (
         <OfficialConsumeLetter ref={printRef} pack={pack} preview />
       )}

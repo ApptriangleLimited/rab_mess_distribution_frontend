@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconAccessPoint,
   IconBuildingBank,
   IconCloudUpload,
   IconCreditCard,
+  IconEye,
   IconFile,
   IconFileUpload,
   IconFolder,
+  IconLoader2,
   IconId,
   IconMapPin,
   IconPhone,
@@ -54,7 +56,13 @@ import {
 } from "@/lib/store/users";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
-import { uploadFile } from "@/lib/api/files";
+import {
+  documentFileId,
+  loadStoredDocument,
+  MEMBER_IMAGE_ACCEPT,
+  prepareMemberImage,
+  uploadFile,
+} from "@/lib/api/files";
 import { isCcApiEnabled } from "@/lib/api/mode";
 import {
   isAdminRootName,
@@ -228,6 +236,18 @@ export function UserForm({
     isHqBranchName(wingCascade.sub) || isHqBranchName(values.wing);
   const [todayTag, setTodayTag] = useState<DailyTag>(initialTag);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(previews).forEach((url) => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      });
+    };
+    // Revoke leftover object URLs only when the form unmounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const apiOn = isCcApiEnabled();
   const isCivilian = values.member_type === "civilian";
   const isGuest = values.member_type === "guest";
@@ -427,47 +447,91 @@ export function UserForm({
     }
   }
 
+  function toastFileError(err: unknown) {
+    if (err instanceof ApiClientError) {
+      if (err.status === 413 || err.code === "FILE_TOO_LARGE") {
+        toast(t("cc.fileTooLarge"), "error");
+        return;
+      }
+      if (err.code === "FILE_NOT_IMAGE") {
+        toast(t("cc.fileNotImage"), "error");
+        return;
+      }
+      if (err.code === "FILE_CONVERT") {
+        toast(t("cc.fileConvertFail"), "error");
+        return;
+      }
+      toast(err.detail, "error");
+      return;
+    }
+    toast(t("cc.fileConvertFail"), "error");
+  }
+
+  function rememberPreview(key: string, file: File) {
+    const url = URL.createObjectURL(file);
+    setPreviews((prev) => {
+      const old = prev[key];
+      if (old?.startsWith("blob:")) URL.revokeObjectURL(old);
+      return { ...prev, [key]: url };
+    });
+  }
+
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
     const incoming = Array.from(files);
-    if (!apiOn) {
-      setValues((prev) => ({
-        ...prev,
-        documents: [
-          ...prev.documents,
-          ...incoming.map((f) => ({ name: f.name, size: f.size })),
-        ],
-      }));
-      return;
-    }
+    setUploadingDocs(true);
     const uploaded: DocumentMeta[] = [];
     for (const file of incoming) {
       try {
-        const row = await uploadFile(file, {
+        const ready = await prepareMemberImage(file);
+        if (!apiOn) {
+          const id = `local-${Date.now()}-${uploaded.length}`;
+          rememberPreview(id, ready);
+          uploaded.push({ id, name: ready.name, size: ready.size });
+          continue;
+        }
+        const row = await uploadFile(ready, {
           entity_type: variant === "public" ? "register" : "member",
           public: variant === "public",
         });
+        const id = row.id || row.file_id || `local-${Date.now()}-${uploaded.length}`;
+        rememberPreview(id, ready);
         uploaded.push({
-          id: row.id || row.file_id,
-          name: row.original_name || file.name,
-          size: row.size || file.size,
+          id,
+          name: row.original_name || ready.name,
+          size: row.size || ready.size,
         });
       } catch (err) {
-        toast(
-          err instanceof ApiClientError
-            ? err.status === 413
-              ? t("cc.fileTooLarge")
-              : err.detail
-            : t("cc.documentOpenFail"),
-          "error",
-        );
+        toastFileError(err);
       }
     }
+    setUploadingDocs(false);
     if (!uploaded.length) return;
     setValues((prev) => ({
       ...prev,
       documents: [...prev.documents, ...uploaded],
     }));
+  }
+
+  async function viewDoc(doc: DocumentMeta, index: number) {
+    const key = documentFileId(doc) || `${doc.name}-${index}`;
+    const local = previews[documentFileId(doc)] || previews[key];
+    if (local) {
+      window.open(local, "_blank", "noopener,noreferrer");
+      return;
+    }
+    try {
+      const loaded = await loadStoredDocument(doc);
+      window.open(loaded.url, "_blank", "noopener,noreferrer");
+      if (loaded.owned) {
+        window.setTimeout(() => URL.revokeObjectURL(loaded.url), 60_000);
+      }
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("cc.documentOpenFail"),
+        "error",
+      );
+    }
   }
 
   function onFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -476,6 +540,18 @@ export function UserForm({
   }
 
   function removeDoc(index: number) {
+    const doc = values.documents[index];
+    if (!doc) return;
+    const keys = [documentFileId(doc), `${doc.name}-${index}`].filter(Boolean);
+    setPreviews((prev) => {
+      const next = { ...prev };
+      for (const key of keys) {
+        const url = next[key];
+        if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+        delete next[key];
+      }
+      return next;
+    });
     setValues((prev) => ({
       ...prev,
       documents: prev.documents.filter((_, i) => i !== index),
@@ -1001,7 +1077,7 @@ export function UserForm({
             <input
               type="file"
               multiple
-              accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
+              accept={MEMBER_IMAGE_ACCEPT}
               className="hidden"
               onChange={onFileInputChange}
             />
@@ -1023,20 +1099,49 @@ export function UserForm({
             </label>
           ) : null}
 
+          {uploadingDocs ? (
+            <p className="flex items-center gap-2 text-xs text-neutral-500">
+              <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+              {t("common.loadingData")}
+            </p>
+          ) : null}
+
           {values.documents.length > 0 ? (
             <ul className="grid gap-1.5 sm:grid-cols-2">
-              {values.documents.map((doc, i) => (
+              {values.documents.map((doc, i) => {
+                const preview =
+                  previews[documentFileId(doc)] || previews[`${doc.name}-${i}`];
+                return (
                 <li
-                  key={`${doc.name}-${i}`}
+                  key={`${doc.id ?? doc.name}-${i}`}
                   className="group/doc flex items-center gap-2 rounded-md border border-neutral-200/90 bg-white/80 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900/70"
                 >
-                  <IconFile className="h-4 w-4 shrink-0 text-neutral-400" stroke={1.75} />
+                  {preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview}
+                      alt=""
+                      className="h-8 w-8 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <IconFile className="h-4 w-4 shrink-0 text-neutral-400" stroke={1.75} />
+                  )}
                   <p className="min-w-0 flex-1 truncate text-sm text-neutral-800 dark:text-neutral-100">
                     {doc.name}
                     <span className="ml-1.5 text-[11px] text-neutral-400">
                       {formatDocSize(doc.size)}
                     </span>
                   </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800"
+                    onClick={() => void viewDoc(doc, i)}
+                    aria-label={t("cc.viewDocument")}
+                  >
+                    <IconEye className="h-3.5 w-3.5" />
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -1048,7 +1153,8 @@ export function UserForm({
                     <IconTrash className="h-3.5 w-3.5" />
                   </Button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           ) : null}
         </div>

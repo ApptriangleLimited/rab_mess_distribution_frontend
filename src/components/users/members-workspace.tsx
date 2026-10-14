@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { IconClipboardList, IconPlus, IconPrinter } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { IconTip } from "@/components/shared/icon-tip";
 import { Button } from "@/components/ui/button";
 import { UserFiltersBar } from "@/components/users/user-filters";
@@ -222,9 +223,7 @@ export function MembersWorkspace({ tabs }: { tabs: ReactNode }) {
           onChange={setFiltersAndResetPage}
         />
         {loading ? (
-          <p className="py-10 text-center text-sm text-neutral-500">
-            {t("common.loading")}
-          </p>
+          <LoadingScreen />
         ) : (
           <UserTable
             users={users}

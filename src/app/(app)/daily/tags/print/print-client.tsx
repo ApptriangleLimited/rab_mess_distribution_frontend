@@ -11,6 +11,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { MonthRegisterPrint } from "@/components/daily/month-register-print";
 import { Button } from "@/components/ui/button";
 import { useDailyCockpit } from "@/hooks/use-daily-cockpit";
@@ -31,6 +32,7 @@ import {
   buildDailyRegisterFromCells,
 } from "@/lib/reports";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import type { MemberType, UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
@@ -83,7 +85,8 @@ export default function DailyRegisterPrintClient() {
         if (u.status !== memberStatus) return false;
         if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
-        if (wing !== "all" && u.wing !== wing) return false;
+        if (wing !== "all" && !memberMatchesWingFilter(u.wing, wing))
+          return false;
         if (!query) return true;
         return [u.name, u.rab_id, u.wing, u.rank]
           .join(" ")
@@ -213,9 +216,7 @@ export default function DailyRegisterPrintClient() {
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-neutral-500">
-          {t("common.loading")}
-        </p>
+        <LoadingScreen />
       ) : !users.length ? (
         <EmptyState title={t("daily.emptyTags")} />
       ) : !dayNumbers.length ? (

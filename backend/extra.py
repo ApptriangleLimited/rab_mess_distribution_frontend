@@ -20,7 +20,7 @@ from database import SessionLocal, get_db
 from models import Assignment, BoroKhanaDay, FileObject, Member, Rate, Sender, Staff
 from persist import CATALOG_KEYS
 from schemas import DUTY_TAGS, MemberIn
-from storage import StorageError, checksum, put_bytes, sniff_mime
+from storage import IMAGE_MAX_BYTES, StorageError, checksum, put_bytes, sniff_image_mime
 from config import settings
 from zk_gate import gate_snapshot, refresh_gate, start_sync
 
@@ -781,13 +781,13 @@ async def public_upload_file(
     """Document upload for public member entry (no staff login)."""
     enforce_register_limit(request)
     data = await upload.read()
-    if len(data) > settings.max_upload_bytes:
-        raise HTTPException(status_code=413, detail="File is too large")
+    if len(data) > IMAGE_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Photo is too large. Use an image up to 2.5 MB.")
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
     try:
-        _ext, mime = sniff_mime(data, upload.filename or "file", upload.content_type)
-        key = put_bytes(data, upload.filename or "file")
+        _ext, mime = sniff_image_mime(data, upload.filename or "photo", upload.content_type)
+        key = put_bytes(data, upload.filename or "photo")
     except StorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     row = FileObject(

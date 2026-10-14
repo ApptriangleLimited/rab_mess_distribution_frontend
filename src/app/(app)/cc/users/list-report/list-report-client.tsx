@@ -11,6 +11,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { MemberFullListLetter } from "@/components/users/member-full-list-letter";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
@@ -193,9 +194,7 @@ export default function MemberFullListReportClient({
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-neutral-500">
-          {t("common.loading")}
-        </p>
+        <LoadingScreen />
       ) : !canAct ? (
         <EmptyState title={t("cc.empty")} />
       ) : (

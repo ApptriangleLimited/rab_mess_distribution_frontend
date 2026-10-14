@@ -10,6 +10,7 @@ from cache import bust_boro, bust_daily, cache_get, cache_key, cache_set
 from database import get_db
 from models import Assignment, BoroKhanaDay, DayLock, Member, Staff, SuppressedCarry
 from schemas import normalize_tag
+from wings import wing_family_names, wing_in_family
 
 DAILY_WRITE = ("daily", "admin")
 router = APIRouter()
@@ -170,6 +171,7 @@ def member_matches(
     q: str | None,
     rank: str | None,
     wing: str | None,
+    family: list[str] | None = None,
 ) -> bool:
     if member.approval_status != "approved":
         return False
@@ -177,8 +179,12 @@ def member_matches(
         return False
     if rank and rank != "all" and member.rank != rank:
         return False
-    if wing and wing != "all" and member.wing != wing:
-        return False
+    if wing and wing != "all":
+        if family:
+            if not wing_in_family(member.wing, family):
+                return False
+        elif member.wing != wing:
+            return False
     if q and q.strip():
         hay = " ".join(
             [
@@ -257,11 +263,15 @@ def load_window(
     rank: str | None,
     wing: str | None,
     member_id: str | None = None,
+    wing_family: str | None = None,
 ):
     query = db.query(Member)
     if member_id:
         query = query.filter(Member.id == member_id)
-    members = [m for m in query.all() if member_matches(m, q, rank, wing)]
+    family = None
+    if wing and wing != "all" and str(wing_family or "").lower() in {"1", "true", "yes"}:
+        family = wing_family_names(db, wing)
+    members = [m for m in query.all() if member_matches(m, q, rank, wing, family)]
     ids = [m.id for m in members]
     stored_rows = []
     suppressed_rows = []
@@ -445,6 +455,7 @@ def list_assignments(
     member_id: str | None = None,
     rank: str | None = None,
     wing: str | None = None,
+    wing_family: str | None = None,
     q: str | None = None,
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
@@ -458,13 +469,14 @@ def list_assignments(
         member_id=member_id,
         rank=rank,
         wing=wing,
+        wing_family=wing_family,
         q=q,
     )
     cached = cache_get(key)
     if cached is not None:
         return envelope(cached)
     members, stored_map, suppressed = load_window(
-        db, start, end, q, rank, wing, member_id
+        db, start, end, q, rank, wing, member_id, wing_family
     )
     days = list(each_date(start, end))
     items = []
@@ -484,6 +496,7 @@ def assignment_summary(
     member_id: str | None = None,
     rank: str | None = None,
     wing: str | None = None,
+    wing_family: str | None = None,
     q: str | None = None,
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
@@ -497,13 +510,14 @@ def assignment_summary(
         member_id=member_id,
         rank=rank,
         wing=wing,
+        wing_family=wing_family,
         q=q,
     )
     cached = cache_get(key)
     if cached is not None:
         return envelope(cached)
     members, stored_map, suppressed = load_window(
-        db, start, end, q, rank, wing, member_id
+        db, start, end, q, rank, wing, member_id, wing_family
     )
     days = list(each_date(start, end))
     by_tag: dict[str, int] = {}

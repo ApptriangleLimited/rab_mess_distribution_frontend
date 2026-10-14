@@ -47,6 +47,7 @@ from daily import (
     router as daily_router,
     upsert_assignment,
 )
+from wings import wing_family_names
 from extra import router as extra_router, seed_catalog
 from persist import router as persist_router, seed_persist
 from account import router as account_router
@@ -594,7 +595,8 @@ def list_members(
         query = query.filter(Member.approval_status == normalize_approval(approval, approval))
     if wing and wing != "all":
         if str(wing_family or "").lower() in {"1", "true", "yes"}:
-            query = query.filter(Member.wing.in_(wing_family_names(db, wing)))
+            family = [name.lower() for name in wing_family_names(db, wing)]
+            query = query.filter(func.lower(Member.wing).in_(family or ["__none__"]))
         else:
             query = query.filter(Member.wing == wing)
     if rank and rank != "all":
@@ -853,40 +855,6 @@ def tag_request_counts(
     return envelope(data)
 
 
-def wing_family_names(db: Session, wing: str) -> list[str]:
-    """Selected wing plus every nested unit from the catalog parent map."""
-    root = (wing or "").strip()
-    if not root:
-        return []
-    row = db.get(CatalogState, "default")
-    parent_raw = {}
-    if row and isinstance(row.payload, dict):
-        raw = row.payload.get("wing_parent") or {}
-        if isinstance(raw, dict):
-            parent_raw = raw
-    children: dict[str, list[str]] = {}
-    labels = {root.lower(): root}
-    for child, parent in parent_raw.items():
-        child_s = str(child).strip()
-        parent_s = str(parent).strip()
-        if not child_s or not parent_s:
-            continue
-        labels.setdefault(child_s.lower(), child_s)
-        labels.setdefault(parent_s.lower(), parent_s)
-        children.setdefault(parent_s.lower(), []).append(child_s)
-    out: list[str] = []
-    stack = [root.lower()]
-    seen: set[str] = set()
-    while stack:
-        cur = stack.pop()
-        if cur in seen:
-            continue
-        seen.add(cur)
-        out.append(labels.get(cur, cur))
-        stack.extend(child.lower() for child in children.get(cur, []))
-    return out
-
-
 @app.get("/api/v1/tag-requests")
 def list_tag_requests(
     queue: str = "daily",
@@ -934,7 +902,8 @@ def list_tag_requests(
         )
     if wing and wing != "all":
         if str(wing_family or "").lower() in {"1", "true", "yes"}:
-            query = query.filter(Member.wing.in_(wing_family_names(db, wing)))
+            family = [name.lower() for name in wing_family_names(db, wing)]
+            query = query.filter(func.lower(Member.wing).in_(family or ["__none__"]))
         else:
             query = query.filter(Member.wing == wing)
     if rank and rank != "all":
