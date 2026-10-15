@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import {
   IconCake,
+  IconClockHour4,
   IconTags,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
@@ -25,9 +26,16 @@ const TABS = [
     match: (path: string) =>
       path === "/mess/pritibhoj" || path.startsWith("/mess/pritibhoj/"),
   },
+  {
+    href: "/mess/shifts",
+    labelKey: "nav.shifts" as const,
+    icon: IconClockHour4,
+    match: (path: string) =>
+      path === "/mess/shifts" || path.startsWith("/mess/shifts/"),
+  },
 ] as const;
 
-/** Ledger / Pritibhoj — header strip. */
+/** Ledger / Pritibhoj / Shifts — header strip. */
 export function MessTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();

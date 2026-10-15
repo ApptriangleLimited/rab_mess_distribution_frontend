@@ -74,10 +74,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     session.role === "consume" ||
     session.role === "ration" ||
     session.role === "admin";
+  const deviceKiosk = pathname === "/admin/zk" || pathname.startsWith("/admin/zk/");
 
   return (
     <div className="flex h-dvh overflow-hidden bg-page-canvas">
-      {!hideSidebar ? (
+      {!hideSidebar && !deviceKiosk ? (
         <>
           <Sidebar role={session.role} collapsed={collapsed} />
           <MobileDrawer
@@ -88,21 +89,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </>
       ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-page-canvas">
-        <div className="relative z-40 shrink-0">
-          <HeaderBar
-            session={session}
-            sidebarCollapsed={collapsed}
-            hideSidebarControls={hideSidebar}
-            onToggleSidebar={toggleCollapsed}
-            onMenu={() => setMobileOpen(true)}
-            onLogout={() => {
-              logout();
-              router.replace("/login");
-            }}
-            onProfileSaved={updateProfile}
-          />
-        </div>
-        <main className="min-h-0 flex-1 overflow-y-auto custom-scrollbar" key={pathname}>
+        {deviceKiosk ? null : (
+          <div className="relative z-40 shrink-0">
+            <HeaderBar
+              session={session}
+              sidebarCollapsed={collapsed}
+              hideSidebarControls={hideSidebar}
+              onToggleSidebar={toggleCollapsed}
+              onMenu={() => setMobileOpen(true)}
+              onLogout={() => {
+                logout();
+                router.replace("/login");
+              }}
+              onProfileSaved={updateProfile}
+            />
+          </div>
+        )}
+        <main
+          className={
+            deviceKiosk
+              ? "min-h-0 flex-1 overflow-hidden"
+              : "min-h-0 flex-1 overflow-y-auto custom-scrollbar"
+          }
+          key={pathname}
+        >
           {children}
         </main>
       </div>

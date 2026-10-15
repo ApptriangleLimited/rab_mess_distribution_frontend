@@ -52,6 +52,7 @@ import { AuthorizedSection } from "@/components/settings/authorized-section";
 import { MemberBanksSection } from "@/components/settings/member-banks-section";
 import { RegisterQrSection } from "@/components/settings/register-qr-section";
 import { StaffAccountsSection } from "@/components/settings/staff-accounts-section";
+import { MealShiftsSection } from "@/components/settings/meal-shifts-section";
 import { OrgListSection } from "@/components/settings/org-list-section";
 import {
   parseSettingsTab,
@@ -480,6 +481,7 @@ function SettingsPageInner() {
         {tab === "force" ? (
           <OrgListSection kind="force" icon={IconShield} />
         ) : null}
+        {tab === "shifts" ? <MealShiftsSection static /> : null}
         {tab === "bank" && isRation ? (
           <SenderAccountsSection static rateTags={rates.map((r) => r.tag)} />
         ) : null}

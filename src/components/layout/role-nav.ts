@@ -3,6 +3,7 @@ import type { MessageKey } from "@/i18n";
 import {
   IconUserCheck,
   IconFingerprint,
+  IconClockHour4,
   IconTags,
   IconSend,
   IconChartBar,
@@ -74,6 +75,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.pritibhoj",
       icon: IconCake,
       chip: "amber",
+    },
+    {
+      href: "/mess/shifts",
+      labelKey: "nav.shifts",
+      icon: IconClockHour4,
+      chip: "violet",
     },
   ],
   consume: [

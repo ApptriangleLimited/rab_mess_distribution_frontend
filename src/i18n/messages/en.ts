@@ -643,6 +643,9 @@ export const en = {
     tabRank: "Ranks",
     tabWing: "Wings",
     tabForce: "Forces",
+    tabShifts: "Shifts",
+    shiftsTitle: "Meal shifts",
+    shiftsHint: "Breakfast, lunch, and dinner windows. Times cannot overlap.",
     tabBank: "SRB Bank",
     tabMemberBank: "Member Bank",
     tabAuthorized: "Authorized",
@@ -1717,7 +1720,7 @@ export const en = {
   zkGate: {
     title: "Device check-in",
     subtitle:
-      "RFID punch: Accepted when today's Daily RR is MS, Not allowed when it is not, RFID not found when the card is unknown.",
+      "One accepted punch per Breakfast, Lunch, or Dinner. A second punch in the same shift is Already accepted.",
     name: "Name",
     srbId: "SRB ID",
     time: "Time",
@@ -1725,6 +1728,7 @@ export const en = {
     positive: "Positive",
     allowed: "Allowed",
     accepted: "Accepted",
+    alreadyAccepted: "Already accepted",
     notAllowed: "Not allowed",
     rfidNotFound: "RFID not found",
     empty: "Waiting for a check-in.",
@@ -1733,6 +1737,8 @@ export const en = {
     syncing: "Sending RFID members to the device…",
     enrolled: "{count} members with RFID are on the device",
     refresh: "Refresh",
+    back: "Back",
+    noShift: "Outside meal time",
   },
 } as const;
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import {
   IconBuildingBank,
+  IconClockHour4,
   IconCoin,
   IconMilitaryRank,
   IconQrcode,
@@ -23,6 +24,7 @@ export type SettingsTabId =
   | "rank"
   | "wing"
   | "force"
+  | "shifts"
   | "bank"
   | "member-bank"
   | "authorized"
@@ -42,6 +44,7 @@ const TABS: TabDef[] = [
   { id: "rank", labelKey: "settings.tabRank", icon: IconMilitaryRank },
   { id: "wing", labelKey: "settings.tabWing", icon: IconTopologyStar3 },
   { id: "force", labelKey: "settings.tabForce", icon: IconShield },
+  { id: "shifts", labelKey: "settings.tabShifts", icon: IconClockHour4 },
   {
     id: "bank",
     labelKey: "settings.tabBank",
@@ -84,7 +87,7 @@ export function parseSettingsTab(
   return allowed[0] ?? "rates";
 }
 
-/** In-page Settings sections — Rates / Ranks / Wings / Forces / SRB Bank / Member Bank / Authorized / QR. */
+/** In-page Settings sections — Rates / Ranks / Wings / Forces / Shifts / SRB Bank / Member Bank / Authorized / QR. */
 export function SettingsSectionTabs({
   value,
   onChange,

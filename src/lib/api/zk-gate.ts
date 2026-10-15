@@ -1,6 +1,10 @@
 import { apiJson } from "@/lib/api/client";
 
-export type ZkGateStatus = "accepted" | "not_allowed" | "rfid_not_found";
+export type ZkGateStatus =
+  | "accepted"
+  | "already_accepted"
+  | "not_allowed"
+  | "rfid_not_found";
 
 export type ZkGateRow = {
   name: string;
@@ -9,6 +13,8 @@ export type ZkGateRow = {
   punched_at: string;
   allowed: boolean;
   status?: ZkGateStatus;
+  shift_id?: string;
+  shift_name?: string;
 };
 
 export type ZkGateSnapshot = {

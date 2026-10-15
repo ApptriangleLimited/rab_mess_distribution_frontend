@@ -1,4 +1,5 @@
 import type { MessageKey } from "@/i18n";
+import { persistAppStateNow } from "@/lib/api/app-sync";
 import { nowISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import type { MealShift, MealShiftId } from "@/lib/types";
@@ -178,6 +179,7 @@ export function createMealShift(input: MealShiftInput): MealShift {
     ...prev,
     meal_shifts: [...(prev.meal_shifts ?? []), shift],
   }));
+  persistAppStateNow();
   return shift;
 }
 
@@ -208,6 +210,7 @@ export function updateMealShift(
     ...prev,
     meal_shifts: prev.meal_shifts.map((s) => (s.id === id ? next : s)),
   }));
+  persistAppStateNow();
   return next;
 }
 
@@ -225,4 +228,5 @@ export function deleteMealShift(id: MealShiftId) {
     ...prev,
     meal_shifts: prev.meal_shifts.filter((s) => s.id !== id),
   }));
+  persistAppStateNow();
 }

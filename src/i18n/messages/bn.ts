@@ -644,6 +644,9 @@ export const bn = {
     tabRank: "পদবী",
     tabWing: "উইং",
     tabForce: "ফোর্স",
+    tabShifts: "শিফট",
+    shiftsTitle: "খাবারের শিফট",
+    shiftsHint: "নাস্তা, দুপুর ও রাতের সময়। সময় ওভারল্যাপ করা যাবে না।",
     tabBank: "এসআরবি ব্যাংক",
     tabMemberBank: "সদস্য ব্যাংক",
     tabAuthorized: "অনুমোদিত",
@@ -1720,7 +1723,7 @@ export const bn = {
   zkGate: {
     title: "ডিভাইস চেক-ইন",
     subtitle:
-      "আরএফআইডি পাঞ্চ: আজকের ডেইলি আরআর এমএস হলে গৃহীত, না হলে অনুমতি নেই, কার্ড না মিললে আরএফআইডি পাওয়া যায়নি।",
+      "নাস্তা, দুপুর বা রাতে একবার গৃহীত। একই শিফটে দ্বিতীয় পাঞ্চ Already accepted।",
     name: "নাম",
     srbId: "এসআরবি আইডি",
     time: "সময়",
@@ -1728,6 +1731,7 @@ export const bn = {
     positive: "পজিটিভ",
     allowed: "অনুমোদিত",
     accepted: "গৃহীত",
+    alreadyAccepted: "ইতিমধ্যে গৃহীত",
     notAllowed: "অনুমতি নেই",
     rfidNotFound: "আরএফআইডি পাওয়া যায়নি",
     empty: "চেক-ইনের অপেক্ষায়।",
@@ -1736,5 +1740,7 @@ export const bn = {
     syncing: "আরএফআইডি সদস্য ডিভাইসে পাঠানো হচ্ছে…",
     enrolled: "আরএফআইডি আছে এমন {count} জন ডিভাইসে আছেন",
     refresh: "রিফ্রেশ",
+    back: "ফিরে যান",
+    noShift: "খাবারের সময়ের বাইরে",
   },
 };
