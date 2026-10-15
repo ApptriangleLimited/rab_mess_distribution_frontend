@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { IconArrowRight, IconEye, IconEyeOff } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
@@ -513,6 +514,12 @@ export default function LoginPage() {
                 {t("login.changePassword")}
               </button>
             )}
+            <Link
+              href="/device"
+              className="block w-full text-center text-sm font-medium text-neutral-500 hover:text-primary hover:underline"
+            >
+              {t("zkGate.openDisplay")}
+            </Link>
           </div>
         </motion.form>
       </section>

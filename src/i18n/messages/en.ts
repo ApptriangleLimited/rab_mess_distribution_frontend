@@ -1739,6 +1739,7 @@ export const en = {
     refresh: "Refresh",
     back: "Back",
     noShift: "Outside meal time",
+    openDisplay: "Device screen",
   },
 } as const;
 

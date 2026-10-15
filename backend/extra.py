@@ -1023,6 +1023,13 @@ def zk_attendance(_staff: Staff = Depends(current_staff)):
     )
 
 
+@router.get("/api/v1/zk/display")
+def zk_gate_display():
+    """Punch board for the public /device tab. No login."""
+    start_live_watch(SessionLocal)
+    return envelope(apply_saved_shifts(SessionLocal))
+
+
 @router.get("/api/v1/zk/gate")
 def zk_gate_list(_staff: Staff = Depends(require_roles("admin"))):
     start_live_watch(SessionLocal)

@@ -2,7 +2,6 @@ import type { Role } from "@/lib/types";
 import type { MessageKey } from "@/i18n";
 import {
   IconUserCheck,
-  IconFingerprint,
   IconClockHour4,
   IconTags,
   IconSend,
@@ -160,12 +159,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.adminUsers",
       icon: IconUsersGroup,
       chip: "violet",
-    },
-    {
-      href: "/admin/zk",
-      labelKey: "nav.zkGate",
-      icon: IconFingerprint,
-      chip: "emerald",
     },
     {
       href: "/ration/monthly",

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   IconChartBar,
   IconFileReport,
-  IconFingerprint,
   IconLayoutDashboard,
   IconSend,
   IconSettings,
@@ -48,13 +47,6 @@ const USERS_TAB: Tab = {
   labelKey: "nav.adminUsers",
   icon: IconUserPlus,
   match: (path) => path.startsWith("/admin/users"),
-};
-
-const DEVICE_TAB: Tab = {
-  href: "/admin/zk",
-  labelKey: "nav.zkGate",
-  icon: IconFingerprint,
-  match: (path) => path.startsWith("/admin/zk"),
 };
 
 const LEDGER_TAB: Tab = {
@@ -165,7 +157,6 @@ export function RationTabs({
         DASHBOARD_TAB,
         REPORT_REQUESTS_TAB,
         USERS_TAB,
-        DEVICE_TAB,
         ...ADMIN_WORK_TABS,
         SETTINGS_TAB,
       ]

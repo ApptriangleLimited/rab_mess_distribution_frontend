@@ -1742,5 +1742,6 @@ export const bn = {
     refresh: "রিফ্রেশ",
     back: "ফিরে যান",
     noShift: "খাবারের সময়ের বাইরে",
+    openDisplay: "ডিভাইস স্ক্রিন",
   },
 };

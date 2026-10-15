@@ -36,6 +36,10 @@ export function fetchZkGate() {
   return apiJson<ZkGateSnapshot>("/api/v1/zk/gate");
 }
 
+export function fetchZkDisplay() {
+  return apiJson<ZkGateSnapshot>("/api/v1/zk/display");
+}
+
 export function syncZkGate() {
   return apiJson<ZkGateSnapshot>("/api/v1/zk/sync", { method: "POST" });
 }

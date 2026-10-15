@@ -193,7 +193,7 @@ export function homeForRole(role: Role) {
 }
 
 export function isRoleAllowed(role: Role, pathname: string) {
-  if (pathname.startsWith("/settings")) return true;
+  if (pathname.startsWith("/settings") || pathname.startsWith("/device")) return true;
   if (role === "admin" && pathname.startsWith("/admin/state-reports")) {
     return false;
   }
