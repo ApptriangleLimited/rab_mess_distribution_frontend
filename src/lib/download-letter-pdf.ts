@@ -159,10 +159,9 @@ function writeTrustBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
     body: sheet.lines.map((row) => trustBankCells(row)),
     foot: [
       [
-        ...Array(9).fill(""),
+        ...Array(8).fill(""),
         "G/Total:",
         trustBankMoney(sheet.total),
-        "",
         "",
         "",
         "",
@@ -257,7 +256,6 @@ function writeCommunityBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
         "",
         "",
         "",
-        "",
       ],
     ],
     styles: {
@@ -346,7 +344,6 @@ function writeSonaliBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
         ...Array(8).fill(""),
         "G/Total:",
         trustBankMoney(sheet.total),
-        "",
         "",
         "",
         "",

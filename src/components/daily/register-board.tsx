@@ -53,9 +53,11 @@ import { useStore } from "@/hooks/use-store";
 import {
   canAssignOnDate,
   canWriteMfrLockedTag,
+  isBeforeJoin,
   isFrTag,
   isMfrLocked,
   isUserInactiveOnDate,
+  rosterStart,
   FR_TAG,
   MFR_TAG,
 } from "@/lib/store/daily";
@@ -810,19 +812,44 @@ export function RegisterBoard({
                   trgTone?: TrgTone;
                   pendingTag?: DailyTag;
                   afterOut: boolean;
+                  beforeJoin: boolean;
+                  joiningDay: boolean;
                   inactiveOnDate: boolean;
                   mfrLocked: boolean;
                 }[] = [];
                 for (const date of columnDates) {
+                  const joinDay = rosterStart(user);
+                  const beforeJoin = isBeforeJoin(user, date);
+                  const joiningDay = Boolean(joinDay && date === joinDay);
                   const inactiveOnDate = isUserInactiveOnDate(user, date);
-                  const afterOut = !canAssignOnDate(user, date);
-                  const mfrLocked = isMfrLocked(user) && !inactiveOnDate && !afterOut;
+                  const afterOut =
+                    !beforeJoin && !canAssignOnDate(user, date);
+                  const mfrLocked =
+                    isMfrLocked(user) &&
+                    !inactiveOnDate &&
+                    !afterOut &&
+                    !beforeJoin;
+                  if (beforeJoin) {
+                    rowMeta.push({
+                      date,
+                      stored: undefined,
+                      ghost: undefined,
+                      afterOut: true,
+                      beforeJoin: true,
+                      joiningDay: false,
+                      inactiveOnDate: false,
+                      mfrLocked: false,
+                    });
+                    continue;
+                  }
                   if (inactiveOnDate) {
                     rowMeta.push({
                       date,
                       stored: undefined,
                       ghost: undefined,
                       afterOut: true,
+                      beforeJoin: false,
+                      joiningDay: false,
                       inactiveOnDate: true,
                       mfrLocked: false,
                     });
@@ -835,6 +862,8 @@ export function RegisterBoard({
                       stored: isFrTag(painted) ? painted : MFR_TAG,
                       ghost: undefined,
                       afterOut: false,
+                      beforeJoin: false,
+                      joiningDay,
                       inactiveOnDate: false,
                       mfrLocked: true,
                     });
@@ -852,6 +881,8 @@ export function RegisterBoard({
                         ? (afterEntry?.trg_tone ?? resolveTrgTone(user.force))
                         : undefined,
                       afterOut: true,
+                      beforeJoin: false,
+                      joiningDay,
                       inactiveOnDate: false,
                       mfrLocked: false,
                     });
@@ -879,6 +910,8 @@ export function RegisterBoard({
                     pendingTag,
                     trgTone,
                     afterOut: false,
+                    beforeJoin: false,
+                    joiningDay,
                     inactiveOnDate: false,
                     mfrLocked: false,
                   });
@@ -1001,13 +1034,18 @@ export function RegisterBoard({
                         trgTone,
                         pendingTag,
                         afterOut,
+                        beforeJoin,
+                        joiningDay,
                         inactiveOnDate,
                         mfrLocked,
                       } = cell;
                       const inactive = inactiveOnDate;
                       const pending = Boolean(pendingTag);
                       const preview = inDragPreview(user.id, date);
-                      const locked = afterOut || !isDailyDateEditable(date, todayISO);
+                      const locked =
+                        beforeJoin ||
+                        afterOut ||
+                        !isDailyDateEditable(date, todayISO);
                       let tag = stored;
                       let isGhost = false;
                       if (stored) {
@@ -1063,6 +1101,8 @@ export function RegisterBoard({
                           boroKhana={bkDates.has(date)}
                           locked={locked}
                           afterOut={afterOut}
+                          beforeJoin={beforeJoin}
+                          joiningDay={joiningDay}
                           inactive={inactive}
                           mfrLocked={mfrLocked}
                           contL={contL}
@@ -1837,6 +1877,8 @@ function RegisterCell({
   boroKhana,
   locked,
   afterOut,
+  beforeJoin,
+  joiningDay,
   inactive,
   mfrLocked,
   contL,
@@ -1856,6 +1898,8 @@ function RegisterCell({
   boroKhana?: boolean;
   locked: boolean;
   afterOut?: boolean;
+  beforeJoin?: boolean;
+  joiningDay?: boolean;
   inactive?: boolean;
   mfrLocked?: boolean;
   contL: boolean;
@@ -1884,26 +1928,32 @@ function RegisterCell({
           pending &&
             "ring-1 ring-inset ring-dashed ring-amber-500/90 dark:ring-amber-300/80",
         )
-      : locked
+      : joiningDay && !tag
+        ? "rounded-md bg-sky-50 text-[9px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200 dark:bg-sky-950/50 dark:text-sky-200 dark:ring-sky-800"
+        : locked
         ? "bg-neutral-50 text-neutral-300 dark:bg-neutral-900/40 dark:text-neutral-600"
         : "text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-800",
     preview &&
       "bg-primary/25 ring-2 ring-inset ring-primary/60 dark:bg-primary/40",
   );
 
-  const lockReason = inactive
-    ? t("daily.inactiveLocked")
-    : mfrLocked
-      ? t("daily.mfrLocked")
-      : afterOut
-        ? t("daily.afterOutLocked")
-        : t("daily.pastLocked");
+  const lockReason = beforeJoin
+    ? t("daily.beforeJoinLocked")
+    : inactive
+      ? t("daily.inactiveLocked")
+      : mfrLocked
+        ? t("daily.mfrLocked")
+        : afterOut
+          ? t("daily.afterOutLocked")
+          : t("daily.pastLocked");
   // Prior stored tags: normal title (not "disabled"). Empty locked: lock reason.
   const title = pending && tag
     ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)} · ${t("daily.pendingRequest")}`
     : tag && !ghost
       ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)}${locked ? ` · ${lockReason}` : ""}`
-      : locked
+      : joiningDay && !tag
+        ? `${userName} · ${date} · ${t("daily.joiningDay")}`
+        : locked
         ? `${userName} · ${date} · ${lockReason}`
         : tag
           ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
@@ -1936,7 +1986,7 @@ function RegisterCell({
           onDragStart();
         }}
       >
-        {tag ?? ""}
+        {tag ?? (joiningDay ? "JN" : "")}
       </button>
     </td>
   );

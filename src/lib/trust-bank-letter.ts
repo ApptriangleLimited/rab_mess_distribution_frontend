@@ -1,5 +1,4 @@
-import { RATION_REPORT_META } from "@/lib/constants";
-import { formatDateDisplay, formatMonthLong, todayISO } from "@/lib/date";
+import { formatDateDisplay, formatMonthBill, todayISO } from "@/lib/date";
 import { isFrFuelSender, isTrustBank } from "@/lib/official-senders";
 import type { RationTransferLine } from "@/lib/reports";
 
@@ -18,28 +17,23 @@ export const TRUST_BANK_COLUMNS = [
   "Date",
   "Ref. No",
   "Sender A/C No",
-  "Receiver A/C No",
-  "Routing Number",
-  "Sender Routing Number",
+  "Sender Branch Routing Number",
   "Type",
-  "Customer Account Name",
-  "Customer Account Number",
+  "Receiver Account Name",
+  "Receiver bank A/C no",
+  "Receiver A/C Routing Number",
   "Amount",
   "Institute",
-  "Entry Description",
-  "Payment Information",
+  "Payment Info",
   "Currency",
 ] as const;
 
 export function trustBankSubject(month: string) {
-  return RATION_REPORT_META.subjectTrustBeftn.replace(
-    "{monthLabel}",
-    formatMonthLong(month),
-  );
+  return `We would request you to disburse the Fresh Money bill for the following employees for the month of ${formatMonthBill(month)}.`;
 }
 
 export function trustBankBody(month: string) {
-  return `We would request you to disburse the Fresh Money bill for the month of ${formatMonthLong(month)}.`;
+  return `We would request you to disburse the Fresh Money bill for the following employees for the month of ${formatMonthBill(month)}.`;
 }
 
 export function trustBankMoney(n: number) {
@@ -57,15 +51,13 @@ export function trustBankCells(row: RationTransferLine): string[] {
     formatDateDisplay(todayISO()),
     TRUST_BANK_FIXED.refNo,
     row.senderAccountNo,
-    memberAcct,
-    memberRouting,
     row.senderRouting,
     TRUST_BANK_FIXED.type,
     row.user.name || "",
     memberAcct,
+    memberRouting,
     trustBankMoney(row.amount),
     TRUST_BANK_FIXED.institute,
-    TRUST_BANK_FIXED.entryDescription,
     TRUST_BANK_FIXED.paymentInfo,
     TRUST_BANK_FIXED.currency,
   ];

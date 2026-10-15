@@ -87,15 +87,16 @@ def resolve_range(
 
 
 def roster_start(member: Member) -> date | None:
-    """First day the member may receive Daily RR tags."""
-    starts = [d for d in (member.duty_start, member.joining_date) if d]
-    return max(starts) if starts else None
+    """First Daily RR day is the joining date, not the accept / duty-start day."""
+    return member.joining_date
+
+
+def is_before_join(member: Member, day: date) -> bool:
+    start = roster_start(member)
+    return bool(start and day < start)
 
 
 def is_inactive_on(member: Member, day: date) -> bool:
-    roster = roster_start(member)
-    if roster and day < roster:
-        return True
     for span in member.inactive_spans or []:
         if not isinstance(span, dict) or not span.get("from"):
             continue
@@ -126,19 +127,10 @@ def is_inactive_on(member: Member, day: date) -> bool:
     return False
 
 
-def roster_start(member: Member) -> date | None:
-    duty = member.duty_start
-    join = member.joining_date
-    if duty and join:
-        return duty if duty > join else join
-    return duty or join
-
-
 def can_assign(member: Member, day: date) -> bool:
     if member.member_type in ("guest", "civilian"):
         return False
-    start = roster_start(member)
-    if start and day < start:
+    if is_before_join(member, day):
         return False
     if is_inactive_on(member, day):
         return False

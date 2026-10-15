@@ -339,7 +339,7 @@ function DataRow({
       <td
         className={cn(
           "border border-black px-1 py-1",
-          centerLabel ? "consume-page-no text-center" : "text-left",
+          centerLabel ? "consume-page-no text-center" : "consume-wing text-left",
         )}
       >
         {row.label}

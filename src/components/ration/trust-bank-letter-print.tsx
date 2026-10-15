@@ -117,7 +117,7 @@ export const TrustBankLetterPrint = forwardRef<HTMLDivElement, Props>(
             <tfoot>
               <tr className="border border-black font-semibold">
                 <td
-                  colSpan={10}
+                  colSpan={9}
                   className="border border-black px-1 py-1 text-right"
                 >
                   G/Total:
@@ -125,7 +125,7 @@ export const TrustBankLetterPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="border border-black px-0.5 py-1 text-right tabular-nums">
                   {trustBankMoney(sheet.total)}
                 </td>
-                <td colSpan={4} className="border border-black px-0.5 py-1" />
+                <td colSpan={3} className="border border-black px-0.5 py-1" />
               </tr>
             </tfoot>
           </table>

@@ -39,14 +39,19 @@ export function canWriteMfrLockedTag(tag: DailyTag | "" | undefined): boolean {
  * True for dates inside an inactive stretch (from deactivate until
  * the day before they are activated again).
  */
-/** First day this member may receive Daily RR tags. */
+/** First Daily RR day — the member joining date. Empty = no join lock. */
 export function rosterStart(
   user: { joining_date?: string; duty_start?: string },
 ): string {
-  const duty = (user.duty_start ?? "").trim();
-  const join = (user.joining_date ?? "").trim();
-  if (duty && join) return duty > join ? duty : join;
-  return duty || join;
+  return (user.joining_date ?? "").trim();
+}
+
+export function isBeforeJoin(
+  user: { joining_date?: string },
+  date: string,
+): boolean {
+  const start = rosterStart(user);
+  return Boolean(start && date < start);
 }
 
 export function isUserInactiveOnDate(
@@ -57,10 +62,6 @@ export function isUserInactiveOnDate(
   },
   date: string,
 ): boolean {
-  const start = rosterStart(user);
-  if (start && date < start) {
-    return true;
-  }
   const spans = user.inactive_spans ?? [];
   for (const span of spans) {
     if (!span?.from) continue;
@@ -89,8 +90,7 @@ export function canAssignOnDate(
   },
   date: string,
 ): boolean {
-  const start = rosterStart(user);
-  if (start && date < start) return false;
+  if (isBeforeJoin(user, date)) return false;
   if (isUserInactiveOnDate(user, date)) return false;
   const out = (user.out_date ?? "").trim();
   if (out && date > out) return false;
@@ -173,7 +173,12 @@ export function approveUser(id: string) {
     ...prev,
     users: prev.users.map((u) => (u.id === id ? withDuty : u)),
     assignments: prev.assignments.filter(
-      (a) => !(a.user_id === id && a.date < today),
+      (a) =>
+        !(
+          a.user_id === id &&
+          updated.joining_date &&
+          a.date < updated.joining_date
+        ),
     ),
   }));
   return withDuty;

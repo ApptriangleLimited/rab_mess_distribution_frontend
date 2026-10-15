@@ -52,3 +52,9 @@ next-env.d.ts
 
 # local database dumps from restore drills
 /backups/
+
+# RFID / member spreadsheets — names, IDs, card numbers
+/rfid/*.xlsx
+/rfid/*.json
+/rfid/~$*
+/srb_member_data/

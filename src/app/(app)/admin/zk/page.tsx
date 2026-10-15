@@ -11,9 +11,24 @@ import { ApiClientError } from "@/lib/api/client";
 import {
   fetchZkGate,
   syncZkGate,
+  type ZkGateRow,
   type ZkGateSnapshot,
+  type ZkGateStatus,
 } from "@/lib/api/zk-gate";
 import { cn } from "@/lib/utils";
+
+function rowStatus(row: ZkGateRow): ZkGateStatus {
+  if (row.status === "accepted" || row.status === "not_allowed" || row.status === "rfid_not_found") {
+    return row.status;
+  }
+  return row.allowed ? "accepted" : "not_allowed";
+}
+
+function statusTone(status: ZkGateStatus) {
+  if (status === "accepted") return "bg-emerald-600";
+  if (status === "rfid_not_found") return "bg-amber-600";
+  return "bg-red-600";
+}
 
 export default function AdminZkPage() {
   const t = useT();
@@ -65,6 +80,13 @@ export default function AdminZkPage() {
   const syncing = Boolean(data?.syncing);
   const rows = data?.rows ?? [];
   const latest = rows[0] ?? null;
+  const latestStatus = latest ? rowStatus(latest) : null;
+
+  const statusLabel = (status: ZkGateStatus) => {
+    if (status === "accepted") return t("zkGate.accepted");
+    if (status === "rfid_not_found") return t("zkGate.rfidNotFound");
+    return t("zkGate.notAllowed");
+  };
 
   return (
     <PagePane className="gap-4">
@@ -101,6 +123,11 @@ export default function AdminZkPage() {
             {t("zkGate.enrolled", { count: data.enrolled })}
           </span>
         ) : null}
+        {data?.host ? (
+          <span className="text-xs tabular-nums text-neutral-500">
+            {data.host}:{data.port}
+          </span>
+        ) : null}
       </div>
 
       {error ? (
@@ -109,17 +136,22 @@ export default function AdminZkPage() {
         </p>
       ) : null}
 
-      {latest ? (
+      {latest && latestStatus ? (
         <section
           className={cn(
             "flex min-h-72 flex-col items-center justify-center rounded-2xl px-6 py-10 text-center text-white shadow-lg",
-            latest.allowed ? "bg-emerald-600" : "bg-red-600",
+            statusTone(latestStatus),
           )}
         >
-          <p className="text-sm font-semibold uppercase tracking-[0.2em]">
-            {latest.allowed ? t("zkGate.allowed") : t("zkGate.notAllowed")}
-          </p>
-          {latest.allowed ? (
+          <p className="text-sm font-semibold uppercase tracking-[0.2em]">{statusLabel(latestStatus)}</p>
+          {latestStatus === "rfid_not_found" ? (
+            <>
+              <p className="mt-4 text-5xl font-semibold leading-tight">{t("zkGate.rfidNotFound")}</p>
+              <p className="mt-2 text-2xl font-medium tabular-nums tracking-wide">
+                {latest.rfid || latest.rab_id}
+              </p>
+            </>
+          ) : latestStatus === "accepted" ? (
             <>
               <p className="mt-4 text-4xl font-semibold leading-tight">{latest.name}</p>
               <p className="mt-2 text-2xl font-medium tabular-nums tracking-wide">{latest.rab_id}</p>
@@ -143,30 +175,33 @@ export default function AdminZkPage() {
 
       {rows.length > 1 ? (
         <div className="grid gap-2">
-          {rows.slice(1).map((row) => (
-            <div
-              key={`${row.rab_id}-${row.punched_at}`}
-              className={cn(
-                "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-white",
-                row.allowed ? "bg-emerald-600" : "bg-red-600",
-              )}
-            >
-              {row.allowed ? (
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold">{row.name}</p>
-                  <p className="text-sm tabular-nums text-white/90">{row.rab_id}</p>
-                </div>
-              ) : (
-                <div className="min-w-0">
-                  <p className="text-base font-semibold">{t("zkGate.notAllowed")}</p>
-                  <p className="truncate text-sm text-white/90">
-                    {[row.name, row.rab_id].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-              )}
-              <p className="shrink-0 text-sm text-white/80">{row.punched_at.slice(11) || row.punched_at}</p>
-            </div>
-          ))}
+          {rows.slice(1).map((row) => {
+            const status = rowStatus(row);
+            return (
+              <div
+                key={`${row.rab_id}-${row.rfid || ""}-${row.punched_at}`}
+                className={cn(
+                  "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-white",
+                  statusTone(status),
+                )}
+              >
+                {status === "accepted" ? (
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold">{row.name}</p>
+                    <p className="text-sm tabular-nums text-white/90">{row.rab_id}</p>
+                  </div>
+                ) : (
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold">{statusLabel(status)}</p>
+                    <p className="truncate text-sm text-white/90">
+                      {[row.name, row.rab_id || row.rfid].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                )}
+                <p className="shrink-0 text-sm text-white/80">{row.punched_at.slice(11) || row.punched_at}</p>
+              </div>
+            );
+          })}
         </div>
       ) : null}
     </PagePane>

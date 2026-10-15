@@ -380,6 +380,36 @@ body {
     display: block !important;
     text-align: center !important;
   }
+  .trust-bank-letter,
+  .community-bank-letter,
+  .sonali-bank-letter,
+  .fr-transfer-letter {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  .trust-bank-letter table,
+  .community-bank-letter table,
+  .sonali-bank-letter table,
+  .fr-transfer-letter table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+  }
+  .trust-bank-letter th,
+  .trust-bank-letter td,
+  .community-bank-letter th,
+  .community-bank-letter td,
+  .sonali-bank-letter th,
+  .sonali-bank-letter td,
+  .fr-transfer-letter th,
+  .fr-transfer-letter td {
+    box-sizing: border-box !important;
+    padding: 1px 2px !important;
+    font-size: 6px !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
 }
 
 /* Consume report titles: capitals, each line underlined. */
@@ -462,6 +492,9 @@ body {
 }
 .official-consume-letter td.consume-page-no {
   text-align: center !important;
+}
+.official-consume-letter td.consume-wing {
+  text-align: left !important;
 }
 .dark .consume-col-titles th {
   color: #fafafa !important;

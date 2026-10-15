@@ -90,7 +90,7 @@ export interface User {
   branch_location: string;
   /** ISO `YYYY-MM-DD` — when member joined. */
   joining_date: string;
-  /** ISO `YYYY-MM-DD` — first Daily RR day (accept). Empty = use joining_date. */
+  /** ISO `YYYY-MM-DD` — accept day. Daily RR starts from joining_date. */
   duty_start: string;
   /** ISO `YYYY-MM-DD` — when member left; empty if still active. */
   out_date: string;

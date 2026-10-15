@@ -178,6 +178,9 @@ function drawOfficialTable(doc: jsPDF, table: OfficialConsumeTable) {
         data.cell.styles.halign = "left";
         data.cell.styles.fontStyle = "bold";
       }
+      if (table.kind !== "consume-pages" && data.column.index === 1) {
+        data.cell.styles.halign = "left";
+      }
     },
   });
 

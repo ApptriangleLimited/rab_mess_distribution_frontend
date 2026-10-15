@@ -56,6 +56,7 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: rab_mess
+      DATABASE_URL: postgresql+psycopg://mess:${POSTGRES_PASSWORD:-mess}@postgres:5432/rab_mess
       REDIS_URL: redis://redis:6379/0
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-120}
@@ -69,10 +70,11 @@ services:
       STORAGE_LOCAL_PATH: /var/lib/rab-mess/files
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
       ZK_ENABLED: ${ZK_ENABLED:-true}
-      ZK_HOST: ${ZK_HOST:-103.86.200.55}
+      ZK_HOST: ${ZK_HOST:-192.168.9.111}
       ZK_PORT: ${ZK_PORT:-4370}
       ZK_TIMEOUT: ${ZK_TIMEOUT:-10}
       ZK_PASSWORD: ${ZK_PASSWORD:-0}
+      ZK_FORCE_UDP: ${ZK_FORCE_UDP:-false}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:

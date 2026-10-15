@@ -1,4 +1,4 @@
-"""ZKTeco gate: today's MS members are the only ones the device accepts."""
+"""ZKTeco gate: RFID holders punch; MS today is accepted, others are not allowed."""
 
 from __future__ import annotations
 
@@ -13,6 +13,10 @@ from daily import project_cell
 from models import Assignment, Member, SuppressedCarry
 
 DHAKA = ZoneInfo("Asia/Dhaka")
+STATUS_ACCEPTED = "accepted"
+STATUS_NOT_ALLOWED = "not_allowed"
+STATUS_RFID_NOT_FOUND = "rfid_not_found"
+
 _device_lock = threading.Lock()
 _state_lock = threading.Lock()
 _state: dict = {
@@ -40,6 +44,41 @@ def device_pin(rab_id: str | None) -> str:
     return "".join((rab_id or "").split())
 
 
+def rfid_digits(raw: str | None) -> str:
+    return "".join(ch for ch in (raw or "") if ch.isdigit())
+
+
+def rfid_card(raw: str | None) -> int:
+    digits = rfid_digits(raw)
+    if not digits:
+        return 0
+    try:
+        value = int(digits)
+    except ValueError:
+        return 0
+    if value <= 0 or value > 0xFFFFFFFF:
+        return 0
+    return value
+
+
+def lookup_keys(member: Member) -> list[str]:
+    keys: list[str] = []
+    pin = device_pin(member.rab_id)
+    if pin:
+        keys.append(pin)
+    digits = rfid_digits(member.rfid)
+    if digits:
+        keys.append(digits)
+        stripped = str(int(digits))
+        if stripped not in keys:
+            keys.append(stripped)
+    return keys
+
+
+def has_rfid(member: Member) -> bool:
+    return rfid_card(member.rfid) > 0 and bool(device_pin(member.rab_id))
+
+
 def device_name(name: str | None) -> str:
     text = " ".join((name or "").split()) or "Member"
     raw = text.encode("utf-8")[:24]
@@ -53,7 +92,7 @@ def is_ms_today(member: Member, tag: str | None) -> bool:
         str(member.status) == "1"
         and (member.approval_status or "") == "approved"
         and (tag or "").upper() == "MS"
-        and bool(device_pin(member.rab_id))
+        and has_rfid(member)
     )
 
 
@@ -79,7 +118,9 @@ def _set(**values) -> None:
         _state.update(values)
 
 
-def _today_maps(db: Session, day: date) -> tuple[dict[str, Member], dict[str, Member]]:
+def _today_maps(
+    db: Session, day: date
+) -> tuple[dict[str, Member], set[str], dict[str, Member]]:
     members = db.query(Member).all()
     ids = [member.id for member in members]
     stored: dict[tuple[str, date], Assignment] = {}
@@ -95,34 +136,43 @@ def _today_maps(db: Session, day: date) -> tuple[dict[str, Member], dict[str, Me
             SuppressedCarry.date == day,
         ):
             suppressed.add((row.user_id, day))
-    ms_by_pin: dict[str, Member] = {}
-    known_by_pin: dict[str, Member] = {}
+    known_by_key: dict[str, Member] = {}
+    ms_ids: set[str] = set()
+    rfid_by_pin: dict[str, Member] = {}
     for member in members:
-        pin = device_pin(member.rab_id)
-        if not pin:
+        if not has_rfid(member):
             continue
+        pin = device_pin(member.rab_id)
+        rfid_by_pin[pin] = member
+        for key in lookup_keys(member):
+            known_by_key.setdefault(key, member)
         cell = project_cell(member, day, stored.get((member.id, day)), suppressed)
         if is_ms_today(member, cell.get("tag")):
-            ms_by_pin[pin] = member
-        elif pin not in known_by_pin:
-            known_by_pin[pin] = member
-    for pin, member in ms_by_pin.items():
-        known_by_pin[pin] = member
-    return ms_by_pin, known_by_pin
+            ms_ids.add(member.id)
+    return known_by_key, ms_ids, rfid_by_pin
 
 
 def _connect():
     from zk import ZK
 
-    zk = ZK(
-        settings.zk_host,
-        port=settings.zk_port,
-        timeout=max(int(settings.zk_timeout or 10), 20),
-        password=int(settings.zk_password or 0),
-        force_udp=False,
-        ommit_ping=True,
-    )
-    return zk.connect()
+    last: Exception | None = None
+    modes = [True] if settings.zk_force_udp else [False, True]
+    for force_udp in modes:
+        zk = ZK(
+            settings.zk_host,
+            port=settings.zk_port,
+            timeout=max(int(settings.zk_timeout or 10), 20),
+            password=int(settings.zk_password or 0),
+            force_udp=force_udp,
+            ommit_ping=True,
+        )
+        try:
+            return zk.connect()
+        except Exception as exc:
+            last = exc
+    if last is not None:
+        raise last
+    raise RuntimeError("ZK device did not answer")
 
 
 def _device_users(conn) -> list:
@@ -130,7 +180,7 @@ def _device_users(conn) -> list:
     return list(users)
 
 
-def _apply_ms(conn, ms_by_pin: dict[str, Member], known_by_pin: dict[str, Member]) -> None:
+def _apply_rfid(conn, rfid_by_pin: dict[str, Member]) -> None:
     users = _device_users(conn)
     by_pin = {}
     used_uids: set[int] = set()
@@ -152,46 +202,99 @@ def _apply_ms(conn, ms_by_pin: dict[str, Member], known_by_pin: dict[str, Member
         return uid
 
     skipped = 0
-    for pin, member in known_by_pin.items():
-        wanted = device_name(member.name)
+    enrolled = 0
+    for pin, member in rfid_by_pin.items():
+        wanted_name = device_name(member.name)
+        wanted_card = rfid_card(member.rfid)
         current = by_pin.get(pin)
-        if current is not None and str(getattr(current, "name", "") or "").strip() == wanted:
+        current_name = str(getattr(current, "name", "") or "").strip() if current else ""
+        current_card = int(getattr(current, "card", 0) or 0) if current is not None else -1
+        if current is not None and current_name == wanted_name and current_card == wanted_card:
+            enrolled += 1
             continue
         uid = int(getattr(current, "uid", 0) or 0) if current is not None else alloc_uid()
         try:
             conn.set_user(
                 uid=uid,
-                name=wanted,
+                name=wanted_name,
                 privilege=0,
                 password=pin[:8],
                 group_id="",
                 user_id=pin,
-                card=0,
+                card=wanted_card,
             )
+            enrolled += 1
         except Exception:
             skipped += 1
 
-    _set(enrolled=len(ms_by_pin), removed=0, skipped=skipped)
+    _set(enrolled=enrolled, removed=0, skipped=skipped)
+
+
+def _row_status(member: Member | None, ms_ids: set[str]) -> str:
+    if member is None:
+        return STATUS_RFID_NOT_FOUND
+    if member.id in ms_ids:
+        return STATUS_ACCEPTED
+    return STATUS_NOT_ALLOWED
 
 
 def _punch_row(
     pin: str,
     punched: datetime,
-    ms_by_pin: dict[str, Member],
-    known_by_pin: dict[str, Member],
+    known_by_key: dict[str, Member],
+    ms_ids: set[str],
     device_names: dict[str, str],
+    device_cards: dict[str, str],
 ) -> dict:
-    member = known_by_pin.get(pin)
-    name = member.name if member is not None else device_names.get(pin, "")
+    member = known_by_key.get(pin)
+    if member is None:
+        card_key = device_cards.get(pin, "")
+        if card_key:
+            member = known_by_key.get(card_key)
+    status = _row_status(member, ms_ids)
     return {
-        "name": name,
+        "name": member.name if member is not None else device_names.get(pin, ""),
         "rab_id": member.rab_id if member is not None else pin,
+        "rfid": member.rfid if member is not None else (device_cards.get(pin) or pin),
         "punched_at": punched.strftime("%Y-%m-%d %H:%M"),
-        "allowed": pin in ms_by_pin,
+        "allowed": status == STATUS_ACCEPTED,
+        "status": status,
     }
 
 
-def _read_rows(conn, ms_by_pin: dict[str, Member], known_by_pin: dict[str, Member], day: date) -> None:
+def _refresh_cached_rows(
+    known_by_key: dict[str, Member],
+    ms_ids: set[str],
+    day: date,
+) -> None:
+    with _state_lock:
+        kept = []
+        for row in _state["rows"]:
+            pin = device_pin(row.get("rab_id")) or str(row.get("rab_id") or "").strip()
+            rfid = str(row.get("rfid") or "").strip()
+            member = known_by_key.get(pin) or known_by_key.get(rfid_digits(rfid))
+            if member is None and rfid:
+                member = known_by_key.get(str(rfid_card(rfid)))
+            status = _row_status(member, ms_ids)
+            kept.append(
+                {
+                    "name": member.name if member is not None else row.get("name") or "",
+                    "rab_id": member.rab_id if member is not None else row.get("rab_id") or pin,
+                    "rfid": member.rfid if member is not None else row.get("rfid") or rfid,
+                    "punched_at": row.get("punched_at") or "",
+                    "allowed": status == STATUS_ACCEPTED,
+                    "status": status,
+                }
+            )
+    _set(rows=kept, date=day.isoformat())
+
+
+def _read_rows(
+    conn,
+    known_by_key: dict[str, Member],
+    ms_ids: set[str],
+    day: date,
+) -> None:
     record_count = None
     try:
         if conn.read_sizes():
@@ -206,31 +309,24 @@ def _read_rows(conn, ms_by_pin: dict[str, Member], known_by_pin: dict[str, Membe
             and _state.get("rows_date") == day.isoformat()
         )
     if same_log:
-        with _state_lock:
-            kept = []
-            for row in _state["rows"]:
-                pin = device_pin(row.get("rab_id")) or str(row.get("rab_id") or "").strip()
-                member = known_by_pin.get(pin)
-                kept.append(
-                    {
-                        "name": member.name if member is not None else row.get("name") or "",
-                        "rab_id": member.rab_id if member is not None else row.get("rab_id") or pin,
-                        "punched_at": row.get("punched_at") or "",
-                        "allowed": pin in ms_by_pin,
-                    }
-                )
-        _set(rows=kept, date=day.isoformat())
+        _refresh_cached_rows(known_by_key, ms_ids, day)
         return
 
     logs = conn.get_attendance() or []
     device_names: dict[str, str] = {}
+    device_cards: dict[str, str] = {}
     try:
         for user in _device_users(conn):
             pin = str(getattr(user, "user_id", "") or "").strip()
-            if pin:
-                device_names[pin] = str(getattr(user, "name", "") or "").strip()
+            if not pin:
+                continue
+            device_names[pin] = str(getattr(user, "name", "") or "").strip()
+            card = int(getattr(user, "card", 0) or 0)
+            if card:
+                device_cards[pin] = str(card)
     except Exception:
         device_names = {}
+        device_cards = {}
     latest: dict[str, datetime] = {}
     for row in logs:
         pin = str(getattr(row, "user_id", "") or "").strip()
@@ -248,7 +344,7 @@ def _read_rows(conn, ms_by_pin: dict[str, Member], known_by_pin: dict[str, Membe
 
     rows = []
     for pin, punched in latest.items():
-        rows.append(_punch_row(pin, punched, ms_by_pin, known_by_pin, device_names))
+        rows.append(_punch_row(pin, punched, known_by_key, ms_ids, device_names, device_cards))
     rows.sort(key=lambda item: item["punched_at"], reverse=True)
     _set(rows=rows, record_count=record_count, rows_date=day.isoformat(), date=day.isoformat())
 
@@ -264,17 +360,18 @@ def _open_and_run(db: Session, write: bool) -> None:
         )
         return
     day = mess_today()
-    ms_by_pin, known_by_pin = _today_maps(db, day)
+    known_by_key, ms_ids, rfid_by_pin = _today_maps(db, day)
     conn = None
     try:
         conn = _connect()
-        _read_rows(conn, ms_by_pin, known_by_pin, day)
+        _read_rows(conn, known_by_key, ms_ids, day)
         _set(
             reachable=True,
             host=settings.zk_host,
             port=settings.zk_port,
             error="",
             date=day.isoformat(),
+            enrolled=len(rfid_by_pin),
         )
         if write:
             try:
@@ -282,7 +379,7 @@ def _open_and_run(db: Session, write: bool) -> None:
             except Exception:
                 pass
             try:
-                _apply_ms(conn, ms_by_pin, known_by_pin)
+                _apply_rfid(conn, rfid_by_pin)
             finally:
                 try:
                     conn.enable_device()
@@ -310,7 +407,7 @@ def gate_snapshot() -> dict:
 
 
 def refresh_gate(db: Session) -> dict:
-    """Read today's MS check-ins. Skip the device when a sync is already using it."""
+    """Read today's RFID check-ins. Skip the device when a sync is already using it."""
     with _state_lock:
         busy = bool(_state["syncing"])
     if busy or not _device_lock.acquire(blocking=False):
@@ -344,7 +441,7 @@ def start_sync(session_factory) -> bool:
     thread = threading.Thread(
         target=_sync_job,
         args=(session_factory,),
-        name="zk-ms-sync",
+        name="zk-rfid-sync",
         daemon=True,
     )
     try:
@@ -356,7 +453,7 @@ def start_sync(session_factory) -> bool:
 
 
 def start_periodic_sync() -> None:
-    """Keep the device aligned with today's MS list, even when the admin page is closed."""
+    """Keep the device aligned with RFID members, even when the admin page is closed."""
     with _state_lock:
         if _state.get("periodic"):
             return
@@ -375,4 +472,4 @@ def start_periodic_sync() -> None:
                 _set(syncing=False, error="ZK sync did not start")
             time.sleep(300)
 
-    threading.Thread(target=_loop, name="zk-ms-periodic", daemon=True).start()
+    threading.Thread(target=_loop, name="zk-rfid-periodic", daemon=True).start()

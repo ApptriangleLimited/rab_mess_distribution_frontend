@@ -743,10 +743,11 @@ def accept_member(
     row.approval_status = "approved"
     row.status = "1"
     row.duty_start = date.today()
-    db.query(Assignment).filter(
-        Assignment.user_id == row.id,
-        Assignment.date < row.duty_start,
-    ).delete(synchronize_session=False)
+    if row.joining_date:
+        db.query(Assignment).filter(
+            Assignment.user_id == row.id,
+            Assignment.date < row.joining_date,
+        ).delete(synchronize_session=False)
     row.updated_at = utcnow()
     db.commit()
     db.refresh(row)

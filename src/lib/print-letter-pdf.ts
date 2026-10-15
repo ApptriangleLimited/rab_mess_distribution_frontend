@@ -609,6 +609,9 @@ function letterSheetCss() {
   .official-consume-letter td.consume-page-no {
     text-align: center !important;
   }
+  .official-consume-letter td.consume-wing {
+    text-align: left !important;
+  }
   .manpower-letter,
   .strength-letter {
     width: 100% !important;
@@ -1041,7 +1044,7 @@ function isBankLetterSurface(el: HTMLElement) {
 
 function bankLetterPrintCss() {
   return `
-  @page { size: A4 landscape; margin: 10mm 8mm; }
+  @page { size: A4 landscape; margin: 6mm 4mm; }
   html { color-scheme: light; }
   html, body {
     margin: 0;
@@ -1054,8 +1057,10 @@ function bankLetterPrintCss() {
     word-spacing: normal;
     letter-spacing: 0;
     width: 100%;
+    max-width: 100%;
   }
   html, body, body * {
+    box-sizing: border-box !important;
     font-family: Arial, Helvetica, sans-serif !important;
     color: #000 !important;
     word-spacing: normal !important;
@@ -1129,19 +1134,19 @@ function bankLetterPrintCss() {
     max-width: 100% !important;
     border-collapse: collapse !important;
     table-layout: fixed !important;
-    margin: 8px 0 10px 0 !important;
+    margin: 6px 0 8px 0 !important;
   }
   thead { display: table-row-group !important; }
   th, td {
-    border: 1.5px solid #000 !important;
+    border: 1px solid #000 !important;
     color: #000 !important;
-    padding: 3px 4px !important;
-    font-size: 7px !important;
-    line-height: 1.25 !important;
+    padding: 1px 2px !important;
+    font-size: 6px !important;
+    line-height: 1.15 !important;
     text-align: left !important;
     vertical-align: top !important;
     white-space: normal !important;
-    overflow-wrap: break-word !important;
+    overflow-wrap: anywhere !important;
     word-break: break-word !important;
     background: #fff !important;
   }
