@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { IconArrowLeft, IconUser } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { PagePane } from "@/components/shared/page-pane";
 import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
@@ -21,10 +22,19 @@ import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { getMember, memberToUser, updateMember } from "@/lib/api/members";
 import { isDailyApiEnabled } from "@/lib/api/mode";
 import { findUserByRabId, updateUser } from "@/lib/store/users";
+import { dailyUserHref, safeDailyBack } from "@/lib/daily-back";
 import { useT } from "@/i18n/provider";
 import type { User } from "@/lib/types";
 
 export default function DailyEditUserPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <DailyEditUser />
+    </Suspense>
+  );
+}
+
+function DailyEditUser() {
   const t = useT();
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -34,7 +44,8 @@ export default function DailyEditUserPage() {
   const [apiUser, setApiUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(apiOn);
   const [busy, setBusy] = useState(false);
-  const detailHref = `/daily/users/${params.id}`;
+  const backHref = safeDailyBack(useSearchParams().get("back"));
+  const detailHref = dailyUserHref(params.id, backHref);
 
   useEffect(() => {
     if (!apiOn) {
@@ -122,7 +133,7 @@ export default function DailyEditUserPage() {
         <SectionCard>
           <p className="text-sm text-neutral-600">{t("cc.notFound")}</p>
           <Button asChild className="mt-4" variant="cta">
-            <Link href="/daily/roster">{t("common.back")}</Link>
+            <Link href={backHref}>{t("common.back")}</Link>
           </Button>
         </SectionCard>
       </PagePane>

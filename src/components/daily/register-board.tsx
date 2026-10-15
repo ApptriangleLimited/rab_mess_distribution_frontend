@@ -47,6 +47,7 @@ import {
 import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
+import { dailyUserHref, DAILY_RR_HREF } from "@/lib/daily-back";
 import { useI18n, useT } from "@/i18n/provider";
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
@@ -152,6 +153,7 @@ export function RegisterBoard({
   onBoroKhanaToggle,
   projectedTagMembers,
   toolbarEnd,
+  memberBack = DAILY_RR_HREF,
 }: {
   users: User[];
   month: string;
@@ -182,9 +184,12 @@ export function RegisterBoard({
   projectedTagMembers?: (tag: DailyTag, date: string) => User[];
   /** Extra control on the register hint row (far right). */
   toolbarEnd?: ReactNode;
+  /** Where member name links should return (Daily RR by default). */
+  memberBack?: string;
 }) {
   void _paintTag;
   void _onPaintTagChange;
+  const memberHref = (id: string) => dailyUserHref(id, memberBack);
 
   const t = useT();
   const { locale } = useI18n();
@@ -958,7 +963,7 @@ export function RegisterBoard({
                     >
                       <span className="flex min-w-0 items-center gap-1 truncate">
                         <Link
-                          href={`/daily/users/${user.id}`}
+                          href={memberHref(user.id)}
                           title={user.name}
                           className="truncate text-primary underline-offset-2 hover:underline"
                           onMouseDown={(e) => e.stopPropagation()}
@@ -1594,7 +1599,12 @@ function DayMsCdPeek({
                 <ul className="flex flex-col gap-1.5">
                   {rows.map(({ user, tag }, i) => (
                     <li key={`${tag}-${user.id}`}>
-                      <DayMsCdRow index={i} user={user} tag={tag} />
+                      <DayMsCdRow
+                        index={i}
+                        user={user}
+                        tag={tag}
+                        href={memberHref(user.id)}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -1664,10 +1674,12 @@ function DayMsCdRow({
   index,
   user,
   tag,
+  href,
 }: {
   index: number;
   user: User;
   tag: "MS" | "CD";
+  href: string;
 }) {
   const initials = user.name
     .split(/\s+/)
@@ -1693,7 +1705,7 @@ function DayMsCdRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <Link
-            href={`/daily/users/${user.id}`}
+            href={href}
             title={user.name}
             className="truncate font-medium text-primary underline-offset-2 hover:underline"
           >

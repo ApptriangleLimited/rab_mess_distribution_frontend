@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { IconArrowLeft, IconPencil } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
+import { LoadingScreen } from "@/components/shared/loading-screen";
 import { PagePane } from "@/components/shared/page-pane";
 import { SectionCard } from "@/components/shared/section-card";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -24,13 +25,23 @@ import { isDailyApiEnabled } from "@/lib/api/mode";
 import { setUserStatus } from "@/lib/store/daily";
 import { updateUser } from "@/lib/store/users";
 import { userToFormValues } from "@/components/users/user-form";
+import { dailyUserEditHref, safeDailyBack } from "@/lib/daily-back";
 import { useT } from "@/i18n/provider";
 import type { DailyTag, User, UserStatus } from "@/lib/types";
 
 export default function DailyUserDetailPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <DailyUserDetail />
+    </Suspense>
+  );
+}
+
+function DailyUserDetail() {
   const t = useT();
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const backHref = safeDailyBack(useSearchParams().get("back"));
   const { toast } = useToast();
   const state = useStore();
   const apiOn = isDailyApiEnabled();
@@ -123,7 +134,7 @@ export default function DailyUserDetailPage() {
         <SectionCard>
           <p className="text-sm text-neutral-600">{t("cc.notFound")}</p>
           <Button asChild className="mt-4" variant="cta">
-            <Link href="/daily/roster">{t("common.back")}</Link>
+            <Link href={backHref}>{t("common.back")}</Link>
           </Button>
         </SectionCard>
       </PagePane>
@@ -176,7 +187,7 @@ export default function DailyUserDetailPage() {
               className="rounded-xl"
               aria-label={t("common.back")}
             >
-              <Link href="/daily/roster">
+              <Link href={backHref}>
                 <IconArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
@@ -185,7 +196,7 @@ export default function DailyUserDetailPage() {
             <MemberAcceptActions
               user={user}
               withTag
-              onAccepted={() => router.replace("/daily/roster")}
+              onAccepted={() => router.replace(backHref)}
               after={
                 <Button
                   asChild
@@ -193,7 +204,7 @@ export default function DailyUserDetailPage() {
                   size="sm"
                   className="rounded-lg"
                 >
-                  <Link href={`/daily/users/${user.id}/edit`}>
+                  <Link href={dailyUserEditHref(user.id, backHref)}>
                     <IconPencil className="h-3.5 w-3.5" />
                     {t("common.edit")}
                   </Link>
