@@ -1237,6 +1237,7 @@ export function RegisterBoard({
         boroKhanaDates={boroKhanaDates}
         onBoroKhanaToggle={onBoroKhanaToggle}
         projectedTagMembers={projectedTagMembers}
+        memberHref={memberHref}
       />
 
       <TrgSardaDialog
@@ -1302,6 +1303,7 @@ function DayMsCdPeek({
   boroKhanaDates,
   onBoroKhanaToggle,
   projectedTagMembers,
+  memberHref,
 }: {
   date: string | null;
   filterUsers: User[];
@@ -1309,6 +1311,7 @@ function DayMsCdPeek({
   boroKhanaDates?: string[];
   onBoroKhanaToggle?: (date: string, on: boolean) => void;
   projectedTagMembers?: (tag: DailyTag, date: string) => User[];
+  memberHref: (id: string) => string;
 }) {
   const t = useT();
   const { locale } = useI18n();
