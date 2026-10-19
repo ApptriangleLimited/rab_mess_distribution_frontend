@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Server
+      - name: Deploy to Oracle Server
         uses: appleboy/ssh-action@v1.0.3
         env:
           HEALTH_BASE_URL: ${{ secrets.STAGE_URL }}
