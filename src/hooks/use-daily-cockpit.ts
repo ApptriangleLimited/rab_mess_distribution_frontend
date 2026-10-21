@@ -12,7 +12,6 @@ function useDebouncedValue<T>(value: T, ms: number) {
 }
 import { ApiClientError } from "@/lib/api/client";
 import {
-  assignmentSummary,
   cellsToAssignments,
   cellsToCountedAssignments,
   cellsToSuppressed,
@@ -29,7 +28,10 @@ import { isDailyApiEnabled } from "@/lib/api/mode";
 import { onCcDataChange } from "@/lib/api/cc-events";
 import { listTagRequests, requestToTagRequest } from "@/lib/api/tag-requests";
 import { useToast } from "@/components/shared/toast-provider";
-import { replaceQueueRequests } from "@/lib/store/tag-requests";
+import {
+  TAG_CHANGE_APPROVAL_ENABLED,
+  replaceQueueRequests,
+} from "@/lib/store/tag-requests";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import type { DailyAssignment, DailyTag, User } from "@/lib/types";
 
@@ -47,6 +49,16 @@ function mergeUpdatedCells(
     ...prev.filter((c) => !keys.has(`${c.member_id}|${c.date}`)),
     ...updated,
   ];
+}
+
+function countsFromCells(cells: AssignmentCell[]): Record<string, number> {
+  const byTag: Record<string, number> = {};
+  for (const cell of cells) {
+    if ((cell.source === "stored" || cell.source === "carry") && cell.tag) {
+      byTag[cell.tag] = (byTag[cell.tag] || 0) + 1;
+    }
+  }
+  return byTag;
 }
 
 type Params = {
@@ -77,7 +89,6 @@ export function useDailyCockpit({
   const [cells, setCells] = useState<AssignmentCell[]>([]);
   const [boroKhanaDates, setBoroKhanaDates] = useState<string[]>([]);
   const [approvedDates, setApprovedDates] = useState<string[]>([]);
-  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     if (!apiOn) {
@@ -88,7 +99,7 @@ export function useDailyCockpit({
     try {
       const wingFilter = wing !== "all" ? wing : undefined;
       const wingFamily = wingFilter ? "1" : undefined;
-      const [memberRes, assignRes, summaryRes, bkRes, locksRes, requestRes] =
+      const [memberRes, assignRes, bkRes, locksRes, requestRes] =
         await Promise.all([
         listMembersAllPages({
           approval: "approved",
@@ -98,7 +109,7 @@ export function useDailyCockpit({
           wing_family: wingFamily,
           member_type: memberType !== "all" ? memberType : undefined,
           status,
-          page_size: 500,
+          page_size: 2000,
         }),
         listAssignments({
           from: dateFrom,
@@ -108,22 +119,16 @@ export function useDailyCockpit({
           wing: wingFilter,
           wing_family: wingFamily,
         }),
-        assignmentSummary({
-          from: dateFrom,
-          to: dateTo,
-          q: qDebounced.trim() || undefined,
-          rank: rank !== "all" ? rank : undefined,
-          wing: wingFilter,
-          wing_family: wingFamily,
-        }),
         listBoroKhanaDates(dateFrom, dateTo),
         listLockedDates(dateFrom, dateTo),
-        listTagRequests({
-          queue: "daily",
-          status: "requested",
-          page: 1,
-          page_size: 500,
-        }).catch(() => null),
+        TAG_CHANGE_APPROVAL_ENABLED
+          ? listTagRequests({
+              queue: "daily",
+              status: "requested",
+              page: 1,
+              page_size: 500,
+            }).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setUsers(
         memberRes.items
@@ -132,7 +137,6 @@ export function useDailyCockpit({
           .sort(compareUsers),
       );
       setCells(assignRes.items);
-      setTagCounts(summaryRes.by_tag);
       setBoroKhanaDates(bkRes.dates);
       setApprovedDates(locksRes.dates);
       if (requestRes) {
@@ -144,7 +148,6 @@ export function useDailyCockpit({
     } catch (err) {
       setUsers([]);
       setCells([]);
-      setTagCounts({});
       setBoroKhanaDates([]);
       setApprovedDates([]);
       const detail =
@@ -167,6 +170,8 @@ export function useDailyCockpit({
     () => cellsToAssignments(cells),
     [cells],
   );
+
+  const tagCounts = useMemo(() => countsFromCells(cells), [cells]);
 
   /** Stored + carry — Daily RR must show default MFR, not only saved paints. */
   const displayAssignments = useMemo(
@@ -230,8 +235,6 @@ export function useDailyCockpit({
           // Apply the server's canonical cell(s) right away — no loading flash.
           setCells((prev) => mergeUpdatedCells(prev, res.items));
         }
-        // Background refresh for counts / carry state — don't await.
-        void load();
       } catch (err) {
         const detail =
           err instanceof ApiClientError ? err.detail : "Could not save tag.";
@@ -260,8 +263,6 @@ export function useDailyCockpit({
         // Merge all returned cells immediately so every day in the range
         // shows the new tag without waiting for the background reload.
         setCells((prev) => mergeUpdatedCells(prev, res.items));
-        // Background refresh for summary counts / carry state.
-        void load();
       } catch (err) {
         const detail =
           err instanceof ApiClientError ? err.detail : "Could not paint range.";

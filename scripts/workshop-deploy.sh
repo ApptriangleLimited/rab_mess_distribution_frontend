@@ -169,7 +169,7 @@ export API_PROXY_URL=http://api:8000
 export GIT_SHA="${GIT_SHA:-workshop-$(date +%Y%m%d%H%M%S)}"
 
 echo "Building mess images (WMS / Meal Tracker keep running)..."
-$COMPOSE build web api
+$COMPOSE build web api worker
 $COMPOSE up -d postgres redis
 $COMPOSE up -d --no-deps --force-recreate api worker web
 

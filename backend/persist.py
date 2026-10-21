@@ -34,7 +34,16 @@ from models import (
     SuppressedCarry,
     TagRequest,
 )
-from cache import bust_members
+from cache import (
+    bust_boro,
+    bust_daily,
+    bust_members,
+    bust_settings,
+    bust_tag_requests,
+    cache_get,
+    cache_key,
+    cache_set,
+)
 
 router = APIRouter()
 
@@ -247,10 +256,10 @@ def seed_persist() -> None:
         db.close()
 
 
-def member_payload(row: Member) -> dict:
+def member_payload(row: Member, *, lite: bool = False) -> dict:
     from main import member_out
 
-    return member_out(row)
+    return member_out(row, lite=lite)
 
 
 def assignment_out(row: Assignment) -> dict:
@@ -398,7 +407,7 @@ def build_snapshot(db: Session) -> dict:
         absent.setdefault(row.date.isoformat(), {})[row.wing] = row.count
     return {
         "users": [
-            member_payload(row)
+            member_payload(row, lite=True)
             for row in db.query(Member)
             .order_by(Member.created_at.desc(), Member.updated_at.desc(), Member.id.desc())
             .all()
@@ -740,12 +749,26 @@ def apply_snapshot(db: Session, body: dict, *, replace_lists: bool) -> None:
                     db.add(SuppressedCarry(user_id=user_id, date=day))
 
 
+def _bust_app_caches() -> None:
+    bust_members()
+    bust_daily()
+    bust_settings()
+    bust_tag_requests()
+    bust_boro()
+
+
 @router.get("/api/v1/app/snapshot")
 def get_snapshot(
     _staff: Staff = Depends(require_permission("snapshot.read")),
     db: Session = Depends(get_db),
 ):
-    return envelope(build_snapshot(db))
+    key = cache_key("snapshot", kind="full")
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = build_snapshot(db)
+    cache_set(key, data)
+    return envelope(data)
 
 
 @router.put("/api/v1/app/snapshot")
@@ -758,6 +781,7 @@ def put_snapshot(
         raise HTTPException(status_code=400, detail="Invalid snapshot")
     apply_snapshot(db, filter_snapshot_body(body, staff.role), replace_lists=True)
     db.commit()
+    _bust_app_caches()
     return envelope(build_snapshot(db), "Saved")
 
 
@@ -775,6 +799,7 @@ def import_snapshot(
     if body.get("meal_shifts") and db.query(MealShift).count() == 0:
         apply_snapshot(db, {"meal_shifts": body["meal_shifts"]}, replace_lists=False)
     db.commit()
+    _bust_app_caches()
     return envelope(build_snapshot(db), "Imported")
 
 
@@ -822,11 +847,16 @@ def consume_month_data(db: Session, month: str) -> dict:
         by_user[row.user_id][row.tag] = by_user[row.user_id].get(row.tag, 0) + 1
     payable_trg = {}
     force_by_user: dict[str, str] = {}
+    member_ids = list(by_user.keys())
+    members_by_id = {
+        row.id: row
+        for row in db.query(Member).filter(Member.id.in_(member_ids)).all()
+    } if member_ids else {}
     for row in rows:
         if row.tag != "TRG":
             continue
         if row.user_id not in force_by_user:
-            member = db.get(Member, row.user_id)
+            member = members_by_id.get(row.user_id)
             force_by_user[row.user_id] = member.force if member else ""
         if not trg_ration_payable(row.trg_tone, force_by_user[row.user_id]):
             continue
@@ -835,7 +865,7 @@ def consume_month_data(db: Session, month: str) -> dict:
     items = []
     total = 0.0
     for user_id, tags in by_user.items():
-        member = db.get(Member, user_id)
+        member = members_by_id.get(user_id)
         if not member:
             continue
         amount = 0.0
@@ -850,7 +880,7 @@ def consume_month_data(db: Session, month: str) -> dict:
         total += amount
         items.append(
             {
-                "user": member_payload(member),
+                "user": member_payload(member, lite=True),
                 "tagDays": tags,
                 "totalDays": days,
                 "amount": round(amount, 2),
@@ -865,7 +895,13 @@ def consume_month_report(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    return envelope(consume_month_data(db, month))
+    key = cache_key("reports", kind="consume", month=month)
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = consume_month_data(db, month)
+    cache_set(key, data)
+    return envelope(data)
 
 
 @router.get("/api/v1/reports/ration/{month}")
@@ -874,8 +910,13 @@ def ration_month_report(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
+    key = cache_key("reports", kind="ration", month=month)
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
     data = consume_month_data(db, month)
     data["senders"] = [_sender_out(row) for row in db.query(Sender).all()]
+    cache_set(key, data)
     return envelope(data)
 
 
@@ -963,7 +1004,13 @@ def manpower_report(
     target = parse_day(day)
     if not target:
         raise HTTPException(status_code=400, detail="Invalid date")
-    return envelope(manpower_day_data(db, target))
+    key = cache_key("reports", kind="manpower", day=target.isoformat())
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = manpower_day_data(db, target)
+    cache_set(key, data)
+    return envelope(data)
 
 
 def report_source_data(db: Session, start: date, end: date) -> dict:
@@ -989,7 +1036,7 @@ def report_source_data(db: Session, start: date, end: date) -> dict:
     return {
         "from": start.isoformat(),
         "to": end.isoformat(),
-        "users": [member_payload(row) for row in members],
+        "users": [member_payload(row, lite=True) for row in members],
         "assignments": [assignment_out(row) for row in assignments],
         "rates": [_rate_out(row) for row in db.query(Rate).all()],
         "senders": [_sender_out(row) for row in db.query(Sender).all()],
@@ -1014,7 +1061,18 @@ def report_source(
         end = parse_day(date_to) or start
         if not start or not end:
             raise HTTPException(status_code=400, detail="Use month=YYYY-MM or from/to")
-    return envelope(report_source_data(db, start, end))
+    key = cache_key(
+        "reports",
+        kind="source",
+        start=start.isoformat(),
+        end=end.isoformat(),
+    )
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = report_source_data(db, start, end)
+    cache_set(key, data)
+    return envelope(data)
 
 
 def mess_checkins_data(db: Session, start: date, end: date) -> dict:
@@ -1053,7 +1111,7 @@ def mess_checkins_data(db: Session, start: date, end: date) -> dict:
         "assigns": [meal_assign_out(row) for row in assigns],
         "guests": [guest_meal_out(row) for row in guests],
         "shifts": [meal_shift_out(row) for row in db.query(MealShift).all()],
-        "members": [member_payload(row) for row in by_id.values()],
+        "members": [member_payload(row, lite=True) for row in by_id.values()],
         "boro_khana_dates": [row.date.isoformat() for row in boro],
     }
 
@@ -1069,7 +1127,18 @@ def mess_checkins(
     end = parse_day(date_to)
     if not start or not end:
         raise HTTPException(status_code=400, detail="Invalid date range")
-    return envelope(mess_checkins_data(db, start, end))
+    key = cache_key(
+        "reports",
+        kind="mess-checkins",
+        start=start.isoformat(),
+        end=end.isoformat(),
+    )
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = mess_checkins_data(db, start, end)
+    cache_set(key, data)
+    return envelope(data)
 
 
 def state_report_draft_data(db: Session, target: date) -> dict:

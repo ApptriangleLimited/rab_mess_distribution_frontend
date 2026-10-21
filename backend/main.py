@@ -225,8 +225,8 @@ def iso_date(value: date | None) -> str | None:
     return value.isoformat() if value else None
 
 
-def member_out(row: Member) -> dict:
-    return {
+def member_out(row: Member, *, lite: bool = False) -> dict:
+    payload = {
         "id": row.id,
         "name": row.name,
         "personal_id": row.personal_id or "",
@@ -241,7 +241,6 @@ def member_out(row: Member) -> dict:
         "dropdown_no": row.dropdown_no or "",
         "phone": row.phone or "",
         "blood_group": row.blood_group or "",
-        "documents": row.documents or [],
         "documents_verified": bool(row.documents_verified),
         "status": row.status if row.status in ("0", "1") else "1",
         "approval_status": row.approval_status or "pending",
@@ -257,10 +256,16 @@ def member_out(row: Member) -> dict:
         "default_tag": (row.default_tag or "").upper(),
         "jl_end_date": row.jl_end_date or "",
         "inactive_spans": row.inactive_spans or [],
-        "emergency_contacts": row.emergency_contacts or [],
         "created_at": row.created_at.isoformat() if row.created_at else utcnow().isoformat(),
         "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
     }
+    if lite:
+        payload["documents"] = []
+        payload["emergency_contacts"] = []
+    else:
+        payload["documents"] = row.documents or []
+        payload["emergency_contacts"] = row.emergency_contacts or []
+    return payload
 
 
 def request_out(row: TagRequest) -> dict:
@@ -572,7 +577,7 @@ def list_members(
     date_from: date | None = None,
     date_to: date | None = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(25, ge=1, le=500),
+    page_size: int = Query(25, ge=1, le=2000),
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
@@ -637,7 +642,7 @@ def list_members(
         .all()
     )
     data = {
-        "items": [member_out(row) for row in rows],
+        "items": [member_out(row, lite=True) for row in rows],
         "total": total,
         "page": page,
         "page_size": page_size,

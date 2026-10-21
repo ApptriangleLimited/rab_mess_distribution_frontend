@@ -143,7 +143,7 @@ export function memberToUser(row: MemberApiRow): User {
 
 /** Page through `/api/v1/members` until every matching row is loaded. */
 export async function listMembersAllPages(params: MemberListParams = {}) {
-  const pageSize = Math.min(params.page_size ?? 500, 500);
+  const pageSize = Math.min(params.page_size ?? 2000, 2000);
   const query = { ...params, page_size: pageSize };
   const first = await listMembers({ ...query, page: 1 });
   const items = [...(first.items ?? [])];
@@ -161,7 +161,7 @@ export async function listMembersAllPages(params: MemberListParams = {}) {
 
 /** Every member (all approval states), paging past the first 500. */
 export async function listAllMembers() {
-  const pageSize = 500;
+  const pageSize = 2000;
   const first = await listMembers({ page: 1, page_size: pageSize });
   const items = [...(first.items ?? [])];
   const total = first.total ?? items.length;
@@ -179,7 +179,7 @@ export async function listAllMembers() {
 
 /** Every approved member, paging past the first 500. Default: active only. */
 export async function listAllApprovedMembers(opts?: { status?: string }) {
-  const pageSize = 500;
+  const pageSize = 2000;
   const query = {
     approval: "approved" as const,
     status: opts?.status ?? "1",

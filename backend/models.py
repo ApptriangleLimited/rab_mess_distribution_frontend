@@ -47,6 +47,22 @@ class Member(AuditUserMixin, Base):
             unique=True,
             postgresql_where=text("rab_id <> ''"),
         ),
+        Index("ix_members_approval_status", "approval_status"),
+        Index("ix_members_status", "status"),
+        Index("ix_members_member_type", "member_type"),
+        Index("ix_members_rank", "rank"),
+        Index("ix_members_approval_status_status", "approval_status", "status"),
+        Index(
+            "ix_members_approval_roster",
+            "approval_status",
+            "status",
+            "member_type",
+        ),
+        Index(
+            "ix_members_rfid",
+            "rfid",
+            postgresql_where=text("rfid <> ''"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -105,6 +121,9 @@ class TagRequest(AuditUserMixin, Base):
             unique=True,
             postgresql_where=text("status = 'requested'"),
         ),
+        Index("ix_tag_requests_status_queue", "status", "queue"),
+        Index("ix_tag_requests_queue_status", "queue", "status"),
+        Index("ix_tag_requests_date", "date"),
     )
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -134,6 +153,8 @@ class Assignment(AuditUserMixin, Base):
     __tablename__ = "assignments"
     __table_args__ = (
         Index("uq_assignments_member_date", "user_id", "date", unique=True),
+        Index("ix_assignments_date", "date"),
+        Index("ix_assignments_date_user", "date", "user_id"),
     )
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)

@@ -49,7 +49,7 @@ def _connect(decode: bool, *, blocking: bool = False) -> redis.Redis | None:
             build_redis_url(),
             decode_responses=decode,
             socket_connect_timeout=2.0,
-            socket_timeout=None if blocking else 1.5,
+            socket_timeout=None if blocking else 3.0,
             retry_on_timeout=True,
             health_check_interval=30,
         )
@@ -92,10 +92,30 @@ def redis_up() -> bool:
         return False
 
 
+def _group_from_pattern(pattern: str) -> str | None:
+    raw = (pattern or "").strip()
+    if raw.startswith("rab:"):
+        raw = raw[4:]
+    raw = raw.rstrip("*").rstrip(":")
+    return raw or None
+
+
+def cache_gen(group: str) -> str:
+    client = get_redis()
+    if client is None:
+        return "0"
+    try:
+        raw = client.get(f"rab:{group}:gen")
+        return str(int(raw)) if raw is not None else "0"
+    except (redis.RedisError, TypeError, ValueError):
+        _reset()
+        return "0"
+
+
 def cache_key(group: str, **parts) -> str:
     payload = json.dumps(parts, sort_keys=True, default=str, separators=(",", ":"))
     digest = hashlib.sha256(payload.encode()).hexdigest()[:24]
-    return f"rab:{group}:{digest}"
+    return f"rab:{group}:v{cache_gen(group)}:{digest}"
 
 
 def cache_get(key: str):
@@ -142,14 +162,29 @@ def cache_has(key: str) -> bool:
 
 
 def cache_bust(*patterns: str) -> None:
+    """Invalidate a group by bumping its generation. Stale keys expire via TTL.
+
+    SCAN + DELETE used to sit on the 1.5s socket timeout after Daily RR writes
+    and `_reset()` the client, so every later read hit Postgres.
+    """
     client = get_redis()
     if client is None:
         return
+    groups: list[str] = []
+    seen: set[str] = set()
+    for pattern in patterns:
+        group = _group_from_pattern(pattern)
+        if not group or group in seen:
+            continue
+        seen.add(group)
+        groups.append(group)
+    if not groups:
+        return
     try:
-        for pattern in patterns:
-            keys = list(client.scan_iter(match=pattern, count=200))
-            if keys:
-                client.delete(*keys)
+        pipe = client.pipeline()
+        for group in groups:
+            pipe.incr(f"rab:{group}:gen")
+        pipe.execute()
     except redis.RedisError:
         _reset()
 
@@ -197,16 +232,20 @@ def worker_up() -> bool:
 
 
 def bust_members() -> None:
-    cache_bust("rab:members:*", "rab:assignments:*")
+    cache_bust("rab:members:*", "rab:assignments:*", "rab:snapshot:*", "rab:reports:*")
 
 
 def bust_tag_requests() -> None:
-    cache_bust("rab:tag-requests:*")
+    cache_bust("rab:tag-requests:*", "rab:snapshot:*")
 
 
 def bust_daily() -> None:
-    cache_bust("rab:assignments:*", "rab:locks:*")
+    cache_bust("rab:assignments:*", "rab:locks:*", "rab:snapshot:*", "rab:reports:*")
 
 
 def bust_boro() -> None:
     cache_bust("rab:boro:*")
+
+
+def bust_settings() -> None:
+    cache_bust("rab:settings:*", "rab:snapshot:*")

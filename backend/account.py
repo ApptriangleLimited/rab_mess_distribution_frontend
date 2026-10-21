@@ -27,7 +27,7 @@ from auth import (
     verify_password,
 )
 from audit import write_audit
-from cache import revoke_staff_access
+from cache import bust_settings, cache_get, cache_key, cache_set, revoke_staff_access
 from config import settings
 from database import get_db
 from jobs import enqueue, send_reset_email
@@ -443,7 +443,13 @@ def get_catalog(
     _staff: Staff = Depends(require_permission("snapshot.read", "settings.manage")),
     db: Session = Depends(get_db),
 ):
-    return envelope(catalog_payload(db))
+    key = cache_key("settings", kind="catalog")
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = catalog_payload(db)
+    cache_set(key, data)
+    return envelope(data)
 
 
 @router.put("/api/v1/catalog")
@@ -454,6 +460,7 @@ def put_catalog(
 ):
     apply_catalog(db, body.payload or {})
     db.commit()
+    bust_settings()
     return envelope(catalog_payload(db), "Saved")
 
 

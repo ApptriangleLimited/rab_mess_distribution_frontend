@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from account import catalog_payload, file_out
+from cache import bust_settings, cache_get, cache_key, cache_set
 from auth import current_staff, hash_password, require_roles
 from security import decrypt_secret, encrypt_secret, validate_password
 from rate_limit import enforce_register_limit
@@ -608,8 +609,13 @@ def list_rates(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(Rate).order_by(Rate.tag.asc()).all()
-    return envelope({"items": [rate_out(row) for row in rows]})
+    key = cache_key("settings", kind="rates")
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = {"items": [rate_out(row) for row in db.query(Rate).order_by(Rate.tag.asc()).all()]}
+    cache_set(key, data)
+    return envelope(data)
 
 
 @router.put("/api/v1/settings/rates")
@@ -640,6 +646,7 @@ def put_rates(
         if row.tag not in seen:
             db.delete(row)
     db.commit()
+    bust_settings()
     rows = db.query(Rate).order_by(Rate.tag.asc()).all()
     return envelope({"items": [rate_out(row) for row in rows]})
 
@@ -664,6 +671,7 @@ def create_rate(
     db.add(row)
     db.commit()
     db.refresh(row)
+    bust_settings()
     return envelope(rate_out(row), "Rate created", 201)
 
 
@@ -679,6 +687,7 @@ def delete_rate(
         raise HTTPException(status_code=404, detail="Rate not found")
     db.delete(row)
     db.commit()
+    bust_settings()
     return envelope({"tag": key}, "Rate deleted")
 
 
@@ -687,8 +696,13 @@ def list_senders(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(Sender).order_by(Sender.label.asc()).all()
-    return envelope({"items": [sender_out(row) for row in rows]})
+    key = cache_key("settings", kind="senders")
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
+    data = {"items": [sender_out(row) for row in db.query(Sender).order_by(Sender.label.asc()).all()]}
+    cache_set(key, data)
+    return envelope(data)
 
 
 @router.post("/api/v1/senders")
@@ -713,6 +727,7 @@ def create_sender(
     db.add(row)
     db.commit()
     db.refresh(row)
+    bust_settings()
     return envelope(sender_out(row), "Sender created", 201)
 
 
@@ -738,6 +753,7 @@ def update_sender(
     row.kind = sender_kind(body.kind, getattr(row, "kind", None) or "srb")
     db.commit()
     db.refresh(row)
+    bust_settings()
     return envelope(sender_out(row), "Sender updated")
 
 
@@ -752,6 +768,7 @@ def delete_sender(
         raise HTTPException(status_code=404, detail="Sender not found")
     db.delete(row)
     db.commit()
+    bust_settings()
     return envelope({"id": sender_id}, "Sender deleted")
 
 
@@ -766,8 +783,14 @@ PUBLIC_FORM_CATALOG_KEYS = tuple(
 @router.get("/api/v1/public/catalog")
 def public_catalog(db: Session = Depends(get_db)):
     """Dropdowns for the QR /register form — Settings wings, ranks, forces, banks."""
+    key = cache_key("settings", kind="public-catalog")
+    cached = cache_get(key)
+    if cached is not None:
+        return envelope(cached)
     payload = catalog_payload(db)
-    return envelope({key: payload.get(key) for key in PUBLIC_FORM_CATALOG_KEYS})
+    data = {item: payload.get(item) for item in PUBLIC_FORM_CATALOG_KEYS}
+    cache_set(key, data)
+    return envelope(data)
 
 
 @router.post("/api/v1/public/files")

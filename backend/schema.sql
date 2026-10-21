@@ -52,6 +52,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_members_rab_id_lower
     ON members (lower(rab_id))
     WHERE rab_id <> '';
 
+CREATE INDEX IF NOT EXISTS ix_members_approval_status ON members (approval_status);
+CREATE INDEX IF NOT EXISTS ix_members_status ON members (status);
+CREATE INDEX IF NOT EXISTS ix_members_member_type ON members (member_type);
+CREATE INDEX IF NOT EXISTS ix_members_rank ON members (rank);
+CREATE INDEX IF NOT EXISTS ix_members_wing_lower ON members (lower(wing));
+CREATE INDEX IF NOT EXISTS ix_members_approval_status_status ON members (approval_status, status);
+CREATE INDEX IF NOT EXISTS ix_members_approval_roster ON members (approval_status, status, member_type);
+CREATE INDEX IF NOT EXISTS ix_members_created_updated ON members (created_at DESC, updated_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS ix_members_rfid ON members (rfid) WHERE rfid <> '';
+CREATE INDEX IF NOT EXISTS ix_members_personal_id_lower ON members (lower(personal_id)) WHERE personal_id <> '';
+
 CREATE TABLE IF NOT EXISTS tag_requests (
     id VARCHAR(40) PRIMARY KEY,
     user_id VARCHAR(40) NOT NULL REFERENCES members(id),
@@ -76,6 +87,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tag_requests_pending
     ON tag_requests (user_id, queue)
     WHERE status = 'requested';
 
+CREATE INDEX IF NOT EXISTS ix_tag_requests_status_queue ON tag_requests (status, queue);
+CREATE INDEX IF NOT EXISTS ix_tag_requests_queue_status ON tag_requests (queue, status);
+CREATE INDEX IF NOT EXISTS ix_tag_requests_date ON tag_requests (date);
+
 CREATE TABLE IF NOT EXISTS assignments (
     id VARCHAR(40) PRIMARY KEY,
     user_id VARCHAR(40) NOT NULL REFERENCES members(id),
@@ -90,12 +105,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_assignments_member_date
     ON assignments (user_id, date);
 
 CREATE INDEX IF NOT EXISTS ix_assignments_user_id ON assignments (user_id);
+CREATE INDEX IF NOT EXISTS ix_assignments_date ON assignments (date);
+CREATE INDEX IF NOT EXISTS ix_assignments_date_user ON assignments (date, user_id);
 
 CREATE TABLE IF NOT EXISTS suppressed_carries (
     user_id VARCHAR(40) NOT NULL REFERENCES members(id),
     date DATE NOT NULL,
     PRIMARY KEY (user_id, date)
 );
+
+CREATE INDEX IF NOT EXISTS ix_suppressed_carries_date ON suppressed_carries (date);
 
 CREATE TABLE IF NOT EXISTS day_locks (
     date DATE PRIMARY KEY,

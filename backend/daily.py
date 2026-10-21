@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -257,13 +258,34 @@ def load_window(
     member_id: str | None = None,
     wing_family: str | None = None,
 ):
-    query = db.query(Member)
+    query = db.query(Member).filter(
+        Member.approval_status == "approved",
+        ~Member.member_type.in_(("guest", "civilian")),
+    )
     if member_id:
         query = query.filter(Member.id == member_id)
     family = None
     if wing and wing != "all" and str(wing_family or "").lower() in {"1", "true", "yes"}:
         family = wing_family_names(db, wing)
-    members = [m for m in query.all() if member_matches(m, q, rank, wing, family)]
+        names = [name.lower() for name in (family or [])]
+        query = query.filter(func.lower(Member.wing).in_(names or ["__none__"]))
+    elif wing and wing != "all":
+        query = query.filter(Member.wing == wing)
+    if rank and rank != "all":
+        query = query.filter(Member.rank == rank)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Member.name.ilike(like),
+                Member.rab_id.ilike(like),
+                Member.personal_id.ilike(like),
+                Member.rank.ilike(like),
+                Member.wing.ilike(like),
+                Member.phone.ilike(like),
+            )
+        )
+    members = query.all()
     ids = [m.id for m in members]
     stored_rows = []
     suppressed_rows = []
@@ -476,7 +498,36 @@ def list_assignments(
         items.extend(cells_for_member(member, days, stored_map, suppressed))
     data = {"items": items, "from": start.isoformat(), "to": end.isoformat()}
     cache_set(key, data)
+    summary_key = cache_key(
+        "assignments",
+        kind="summary",
+        start=start.isoformat(),
+        end=end.isoformat(),
+        member_id=member_id,
+        rank=rank,
+        wing=wing,
+        wing_family=wing_family,
+        q=q,
+    )
+    cache_set(summary_key, _summary_from_items(items, start, end, len(members)))
     return envelope(data)
+
+
+def _summary_from_items(items: list, start, end, member_count: int) -> dict:
+    by_tag: dict[str, int] = {}
+    tagged = 0
+    for cell in items:
+        if cell.get("source") in ("stored", "carry") and cell.get("tag"):
+            tag = cell["tag"]
+            by_tag[tag] = by_tag.get(tag, 0) + 1
+            tagged += 1
+    return {
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+        "by_tag": by_tag,
+        "total_tagged_person_days": tagged,
+        "member_count": member_count,
+    }
 
 
 @router.get("/api/v1/assignments/summary")
@@ -508,24 +559,32 @@ def assignment_summary(
     cached = cache_get(key)
     if cached is not None:
         return envelope(cached)
+    list_key = cache_key(
+        "assignments",
+        kind="list",
+        start=start.isoformat(),
+        end=end.isoformat(),
+        member_id=member_id,
+        rank=rank,
+        wing=wing,
+        wing_family=wing_family,
+        q=q,
+    )
+    listed = cache_get(list_key)
+    if listed is not None:
+        items = listed.get("items") or []
+        member_ids = {cell.get("member_id") for cell in items if cell.get("member_id")}
+        data = _summary_from_items(items, start, end, len(member_ids))
+        cache_set(key, data)
+        return envelope(data)
     members, stored_map, suppressed = load_window(
         db, start, end, q, rank, wing, member_id, wing_family
     )
     days = list(each_date(start, end))
-    by_tag: dict[str, int] = {}
-    tagged = 0
+    items = []
     for member in members:
-        for cell in cells_for_member(member, days, stored_map, suppressed):
-            if cell["source"] in ("stored", "carry") and cell["tag"]:
-                by_tag[cell["tag"]] = by_tag.get(cell["tag"], 0) + 1
-                tagged += 1
-    data = {
-        "from": start.isoformat(),
-        "to": end.isoformat(),
-        "by_tag": by_tag,
-        "total_tagged_person_days": tagged,
-        "member_count": len(members),
-    }
+        items.extend(cells_for_member(member, days, stored_map, suppressed))
+    data = _summary_from_items(items, start, end, len(members))
     cache_set(key, data)
     return envelope(data)
 

@@ -30,11 +30,19 @@ function newId() {
   return `tr_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Data-entry phase: Daily RR tag paints apply now (no Ration/Consume queue).
+ * Set true to restore the same approval routes:
+ * MS + MFR apply now. FR/CD → Ration. Red TRG → Ration. Black TRG applies now.
+ */
+export const TAG_CHANGE_APPROVAL_ENABLED = false;
+
 /** MS + MFR apply now. FR/CD → Ration. Red TRG → Ration. Black TRG applies now. */
 export function dutyTagQueue(
   tag: DailyTag | "",
   trgTone?: TrgTone,
 ): "immediate" | "ration" | "consume" {
+  if (!TAG_CHANGE_APPROVAL_ENABLED) return "immediate";
   if (!tag || tag === "MS" || tag === MFR_TAG) return "immediate";
   if (tag === "FR" || tag === "CD") return "ration";
   if (tag === "TRG") return trgTone === "red" ? "ration" : "immediate";
