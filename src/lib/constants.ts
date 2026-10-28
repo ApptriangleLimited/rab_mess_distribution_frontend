@@ -1691,17 +1691,17 @@ export const RATION_REPORT_META = {
   refPrefixPayAllce: "SRB HQ/Finance/S33/Pay & Allce",
   /** Official generate-report Ref. No stem — row 1 is 150120250000500001. */
   transferRefPrefix: "1501202500005",
-  subjectFreshMoney: "Disbursement of Fresh Money Bill {month}",
+  subjectFreshMoney: "Disbursement of Fresh Money Bill {month} BEFTN to Trust Bank.",
   subjectTagBill:
-    "Disbursement of Payment Fresh Money Bill-{monthLabel} Transfer BEFTN to {bank}.",
+    "Disbursement of Fresh Money Bill {monthLabel} BEFTN to {bank}.",
   subjectFreshMoneyTransfer:
-    "Disbursement of Fresh Money Bill {monthLabel} transfer to {bank}.",
+    "Disbursement of Fresh Money Bill {monthLabel} BEFTN to {bank}.",
   subjectTrustBeftn:
     "Disbursement of Fresh Money Bill {monthLabel} BEFTN to Trust Bank.",
   subjectCommunityBeftn:
     "Disbursement of Fresh Money Bill {monthLabel} BEFTN to Community Bank.",
   subjectSonaliTransfer:
-    "Disbursement of Fresh Money Bill {monthLabel} transfer to Sonali Bank.",
+    "Disbursement of Fresh Money Bill {monthLabel} BEFTN to Sonali Bank.",
 } as const;
 
 export const MEMBER_TYPES: {

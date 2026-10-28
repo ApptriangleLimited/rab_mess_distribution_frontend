@@ -4,7 +4,6 @@ import { RATION_REPORT_META } from "@/lib/constants";
 import {
   formatDateLong,
   formatDateOrdinal,
-  formatMonthBill,
   formatMonthLong,
 } from "@/lib/date";
 import { amountToWordsEn } from "@/lib/money-words";
@@ -39,10 +38,14 @@ import {
 } from "@/lib/sonali-bank-letter";
 import {
   TRUST_BANK_COLUMNS,
+  beftnBodyAlign,
+  beftnHeadAlign,
   isTrustBankSheet,
   isTrustFuelStaffSheet,
   trustBankBody,
   trustBankCells,
+  freshMoneyBeftnBody,
+  freshMoneyBeftnSubject,
   trustBankMoney,
   trustBankSubject,
 } from "@/lib/trust-bank-letter";
@@ -51,9 +54,35 @@ function transferColumnStyles(headers: readonly string[]) {
   return Object.fromEntries(
     headers.map((col, i) => [
       i,
-      { halign: /amount/i.test(col) ? ("right" as const) : ("left" as const) },
+      {
+        halign: beftnBodyAlign(col),
+        valign: "middle" as const,
+        ...(/^ser$/i.test(col) ? { cellWidth: 9 } : {}),
+        ...(/^srb id$/i.test(col) ? { cellWidth: 16 } : {}),
+        ...(/^personal no$/i.test(col) ? { cellWidth: 16 } : {}),
+        ...(/^ref\.?\s*no$/i.test(col)
+          ? { cellWidth: 34, overflow: "visible" as const }
+          : {}),
+      },
     ]),
   );
+}
+
+function beftnTotalFoot(headers: readonly string[], total: number) {
+  const idx = headers.findIndex((col) => /^amount$/i.test(col));
+  const amountAt = idx >= 0 ? idx : headers.length - 1;
+  const row = Array.from({ length: headers.length }, () => "");
+  if (amountAt > 0) row[amountAt - 1] = "G/Total:";
+  row[amountAt] = trustBankMoney(total);
+  return [row];
+}
+
+function beftnParseAlign(headers: readonly string[]) {
+  return (data: { section: string; column: { index: number }; cell: { styles: { halign?: string } } }) => {
+    const col = headers[data.column.index] ?? "";
+    data.cell.styles.halign =
+      data.section === "head" ? beftnHeadAlign(col) : beftnBodyAlign(col);
+  };
 }
 
 const INK: [number, number, number] = [0, 0, 0];
@@ -157,34 +186,26 @@ function writeTrustBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
     startY: y,
     head: [TRUST_BANK_COLUMNS as unknown as string[]],
     body: sheet.lines.map((row) => trustBankCells(row)),
-    foot: [
-      [
-        ...Array(8).fill(""),
-        "G/Total:",
-        trustBankMoney(sheet.total),
-        "",
-        "",
-        "",
-      ],
-    ],
+    foot: beftnTotalFoot(TRUST_BANK_COLUMNS, sheet.total),
     styles: {
-      fontSize: 6.5,
+      fontSize: 8,
       cellPadding: 1.1,
       overflow: "linebreak",
-      halign: "left",
+      halign: "center",
       valign: "middle",
       ...reportTableChrome(),
     },
     headStyles: {
       ...reportHeadChrome(),
       overflow: "linebreak",
-      halign: "left",
+      halign: "center",
     },
     footStyles: reportFootChrome(),
     columnStyles: transferColumnStyles(TRUST_BANK_COLUMNS),
-    showHead: "firstPage",
+    didParseCell: beftnParseAlign(TRUST_BANK_COLUMNS),
+    showHead: "everyPage",
     theme: "grid",
-    margin: { left: 8, right: 8 },
+    margin: { left: 8, right: 8, bottom: 10 },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -248,34 +269,26 @@ function writeCommunityBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
     startY: y,
     head: [COMMUNITY_BANK_COLUMNS as unknown as string[]],
     body: sheet.lines.map((row) => communityBankCells(row)),
-    foot: [
-      [
-        ...Array(8).fill(""),
-        "G/Total:",
-        trustBankMoney(sheet.total),
-        "",
-        "",
-        "",
-      ],
-    ],
+    foot: beftnTotalFoot(COMMUNITY_BANK_COLUMNS, sheet.total),
     styles: {
-      fontSize: 6.5,
+      fontSize: 8,
       cellPadding: 1.1,
       overflow: "linebreak",
-      halign: "left",
+      halign: "center",
       valign: "middle",
       ...reportTableChrome(),
     },
     headStyles: {
       ...reportHeadChrome(),
       overflow: "linebreak",
-      halign: "left",
+      halign: "center",
     },
     footStyles: reportFootChrome(),
     columnStyles: transferColumnStyles(COMMUNITY_BANK_COLUMNS),
-    showHead: "firstPage",
+    didParseCell: beftnParseAlign(COMMUNITY_BANK_COLUMNS),
+    showHead: "everyPage",
     theme: "grid",
-    margin: { left: 8, right: 8 },
+    margin: { left: 8, right: 8, bottom: 10 },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -339,34 +352,26 @@ function writeSonaliBankLetter(doc: jsPDF, sheet: RationTransferSheet) {
     startY: y,
     head: [SONALI_BANK_COLUMNS as unknown as string[]],
     body: sheet.lines.map((row) => sonaliBankCells(row)),
-    foot: [
-      [
-        ...Array(8).fill(""),
-        "G/Total:",
-        trustBankMoney(sheet.total),
-        "",
-        "",
-        "",
-      ],
-    ],
+    foot: beftnTotalFoot(SONALI_BANK_COLUMNS, sheet.total),
     styles: {
-      fontSize: 6.5,
+      fontSize: 8,
       cellPadding: 1.1,
       overflow: "linebreak",
-      halign: "left",
+      halign: "center",
       valign: "middle",
       ...reportTableChrome(),
     },
     headStyles: {
       ...reportHeadChrome(),
       overflow: "linebreak",
-      halign: "left",
+      halign: "center",
     },
     footStyles: reportFootChrome(),
     columnStyles: transferColumnStyles(SONALI_BANK_COLUMNS),
-    showHead: "firstPage",
+    didParseCell: beftnParseAlign(SONALI_BANK_COLUMNS),
+    showHead: "everyPage",
     theme: "grid",
-    margin: { left: 8, right: 8 },
+    margin: { left: 8, right: 8, bottom: 10 },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -406,13 +411,9 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
   const pageW = doc.internal.pageSize.getWidth();
   let y = writeHeader(doc, 12);
 
-  const monthBill = formatMonthBill(sheet.month);
   const dtLabel = formatMonthLong(sheet.reportDate.slice(0, 7));
   const memberBank = sheet.lines[0]?.user.bank_name || "—";
-  const monthLabel = formatMonthLong(sheet.month);
-  const subject = RATION_REPORT_META.subjectTagBill
-    .replace("{monthLabel}", monthLabel)
-    .replace("{bank}", memberBank);
+  const subject = freshMoneyBeftnSubject(sheet.month, memberBank);
 
   doc.setFontSize(9);
   doc.text(`DT: ${dtLabel}`, pageW - 10, y, { align: "right" });
@@ -440,12 +441,7 @@ function writeFrTransferLetter(doc: jsPDF, sheet: RationTransferSheet) {
 
   doc.text("Dear Sir,", 10, y);
   y += 5;
-  doc.text(
-    `We would request you to disburse the Fresh Money bill for the following employees for the month of ${monthBill}.`,
-    10,
-    y,
-    { maxWidth: pageW - 20 },
-  );
+  doc.text(freshMoneyBeftnBody(sheet.month), 10, y, { maxWidth: pageW - 20 });
   y += 8;
 
   autoTable(doc, {
@@ -563,6 +559,19 @@ function sheetBankName(
   return sheet.memberBank || sheet.lines[0]?.user.bank_name || "unknown";
 }
 
+function stampPageNumbers(doc: jsPDF) {
+  const total = doc.getNumberOfPages();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`page no : ${i}`, pageW - 8, pageH - 4, { align: "right" });
+  }
+}
+
 function savePdfsStaggered(jobs: { write: (doc: jsPDF) => void; filename: string; landscape?: boolean }[]) {
   jobs.forEach((job, i) => {
     const run = () => {
@@ -572,6 +581,7 @@ function savePdfsStaggered(jobs: { write: (doc: jsPDF) => void; filename: string
         format: "a4",
       });
       job.write(doc);
+      stampPageNumbers(doc);
       doc.save(job.filename);
     };
     if (i === 0) run();
@@ -738,14 +748,10 @@ function writeStaffPayoutLetter(
   const monthLabel = formatMonthLong(sheet.month);
   const subject =
     subjectOverride ??
-    (sheet.memberBank
-      ? RATION_REPORT_META.subjectTagBill
-          .replace("{monthLabel}", monthLabel)
-          .replace("{bank}", sheet.memberBank)
-      : RATION_REPORT_META.subjectFreshMoney.replace(
-          "{month}",
-          monthLabel,
-        ));
+    freshMoneyBeftnSubject(
+      sheet.month,
+      sheet.memberBank || sheet.sender.bank_name || "Trust Bank",
+    );
 
   doc.setFontSize(9);
   doc.text(`DT: ${monthLabel}`, pageW - 14, y, { align: "right" });
@@ -770,12 +776,7 @@ function writeStaffPayoutLetter(
 
   doc.text("Dear Sir,", 14, y);
   y += 5;
-  doc.text(
-    `We would request you to disburse of payment Fresh Money bills for the following employees for the month of ${monthLabel}.`,
-    14,
-    y,
-    { maxWidth: pageW - 28 },
-  );
+  doc.text(freshMoneyBeftnBody(sheet.month), 14, y, { maxWidth: pageW - 28 });
   y += 8;
 
   autoTable(doc, {

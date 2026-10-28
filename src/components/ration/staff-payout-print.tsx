@@ -3,6 +3,7 @@
 import { forwardRef } from "react";
 import { RATION_REPORT_META } from "@/lib/constants";
 import { formatMonthLong } from "@/lib/date";
+import { freshMoneyBeftnBody, freshMoneyBeftnSubject } from "@/lib/trust-bank-letter";
 import { amountToWordsEn } from "@/lib/money-words";
 import { isFrFuelSender } from "@/lib/official-senders";
 import type { RationStaffSheet } from "@/lib/reports";
@@ -43,14 +44,10 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
           const monthLabel = formatMonthLong(sheet.month);
           const subject =
             subjectOverride ??
-            (sheet.memberBank
-              ? RATION_REPORT_META.subjectTagBill
-                  .replace("{monthLabel}", monthLabel)
-                  .replace("{bank}", sheet.memberBank)
-              : RATION_REPORT_META.subjectFreshMoney.replace(
-                  "{month}",
-                  monthLabel,
-                ));
+            freshMoneyBeftnSubject(
+              sheet.month,
+              sheet.memberBank || sheet.sender.bank_name || "Trust Bank",
+            );
 
           return (
             <section
@@ -101,10 +98,7 @@ export const StaffPayoutPrint = forwardRef<HTMLDivElement, Props>(
 
               <p className="mb-1 text-left text-[11px]">{t("ration.dearSir")}</p>
               <p className="mb-3 text-left text-[11px]">
-                {t("ration.disburseBody", {
-                  bill: t("ration.freshMoneyBill"),
-                  month: monthLabel,
-                })}
+                {freshMoneyBeftnBody(sheet.month)}
               </p>
 
               <table className="w-full border-collapse text-[10px]">

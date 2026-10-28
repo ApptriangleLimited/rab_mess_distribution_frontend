@@ -1602,11 +1602,11 @@ export const en = {
     subject: "Subject",
     dearSir: "Dear Sir,",
     disburseBody:
-      "We would request you to disburse of payment {bill} for the following employees for the month of {month}.",
+      "We would request you to disburse the Fresh Money bill for the month of {month}.",
     freshMoneyBill: "Fresh Money bills",
     selectedBill: "bills",
     disburseFreshMoneyBody:
-      "We would request you to disburse the Fresh Money bill for the following employees for the month of {month}.",
+      "We would request you to disburse the Fresh Money bill for the month of {month}.",
     gTotal: "G/Total:",
     amountInWord: "Amount in word",
     debitAdviceAccount:

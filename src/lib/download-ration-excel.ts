@@ -2,7 +2,6 @@ import { RATION_REPORT_META } from "@/lib/constants";
 import {
   formatDateLong,
   formatDateOrdinal,
-  formatMonthBill,
   formatMonthLong,
 } from "@/lib/date";
 import {
@@ -46,6 +45,8 @@ import {
   isTrustFuelStaffSheet,
   trustBankBody,
   trustBankCells,
+  freshMoneyBeftnBody,
+  freshMoneyBeftnSubject,
   trustBankMoney,
   trustBankSubject,
 } from "@/lib/trust-bank-letter";
@@ -127,17 +128,20 @@ function transferCloseRows(
   headers: readonly string[],
   total: number,
   accountNo?: string,
+  pageNo = "page no : 1",
 ): string[][] {
   return [
     amountTotalRow(headers, trustBankMoney(total)),
     [],
-    ["Amount in word:", amountToWordsEn(total)],
+    amountInWordLine(total),
     [
       `Please, the above amount will be debited today from our current account No. ${accountNo?.trim() || "—"} maintained in your branch.`,
     ],
     [],
     ["Thanking You"],
     ["Sincerely Yours,"],
+    [],
+    ["", pageNo],
   ];
 }
 
@@ -236,8 +240,6 @@ function transferExcelSheet(
       },
     );
   }
-  const monthLabel = formatMonthLong(sheet.month);
-  const monthBill = formatMonthBill(sheet.month);
   const memberBank = sheet.lines[0]?.user.bank_name || "—";
   const headers = [
     "Ser",
@@ -276,10 +278,8 @@ function transferExcelSheet(
     ]),
     {
       sheet,
-      subject: RATION_REPORT_META.subjectTagBill
-        .replace("{monthLabel}", monthLabel)
-        .replace("{bank}", memberBank),
-      body: `We would request you to disburse the Fresh Money bill for the following employees for the month of ${monthBill}.`,
+      subject: freshMoneyBeftnSubject(sheet.month, memberBank),
+      body: freshMoneyBeftnBody(sheet.month),
       afterRows: transferCloseRows(
         headers,
         sheet.total,
@@ -370,15 +370,11 @@ export function downloadStaffPayoutExcel(
         ]),
         {
           sheet: letterSheet,
-          subject: sheet.memberBank
-            ? RATION_REPORT_META.subjectTagBill
-                .replace("{monthLabel}", monthLabel)
-                .replace("{bank}", sheet.memberBank)
-            : RATION_REPORT_META.subjectFreshMoney.replace(
-                "{month}",
-                monthLabel,
-              ),
-          body: `We would request you to disburse of payment Fresh Money bills for the following employees for the month of ${monthLabel}.`,
+          subject: freshMoneyBeftnSubject(
+            sheet.month,
+            sheet.memberBank || sheet.sender.bank_name || "Trust Bank",
+          ),
+          body: freshMoneyBeftnBody(sheet.month),
           dateRight,
           afterRows: isTrustFuelStaffSheet(sheet)
             ? fuelCloseRows(headers, sheet.total)

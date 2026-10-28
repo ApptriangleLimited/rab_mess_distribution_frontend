@@ -11,7 +11,13 @@ import {
   sonaliBankCells,
   sonaliBankSubject,
 } from "@/lib/sonali-bank-letter";
-import { trustBankMoney } from "@/lib/trust-bank-letter";
+import {
+  beftnAlignClass,
+  beftnPageLabel,
+  beftnWidthClass,
+  chunkBeftnPages,
+  trustBankMoney,
+} from "@/lib/trust-bank-letter";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -28,18 +34,22 @@ export const SonaliBankLetterPrint = forwardRef<HTMLDivElement, Props>(
       sheet.sender.branch_location?.trim() ||
       RATION_REPORT_META.station.split(",")[1]?.trim() ||
       "Dhaka";
+    const pages = chunkBeftnPages(sheet.lines);
 
     return (
       <div
         ref={ref}
         className={cn(
           "sonali-bank-letter staff-payout-print text-black",
-          "box-border block w-[297mm] min-h-[210mm] max-w-none overflow-visible",
+          "box-border block w-[297mm] max-w-none overflow-visible",
           "bg-white p-5",
           className,
         )}
       >
-        <section>
+        {pages.map((lines, pageIndex) => {
+          const last = pageIndex === pages.length - 1;
+          return (
+        <section key={pageIndex} className="beftn-letter-page">
           <div className="letter-masthead mb-8 text-center text-black">
             <p className="text-[10px] text-black">
               {RATION_REPORT_META.govLine}
@@ -80,15 +90,16 @@ export const SonaliBankLetterPrint = forwardRef<HTMLDivElement, Props>(
             {sonaliBankBody(sheet.month)}
           </p>
 
-          <table className="w-full border-collapse text-[8px] leading-tight">
+          <table className="w-full border-collapse text-[10px] leading-tight">
             <thead>
               <tr className="border border-black bg-white text-black">
                 {SONALI_BANK_COLUMNS.map((col) => (
                   <th
                     key={col}
                     className={cn(
-                      "border border-black px-0.5 py-1 text-left font-semibold",
-                      /amount/i.test(col) && "text-right",
+                      "border border-black px-0.5 py-1 align-middle font-semibold",
+                      beftnWidthClass(col),
+                      beftnAlignClass(col, "head"),
                     )}
                   >
                     {col}
@@ -97,15 +108,15 @@ export const SonaliBankLetterPrint = forwardRef<HTMLDivElement, Props>(
               </tr>
             </thead>
             <tbody>
-              {sheet.lines.map((row) => (
+              {lines.map((row) => (
                 <tr key={`${row.ser}-${row.refNo}`}>
                   {sonaliBankCells(row).map((cell, i) => (
                     <td
                       key={`${row.ser}-${i}`}
                       className={cn(
-                        "border border-black px-0.5 py-0.5 text-left",
-                        /amount/i.test(SONALI_BANK_COLUMNS[i] ?? "") &&
-                          "text-right tabular-nums",
+                        "border border-black px-0.5 py-0.5 align-middle",
+                        beftnWidthClass(SONALI_BANK_COLUMNS[i] ?? ""),
+                        beftnAlignClass(SONALI_BANK_COLUMNS[i] ?? "", "body"),
                       )}
                     >
                       {cell}
@@ -114,10 +125,11 @@ export const SonaliBankLetterPrint = forwardRef<HTMLDivElement, Props>(
                 </tr>
               ))}
             </tbody>
+            {last ? (
             <tfoot>
               <tr className="border border-black font-semibold">
                 <td
-                  colSpan={9}
+                  colSpan={11}
                   className="border border-black px-1 py-1 text-right"
                 >
                   G/Total:
@@ -128,8 +140,11 @@ export const SonaliBankLetterPrint = forwardRef<HTMLDivElement, Props>(
                 <td colSpan={3} className="border border-black px-0.5 py-1" />
               </tr>
             </tfoot>
+            ) : null}
           </table>
 
+          {last ? (
+            <>
           <p className="mt-3 text-[11px]">
             <span className="font-semibold">Amount in word:</span> {words}
           </p>
@@ -143,7 +158,12 @@ export const SonaliBankLetterPrint = forwardRef<HTMLDivElement, Props>(
             <p>Thanking You</p>
             <p className="mt-6">Sincerely Yours,</p>
           </div>
+            </>
+          ) : null}
+          <p className="beftn-page-no">{beftnPageLabel(pageIndex + 1)}</p>
         </section>
+          );
+        })}
       </div>
     );
   },

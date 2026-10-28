@@ -1,31 +1,22 @@
-import { RATION_REPORT_META } from "@/lib/constants";
-import { formatDateDisplay, formatMonthBill, formatMonthLong, todayISO } from "@/lib/date";
+import { formatDateDisplay, todayISO } from "@/lib/date";
 import { isCommunityBank, isFrFuelSender } from "@/lib/official-senders";
 import type { RationStaffLine, RationTransferLine } from "@/lib/reports";
-import { TRUST_BANK_FIXED, trustBankMoney } from "@/lib/trust-bank-letter";
+import {
+  TRUST_BANK_COLUMNS,
+  TRUST_BANK_FIXED,
+  freshMoneyBeftnBody,
+  freshMoneyBeftnSubject,
+  trustBankMoney,
+} from "@/lib/trust-bank-letter";
 
-export const COMMUNITY_BANK_COLUMNS = [
-  "Ser",
-  "Date",
-  "Ref. No",
-  "Sender A/C No",
-  "Sender Branch Routing Number",
-  "Type",
-  "Receiver Account Name",
-  "Receiver bank A/C no",
-  "Receiver A/C Routing Number",
-  "Amount",
-  "Institute",
-  "Payment Info",
-  "Currency",
-] as const;
+export const COMMUNITY_BANK_COLUMNS = TRUST_BANK_COLUMNS;
 
 export function communityBankSubject(month: string) {
-  return `We would request you to disburse the Fresh Money bill for the following employees for the month of ${formatMonthBill(month)}.`;
+  return freshMoneyBeftnSubject(month, "Community Bank");
 }
 
 export function communityBankBody(month: string) {
-  return `We would request you to disburse the Fresh Money bill for the following employees for the month of ${formatMonthBill(month)}.`;
+  return freshMoneyBeftnBody(month);
 }
 
 export function communityBankCells(row: RationTransferLine): string[] {
@@ -33,6 +24,8 @@ export function communityBankCells(row: RationTransferLine): string[] {
   const memberRouting = row.user.routing?.trim() || "";
   return [
     String(row.ser),
+    row.user.rab_id || "—",
+    row.user.personal_id || "—",
     formatDateDisplay(todayISO()),
     TRUST_BANK_FIXED.refNo,
     row.senderAccountNo,
@@ -83,13 +76,11 @@ export const COMMUNITY_FUEL_COLUMNS = [
 ] as const;
 
 export function communityFuelSubject(month: string) {
-  return RATION_REPORT_META.subjectTagBill
-    .replace("{monthLabel}", formatMonthLong(month))
-    .replace("{bank}", "Community Bank");
+  return freshMoneyBeftnSubject(month, "Community Bank");
 }
 
 export function communityFuelBody(month: string) {
-  return `We would request you to disburse of payment Fresh Money bills for the following employees for the month of ${formatMonthLong(month)}.`;
+  return freshMoneyBeftnBody(month);
 }
 
 export function communityFuelCells(row: RationStaffLine): string[] {

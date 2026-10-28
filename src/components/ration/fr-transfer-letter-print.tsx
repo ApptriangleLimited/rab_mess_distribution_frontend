@@ -2,13 +2,10 @@
 
 import { forwardRef } from "react";
 import { RATION_REPORT_META } from "@/lib/constants";
-import {
-  formatDateLong,
-  formatMonthBill,
-  formatMonthLong,
-} from "@/lib/date";
+import { formatDateLong, formatMonthLong } from "@/lib/date";
 import { amountToWordsEn } from "@/lib/money-words";
 import type { RationTransferSheet } from "@/lib/reports";
+import { freshMoneyBeftnBody, freshMoneyBeftnSubject } from "@/lib/trust-bank-letter";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -30,16 +27,12 @@ function amt(n: number) {
 export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
   function FrTransferLetterPrint({ sheet, transferToBank, className }, ref) {
     const t = useT();
-    const monthBill = formatMonthBill(sheet.month);
     const dtLabel = formatMonthLong(sheet.reportDate.slice(0, 7));
     const memberBank =
       transferToBank ||
       sheet.lines[0]?.user.bank_name ||
       "—";
-    const monthLabel = formatMonthLong(sheet.month);
-    const subject = RATION_REPORT_META.subjectTagBill
-      .replace("{monthLabel}", monthLabel)
-      .replace("{bank}", memberBank);
+    const subject = freshMoneyBeftnSubject(sheet.month, memberBank);
     const words = amountToWordsEn(sheet.total);
 
     return (
@@ -92,7 +85,7 @@ export const FrTransferLetterPrint = forwardRef<HTMLDivElement, Props>(
 
           <p className="mb-1 text-left text-[11px]">{t("ration.dearSir")}</p>
           <p className="mb-3 text-left text-[11px]">
-            {t("ration.disburseFreshMoneyBody", { month: monthBill })}
+            {freshMoneyBeftnBody(sheet.month)}
           </p>
 
           <table className="w-full border-collapse text-[8px] leading-tight">

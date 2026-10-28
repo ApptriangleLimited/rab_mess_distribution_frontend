@@ -69,6 +69,10 @@ function isWidthRow(row: string[]) {
 }
 
 function colWidth(header: string, values: string[], cols: number) {
+  const key = String(header ?? "").trim().toLowerCase();
+  if (key === "ser") return 14;
+  if (key === "srb id") return 36;
+  if (key === "ref. no" || key === "ref no") return 112;
   const cap = cols >= 12 ? 78 : cols >= 8 ? 140 : 220;
   const headerW = String(header ?? "").length * 6.2 + 14;
   let dataW = 32;
@@ -133,16 +137,24 @@ function splitLegacyRows(rows: string[][]) {
   return { titles, preamble, headers, rows: rows.slice(i) };
 }
 
-function dataStyle(header: string) {
+function isBeftnHeaders(headers: string[]) {
+  return headers.some((h) => /receiver account name/i.test(h));
+}
+
+function dataStyle(header: string, headers: string[]) {
   const key = header.trim().toLowerCase();
   if (key.includes("amount") || key === "g/total:" || key === "g/total") {
     return "Money";
   }
-  return "Data";
+  if (isBeftnHeaders(headers) && /receiver account name/i.test(header)) {
+    return "Data";
+  }
+  return isBeftnHeaders(headers) ? "Center" : "Data";
 }
 
-function headStyle(_header: string) {
-  return "Head";
+function headStyle(_header: string, headers: string[]) {
+  if (!isBeftnHeaders(headers)) return "Head";
+  return "HeadCenter";
 }
 
 function preambleRowXml(row: string[], cols: number) {
@@ -206,7 +218,7 @@ function worksheetXml(sheet: ExcelSheetSpec) {
   if (headers.length) {
     out.push(
       `<Row>${padRow(headers, maxCols)
-        .map((cell) => styledCell(cell, headStyle(cell)))
+        .map((cell) => styledCell(cell, headStyle(cell, headers)))
         .join("")}</Row>`,
     );
   }
@@ -226,7 +238,7 @@ function worksheetXml(sheet: ExcelSheetSpec) {
     out.push(
       `<Row>${padded
         .map((cell, i) =>
-          styledCell(cell, isTotal ? "Total" : dataStyle(headers[i] ?? "")),
+          styledCell(cell, isTotal ? "Total" : dataStyle(headers[i] ?? "", headers)),
         )
         .join("")}</Row>`,
     );
@@ -240,8 +252,8 @@ const WORKSHEET_PRINT_OPTIONS = `
     <PageSetup>
       <Layout x:Orientation="Landscape"/>
       <Header x:Margin="0.2"/>
-      <Footer x:Margin="0.2"/>
-      <PageMargins x:Bottom="0.4" x:Left="0.3" x:Right="0.3" x:Top="0.4"/>
+      <Footer x:Margin="0.4" x:Data="&amp;Rpage no : &amp;P"/>
+      <PageMargins x:Bottom="0.6" x:Left="0.3" x:Right="0.3" x:Top="0.4"/>
     </PageSetup>
     <FitToPage/>
     <Print>
@@ -280,7 +292,7 @@ const EXCEL_REPORT_STYLES = `
       </Borders>
     </Style>
     <Style ss:ID="HeadCenter">
-      <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="0"/>
+      <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
       <Font ss:Bold="1" ss:Size="9" ss:Color="#000000"/>
       <Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/>
       <Borders>

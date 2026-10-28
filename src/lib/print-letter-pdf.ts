@@ -258,7 +258,7 @@ function letterSheetCss() {
   .sonali-bank-letter td,
   .fr-transfer-letter th,
   .fr-transfer-letter td {
-    font-size: 6.5px !important;
+    font-size: 8px !important;
     line-height: 1.2 !important;
     padding: 2px 3px !important;
     white-space: normal !important;
@@ -266,13 +266,55 @@ function letterSheetCss() {
     word-break: normal !important;
     word-wrap: break-word !important;
     text-align: left !important;
-    vertical-align: top !important;
+    vertical-align: middle !important;
+  }
+  .trust-bank-letter .beftn-ser,
+  .community-bank-letter .beftn-ser,
+  .sonali-bank-letter .beftn-ser {
+    width: 7.5mm !important;
+    max-width: 7.5mm !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+  }
+  .trust-bank-letter .beftn-ref,
+  .community-bank-letter .beftn-ref,
+  .sonali-bank-letter .beftn-ref {
+    width: 34mm !important;
+    min-width: 34mm !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+  .trust-bank-letter .text-center,
+  .community-bank-letter .text-center,
+  .sonali-bank-letter .text-center,
+  .fr-transfer-letter .text-center {
+    text-align: center !important;
   }
   .trust-bank-letter .text-right,
   .community-bank-letter .text-right,
   .sonali-bank-letter .text-right,
   .fr-transfer-letter .text-right {
     text-align: right !important;
+  }
+  .beftn-letter-page {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .beftn-letter-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  .beftn-page-no {
+    display: block !important;
+    margin-top: 8px !important;
+    padding-top: 4px !important;
+    text-align: right !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
   }
   .month-ledger-print .letter-masthead {
     margin-bottom: 8px !important;
@@ -1067,7 +1109,18 @@ function isBankLetterSurface(el: HTMLElement) {
 
 function bankLetterPrintCss() {
   return `
-  @page { size: A4 landscape; margin: 6mm 4mm; }
+  @page {
+    size: A4 landscape;
+    margin: 6mm 4mm 10mm 4mm;
+  }
+  @page {
+    @top-left { content: none; }
+    @top-center { content: none; }
+    @top-right { content: none; }
+    @bottom-left { content: none; }
+    @bottom-center { content: none; }
+    @bottom-right { content: none; }
+  }
   html { color-scheme: light; }
   html, body {
     margin: 0;
@@ -1104,7 +1157,7 @@ function bankLetterPrintCss() {
     max-width: 100% !important;
     min-height: 0 !important;
     height: auto !important;
-    margin: 0 0 10mm 0 !important;
+    margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
     overflow: visible !important;
@@ -1164,7 +1217,7 @@ function bankLetterPrintCss() {
     border: 1px solid #000 !important;
     color: #000 !important;
     padding: 1px 2px !important;
-    font-size: 6px !important;
+    font-size: 8px !important;
     line-height: 1.15 !important;
     text-align: left !important;
     vertical-align: top !important;
@@ -1173,6 +1226,19 @@ function bankLetterPrintCss() {
     word-break: break-word !important;
     background: #fff !important;
   }
+  .beftn-ser {
+    width: 7.5mm !important;
+    max-width: 7.5mm !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+  }
+  .beftn-ref {
+    width: 34mm !important;
+    min-width: 34mm !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
   thead th {
     background: #fff !important;
     color: #000 !important;
@@ -1180,6 +1246,27 @@ function bankLetterPrintCss() {
     border: 1.5px solid #000 !important;
   }
   .text-right { text-align: right !important; }
+  .text-center { text-align: center !important; }
+  .beftn-letter-page {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .beftn-letter-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  .beftn-page-no {
+    display: block !important;
+    margin-top: 8px !important;
+    padding-top: 4px !important;
+    text-align: right !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    border: none !important;
+  }
   `;
 }
 
@@ -1197,11 +1284,11 @@ async function printBankLetterElement(el: HTMLElement) {
   clone.style.maxWidth = "100%";
   clone.style.height = "auto";
   clone.style.minHeight = "0";
-  clone.style.gap = "12mm";
+  clone.style.gap = "0";
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <meta name="color-scheme" content="light"/>
-<title>Print</title>
+<title></title>
 <style>${bankLetterPrintCss()}</style>
 </head><body></body></html>`;
 
@@ -1211,6 +1298,7 @@ async function printBankLetterElement(el: HTMLElement) {
       printWin.document.open();
       printWin.document.write(html);
       printWin.document.close();
+      printWin.document.title = "";
       printWin.document.body.appendChild(
         printWin.document.importNode(clone, true),
       );
