@@ -11,7 +11,7 @@ import {
 import { parseMoney, roundPaisa } from "@/lib/money";
 import type { AllowanceRate, DailyTag } from "@/lib/types";
 
-/** Settings + consume bills always have FR, MFR, CL, JL, CD, TRG, WIT, MED, BGH, LNK. */
+/** Settings + consume bills always have FR, MFR, CL, PL, JL, CD, TRG, WIT, MED, BGH, LNK. */
 const CONSUME_BILL_RATE_TAGS: DailyTag[] = [
   "FR",
   "MFR",

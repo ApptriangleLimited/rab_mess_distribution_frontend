@@ -63,6 +63,7 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
               <th className="border border-black px-1 py-1">MS</th>
               <th className="border border-black px-1 py-1">FR</th>
               <th className="border border-black px-1 py-1">CL</th>
+              <th className="border border-black px-1 py-1">PL</th>
               <th className="border border-black px-1 py-1">JL</th>
               <th className="border border-black px-1 py-1">CD</th>
               <th className="border border-black px-1 py-1">TRG</th>
@@ -108,6 +109,9 @@ export const WingFoodListPrint = forwardRef<HTMLDivElement, Props>(
                 </td>
                 <td className="border border-black px-1 py-0.5 text-center tabular-nums">
                   {cell(row.tagDays.CL ?? 0)}
+                </td>
+                <td className="border border-black px-1 py-0.5 text-center tabular-nums">
+                  {cell(row.tagDays.PL ?? 0)}
                 </td>
                 <td className="border border-black px-1 py-0.5 text-center tabular-nums">
                   {cell(row.tagDays.JL ?? 0)}

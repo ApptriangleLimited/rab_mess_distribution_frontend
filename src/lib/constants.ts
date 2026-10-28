@@ -65,11 +65,12 @@ export const CONSUME_LEDGER_TAGS: DailyTag[] = [
   "WR",
 ];
 
-/** Consume-user reports only — JL column and JL days, not PL. */
+/** Consume-user reports — PL sits after CL and before JL. */
 export const CONSUME_REPORT_LEDGER_TAGS: DailyTag[] = [
   "MS",
   "FR",
   "CL",
+  "PL",
   "JL",
   "CD",
   "TRG",
@@ -96,12 +97,13 @@ export const CONSUME_LEDGER_SOURCE_TAGS: DailyTag[] = [
   "WR",
 ];
 
-/** Consume-user ledger source — counts JL days, ignores PL. */
+/** Consume-user ledger source — counts PL and JL days. */
 export const CONSUME_REPORT_LEDGER_SOURCE_TAGS: DailyTag[] = [
   "MS",
   "FR",
   "MFR",
   "CL",
+  "PL",
   "JL",
   "CD",
   "TRG",

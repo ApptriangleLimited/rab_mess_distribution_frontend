@@ -217,6 +217,9 @@ export function MonthLedgerBoard({
             )}
           >
             {rows.length} · {month}
+            {centerColumnTitles
+              ? ` · ${t("common.pageOf", { page, total: totalPages })}`
+              : ""}
           </p>
         ) : (
           <p

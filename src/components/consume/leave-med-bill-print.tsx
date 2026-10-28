@@ -67,13 +67,11 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
         )}
       >
         {pages.map((pageRows, pageIndex) => {
-          const lastPage = pageIndex === pages.length - 1;
           return (
         <section
           key={pageIndex}
           className={cn(
-            "consume-bill-page consume-bill-page--full",
-            lastPage && "consume-bill-page--signed",
+            "consume-bill-page consume-bill-page--full consume-bill-page--signed",
             pageIndex > 0 && "consume-wing-break",
             preview &&
               "overflow-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700",
@@ -147,7 +145,6 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="border border-black px-1 py-0.5">{row.remarks}</td>
               </tr>
             ))}
-            {lastPage ? (
             <tr className="border border-black font-semibold">
               <td
                 colSpan={4}
@@ -171,18 +168,15 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
               </td>
               <td className="border border-black px-1 py-1" />
             </tr>
-            ) : null}
           </tbody>
         </table>
 
-        {lastPage ? (
         <div className="consume-bill-signs">
         <ConsumeSignOff
           className="mt-0 grid-cols-2 gap-4 text-[11px] sm:grid-cols-5"
           labels={[...SIGNS]}
         />
         </div>
-        ) : null}
         </div>
         </section>
           );

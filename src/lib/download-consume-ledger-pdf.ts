@@ -179,8 +179,8 @@ export function downloadConsumeLedgerPdf({
         },
         columnStyles: {
           0: { cellWidth: 7, halign: "center" },
-          1: { cellWidth: 24, halign: "left" },
-          2: { cellWidth: 16, halign: "left" },
+          1: { cellWidth: 16, halign: "left", fontSize: 5 },
+          2: { cellWidth: 10, halign: "left", fontSize: 5 },
           3: { cellWidth: 12, halign: "left" },
           4: { cellWidth: 36, halign: "left", overflow: "linebreak" },
         },
@@ -188,6 +188,10 @@ export function downloadConsumeLedgerPdf({
         margin: { left: 6, right: 6, bottom: showSigns ? 28 : 10 },
         tableWidth: "auto",
         didParseCell: (data) => {
+          if (data.column.index === 1 || data.column.index === 2) {
+            data.cell.styles.halign = "left";
+            if (data.section === "body") data.cell.styles.fontSize = 5;
+          }
           if (data.section === "body" && data.column.index === 0) {
             data.cell.styles.halign = "center";
           }
@@ -202,6 +206,13 @@ export function downloadConsumeLedgerPdf({
               data.cell.styles.halign = "left";
             }
           }
+          if (
+            data.section === "head" &&
+            data.column.index >= 5 + dayHeaders.length &&
+            String(data.cell.raw ?? "").trim().length >= 3
+          ) {
+            data.cell.styles.fontSize = 5.5;
+          }
           if (data.section !== "body" || data.column.index < 5) return;
           if (data.column.index >= 5 + dayHeaders.length) return;
           const row = pageRows[data.row.index];
@@ -212,11 +223,21 @@ export function downloadConsumeLedgerPdf({
           data.cell.styles.fillColor = hexRgb(fill.bg);
           data.cell.styles.textColor = hexRgb(fill.fg);
           data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fontSize = 6;
+          data.cell.styles.fontSize = tag.length >= 3 ? 4.5 : 5;
           data.cell.styles.halign = "center";
         },
       });
 
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6);
+      doc.setTextColor(0);
+      doc.text(
+        `Page ${pageIndex + 1} of ${pageGroups.length}`,
+        pageW - 6,
+        pageH - 3.5,
+        { align: "right" },
+      );
       if (!showSigns) return;
       drawConsumeReportSigns(doc, { pinToPageEnd: true, marginX: 6 });
     });

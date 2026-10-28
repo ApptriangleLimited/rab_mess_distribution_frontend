@@ -47,14 +47,14 @@ function tableColCount(table: OfficialConsumeTable) {
   }
   if (table.kind === "leave") {
     return (
-      10 +
+      11 +
       (table.showPageNo ? 1 : 0) +
       (table.showManpower ? 1 : 0) +
       (table.remarks ? 1 : 0)
     );
   }
   const pageCol = table.kind !== "consume-pages" && table.showPageNo;
-  return 15 + (pageCol ? 1 : 0) + (table.remarks ? 1 : 0);
+  return 16 + (pageCol ? 1 : 0) + (table.remarks ? 1 : 0);
 }
 
 function TitleHead({ table }: { table: OfficialConsumeTable }) {
@@ -98,6 +98,7 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
           <th className="border border-black px-1 py-1 align-bottom">MS</th>
           <th className="border border-black px-1 py-1 align-bottom">FR</th>
           <th className="border border-black px-1 py-1 align-bottom">CL</th>
+          <th className="border border-black px-1 py-1 align-bottom">PL</th>
           <th className="border border-black px-1 py-1 align-bottom">JL</th>
           <th className="border border-black px-1 py-1 align-bottom">CD</th>
           <th className="border border-black px-1 py-1 align-bottom">TRG</th>
@@ -136,6 +137,9 @@ function ConsumeTable({ table }: { table: OfficialConsumeTable }) {
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.CL ?? 0)}
+            </td>
+            <td className="border border-black px-1 py-1 text-center tabular-nums">
+              {cell(row.tagDays.PL ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.JL ?? 0)}
@@ -244,6 +248,7 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
             </th>
           ) : null}
           <th className="border border-black px-1 py-1 align-bottom">CL</th>
+          <th className="border border-black px-1 py-1 align-bottom">PL</th>
           <th className="border border-black px-1 py-1 align-bottom">JL</th>
           <th className="border border-black px-1 py-1 align-bottom">TRG</th>
           <th className="border border-black px-1 py-1 align-bottom">WT</th>
@@ -273,6 +278,9 @@ function LeaveTable({ table }: { table: OfficialConsumeTable }) {
             ) : null}
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.CL ?? 0)}
+            </td>
+            <td className="border border-black px-1 py-1 text-center tabular-nums">
+              {cell(row.tagDays.PL ?? 0)}
             </td>
             <td className="border border-black px-1 py-1 text-center tabular-nums">
               {cell(row.tagDays.JL ?? 0)}

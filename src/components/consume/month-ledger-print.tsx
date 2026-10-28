@@ -137,21 +137,23 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
 
     /** Inside the preview padding and the 8mm print margin, so the last column stays on the sheet. */
     const pageMm = english ? 270 : 291;
-    const tagColMm = english ? 5.6 : 7;
+    const tagColMm = (code: string) =>
+      english ? (code.length >= 3 ? 6.5 : 5.2) : 7;
+    const tagColsMm = tagCodes.reduce((s, code) => s + tagColMm(code), 0);
     const totalColMm = english ? 8 : 10;
     const fixedWithoutName = showSrbNo
       ? english
-        ? 6 + 22 + 15 + 11
+        ? 6 + 16 + 10 + 11
         : 7 + 16 + 16 + 14
       : english
-        ? 6 + 22 + 11
+        ? 6 + 16 + 11
         : 7 + 22 + 16;
     const minDayMm = 3.4;
     const maxNameMm = Math.max(
       14,
       pageMm -
         fixedWithoutName -
-        tagCodes.length * tagColMm -
+        tagColsMm -
         totalColMm -
         columns.length * minDayMm,
     );
@@ -163,18 +165,16 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
     const nameMm = Math.min(maxNameMm, Math.max(14, longestName * 1.45 + 2));
     const identityMm = showSrbNo
       ? english
-        ? [6, 22, 15, 11, nameMm]
+        ? [6, 16, 10, 11, nameMm]
         : [7, 16, 16, 14, nameMm]
       : english
-        ? [6, 22, 11, nameMm]
+        ? [6, 16, 11, nameMm]
         : [7, 22, 16, nameMm];
     const identityColCount = identityMm.length;
     const reservedMm =
-      identityMm.reduce((s, n) => s + n, 0) +
-      tagCodes.length * tagColMm +
-      totalColMm;
+      identityMm.reduce((s, n) => s + n, 0) + tagColsMm + totalColMm;
     const dayColMm = Math.max(
-      3.2,
+      3.5,
       (pageMm - reservedMm) / Math.max(columns.length, 1),
     );
 
@@ -195,7 +195,8 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           key={pageIndex}
           className={cn(
             "consume-ledger-page",
-            english && "box-border w-[281mm] max-w-[281mm] overflow-visible",
+            english &&
+              "consume-ledger-en box-border w-[281mm] max-w-[281mm] overflow-visible",
             pageIndex > 0 && "consume-wing-break",
             preview
               ? "mx-auto rounded-xl border border-neutral-200 bg-white p-3 shadow-sm [print-color-adjust:exact] dark:border-neutral-700"
@@ -225,7 +226,7 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               <col key={`d-${date}`} style={{ width: `${dayColMm}mm` }} />
             ))}
             {tagCodes.map((code) => (
-              <col key={`t-${code}`} style={{ width: `${tagColMm}mm` }} />
+              <col key={`t-${code}`} style={{ width: `${tagColMm(code)}mm` }} />
             ))}
             <col style={{ width: `${totalColMm}mm` }} />
           </colgroup>
@@ -234,11 +235,11 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               <th className="border border-black px-0.5 py-1">
                 {t("consume.colSl")}
               </th>
-              <th className="border border-black px-0.5 py-1">
+              <th className="ledger-id border border-black px-0.5 py-1 text-left">
                 {t("consume.colId")}
               </th>
               {showSrbNo ? (
-                <th className="border border-black px-0.5 py-1">
+                <th className="ledger-srb border border-black px-0.5 py-1 text-left">
                   {t("consume.colSrbNo")}
                 </th>
               ) : null}
@@ -259,7 +260,10 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
               {tagCodes.map((code) => (
                 <th
                   key={code}
-                  className="overflow-hidden border border-black px-0 py-1 text-[7px] whitespace-nowrap"
+                  className={cn(
+                    "overflow-hidden border border-black px-0 py-1 whitespace-nowrap",
+                    code.length >= 3 ? "ledger-tag-3 text-[5.5px]" : "text-[7px]",
+                  )}
                 >
                   {code}
                 </th>
@@ -275,11 +279,11 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="consume-sl border border-black px-0.5 py-0.5 text-center tabular-nums">
                   {serLabel(serialOffset + i + 1)}
                 </td>
-                <td className="ledger-id overflow-hidden border border-black px-0.5 py-0.5 font-mono whitespace-nowrap">
+                <td className="ledger-id overflow-hidden border border-black px-0.5 py-0.5 font-mono text-[5.5px] leading-none whitespace-nowrap">
                   {row.user.personal_id || "—"}
                 </td>
                 {showSrbNo ? (
-                  <td className="ledger-id overflow-hidden border border-black px-0.5 py-0.5 font-mono whitespace-nowrap">
+                  <td className="ledger-srb overflow-hidden border border-black px-0.5 py-0.5 font-mono text-[5.5px] leading-none whitespace-nowrap">
                     {row.user.rab_id || "—"}
                   </td>
                 ) : null}
@@ -310,7 +314,10 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
                       key={date}
                       className={cn(
                         tagPrintClass(cell, tone),
-                        "border border-black px-0 py-0.5 text-center font-mono text-[7px] font-bold leading-none",
+                        "border border-black px-0 py-0.5 text-center font-mono font-bold leading-none",
+                        cell.length >= 3
+                          ? "ledger-tag-3 text-[5px]"
+                          : "text-[6px]",
                       )}
                       style={{ backgroundColor: fill.bg, color: fill.fg }}
                     >
@@ -382,6 +389,14 @@ export const MonthLedgerPrint = forwardRef<HTMLDivElement, Props>(
           ).map((key) => t(key))}
         />
         </div>
+        ) : null}
+        {english ? (
+          <p className="ledger-page-no">
+            {t("common.pageOf", {
+              page: pageIndex + 1,
+              total: pages.length,
+            })}
+          </p>
         ) : null}
         </section>
           );

@@ -396,7 +396,22 @@ function letterSheetCss() {
     table-layout: fixed !important;
     width: 100% !important;
   }
+  .month-ledger-print th.ledger-srb,
+  .month-ledger-print th.ledger-id {
+    text-align: left !important;
+  }
+  .month-ledger-print td.ledger-srb,
+  .consume-ledger-en td.ledger-id {
+    font-size: 5.5px !important;
+  }
+  .consume-ledger-en th.ledger-tag-3 {
+    font-size: 5.5px !important;
+  }
+  .consume-ledger-en td.register-tag.ledger-tag-3 {
+    font-size: 5px !important;
+  }
   .month-ledger-print .ledger-id,
+  .month-ledger-print .ledger-srb,
   .month-ledger-print .ledger-rank {
     overflow: hidden !important;
     white-space: nowrap !important;
@@ -421,7 +436,7 @@ function letterSheetCss() {
     white-space: nowrap !important;
   }
   .month-ledger-print td.register-tag {
-    font-size: 8px !important;
+    font-size: 6px !important;
     font-weight: 700 !important;
     padding: 3px 2px !important;
   }
@@ -576,6 +591,14 @@ function letterSheetCss() {
   }
   .consume-ledger-page .consume-bill-signs {
     margin-top: auto !important;
+  }
+  .consume-ledger-page .ledger-page-no {
+    display: block !important;
+    margin: 4px 0 0 !important;
+    text-align: right !important;
+    font-size: 6px !important;
+    font-weight: 500 !important;
+    line-height: 1 !important;
   }
   .consume-ledger-page {
     display: flex !important;

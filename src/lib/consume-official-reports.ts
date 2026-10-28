@@ -1,5 +1,7 @@
 import {
   ADMIN_SUB_WINGS,
+  CONSUME_REPORT_LEDGER_SOURCE_TAGS,
+  CONSUME_REPORT_LEDGER_TAGS,
   CONSUME_REPORT_META,
   HQ_SUB_WINGS,
   wingOfficialName,
@@ -9,7 +11,15 @@ import {
   type ConsumeMemberTypeFilter,
 } from "@/lib/consume-filters";
 import { countedDaysInMonth, formatMonthDash, formatMonthLong } from "@/lib/date";
-import { buildConsumeMonth } from "@/lib/reports";
+import {
+  buildConsumeMonth,
+  buildMonthLedger,
+  presentConsumeLedger,
+} from "@/lib/reports";
+import {
+  chunkBillRows,
+  CONSUME_BILL_ROWS_PER_PAGE,
+} from "@/lib/consume-bill-pages";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { compareUsers } from "@/lib/store/users";
 import type { DailyTag, MemberType, User } from "@/lib/types";
@@ -70,7 +80,6 @@ export type OfficialConsumePack = {
   summary: OfficialConsumeReport;
 };
 
-const REGISTER_PAGE_SIZE = 3;
 const EMPTY_TEMPLATE_PAGES = 8;
 
 const BN_DIGITS = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
@@ -119,6 +128,7 @@ export function officialConsumeTotal(tagDays: Partial<Record<DailyTag, number>>)
     officialMsDays(tagDays) +
     officialFrDays(tagDays) +
     (tagDays.CL ?? 0) +
+    (tagDays.PL ?? 0) +
     (tagDays.JL ?? 0) +
     (tagDays.CD ?? 0) +
     (tagDays.TRG ?? 0) +
@@ -249,6 +259,20 @@ function consumeMonthRows(
   );
 }
 
+/** Same members and order as the consume ledger print (30 per page). */
+function consumeLedgerMembers(
+  month: string,
+  memberType: ConsumeMemberTypeFilter = "all",
+) {
+  const ledger = presentConsumeLedger(
+    buildMonthLedger(month, CONSUME_REPORT_LEDGER_SOURCE_TAGS, { carry: true }),
+    CONSUME_REPORT_LEDGER_TAGS,
+  );
+  return ledger.rows.filter((row) =>
+    memberMatchesTypeFilter(row.user.member_type, memberType),
+  );
+}
+
 function bucketsFromMonth(
   month: string,
   memberType: ConsumeMemberTypeFilter = "all",
@@ -342,7 +366,7 @@ function membersByWing(
   month: string,
   memberType: ConsumeMemberTypeFilter = "all",
 ) {
-  const rows = consumeMonthRows(month, memberType);
+  const rows = consumeLedgerMembers(month, memberType);
   const byWing = new Map<string, typeof rows>();
   for (const def of WING_DEFS) byWing.set(def.id, []);
   for (const row of rows) {
@@ -359,7 +383,7 @@ function membersByWing(
 
 function registerPages(memberCount: number) {
   if (!memberCount) return 0;
-  return Math.ceil(memberCount / REGISTER_PAGE_SIZE);
+  return Math.ceil(memberCount / CONSUME_BILL_ROWS_PER_PAGE);
 }
 
 export function pageRangeBn(pages: number) {
@@ -452,7 +476,7 @@ export function buildOfficialLeaveBill(
   const wings = buildOfficialWingConsume(month, memberType);
   return {
     ...wings,
-    title: `All WING CL, JL, Training, WT, MED, BGH and LNK BILL SUMMARY - ${formatMonthLong(month)}`,
+    title: `All WING CL, PL, JL, Training, WT, MED, BGH and LNK BILL SUMMARY - ${formatMonthLong(month)}`,
   };
 }
 
@@ -470,6 +494,7 @@ export function buildOfficialConsumeSheet(
 export function officialLeaveTotal(tagDays: Partial<Record<DailyTag, number>>) {
   return (
     (tagDays.CL ?? 0) +
+    (tagDays.PL ?? 0) +
     (tagDays.JL ?? 0) +
     (tagDays.TRG ?? 0) +
     officialWitDays(tagDays) +
@@ -507,8 +532,7 @@ export function buildWingFoodList(
   wingName: string,
   labelOverrides?: Record<string, string>,
 ): OfficialConsumeTable {
-  const consume = buildConsumeMonth(month);
-  const members = consume.rows
+  const members = consumeLedgerMembers(month)
     .filter((row) => memberMatchesWingFilter(row.user.wing, wingName))
     .sort((a, b) => compareUsers(a.user, b.user));
   const monthDays = countedDaysInMonth(month);
@@ -535,9 +559,20 @@ export function buildWingFoodList(
   );
 }
 
+function memberTagDays(member: {
+  tagDays?: Partial<Record<DailyTag, number>>;
+  tagCounts?: Partial<Record<DailyTag, number>>;
+}) {
+  return member.tagDays ?? member.tagCounts ?? {};
+}
+
 function wingPageRows(
   wingId: string,
-  members: ReturnType<typeof buildConsumeMonth>["rows"],
+  members: readonly {
+    user: User;
+    tagDays?: Partial<Record<DailyTag, number>>;
+    tagCounts?: Partial<Record<DailyTag, number>>;
+  }[],
   extras?: { monthDays?: number; english?: boolean },
 ): OfficialConsumeRow[] {
   const english = extras?.english ?? false;
@@ -554,16 +589,10 @@ function wingPageRows(
       totalDays: 0,
     }));
   }
-  const pages = registerPages(members.length);
-  const rows: OfficialConsumeRow[] = [];
-  for (let i = 0; i < pages; i++) {
-    const chunk = members.slice(
-      i * REGISTER_PAGE_SIZE,
-      (i + 1) * REGISTER_PAGE_SIZE,
-    );
+  return chunkBillRows(members).map((chunk, i) => {
     const tagDays: Partial<Record<DailyTag, number>> = {};
-    for (const member of chunk) addTagDays(tagDays, member.tagDays);
-    rows.push({
+    for (const member of chunk) addTagDays(tagDays, memberTagDays(member));
+    return {
       id: `${wingId}-p${i + 1}`,
       sl: i + 1,
       label: pageLabel(i + 1, english),
@@ -572,9 +601,8 @@ function wingPageRows(
       days: monthDays,
       tagDays,
       totalDays: totalOf(tagDays),
-    });
-  }
-  return rows;
+    };
+  });
 }
 
 function consumeTable(
@@ -677,7 +705,7 @@ export function buildOfficialConsumePack(
       if (memberType !== "all" && !hasOfficialData(row)) return [];
       return [
         consumeTable(
-          `CL, JL, Training, WT, MED, BGH and LNK bill — ${def.label} — ${monthLabel}`,
+          `CL, PL, JL, Training, WT, MED, BGH and LNK bill — ${def.label} — ${monthLabel}`,
           [org],
           [{ ...row, sl: 1 }],
           {

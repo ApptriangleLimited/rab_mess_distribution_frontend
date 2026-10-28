@@ -510,7 +510,7 @@ export function buildTagBill(
 
 export function buildLeaveMedBill(
   month: string,
-  tags: readonly DailyTag[] = ["CL", "JL", "TRG", "WIT", "MED", "BGH", "LNK"],
+  tags: readonly DailyTag[] = ["CL", "PL", "JL", "TRG", "WIT", "MED", "BGH", "LNK"],
 ): {
   month: string;
   tags: DailyTag[];

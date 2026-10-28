@@ -16,7 +16,7 @@ export function consumeFiltersForRole(ration: boolean): ConsumeFilter[] {
 export const CONSUME_FILTER_TAGS: Record<ConsumeFilter, readonly DailyTag[]> = {
   "fr-mfr": ["FR", "MFR"],
   cd: ["CD"],
-  "leave-med": ["CL", "JL", "TRG", "WIT", "MED", "BGH", "LNK"],
+  "leave-med": ["CL", "PL", "JL", "TRG", "WIT", "MED", "BGH", "LNK"],
   fuel: ["FR", "MFR"],
 };
 

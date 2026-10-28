@@ -249,7 +249,6 @@ export function downloadTagBillPdf(args: {
     if (wingIndex > 0 || pageIndex > 0) doc.addPage();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (doc as any).__consumeColBoxes = [];
-    const lastPage = pageIndex === pageGroups.length - 1;
     let y = 12;
 
     const title = consumeWingBillTitle(titleHead, section.wingLabel, monthLabel);
@@ -340,8 +339,6 @@ export function downloadTagBillPdf(args: {
       },
     });
 
-    if (!lastPage) return;
-
     const afterTable = drawConsumeTotalRow(
       doc,
       fuelOnly
@@ -363,7 +360,7 @@ export function downloadTagBillPdf(args: {
             { text: "" },
           ],
     );
-    if (!fuelOnly) drawConsumeBillSigns(doc, afterTable + 12, true);
+    drawConsumeBillSigns(doc, afterTable + 12, true);
     });
   });
 
@@ -403,7 +400,6 @@ export function downloadLeaveMedBillPdf(args: {
     if (wingIndex > 0 || pageIndex > 0) doc.addPage();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (doc as any).__consumeColBoxes = [];
-    const lastPage = pageIndex === pageGroups.length - 1;
     let y = 12;
 
     const title = consumeWingBillTitle(titleHead, section.wingLabel, monthLabel);
@@ -474,8 +470,6 @@ export function downloadLeaveMedBillPdf(args: {
         recordConsumeColBox(doc, data.column.index, data.cell.x, data.cell.width);
       },
     });
-
-    if (!lastPage) return;
 
     const afterTable = drawConsumeTotalRow(doc, [
       { text: "Total", colSpan: 4, align: "left" },

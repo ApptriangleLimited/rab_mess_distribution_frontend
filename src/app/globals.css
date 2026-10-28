@@ -442,6 +442,20 @@ body {
   color: #111111 !important;
   letter-spacing: 0.03em;
 }
+.consume-col-titles th.ledger-srb,
+.consume-col-titles th.ledger-id {
+  text-align: left !important;
+}
+.month-ledger-print td.ledger-srb,
+.consume-ledger-en td.ledger-id {
+  font-size: 5.5px !important;
+}
+.consume-ledger-en th.ledger-tag-3 {
+  font-size: 5.5px !important;
+}
+.consume-ledger-en td.register-tag.ledger-tag-3 {
+  font-size: 5px !important;
+}
 .tag-bill-print .consume-bill-title-cell,
 .leave-med-bill-print .consume-bill-title-cell {
   border: none !important;
@@ -463,6 +477,13 @@ body {
 .consume-ledger-page .consume-bill-signs,
 .official-consume-page .consume-bill-signs {
   margin-top: auto;
+}
+.consume-ledger-page .ledger-page-no {
+  margin: 4px 0 0;
+  text-align: right;
+  font-size: 6px;
+  font-weight: 500;
+  line-height: 1;
 }
 .consume-ledger-page {
   display: flex;
