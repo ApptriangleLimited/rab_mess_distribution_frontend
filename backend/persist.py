@@ -88,6 +88,7 @@ CATALOG_KEYS = (
     "manpower_present",
     "manpower_absence_detail",
     "force_rank_officer",
+    "force_rank_cells",
     "paper_report_requests",
 )
 
@@ -922,9 +923,10 @@ def ration_month_report(
 
 def manpower_day_data(db: Session, target: date) -> dict:
     """Roster + projected Daily tags for one day (same rules as the cockpit)."""
-    from daily import can_assign, load_window, project_cell
+    from daily import can_assign, load_window, prior_tags_before, project_cell
 
     members, stored_map, suppressed = load_window(db, target, target, None, None, None)
+    priors = prior_tags_before(db, [member.id for member in members], target)
     items = []
     for member in members:
         if member.status != "1":
@@ -933,11 +935,14 @@ def manpower_day_data(db: Session, target: date) -> dict:
             continue
         if not can_assign(member, target):
             continue
+        prior = priors.get(member.id)
         cell = project_cell(
             member,
             target,
             stored_map.get((member.id, target)),
             suppressed,
+            carry_tag=prior.tag if prior else None,
+            carry_tone=prior.trg_tone if prior else None,
         )
         source = cell.get("source") or "empty"
         painted = str(cell.get("tag") or "").upper()

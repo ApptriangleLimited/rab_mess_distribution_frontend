@@ -733,13 +733,15 @@ export function buildStrengthReport(
   const presentDay = state.manpower_present?.[date] ?? {};
   const absenceDay = state.manpower_absence_detail?.[date] ?? {};
   for (const [wingName, bucket] of map.entries()) {
-    if (!isManualAttachedWing(wingName)) continue;
+    const manualWing = isManualAttachedWing(wingName);
     for (const cat of STRENGTH_CATEGORIES) {
+      if (!manualWing && cat.id !== "officer" && cat.id !== "dad") continue;
       const heldOverride = lookupDayWingCat(heldDay, wingName, cat.id);
       if (heldOverride !== undefined) bucket.held[cat.id] = heldOverride;
       const absOverride = lookupDayWingCat(absentDay, wingName, cat.id);
       if (absOverride !== undefined) bucket.absent[cat.id] = absOverride;
     }
+    if (!manualWing) continue;
     let hasDetail = false;
     for (const field of ABSENCE_DETAIL_FIELDS) {
       const storeKey = field === "witness" ? "witness" : field;
@@ -783,8 +785,9 @@ export function buildStrengthReport(
   for (const [wing, b] of map.entries()) {
     if (scope === "hq" && isSadarWing(wing)) continue;
     b.present = presentFromHeldAbsent(b.held, b.absent);
-    if (!isManualAttachedWing(wing)) continue;
+    const manualWing = isManualAttachedWing(wing);
     for (const cat of STRENGTH_CATEGORIES) {
+      if (!manualWing && cat.id !== "officer" && cat.id !== "dad") continue;
       const presentOverride = lookupDayWingCat(presentDay, wing, cat.id);
       if (presentOverride !== undefined) b.present[cat.id] = presentOverride;
     }
@@ -802,12 +805,18 @@ export function buildStrengthReport(
     const b = map.get(wing)!;
     const withoutRecord = cfg.skipSadarFill && isSadarWing(wing);
     if (withoutRecord) {
+      const held = emptyCounts();
+      const present = emptyCounts();
+      const absent = emptyCounts();
+      held.officer = b.held.officer ?? 0;
+      present.officer = b.present.officer ?? 0;
+      absent.officer = b.absent.officer ?? 0;
       return {
         wing,
         withoutRecord: true,
-        held: emptyCounts(),
-        present: emptyCounts(),
-        absent: emptyCounts(),
+        held,
+        present,
+        absent,
       };
     }
     return {

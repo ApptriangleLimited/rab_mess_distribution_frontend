@@ -20,11 +20,14 @@ import {
   putAssignment,
   putAssignmentRange,
   type AssignmentCell,
+  type JlMemberState,
 } from "@/lib/api/assignments";
 import { approveDay, listLockedDates } from "@/lib/api/days";
 import { listBoroKhanaDates, setBoroKhanaDate } from "@/lib/api/boro-khana";
 import { listMembersAllPages, memberToUser } from "@/lib/api/members";
 import { isDailyApiEnabled } from "@/lib/api/mode";
+import { eachISODate } from "@/lib/date";
+import { dailyRosterVisible } from "@/lib/store/daily";
 import { onCcDataChange } from "@/lib/api/cc-events";
 import { listTagRequests, requestToTagRequest } from "@/lib/api/tag-requests";
 import { useToast } from "@/components/shared/toast-provider";
@@ -108,7 +111,6 @@ export function useDailyCockpit({
           wing: wingFilter,
           wing_family: wingFamily,
           member_type: memberType !== "all" ? memberType : undefined,
-          status,
           page_size: 2000,
         }),
         listAssignments({
@@ -158,7 +160,7 @@ export function useDailyCockpit({
     } finally {
       setLoading(false);
     }
-  }, [apiOn, dateFrom, dateTo, qDebounced, rank, wing, memberType, status, toast]);
+  }, [apiOn, dateFrom, dateTo, qDebounced, rank, wing, memberType, toast]);
 
   useEffect(() => {
     void load();
@@ -208,6 +210,35 @@ export function useDailyCockpit({
     [cells, users],
   );
 
+  const applyJlMember = useCallback((member?: JlMemberState) => {
+    if (!member) return;
+    setUsers((prev) =>
+      prev.map((user) => {
+        if (user.id !== member.id) return user;
+        return {
+          ...user,
+          status: member.status === "0" ? "0" : "1",
+          jl_end_date: member.jl_end_date ?? "",
+          inactive_spans: member.inactive_spans ?? user.inactive_spans,
+        };
+      }),
+    );
+  }, []);
+
+  const rosterUsers = useMemo(() => {
+    const dates = eachISODate(dateFrom, dateTo);
+    const tagged = new Set<string>();
+    for (const cell of cells) {
+      if (!cell.tag) continue;
+      if (cell.source !== "stored" && cell.source !== "carry") continue;
+      if (cell.date < dateFrom || cell.date > dateTo) continue;
+      tagged.add(cell.member_id);
+    }
+    return users.filter((user) =>
+      dailyRosterVisible(user, dates, tagged.has(user.id), status),
+    );
+  }, [users, cells, dateFrom, dateTo, status]);
+
   const onTagChange = useCallback(
     async (
       userId: string,
@@ -225,6 +256,7 @@ export function useDailyCockpit({
               res.items,
             ),
           );
+          applyJlMember(res.member);
         } else {
           const res = await putAssignment({
             member_id: userId,
@@ -234,6 +266,7 @@ export function useDailyCockpit({
           });
           // Apply the server's canonical cell(s) right away — no loading flash.
           setCells((prev) => mergeUpdatedCells(prev, res.items));
+          applyJlMember(res.member);
         }
       } catch (err) {
         const detail =
@@ -243,7 +276,7 @@ export function useDailyCockpit({
         void load();
       }
     },
-    [load, toast],
+    [applyJlMember, load, toast],
   );
 
   const onPaintRange = useCallback(
@@ -263,6 +296,7 @@ export function useDailyCockpit({
         // Merge all returned cells immediately so every day in the range
         // shows the new tag without waiting for the background reload.
         setCells((prev) => mergeUpdatedCells(prev, res.items));
+        applyJlMember(res.member);
       } catch (err) {
         const detail =
           err instanceof ApiClientError ? err.detail : "Could not paint range.";
@@ -270,7 +304,7 @@ export function useDailyCockpit({
         void load();
       }
     },
-    [load, toast],
+    [applyJlMember, load, toast],
   );
 
   const onBoroKhanaToggle = useCallback(
@@ -309,8 +343,8 @@ export function useDailyCockpit({
 
   return {
     loading,
-    refreshing: loading && users.length > 0,
-    users,
+    refreshing: loading && rosterUsers.length > 0,
+    users: rosterUsers,
     cells,
     assignments,
     displayAssignments,

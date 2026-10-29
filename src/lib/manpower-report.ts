@@ -273,6 +273,24 @@ export function isOfficerCategory(
   return key === "officer" || key.startsWith("officer");
 }
 
+/** Form 1 DAD column — same editable override as Officer. */
+export function isDadCategory(
+  cat: AuthorizedStrength | undefined,
+): boolean {
+  if (!cat) return false;
+  const key = cat.label.trim().toLowerCase();
+  const id = cat.id.trim().toLowerCase();
+  return (
+    key === "dad" ||
+    key.startsWith("dad ") ||
+    key.includes("deputy assistant") ||
+    key === "ডিএডি" ||
+    id === "dad" ||
+    id.endsWith("_dad") ||
+    id.endsWith("-dad")
+  );
+}
+
 function officerIdOf(categories: AuthorizedStrength[]): string | null {
   return categories.find((c) => isOfficerCategory(c))?.id ?? null;
 }
@@ -636,13 +654,15 @@ export function buildManpowerReport(
   for (const wingName of [...wingMap.keys()]) {
     const bucket = wingMap.get(wingName);
     if (!bucket) continue;
-    if (!isManualPresentWing(wingName)) continue;
+    const manualWing = isManualPresentWing(wingName);
     for (const cat of categories) {
+      if (!manualWing && !isOfficerCategory(cat) && !isDadCategory(cat)) continue;
       const heldOverride = lookupDayWingCat(heldDay, wingName, cat.id);
       if (heldOverride !== undefined) bucket.held[cat.id] = heldOverride;
       const absOverride = lookupDayWingCat(absentDay, wingName, cat.id);
       if (absOverride !== undefined) bucket.absent[cat.id] = absOverride;
     }
+    if (!manualWing) continue;
     const detail = { ...bucket.absence };
     let hasDetailOverride = false;
     for (const field of ABSENCE_DETAIL_FIELDS) {
@@ -673,8 +693,9 @@ export function buildManpowerReport(
 
   for (const [wingName, block] of wingMap.entries()) {
     block.present = presentFromHeldAbsent(block.held, block.absent, categories);
-    if (!isManualPresentWing(wingName)) continue;
+    const manualWing = isManualPresentWing(wingName);
     for (const cat of categories) {
+      if (!manualWing && !isOfficerCategory(cat) && !isDadCategory(cat)) continue;
       const presentOverride = lookupDayWingCat(presentDay, wingName, cat.id);
       if (presentOverride !== undefined) block.present[cat.id] = presentOverride;
     }

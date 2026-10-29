@@ -20,7 +20,6 @@ import {
 } from "@/lib/date";
 import { projectedCockpitTag } from "@/lib/store/pritibhoj-counts";
 import { registerCountedTag } from "@/lib/store/register-totals";
-import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import { isTrgRationPayable, isTrgTag } from "@/lib/trg-tone";
 import { activeSenders } from "@/lib/store/senders";
@@ -968,10 +967,7 @@ export function buildDailyRegisterFromCells(
       const dayMap = byUser.get(user.id);
       const counts: Partial<Record<DailyTag, number>> = {};
       const days: LedgerDayCell[] = dates.map((date) => {
-        const tag =
-          isMfrLocked(user) && canAssignOnDate(user, date)
-            ? MFR_TAG
-            : (dayMap?.get(date) ?? "");
+        const tag = dayMap?.get(date) ?? "";
         if (tag) counts[tag] = (counts[tag] ?? 0) + 1;
         return tag;
       });

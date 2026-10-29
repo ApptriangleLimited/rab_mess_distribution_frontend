@@ -12,10 +12,11 @@ export function registerCountedTag(
   stored: DailyTag | undefined,
   suppressed: boolean,
   today: string,
+  honorMfrLock = true,
 ): DailyTag | "" {
   if (date > today) return "";
   if (!canAssignOnDate(user, date)) return stored ?? "";
-  if (isMfrLocked(user)) return MFR_TAG;
+  if (honorMfrLock && isMfrLocked(user)) return MFR_TAG;
   if (stored) return stored;
   if (suppressed) return "";
   return user.default_tag || "";
@@ -49,6 +50,7 @@ export function countRegisterTags(
         byUserDate.get(`${user.id}|${date}`),
         suppressedSet.has(`${user.id}|${date}`),
         today,
+        false,
       );
       if (!tag) continue;
       counts[tag] = (counts[tag] ?? 0) + 1;

@@ -2,10 +2,12 @@ import {
   FORCES,
   canonicalForceName,
   canonicalForceServiceRank,
+  canonicalWingName,
   defaultForceRankForSrb,
   forceLabelBn,
 } from "@/lib/constants";
 import {
+  isManualPresentWing,
   isManpowerCountableMember,
   type ManpowerSnapshot,
 } from "@/lib/manpower-report";
@@ -544,6 +546,59 @@ function buildForceRowsForWing(
   });
 }
 
+export function forceRankCellKey(
+  force: string,
+  colId: string,
+  index: number,
+  rank: string,
+): string {
+  return `${force.trim().toLowerCase()}||${colId}||${index}||${rank.trim().toLowerCase()}`;
+}
+
+function savedForceRankCells(
+  date: string,
+  wing: string,
+): Record<string, number> {
+  const day = getState().force_rank_cells?.[date];
+  if (!day) return {};
+  const names = [wing, canonicalWingName(wing)];
+  for (const name of names) {
+    const hit = day[name];
+    if (hit) return hit;
+  }
+  const want = canonicalWingName(wing).trim().toLowerCase();
+  for (const [key, value] of Object.entries(day)) {
+    if (canonicalWingName(key).trim().toLowerCase() === want) return value;
+  }
+  return {};
+}
+
+function applyManualForceRankCounts(
+  date: string,
+  wing: string,
+  rows: ForceRankForceRow[],
+  columns: ForceRankCol[],
+) {
+  const manual = isManualPresentWing(wing);
+  const saved = savedForceRankCells(date, wing);
+  for (const row of rows) {
+    for (const col of columns) {
+      if (!manual && col.id !== "dad") continue;
+      const cells = row.cells[col.id] ?? [];
+      row.cells[col.id] = cells.map((cell, index) => {
+        const key = forceRankCellKey(row.force, col.id, index, cell.rank);
+        if (!Object.prototype.hasOwnProperty.call(saved, key)) return cell;
+        const count = saved[key];
+        return Number.isFinite(count) ? { ...cell, count } : cell;
+      });
+    }
+    row.total = Object.values(row.cells).reduce(
+      (sum, list) => sum + list.reduce((n, cell) => n + (cell.count || 0), 0),
+      0,
+    );
+  }
+}
+
 function finishForceRows(rows: ForceRankForceRow[], columns: ForceRankCol[]) {
   for (const row of rows) {
     for (const col of columns) {
@@ -634,6 +689,7 @@ export function buildForceRankReport(
 
   const wings: ForceRankWingBlock[] = draftWings.map((block) => {
     finishForceRows(block.rows, columns);
+    applyManualForceRankCounts(date, block.wing, block.rows, columns);
     return {
       wing: block.wing,
       labelBn: manpowerPaperWingLabel(block.wing, state.wing_labels_bn),

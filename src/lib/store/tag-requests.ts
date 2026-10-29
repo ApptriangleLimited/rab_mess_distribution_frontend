@@ -296,10 +296,12 @@ export function createDutyTagRequest(input: {
   requestedBy?: string;
   trg_tone?: TrgTone;
   trg_sarda?: boolean;
+  /** Daily RR paint only. Other menus keep the MFR lock. */
+  skipMfrLock?: boolean;
 }): TagRequest | null {
   const user = getState().users.find((u) => u.id === input.userId);
   if (!user || !input.toTag) return null;
-  if (!canDailyWriteTag(user, input.toTag)) return null;
+  if (!input.skipMfrLock && !canDailyWriteTag(user, input.toTag)) return null;
   const fromDate = input.fromDate || todayISO();
   const toDate = input.toDate || fromDate;
   const fromTag = getCockpitTagOnDate(user, fromDate);

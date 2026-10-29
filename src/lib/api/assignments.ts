@@ -1,5 +1,12 @@
 import { apiJson } from "@/lib/api/client";
-import type { DailyAssignment, DailyTag } from "@/lib/types";
+import type { DailyAssignment, DailyTag, InactiveSpan, UserStatus } from "@/lib/types";
+
+export type JlMemberState = {
+  id: string;
+  status: UserStatus;
+  jl_end_date: string;
+  inactive_spans: InactiveSpan[];
+};
 
 export type AssignmentSource = "stored" | "carry" | "empty" | "suppressed";
 
@@ -65,14 +72,14 @@ export function putAssignment(body: {
   tag: string;
   trg_tone?: "black" | "red";
 }) {
-  return apiJson<{ items: AssignmentCell[] }>("/api/v1/assignments", {
+  return apiJson<{ items: AssignmentCell[]; member?: JlMemberState }>("/api/v1/assignments", {
     method: "PUT",
     body: JSON.stringify(body),
   });
 }
 
 export function deleteAssignment(member_id: string, date: string) {
-  return apiJson<{ items: AssignmentCell[] }>(
+  return apiJson<{ items: AssignmentCell[]; member?: JlMemberState }>(
     `/api/v1/assignments${qs({ member_id, date })}`,
     { method: "DELETE" },
   );
@@ -84,7 +91,7 @@ export function putAssignmentRange(body: {
   tag: string;
   trg_tone?: "black" | "red";
 }) {
-  return apiJson<{ updated: number; items: AssignmentCell[] }>(
+  return apiJson<{ updated: number; items: AssignmentCell[]; member?: JlMemberState }>(
     "/api/v1/assignments/range",
     {
       method: "PUT",

@@ -44,13 +44,12 @@ import {
   daysInMonth,
   eachISODate,
   monthDateBounds,
-  monthsCoveringRange,
   todayISO,
 } from "@/lib/date";
 import {
   autoApplyCarryForward,
   clearTag,
-  listByMonth,
+  projectRangeCarry,
   setTag,
   setTagRange,
 } from "@/lib/store/assignments";
@@ -58,7 +57,7 @@ import { listAllTags } from "@/lib/store/rates";
 import {
   applyDueJlInactivations,
   canAssignOnDate,
-  canDailyWriteTag,
+  dailyRosterVisible,
 } from "@/lib/store/daily";
 import { countRegisterTags } from "@/lib/store/register-totals";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
@@ -135,7 +134,7 @@ export default function TagsPageClient() {
     setDateTo(to || from);
   }
 
-  /** Demo only — API computes carry on read. Active members only. */
+  /** Demo only — API computes carry on read. */
   useEffect(() => {
     if (apiOn) return;
     applyDueJlInactivations(today);
@@ -151,14 +150,21 @@ export default function TagsPageClient() {
     autoApplyCarryForward(ids, today);
   }, [apiOn, today, state.users]);
 
-  /** Approved roster — member type + Active / Inactive toggle (default Active). */
+  /** Active members, plus inactive members who already have a tag in this range. */
   const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
+    const dates = eachISODate(dateFrom, dateTo);
+    const tagged = new Set(
+      state.assignments
+        .filter((row) => row.tag && row.date >= dateFrom && row.date <= dateTo)
+        .map((row) => row.user_id),
+    );
     return state.users
       .filter((u) => {
         if (u.approval_status !== "approved") return false;
         if (!isCockpitMember(u)) return false;
-        if (u.status !== memberStatus) return false;
+        if (!dailyRosterVisible(u, dates, tagged.has(u.id), memberStatus))
+          return false;
         if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && !memberMatchesWingFilter(u.wing, wing))
@@ -170,18 +176,24 @@ export default function TagsPageClient() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [state.users, q, rank, wing, memberType, memberStatus]);
+  }, [state.users, state.assignments, q, rank, wing, memberType, memberStatus, dateFrom, dateTo]);
 
   const users = apiOn ? cockpit.users : demoUsers;
 
-  const assignmentMonths = useMemo(
-    () => monthsCoveringRange(dateFrom, dateTo),
+  const visibleDates = useMemo(
+    () => eachISODate(dateFrom, dateTo),
     [dateFrom, dateTo],
   );
 
   const demoAssignments = useMemo(
-    () => assignmentMonths.flatMap((m) => listByMonth(m)),
-    [state.assignments, assignmentMonths],
+    () =>
+      projectRangeCarry(
+        demoUsers,
+        visibleDates,
+        state.assignments,
+        state.suppressed_carries ?? [],
+      ),
+    [demoUsers, visibleDates, state.assignments, state.suppressed_carries],
   );
   const assignments = apiOn ? cockpit.displayAssignments : demoAssignments;
 
@@ -194,11 +206,6 @@ export default function TagsPageClient() {
   }, [users]);
 
   const priorByUser = apiOn ? cockpit.priorByUser : demoPriorByUser;
-
-  const visibleDates = useMemo(
-    () => eachISODate(dateFrom, dateTo),
-    [dateFrom, dateTo],
-  );
 
   const suppressedCarries = apiOn
     ? cockpit.suppressedCarries
@@ -266,7 +273,6 @@ export default function TagsPageClient() {
   ) {
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
-    if (user && !canDailyWriteTag(user, tag)) return;
     if (apiOn) void cockpit.onTagChange(userId, date, tag, trgTone);
     else if (!tag) clearTag(userId, date);
     else setTag(userId, date, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
@@ -280,7 +286,6 @@ export default function TagsPageClient() {
   ) {
     const user = users.find((u) => u.id === userId);
     if (user && dates.every((d) => !canAssignOnDate(user, d))) return;
-    if (user && !canDailyWriteTag(user, tag)) return;
     if (apiOn) void cockpit.onPaintRange(userId, dates, tag, trgTone);
     else setTagRange(userId, dates, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
   }

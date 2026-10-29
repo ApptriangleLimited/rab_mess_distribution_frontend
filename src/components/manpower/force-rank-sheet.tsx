@@ -6,12 +6,14 @@ import { CONSUME_REPORT_META } from "@/lib/constants";
 import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import { formatDateDmy } from "@/lib/date";
 import {
+  forceRankCellKey,
   forceRankCells,
   type ForceRankForceRow,
   type ForceRankReport,
   type ForceRankWingBlock,
 } from "@/lib/force-rank-report";
-import { setForceRankOfficer } from "@/lib/store/org-options";
+import { isManualPresentWing } from "@/lib/manpower-report";
+import { setForceRankCell, setForceRankOfficer } from "@/lib/store/org-options";
 import { cn } from "@/lib/utils";
 
 function countText(n: number) {
@@ -76,6 +78,67 @@ function OfficerCountInput({
   );
 }
 
+function ForceRankCountInput({
+  date,
+  wing,
+  force,
+  colId,
+  index,
+  rank,
+  value,
+  ariaLabel,
+  compact,
+}: {
+  date: string;
+  wing: string;
+  force: string;
+  colId: string;
+  index: number;
+  rank: string;
+  value: number;
+  ariaLabel: string;
+  compact?: boolean;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cellKey = forceRankCellKey(force, colId, index, rank);
+
+  function commit(raw: string) {
+    const digits = asciiDigits(raw);
+    const n = digits === "" ? 0 : Number(digits);
+    if (!Number.isFinite(n) || n < 0) return;
+    setForceRankCell(date, wing, cellKey, Math.floor(n));
+    setDraft(null);
+  }
+
+  return (
+    <Input
+      value={toBnDigits(draft !== null ? draft : String(value))}
+      onChange={(e) => {
+        const digits = asciiDigits(e.target.value);
+        setDraft(digits);
+        if (digits === "") {
+          setForceRankCell(date, wing, cellKey, 0);
+          return;
+        }
+        const n = Number(digits);
+        if (Number.isFinite(n) && n >= 0) {
+          setForceRankCell(date, wing, cellKey, Math.floor(n));
+        }
+      }}
+      onBlur={() => {
+        if (draft !== null) commit(draft);
+        setDraft(null);
+      }}
+      inputMode="numeric"
+      aria-label={ariaLabel}
+      className={cn(
+        "mx-auto h-6 w-full min-w-0 max-w-[2.75rem] rounded-sm border-amber-300 bg-amber-50 px-0.5 text-center font-mono tabular-nums shadow-none dark:border-amber-700 dark:bg-amber-950/40",
+        compact ? "text-[8px]" : "text-[11px]",
+      )}
+    />
+  );
+}
+
 function fallbackWing(report: ForceRankReport): ForceRankWingBlock[] {
   if (report.forces.length) {
     return [
@@ -92,17 +155,22 @@ function fallbackWing(report: ForceRankReport): ForceRankWingBlock[] {
 
 function ForceRankWingTable({
   report,
+  wing,
   forces,
   compact,
   head,
   cell,
+  editable,
 }: {
   report: ForceRankReport;
+  wing: string;
   forces: ForceRankForceRow[];
   compact?: boolean;
   head: string;
   cell: string;
+  editable?: boolean;
 }) {
+  const manual = Boolean(editable && isManualPresentWing(wing));
   return (
     <table className="force-rank-main w-full border-collapse">
       <thead>
@@ -150,7 +218,21 @@ function ForceRankWingTable({
                     colSpan={item.span || 1}
                     className={cn(cell, "tabular-nums")}
                   >
-                    {countText(item.count)}
+                    {manual || (editable && col.id === "dad") ? (
+                      <ForceRankCountInput
+                        date={report.date}
+                        wing={wing}
+                        force={row.force}
+                        colId={col.id}
+                        index={i}
+                        rank={item.rank}
+                        value={item.count}
+                        ariaLabel={`${wing} ${row.labelBn} ${col.labelBn} ${item.labelBn}`}
+                        compact={compact}
+                      />
+                    ) : (
+                      countText(item.count)
+                    )}
                   </td>
                 )),
               )}
@@ -235,10 +317,12 @@ export function ForceRankSheet({
             </h3>
             <ForceRankWingTable
               report={report}
+              wing={block.wing}
               forces={block.forces}
               compact={compact}
               head={head}
               cell={cell}
+              editable={editable}
             />
           </section>
         ),

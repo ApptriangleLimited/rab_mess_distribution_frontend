@@ -9,7 +9,9 @@ import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import {
   ABSENCE_DETAIL_FIELDS,
   formatManpowerCell,
+  isDadCategory,
   isManualPresentWing,
+  isOfficerCategory,
   manpowerRowTotalFor,
   type ManpowerAbsenceRow,
   type ManpowerCounts,
@@ -85,6 +87,7 @@ function MetricRow({
   signed,
   wingCell,
   withWing,
+  officerEdit,
 }: {
   label: ReactNode;
   counts: ManpowerCounts;
@@ -93,6 +96,11 @@ function MetricRow({
   signed?: boolean;
   wingCell?: ReactNode;
   withWing?: boolean;
+  officerEdit?: {
+    date: string;
+    wing: string;
+    kind: "held" | "present" | "absent";
+  };
 }) {
   return (
     <tr
@@ -109,13 +117,36 @@ function MetricRow({
       >
         {label}
       </td>
-      {categories.map((cat) => (
-        <Cell
-          key={cat.id}
-          value={counts[cat.id] ?? 0}
-          signed={signed}
-        />
-      ))}
+      {categories.map((cat) =>
+        officerEdit && (isOfficerCategory(cat) || isDadCategory(cat)) ? (
+          <CountInput
+            key={cat.id}
+            value={counts[cat.id] ?? 0}
+            ariaLabel={`${form1RankLabelBn(cat.label)} ${String(label)} — ${officerEdit.wing}`}
+            onCommit={(n) => {
+              if (officerEdit.kind === "held") {
+                setManpowerHeld(officerEdit.date, officerEdit.wing, cat.id, n);
+              } else if (officerEdit.kind === "present") {
+                setManpowerPresentCount(
+                  officerEdit.date,
+                  officerEdit.wing,
+                  cat.id,
+                  n,
+                );
+              } else {
+                setManpowerAbsentCount(
+                  officerEdit.date,
+                  officerEdit.wing,
+                  cat.id,
+                  n,
+                );
+              }
+            }}
+          />
+        ) : (
+          <Cell key={cat.id} value={counts[cat.id] ?? 0} signed={signed} />
+        ),
+      )}
       <Cell
         value={manpowerRowTotalFor(counts, categories)}
         signed={signed}
@@ -282,6 +313,11 @@ function BlockRows({
           emphasize={emphasize}
           signed={signed}
           withWing={withWing}
+          officerEdit={
+            editable && !emphasize
+              ? { date, wing, kind }
+              : undefined
+          }
         />
       );
     }

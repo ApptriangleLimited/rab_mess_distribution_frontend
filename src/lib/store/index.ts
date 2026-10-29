@@ -127,7 +127,8 @@ export function applyApiSnapshot(partial: Partial<AppState>) {
         key === "manpower_absent" ||
         key === "manpower_present" ||
         key === "manpower_absence_detail" ||
-        key === "force_rank_officer") &&
+        key === "force_rank_officer" ||
+        key === "force_rank_cells") &&
       value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
@@ -1881,6 +1882,13 @@ export function getState(): AppState {
   ) {
     seeded.force_rank_officer = fromDisk.force_rank_officer;
   }
+  if (
+    fromDisk &&
+    fromDisk.force_rank_cells &&
+    typeof fromDisk.force_rank_cells === "object"
+  ) {
+    seeded.force_rank_cells = fromDisk.force_rank_cells;
+  }
   catalogHealed = true;
   memory = seeded;
   writeStorage(seeded);
@@ -2199,6 +2207,9 @@ function normalizeState(state: AppState): AppState {
     force_rank_officer: ensureForceRankOfficer(
       (state as AppState & { force_rank_officer?: unknown }).force_rank_officer,
     ),
+    force_rank_cells: ensureDayWingCatMap(
+      (state as AppState & { force_rank_cells?: unknown }).force_rank_cells,
+    ),
     senders: (() => {
       const raw = (state.senders ?? []).map((s) => ({
         ...s,
@@ -2294,6 +2305,7 @@ const EMPTY_SERVER_SNAPSHOT: AppState = {
   manpower_present: {},
   manpower_absence_detail: {},
   force_rank_officer: {},
+  force_rank_cells: {},
   approved_dates: [],
   suppressed_carries: [],
   boro_khana_dates: [],

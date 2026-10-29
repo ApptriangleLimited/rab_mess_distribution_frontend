@@ -55,6 +55,7 @@ const CATALOG_KEYS = [
   "manpower_present",
   "manpower_absence_detail",
   "force_rank_officer",
+  "force_rank_cells",
   "paper_report_requests",
 ] as const;
 

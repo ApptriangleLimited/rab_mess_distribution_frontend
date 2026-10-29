@@ -53,14 +53,9 @@ import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import {
   canAssignOnDate,
-  canDailyWriteTag,
-  dailyRrAllowedTags,
   isBeforeJoin,
-  isJlTag,
-  isMfrLocked,
   isUserInactiveOnDate,
   rosterStart,
-  MFR_TAG,
 } from "@/lib/store/daily";
 import { setBoroKhana } from "@/lib/store/boro-khana";
 import { getProjectedTagMembers } from "@/lib/store/mess";
@@ -509,6 +504,7 @@ export function RegisterBoard({
       queue,
       trg_tone,
       trg_sarda,
+      skipMfrLock: true,
     });
     if (row) {
       toast(
@@ -532,8 +528,6 @@ export function RegisterBoard({
         (!user || canAssignOnDate(user, date)),
     );
     if (dates.length === 0) return;
-    if (user && !canDailyWriteTag(user, tag)) return;
-    if (user && isMfrLocked(user) && !tag) return;
     const fromDate = dates[0]!;
     const toDate = dates[dates.length - 1]!;
     if (isTrgTag(tag) && user && needsTrgPrompt(user.force)) {
@@ -589,11 +583,6 @@ export function RegisterBoard({
       ? `${formatDateDisplay(rangeMenu.fromDate)} → ${formatDateDisplay(rangeMenu.toDate)}`
       : formatDateDisplay(rangeMenu.fromDate)
     : "";
-  const rangeUser = rangeMenu
-    ? users.find((u) => u.id === rangeMenu.userId)
-    : undefined;
-  const rangeMfrLocked = Boolean(rangeUser && isMfrLocked(rangeUser));
-
   const resetKey = useMemo(
     () =>
       `${month}|${dateFrom}|${dateTo}|${users.map((u) => u.id).join("|")}`,
@@ -829,11 +818,6 @@ export function RegisterBoard({
                   const inactiveOnDate = isUserInactiveOnDate(user, date);
                   const afterOut =
                     !beforeJoin && !canAssignOnDate(user, date);
-                  const mfrLocked =
-                    isMfrLocked(user) &&
-                    !inactiveOnDate &&
-                    !afterOut &&
-                    !beforeJoin;
                   if (beforeJoin) {
                     rowMeta.push({
                       date,
@@ -848,29 +832,16 @@ export function RegisterBoard({
                     continue;
                   }
                   if (inactiveOnDate) {
+                    const painted = byUserDate.get(`${user.id}|${date}`)?.tag;
                     rowMeta.push({
                       date,
-                      stored: undefined,
+                      stored: painted,
                       ghost: undefined,
                       afterOut: true,
                       beforeJoin: false,
                       joiningDay: false,
                       inactiveOnDate: true,
                       mfrLocked: false,
-                    });
-                    continue;
-                  }
-                  if (mfrLocked) {
-                    const painted = byUserDate.get(`${user.id}|${date}`)?.tag;
-                    rowMeta.push({
-                      date,
-                      stored: isJlTag(painted) ? painted : MFR_TAG,
-                      ghost: undefined,
-                      afterOut: false,
-                      beforeJoin: false,
-                      joiningDay,
-                      inactiveOnDate: false,
-                      mfrLocked: true,
                     });
                     continue;
                   }
@@ -1205,8 +1176,8 @@ export function RegisterBoard({
               ghost={Boolean(rangeMenu.ghostTag)}
               tag={rangeMenu.storedTag ?? rangeMenu.ghostTag}
               locale={locale}
-              allowedTags={dailyRrAllowedTags(rangeMfrLocked, listAllTags())}
-              allowClear={!rangeMfrLocked}
+              allowedTags={listAllTags()}
+              allowClear
               fromDate={rangeMenu.fromDate}
               toDate={rangeMenu.toDate}
               minDate={dailyEditMinDate(todayISO)}

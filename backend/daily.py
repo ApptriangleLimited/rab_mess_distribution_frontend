@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -98,6 +98,7 @@ def is_before_join(member: Member, day: date) -> bool:
 
 
 def is_inactive_on(member: Member, day: date) -> bool:
+    active = member.status == "1"
     for span in member.inactive_spans or []:
         if not isinstance(span, dict) or not span.get("from"):
             continue
@@ -108,13 +109,17 @@ def is_inactive_on(member: Member, day: date) -> bool:
         if day < span_from:
             continue
         raw_to = span.get("to")
-        if raw_to:
-            try:
-                end = date.fromisoformat(str(raw_to)[:10])
-            except ValueError:
+        if not raw_to:
+            # Open span means still inactive. An Active member must not keep it.
+            if active:
                 continue
-            if day > end:
-                continue
+            return True
+        try:
+            end = date.fromisoformat(str(raw_to)[:10])
+        except ValueError:
+            continue
+        if day > end:
+            continue
         return True
     jl_end = (member.jl_end_date or "").strip()
     if jl_end:
@@ -126,6 +131,171 @@ def is_inactive_on(member: Member, day: date) -> bool:
     if member.status != "1" and not (member.inactive_spans or []):
         return True
     return False
+
+
+def _span_covers(spans, day: date) -> bool:
+    for span in spans or []:
+        if not isinstance(span, dict) or not span.get("from"):
+            continue
+        try:
+            start = date.fromisoformat(str(span["from"])[:10])
+        except ValueError:
+            continue
+        if day < start:
+            continue
+        raw_to = span.get("to")
+        if not raw_to:
+            return True
+        try:
+            end = date.fromisoformat(str(raw_to)[:10])
+        except ValueError:
+            continue
+        if day <= end:
+            return True
+    return False
+
+
+def _ensure_open_inactive(member: Member, start: date) -> None:
+    spans = [span for span in (member.inactive_spans or []) if isinstance(span, dict)]
+    if any(not span.get("to") for span in spans):
+        return
+    spans.append({"from": start.isoformat(), "to": None})
+    member.inactive_spans = spans
+
+
+def _clear_tags_after(db: Session, member_id: str, last: date) -> int:
+    removed = (
+        db.query(Assignment)
+        .filter(Assignment.user_id == member_id, Assignment.date > last)
+        .delete(synchronize_session=False)
+    )
+    removed += (
+        db.query(SuppressedCarry)
+        .filter(SuppressedCarry.user_id == member_id, SuppressedCarry.date > last)
+        .delete(synchronize_session=False)
+    )
+    return int(removed or 0)
+
+
+def sync_member_after_jl(
+    db: Session,
+    member: Member,
+    last: date | None,
+    today: date | None = None,
+) -> bool:
+    """After the last JL day, later cells stay empty. Once that day has passed, the member is inactive."""
+    today = today or date.today()
+    if last is None:
+        if (member.jl_end_date or "").strip():
+            member.jl_end_date = ""
+            member.updated_at = utcnow()
+            return True
+        return False
+    if today > last:
+        start = last + timedelta(days=1)
+        # Already inactive, or turned active again after this JL block.
+        if member.status == "0" and not (member.jl_end_date or "").strip():
+            return False
+        if member.status == "1" and _span_covers(member.inactive_spans, start):
+            if (member.jl_end_date or "").strip():
+                member.jl_end_date = ""
+                member.updated_at = utcnow()
+                return True
+            return False
+        member.status = "0"
+        member.jl_end_date = ""
+        _ensure_open_inactive(member, start)
+        _clear_tags_after(db, member.id, last)
+        member.updated_at = utcnow()
+        return True
+    iso = last.isoformat()
+    changed = (member.jl_end_date or "") != iso
+    if changed:
+        member.jl_end_date = iso
+        member.updated_at = utcnow()
+    removed = _clear_tags_after(db, member.id, last)
+    return changed or removed > 0
+
+
+def sync_member_jl(db: Session, member: Member) -> bool:
+    db.flush()
+    last = (
+        db.query(func.max(Assignment.date))
+        .filter(Assignment.user_id == member.id, func.upper(Assignment.tag) == "JL")
+        .scalar()
+    )
+    return sync_member_after_jl(db, member, last)
+
+
+def sync_due_jl(db: Session) -> bool:
+    """Heal members whose JL has already ended but who are still carrying MS."""
+    pairs = (
+        db.query(Assignment.user_id, func.max(Assignment.date))
+        .filter(func.upper(Assignment.tag) == "JL")
+        .group_by(Assignment.user_id)
+        .all()
+    )
+    changed = False
+    today = date.today()
+    if pairs:
+        ids = [user_id for user_id, _last in pairs]
+        members = {
+            row.id: row
+            for row in db.query(Member).filter(Member.id.in_(ids)).all()
+        }
+        for user_id, last in pairs:
+            member = members.get(user_id)
+            if member is None:
+                continue
+            if sync_member_after_jl(db, member, last, today):
+                changed = True
+    leftovers = (
+        db.query(Member)
+        .filter(Member.jl_end_date != "")
+        .all()
+    )
+    seen = {user_id for user_id, _last in pairs}
+    for member in leftovers:
+        if member.id in seen:
+            continue
+        if sync_member_after_jl(db, member, None, today):
+            changed = True
+    return changed
+
+
+def member_jl_state(member: Member) -> dict:
+    return {
+        "id": member.id,
+        "status": member.status if member.status in ("0", "1") else "1",
+        "jl_end_date": member.jl_end_date or "",
+        "inactive_spans": member.inactive_spans or [],
+    }
+
+
+def empty_cells_after(member_id: str, last: date | None) -> list[dict]:
+    if last is None:
+        return []
+    start = last + timedelta(days=1)
+    anchors = [last, date.today()]
+    end = start
+    for anchor in anchors:
+        if anchor.month == 12:
+            month_end = date(anchor.year, 12, 31)
+        else:
+            month_end = date(anchor.year, anchor.month + 1, 1) - timedelta(days=1)
+        if month_end > end:
+            end = month_end
+    if start > end:
+        return []
+    return [
+        {
+            "member_id": member_id,
+            "date": day.isoformat(),
+            "tag": None,
+            "source": "empty",
+        }
+        for day in each_date(start, end)
+    ]
 
 
 def can_assign(member: Member, day: date) -> bool:
@@ -145,16 +315,12 @@ def is_mfr_locked(member: Member) -> bool:
 
 
 def can_write_tag(member: Member, day: date, tag: str) -> bool:
-    if not can_assign(member, day):
-        return False
-    if tag == "MFR" and not is_mfr_locked(member):
-        return False
-    if is_mfr_locked(member) and tag and tag not in ("MFR", "JL"):
-        return False
-    return True
+    """Daily RR paints any tag, including MFR and FR. Other menus keep their own rules."""
+    return can_assign(member, day)
 
 
 def apply_mfr_default(member: Member, tag: str) -> None:
+    """Profile/default-tag helper. Daily RR writes must not call this."""
     if tag == "JL" and is_mfr_locked(member):
         member.default_tag = "JL"
 
@@ -199,6 +365,9 @@ def project_cell(
     day: date,
     stored: Assignment | None,
     suppressed: set[tuple[str, date]],
+    carry_tag: str | None = None,
+    carry_tone: str | None = None,
+    mfr_lock: bool = True,
 ) -> dict:
     key = (member.id, day)
     if stored:
@@ -225,21 +394,27 @@ def project_cell(
             "tag": None,
             "source": "empty",
         }
-    if is_mfr_locked(member):
+    if mfr_lock and is_mfr_locked(member):
         return {
             "member_id": member.id,
             "date": day.isoformat(),
             "tag": "MFR",
             "source": "carry",
         }
-    default = (member.default_tag or "").upper()
-    if default:
-        return {
+    # Last painted tag continues across the month boundary. default_tag
+    # fills only when nothing has been painted yet.
+    tag = (carry_tag or member.default_tag or "").upper()
+    if tag:
+        tone = carry_tone if tag == "TRG" and carry_tag else None
+        cell = {
             "member_id": member.id,
             "date": day.isoformat(),
-            "tag": default,
+            "tag": tag,
             "source": "carry",
         }
+        if tone in ("black", "red"):
+            cell["trg_tone"] = tone
+        return cell
     return {
         "member_id": member.id,
         "date": day.isoformat(),
@@ -313,16 +488,65 @@ def load_window(
     return members, stored_map, suppressed
 
 
+def prior_tags_before(
+    db: Session,
+    ids: list[str],
+    before: date,
+) -> dict[str, Assignment]:
+    """Latest stored tag strictly before `before`, so a new month keeps the previous tag."""
+    if not ids:
+        return {}
+    latest = (
+        db.query(
+            Assignment.user_id.label("user_id"),
+            func.max(Assignment.date).label("max_date"),
+        )
+        .filter(Assignment.user_id.in_(ids), Assignment.date < before)
+        .group_by(Assignment.user_id)
+        .subquery()
+    )
+    rows = (
+        db.query(Assignment)
+        .join(
+            latest,
+            and_(
+                Assignment.user_id == latest.c.user_id,
+                Assignment.date == latest.c.max_date,
+            ),
+        )
+        .all()
+    )
+    return {row.user_id: row for row in rows}
+
+
 def cells_for_member(
     member: Member,
     days: list[date],
     stored_map: dict,
     suppressed: set[tuple[str, date]],
+    prior: Assignment | None = None,
+    mfr_lock: bool = True,
 ) -> list[dict]:
-    return [
-        project_cell(member, day, stored_map.get((member.id, day)), suppressed)
-        for day in days
-    ]
+    running = (prior.tag or "").upper() if prior and prior.tag else None
+    tone = prior.trg_tone if prior else None
+    cells: list[dict] = []
+    for day in days:
+        stored = stored_map.get((member.id, day))
+        cells.append(
+            project_cell(
+                member,
+                day,
+                stored,
+                suppressed,
+                carry_tag=running,
+                carry_tone=tone,
+                mfr_lock=mfr_lock,
+            )
+        )
+        if stored is not None and stored.tag:
+            running = (stored.tag or "").upper()
+            tone = stored.trg_tone
+    return cells
 
 
 def unlock_date(db: Session, day: date) -> None:
@@ -437,7 +661,6 @@ def upsert_assignment(
         db.add(row)
     set_suppressed(db, member.id, day, False)
     unlock_date(db, day)
-    apply_mfr_default(member, tag)
     member.updated_at = now
     return row
 
@@ -486,16 +709,31 @@ def list_assignments(
         wing_family=wing_family,
         q=q,
     )
-    cached = cache_get(key)
-    if cached is not None:
-        return envelope(cached)
+    if sync_due_jl(db):
+        db.commit()
+        bust_daily()
+        bust_members()
+    else:
+        cached = cache_get(key)
+        if cached is not None:
+            return envelope(cached)
     members, stored_map, suppressed = load_window(
         db, start, end, q, rank, wing, member_id, wing_family
     )
+    priors = prior_tags_before(db, [member.id for member in members], start)
     days = list(each_date(start, end))
     items = []
     for member in members:
-        items.extend(cells_for_member(member, days, stored_map, suppressed))
+        items.extend(
+            cells_for_member(
+                member,
+                days,
+                stored_map,
+                suppressed,
+                priors.get(member.id),
+                mfr_lock=False,
+            )
+        )
     data = {"items": items, "from": start.isoformat(), "to": end.isoformat()}
     cache_set(key, data)
     summary_key = cache_key(
@@ -580,10 +818,15 @@ def assignment_summary(
     members, stored_map, suppressed = load_window(
         db, start, end, q, rank, wing, member_id, wing_family
     )
+    priors = prior_tags_before(db, [member.id for member in members], start)
     days = list(each_date(start, end))
     items = []
     for member in members:
-        items.extend(cells_for_member(member, days, stored_map, suppressed))
+        items.extend(
+            cells_for_member(
+                member, days, stored_map, suppressed, priors.get(member.id)
+            )
+        )
     data = _summary_from_items(items, start, end, len(members))
     cache_set(key, data)
     return envelope(data)
@@ -608,22 +851,35 @@ def put_assignment(
     if not can_write_tag(member, day, tag):
         raise HTTPException(status_code=409, detail="Cannot assign tag on this date")
     row = upsert_assignment(db, member, day, tag, staff, body.trg_tone)
+    sync_member_jl(db, member)
+    last_jl = (
+        db.query(func.max(Assignment.date))
+        .filter(Assignment.user_id == member.id, func.upper(Assignment.tag) == "JL")
+        .scalar()
+    )
+    painted = {
+        "member_id": row.user_id,
+        "date": row.date.isoformat(),
+        "tag": row.tag,
+        "source": "stored",
+        "trg_tone": row.trg_tone,
+        "updated_at": row.updated_at.isoformat(),
+        "updated_by": row.updated_by,
+    }
+    kept = [] if last_jl is not None and row.date > last_jl else [painted]
     db.commit()
-    db.refresh(row)
+    db.refresh(member)
+    if kept:
+        db.refresh(row)
     bust_daily()
+    bust_members()
     return envelope(
         {
             "items": [
-                {
-                    "member_id": row.user_id,
-                    "date": row.date.isoformat(),
-                    "tag": row.tag,
-                    "source": "stored",
-                    "trg_tone": row.trg_tone,
-                    "updated_at": row.updated_at.isoformat(),
-                    "updated_by": row.updated_by,
-                }
-            ]
+                *kept,
+                *empty_cells_after(member.id, last_jl),
+            ],
+            "member": member_jl_state(member),
         },
         "Tag updated",
     )
@@ -642,8 +898,6 @@ def delete_assignment(
     target = parse_day(day)
     if not daily_day_writable(target):
         raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
-    if is_mfr_locked(member):
-        raise HTTPException(status_code=409, detail="Cannot clear an MFR-locked member")
     if not can_assign(member, target):
         raise HTTPException(status_code=409, detail="Cannot clear tag on this date")
     freeze_prior_tags(db, member, target, staff)
@@ -653,8 +907,16 @@ def delete_assignment(
     set_suppressed(db, member_id, target, True)
     unlock_date(db, target)
     member.updated_at = utcnow()
+    sync_member_jl(db, member)
     db.commit()
+    db.refresh(member)
     bust_daily()
+    bust_members()
+    last_jl = (
+        db.query(func.max(Assignment.date))
+        .filter(Assignment.user_id == member.id, func.upper(Assignment.tag) == "JL")
+        .scalar()
+    )
     return envelope(
         {
             "items": [
@@ -663,8 +925,10 @@ def delete_assignment(
                     "date": target.isoformat(),
                     "tag": None,
                     "source": "suppressed",
-                }
-            ]
+                },
+                *empty_cells_after(member.id, last_jl),
+            ],
+            "member": member_jl_state(member),
         },
         "Tag cleared",
     )
@@ -711,7 +975,7 @@ def put_assignment_range(
             )
             updated += 1
         else:
-            if is_mfr_locked(member) or not can_assign(member, day):
+            if not can_assign(member, day):
                 continue
             db.query(Assignment).filter(
                 Assignment.user_id == member.id, Assignment.date == day
@@ -728,6 +992,16 @@ def put_assignment_range(
             )
             updated += 1
     member.updated_at = utcnow()
+    sync_member_jl(db, member)
+    last_jl = (
+        db.query(func.max(Assignment.date))
+        .filter(Assignment.user_id == member.id, func.upper(Assignment.tag) == "JL")
+        .scalar()
+    )
+    if last_jl is not None:
+        cutoff = last_jl.isoformat()
+        items = [item for item in items if str(item.get("date") or "") <= cutoff]
+    items.extend(empty_cells_after(member.id, last_jl))
     try:
         db.commit()
     except IntegrityError as exc:
@@ -736,8 +1010,13 @@ def put_assignment_range(
             status_code=409,
             detail="Could not save this tag range",
         ) from exc
+    db.refresh(member)
     bust_daily()
-    return envelope({"updated": updated, "items": items}, "Range updated")
+    bust_members()
+    return envelope(
+        {"updated": updated, "items": items, "member": member_jl_state(member)},
+        "Range updated",
+    )
 
 
 @router.post("/api/v1/days/{day}/approve")
@@ -747,6 +1026,10 @@ def approve_day(
     db: Session = Depends(get_db),
 ):
     target = parse_day(day)
+    if sync_due_jl(db):
+        db.commit()
+        bust_daily()
+        bust_members()
     members = [
         m
         for m in db.query(Member).all()

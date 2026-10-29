@@ -69,6 +69,7 @@ function MetricRow({
   wingCell,
   withWing,
   bn,
+  officerEdit,
 }: {
   label: string;
   counts: StrengthCounts;
@@ -77,6 +78,11 @@ function MetricRow({
   wingCell?: ReactNode;
   withWing?: boolean;
   bn?: boolean;
+  officerEdit?: {
+    date: string;
+    wing: string;
+    kind: "held" | "present" | "absent";
+  };
 }) {
   return (
     <tr
@@ -93,16 +99,43 @@ function MetricRow({
       >
         {label}
       </td>
-      {STRENGTH_CATEGORIES.map((cat) => (
-        <CountCell
-          key={cat.id}
-          value={counts[cat.id] ?? 0}
-          blank={blankOfficer && cat.id === "officer"}
-          bn={bn}
-        />
-      ))}
+      {STRENGTH_CATEGORIES.map((cat) =>
+        officerEdit && (cat.id === "officer" || cat.id === "dad") ? (
+          <CountInput
+            key={cat.id}
+            value={counts[cat.id] ?? 0}
+            ariaLabel={`${cat.labelBn} ${label} — ${officerEdit.wing}`}
+            onCommit={(n) => {
+              if (officerEdit.kind === "held") {
+                setManpowerHeld(officerEdit.date, officerEdit.wing, cat.id, n);
+              } else if (officerEdit.kind === "present") {
+                setManpowerPresentCount(
+                  officerEdit.date,
+                  officerEdit.wing,
+                  cat.id,
+                  n,
+                );
+              } else {
+                setManpowerAbsentCount(
+                  officerEdit.date,
+                  officerEdit.wing,
+                  cat.id,
+                  n,
+                );
+              }
+            }}
+          />
+        ) : (
+          <CountCell
+            key={cat.id}
+            value={counts[cat.id] ?? 0}
+            blank={blankOfficer && cat.id === "officer"}
+            bn={bn}
+          />
+        ),
+      )}
       <td className="border border-neutral-200 px-2 py-1.5 text-center text-sm font-semibold tabular-nums dark:border-neutral-700">
-        {formatCount(strengthMetricTotal(counts, !!blankOfficer), bn)}
+        {formatCount(strengthMetricTotal(counts, !!blankOfficer && !officerEdit), bn)}
       </td>
     </tr>
   );
@@ -241,6 +274,11 @@ function BranchRows({
           withWing
           wingCell={wingCellNode}
           bn={bn}
+          officerEdit={
+            editableOfficer
+              ? { date, wing: block.wing, kind }
+              : undefined
+          }
         />
       );
     }

@@ -415,6 +415,11 @@ export interface AppState {
   manpower_absence_detail: Record<string, Record<string, Record<string, number>>>;
   /** Form 4 অফিসার প্রাপ্ত/মোট (`YYYY-MM-DD` → held/total). */
   force_rank_officer: Record<string, { held: number; total: number }>;
+  /**
+   * Form 4 count overrides for Air Wg / Training School
+   * (`YYYY-MM-DD` → wing → cell key → count). Missing key = roster count.
+   */
+  force_rank_cells: Record<string, Record<string, Record<string, number>>>;
   /** ISO dates Daily has confirmed (carry + edits locked as approved). */
   approved_dates: string[];
   /** `${userId}|${date}` — hide carry ghost until Approve restores or new tag set. */

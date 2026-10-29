@@ -27,10 +27,9 @@ import {
 import { wingPrintOrder } from "@/lib/daily-register-wings";
 import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
-import {
-  buildDailyRegisterDates,
-  buildDailyRegisterFromCells,
-} from "@/lib/reports";
+import { buildDailyRegisterFromCells } from "@/lib/reports";
+import { projectRangeCarry } from "@/lib/store/assignments";
+import { dailyRosterVisible } from "@/lib/store/daily";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import type { MemberType, UserStatus } from "@/lib/types";
@@ -75,14 +74,21 @@ export default function DailyRegisterPrintClient() {
     status: memberStatus,
   });
 
-  /** Approved roster — honor member type + Active / Inactive toggle. */
+  /** Active members, plus inactive members who already have a tag in this range. */
   const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
+    const dates = eachISODate(loadFrom, loadTo);
+    const tagged = new Set(
+      state.assignments
+        .filter((row) => row.tag && row.date >= loadFrom && row.date <= loadTo)
+        .map((row) => row.user_id),
+    );
     return state.users
       .filter((u) => {
         if (u.approval_status !== "approved") return false;
         if (!isCockpitMember(u)) return false;
-        if (u.status !== memberStatus) return false;
+        if (!dailyRosterVisible(u, dates, tagged.has(u.id), memberStatus))
+          return false;
         if (memberType !== "all" && u.member_type !== memberType) return false;
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && !memberMatchesWingFilter(u.wing, wing))
@@ -94,7 +100,17 @@ export default function DailyRegisterPrintClient() {
           .includes(query);
       })
       .sort(compareUsers);
-  }, [state.users, q, rank, wing, memberType, memberStatus]);
+  }, [
+    state.users,
+    state.assignments,
+    q,
+    rank,
+    wing,
+    memberType,
+    memberStatus,
+    loadFrom,
+    loadTo,
+  ]);
 
   const users = apiOn ? cockpit.users : demoUsers;
   const loading = apiOn && cockpit.loading;
@@ -119,8 +135,31 @@ export default function DailyRegisterPrintClient() {
     if (apiOn) {
       return buildDailyRegisterFromCells(columnDates, users, cockpit.cells).rows;
     }
-    return buildDailyRegisterDates(columnDates, users).rows;
-  }, [apiOn, columnDates, users, cockpit.cells, state.assignments]);
+    const projected = projectRangeCarry(
+      users,
+      columnDates,
+      state.assignments,
+      state.suppressed_carries ?? [],
+    );
+    return buildDailyRegisterFromCells(
+      columnDates,
+      users,
+      projected.map((row) => ({
+        member_id: row.user_id,
+        date: row.date,
+        tag: row.tag,
+        source: row.id.startsWith("carry|") ? "carry" : "stored",
+        trg_tone: row.trg_tone,
+      })),
+    ).rows;
+  }, [
+    apiOn,
+    columnDates,
+    users,
+    cockpit.cells,
+    state.assignments,
+    state.suppressed_carries,
+  ]);
 
   const backHref = useMemo(() => {
     const params = new URLSearchParams();

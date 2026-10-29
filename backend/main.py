@@ -45,6 +45,8 @@ from daily import (
     daily_day_writable,
     each_date,
     router as daily_router,
+    sync_due_jl,
+    sync_member_jl,
     upsert_assignment,
 )
 from wings import wing_family_names
@@ -607,6 +609,9 @@ def list_members(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
+    if sync_due_jl(db):
+        db.commit()
+        bust_members()
     query = db.query(Member)
     if q and q.strip():
         like = f"%{q.strip()}%"
@@ -741,6 +746,14 @@ def update_member(
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     apply_member_fields(row, body)
     if body.status in ("0", "1"):
+        if body.status != row.status or (
+            body.status == "1"
+            and any(
+                isinstance(span, dict) and not span.get("to")
+                for span in (row.inactive_spans or [])
+            )
+        ):
+            apply_status_spans(row, body.status)
         row.status = body.status
     if body.approval_status:
         row.approval_status = normalize_approval(body.approval_status, row.approval_status)
@@ -1152,6 +1165,8 @@ def accept_tag_request(
         wrote += 1
     if wrote == 0:
         raise HTTPException(status_code=409, detail="No assignable days in this request")
+    if (row.to_tag or "").upper() == "JL":
+        sync_member_jl(db, row.member)
     db.commit()
     db.refresh(row)
     bust_tag_requests()

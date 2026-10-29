@@ -2036,6 +2036,29 @@ export function setManpowerOfficerAbsent(
   return true;
 }
 
+/** Form 4 — one Air Wg / Training School count cell on a date. */
+export function setForceRankCell(
+  date: string,
+  wing: string,
+  cellKey: string,
+  count: number,
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !cellKey.trim()) return false;
+  const wingLabel = canonicalWingName(normalizeLabel(wing));
+  if (!wingLabel || BANNED_WINGS.has(wingLabel.toLowerCase())) return false;
+  setState((prev) => ({
+    ...prev,
+    force_rank_cells: setDayWingCat(
+      prev.force_rank_cells ?? {},
+      date,
+      wingLabel,
+      cellKey,
+      count,
+    ),
+  }));
+  return true;
+}
+
 export function setForceRankOfficer(
   date: string,
   field: "held" | "total",

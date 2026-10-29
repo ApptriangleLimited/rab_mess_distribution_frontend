@@ -83,10 +83,16 @@ export function isUserInactiveOnDate(
   date: string,
 ): boolean {
   const spans = user.inactive_spans ?? [];
+  const active = user.status === "1";
   for (const span of spans) {
     if (!span?.from) continue;
     if (date < span.from) continue;
-    if (span.to && date > span.to) continue;
+    // An open span means "still inactive". Ignore it when the member is Active.
+    if (!span.to) {
+      if (active) continue;
+      return true;
+    }
+    if (date > span.to) continue;
     return true;
   }
   const jlEnd = (user.jl_end_date ?? "").trim();
@@ -97,6 +103,36 @@ export function isUserInactiveOnDate(
     return spans.length === 0;
   }
   return false;
+}
+
+/** Every day in the range is before join, inactive, or after out. */
+export function isRangeFullyBlocked(
+  user: Parameters<typeof canAssignOnDate>[0],
+  dates: readonly string[],
+): boolean {
+  if (!dates.length) return user.status !== "1";
+  return dates.every((date) => !canAssignOnDate(user, date));
+}
+
+/**
+ * Daily RR roster for a month.
+ * Active (assignable on any day) members always stay.
+ * A member who is inactive for the whole range stays only when that range
+ * already has a tag for them.
+ * `statusFilter` "0" is the Inactive switch: only those tagged inactive rows.
+ */
+export function dailyRosterVisible(
+  user: Parameters<typeof canAssignOnDate>[0],
+  dates: readonly string[],
+  hasTag: boolean,
+  statusFilter: "0" | "1" = "1",
+): boolean {
+  const blocked = isRangeFullyBlocked(user, dates);
+  if (statusFilter === "0") {
+    return (user.status === "0" || blocked) && hasTag;
+  }
+  if (!blocked) return true;
+  return hasTag;
 }
 
 /**

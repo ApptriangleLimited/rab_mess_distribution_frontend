@@ -2,13 +2,9 @@ import { eachISODate, isDailyDateEditable, nowISO, todayISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import {
   canAssignOnDate,
-  canDailyWriteTag,
-  isJlTag,
-  isMfrLocked,
   isUserInactiveOnDate,
   rosterStart,
   syncUsersAfterJl,
-  JL_TAG,
 } from "@/lib/store/daily";
 import { isCockpitMember } from "@/lib/store/users";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
@@ -52,7 +48,7 @@ function canWriteTag(
   if (!isDailyDateEditable(date)) return false;
   const user = findUser(userId);
   if (!user || !isCockpitMember(user) || !canAssignOnDate(user, date)) return false;
-  return canDailyWriteTag(user, tag);
+  return true;
 }
 
 /** Persist default_tag on empty days before `before` so a new paint cannot rewrite them. */
@@ -133,20 +129,6 @@ function withJlSync(
   };
 }
 
-function applyMfrDefaultTag(
-  users: User[],
-  userIds: string[],
-  tag: DailyTag | "",
-): User[] {
-  const ids = new Set(userIds);
-  if (isJlTag(tag)) {
-    return users.map((u) =>
-      ids.has(u.id) && isMfrLocked(u) ? { ...u, default_tag: JL_TAG } : u,
-    );
-  }
-  return users;
-}
-
 export function getAssignmentsByDate(date: string) {
   return getState().assignments.filter((a) => a.date === date);
 }
@@ -193,11 +175,7 @@ export function setTag(
       const assignments = frozen.map((a) =>
         a.id === existing.id ? updated : a,
       );
-      const synced = withJlSync(
-        applyMfrDefaultTag(prev.users, [userId], tag),
-        assignments,
-        [userId],
-      );
+      const synced = withJlSync(prev.users, assignments, [userId]);
       return {
         ...prev,
         ...synced,
@@ -223,11 +201,7 @@ export function setTag(
       ...freezePriorTags(prev.assignments, prev.users, userId, date, updatedBy),
       created,
     ];
-    const synced = withJlSync(
-      applyMfrDefaultTag(prev.users, [userId], tag),
-      assignments,
-      [userId],
-    );
+    const synced = withJlSync(prev.users, assignments, [userId]);
     return {
       ...prev,
       ...synced,
@@ -280,11 +254,7 @@ export function setTagBulk(
         next.push(row);
       }
     }
-    const synced = withJlSync(
-      applyMfrDefaultTag(prev.users, eligible, tag),
-      next,
-      eligible,
-    );
+    const synced = withJlSync(prev.users, next, eligible);
     return {
       ...prev,
       ...synced,
@@ -366,11 +336,7 @@ export function setTagRange(
         suppressed = withCarry(suppressed, userId, date);
       }
     }
-    const synced = withJlSync(
-      applyMfrDefaultTag(prev.users, [userId], tag),
-      next,
-      [userId],
-    );
+    const synced = withJlSync(prev.users, next, [userId]);
     return {
       ...prev,
       ...synced,
@@ -424,6 +390,64 @@ export function markDateApproved(date: string) {
     if (cur.includes(date)) return prev;
     return { ...prev, approved_dates: [...cur, date] };
   });
+}
+
+/**
+ * Tags for a Daily RR range.
+ * A painted tag continues through later empty days, including into the next
+ * month, until another saved tag. Inactive days keep only a saved tag.
+ */
+export function projectRangeCarry(
+  users: User[],
+  dates: string[],
+  assignments: DailyAssignment[],
+  suppressed: readonly string[] = [],
+): DailyAssignment[] {
+  if (!dates.length || !users.length) return [];
+  const start = dates[0];
+  const byKey = new Map<string, DailyAssignment>();
+  const prior = new Map<string, DailyAssignment>();
+  for (const row of assignments) {
+    if (!row.tag) continue;
+    if (row.date < start) {
+      const current = prior.get(row.user_id);
+      if (!current || row.date > current.date) prior.set(row.user_id, row);
+      continue;
+    }
+    byKey.set(`${row.user_id}|${row.date}`, row);
+  }
+  const suppressedSet = new Set(suppressed);
+  const out: DailyAssignment[] = [];
+  for (const user of users) {
+    let running: DailyTag | null = prior.get(user.id)?.tag ?? null;
+    let tone = prior.get(user.id)?.trg_tone;
+    for (const date of dates) {
+      const stored = byKey.get(`${user.id}|${date}`);
+      if (stored?.tag) {
+        out.push(stored);
+        running = stored.tag;
+        tone = stored.trg_tone;
+        continue;
+      }
+      if (suppressedSet.has(`${user.id}|${date}`)) continue;
+      if (!canAssignOnDate(user, date)) continue;
+      const tag: DailyTag | null = running || user.default_tag || null;
+      if (!tag) continue;
+      const row: DailyAssignment = {
+        id: `carry|${user.id}|${date}`,
+        user_id: user.id,
+        date,
+        tag,
+        updated_by: "carry",
+        updated_at: "",
+      };
+      if (tag === "TRG" && (tone === "black" || tone === "red")) {
+        row.trg_tone = tone;
+      }
+      out.push(row);
+    }
+  }
+  return out;
 }
 
 /** Empty-cell projection: member `default_tag` (not last painted tag). */

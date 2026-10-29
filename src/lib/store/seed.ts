@@ -749,6 +749,7 @@ export function createSeedState(): AppState {
     manpower_present: {},
     manpower_absence_detail: {},
     force_rank_officer: {},
+    force_rank_cells: {},
     approved_dates: [],
     suppressed_carries: [],
     boro_khana_dates: [],
