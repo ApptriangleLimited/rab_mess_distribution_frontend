@@ -96,7 +96,9 @@ export function TagBillPanel({
   const showFuel = bill.tags.includes("FR") || bill.fuelRate > 0;
   const wingBills = useMemo(
     () =>
-      groupRowsByOfficialWing(members).map((group) => ({
+      groupRowsByOfficialWing(members, {
+        separateNewMembers: memberType === "new",
+      }).map((group) => ({
         ...group,
         rows: group.rows.map((row, i) => ({ ...row, sl: i + 1 })),
         totalDays: group.rows.reduce((s, r) => s + r.days, 0),

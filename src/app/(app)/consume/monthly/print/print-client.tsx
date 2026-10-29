@@ -121,7 +121,9 @@ export default function ConsumeTagBillPrintClient() {
 
   const tagWingBills = useMemo(
     () =>
-      groupRowsByOfficialWing(tagRows).map((group) => ({
+      groupRowsByOfficialWing(tagRows, {
+        separateNewMembers: memberType === "new",
+      }).map((group) => ({
         ...group,
         rows: group.rows.map((row, i) => ({ ...row, sl: i + 1 })),
         totalDays: group.rows.reduce((s, r) => s + r.days, 0),
@@ -134,7 +136,9 @@ export default function ConsumeTagBillPrintClient() {
 
   const leaveWingBills = useMemo(
     () =>
-      groupRowsByOfficialWing(leaveRows).map((group) => {
+      groupRowsByOfficialWing(leaveRows, {
+        separateNewMembers: memberType === "new",
+      }).map((group) => {
         const tagTotals: Partial<Record<DailyTag, number>> = {};
         for (const code of filterTags) {
           tagTotals[code] = group.rows.reduce(

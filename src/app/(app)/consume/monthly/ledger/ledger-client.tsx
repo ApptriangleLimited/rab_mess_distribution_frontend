@@ -157,7 +157,9 @@ export default function ConsumeLedgerClient() {
       tagCodes: ledger.tagCodes,
       rows,
       columnDates: ledger.columnDates,
-      sections: groupRowsByOfficialWing(rows).map((group) => ({
+      sections: groupRowsByOfficialWing(rows, {
+        separateNewMembers: memberType === "new",
+      }).map((group) => ({
         wingLabel: group.label,
         rows: group.rows,
       })),

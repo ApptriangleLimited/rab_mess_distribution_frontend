@@ -176,7 +176,13 @@ export default function ConsumeLedgerPrintClient() {
     return `/consume/monthly/ledger?${params.toString()}`;
   }, [month, dateFrom, dateTo, memberType, searchParams]);
 
-  const wingLedgers = useMemo(() => groupRowsByOfficialWing(rows), [rows]);
+  const wingLedgers = useMemo(
+    () =>
+      groupRowsByOfficialWing(rows, {
+        separateNewMembers: memberType === "new",
+      }),
+    [rows, memberType],
+  );
 
   const canAct = rows.length > 0;
   const rangeLabel = rangeBounds

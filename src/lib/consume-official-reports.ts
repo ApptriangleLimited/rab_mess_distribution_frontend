@@ -346,11 +346,29 @@ export function officialSheetOrientation(
   return "portrait";
 }
 
+/**
+ * Wing bucket for consume bills.
+ * New members stay in their real wing unless the member-type filter is New.
+ */
+function billWingId(user: User, separateNewMembers: boolean): string {
+  if (separateNewMembers && user.member_type === "new") return "new";
+  if (user.member_type === "new") {
+    const key = norm(user.wing);
+    if (ATTACHED_WINGS.has(key)) return "attached";
+    return WING_LOOKUP.get(key) ?? "admin";
+  }
+  return officialRowId(user);
+}
+
 /** Same wing order as the consume summary: one group per official wing that has rows. */
-export function groupRowsByOfficialWing<T extends { user: User }>(rows: T[]) {
+export function groupRowsByOfficialWing<T extends { user: User }>(
+  rows: T[],
+  opts?: { separateNewMembers?: boolean },
+) {
+  const separateNewMembers = opts?.separateNewMembers ?? false;
   const buckets = new Map<string, T[]>();
   for (const row of rows) {
-    const id = officialRowId(row.user);
+    const id = billWingId(row.user, separateNewMembers);
     const list = buckets.get(id) ?? [];
     list.push(row);
     buckets.set(id, list);

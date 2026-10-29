@@ -95,7 +95,9 @@ export function LeaveMedBillPanel({
 
   const wingBills = useMemo(
     () =>
-      groupRowsByOfficialWing(members).map((group) => {
+      groupRowsByOfficialWing(members, {
+        separateNewMembers: memberType === "new",
+      }).map((group) => {
         const tagTotals: Partial<Record<DailyTag, number>> = {};
         for (const code of LEAVE_MED_BILL_TAGS) {
           tagTotals[code] = group.rows.reduce(

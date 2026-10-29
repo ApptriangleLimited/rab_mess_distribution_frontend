@@ -244,7 +244,8 @@ export function downloadTagBillPdf(args: {
       ];
 
   bills.forEach((section, wingIndex) => {
-    const pageGroups = chunkBillRows(section.rows);
+    const numberedRows = section.rows.map((row, i) => ({ ...row, sl: i + 1 }));
+    const pageGroups = chunkBillRows(numberedRows);
     pageGroups.forEach((pageRows, pageIndex) => {
     if (wingIndex > 0 || pageIndex > 0) doc.addPage();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -427,7 +428,8 @@ export function downloadLeaveMedBillPdf(args: {
     : [{ wingLabel: "", rows, tagTotals, totalDays, totalAmount }];
 
   bills.forEach((section, wingIndex) => {
-    const pageGroups = chunkBillRows(section.rows);
+    const numberedRows = section.rows.map((row, i) => ({ ...row, sl: i + 1 }));
+    const pageGroups = chunkBillRows(numberedRows);
     pageGroups.forEach((pageRows, pageIndex) => {
     if (wingIndex > 0 || pageIndex > 0) doc.addPage();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -246,7 +246,9 @@ export default function ConsumeMonthlyClient() {
         totalDays: 0,
         totalAmount: 0,
         allowanceRate: leaveBill.rate,
-        sections: groupRowsByOfficialWing(rows).map((group) => {
+        sections: groupRowsByOfficialWing(rows, {
+          separateNewMembers: memberType === "new",
+        }).map((group) => {
           const tagTotals: Partial<Record<DailyTag, number>> = {};
           for (const code of filterTags) {
             tagTotals[code] = group.rows.reduce(
@@ -285,7 +287,9 @@ export default function ConsumeMonthlyClient() {
       fuelOnly,
       allowanceRate: tagBill.rate,
       fuelRate: tagBill.fuelRate,
-      sections: groupRowsByOfficialWing(rows).map((group) => ({
+      sections: groupRowsByOfficialWing(rows, {
+        separateNewMembers: memberType === "new",
+      }).map((group) => ({
         wingLabel: group.label,
         rows: group.rows,
         totalDays: group.rows.reduce((s, r) => s + r.days, 0),
