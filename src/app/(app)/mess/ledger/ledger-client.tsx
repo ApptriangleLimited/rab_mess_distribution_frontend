@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  IconBuilding,
   IconFlame,
   IconPrinter,
   IconShield,
   IconSoup,
+  IconStar,
   IconUsers,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
@@ -33,17 +35,27 @@ import {
   listMessLedger,
 } from "@/lib/api/mess";
 import { isApiEnabled } from "@/lib/api/mode";
-import { MESS_LEDGER_TAGS } from "@/lib/constants";
+import { canonicalRankName, MESS_LEDGER_TAGS } from "@/lib/constants";
 import { formatDateLong, monthDateBounds } from "@/lib/date";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import { useToast } from "@/components/shared/toast-provider";
 import { listBoroKhanaDates } from "@/lib/store/boro-khana";
 import { getMessEaters } from "@/lib/store/mess";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
+import { isCivilianMember } from "@/lib/store/users";
 import type { DailyTag } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
-type MessTagFilter = "all" | "MS" | "CD";
+type MessChipFilter = "all" | "DAD" | "FR" | "MFR" | "CIVIL" | "MS" | "CD";
+
+function isDadRank(rank: string) {
+  return canonicalRankName(rank) === "DAD";
+}
+
+function rowHasTag(row: LedgerRow, tag: DailyTag) {
+  return row.days.some((day) => day === tag);
+}
 
 function defaultRange() {
   return monthDateBounds();
@@ -61,7 +73,7 @@ export default function MessLedgerClient() {
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
-  const [tagFilter, setTagFilter] = useState<MessTagFilter>("all");
+  const [tagFilter, setTagFilter] = useState<MessChipFilter>("all");
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
   const [loading, setLoading] = useState(false);
@@ -101,7 +113,7 @@ export default function MessLedgerClient() {
         setApiLedger({
           rows: res.rows.map(ledgerRowApiToLedgerRow),
           dates: res.dates,
-          tagCodes: res.tag_codes as DailyTag[],
+          tagCodes: [...MESS_LEDGER_TAGS],
           bkDays: res.boro_khana_days.map((row) => ({
             date: row.date,
             eaters: row.eater_count,
@@ -183,23 +195,68 @@ export default function MessLedgerClient() {
   const totals = useMemo(() => {
     let ms = 0;
     let cd = 0;
+    let dad = 0;
+    let fr = 0;
+    let mfr = 0;
+    const query = q.trim().toLowerCase();
+    const civilFromUsers = state.users.filter((user) => {
+      if (user.approval_status !== "approved") return false;
+      if (!isCivilianMember(user)) return false;
+      if (rank !== "all" && user.rank !== rank) return false;
+      if (!memberMatchesWingFilter(user.wing, wing)) return false;
+      if (!query) return true;
+      return [user.name, user.rab_id, user.rank, user.wing]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    }).length;
     for (const row of rows) {
+      if (isDadRank(row.user.rank)) {
+        dad += 1;
+        if (rowHasTag(row, "FR")) fr += 1;
+        if (rowHasTag(row, "MFR")) mfr += 1;
+      }
       for (const tag of row.days) {
         if (tag === "MS") ms += 1;
         else if (tag === "CD") cd += 1;
       }
     }
-    return { ms, cd, all: ms + cd };
-  }, [rows]);
+    const civilFromRows = rows.filter((row) => isCivilianMember(row.user)).length;
+    return {
+      ms,
+      cd,
+      all: ms + cd,
+      dad,
+      fr,
+      mfr,
+      civil: civilFromUsers || civilFromRows,
+    };
+  }, [rows, state.users, q, rank, wing, state.wing_parent]);
 
   const boardRows = useMemo(() => {
     if (tagFilter === "all") return rows;
+    if (tagFilter === "DAD") return rows.filter((row) => isDadRank(row.user.rank));
+    if (tagFilter === "FR") {
+      return rows.filter(
+        (row) => isDadRank(row.user.rank) && rowHasTag(row, "FR"),
+      );
+    }
+    if (tagFilter === "MFR") {
+      return rows.filter(
+        (row) => isDadRank(row.user.rank) && rowHasTag(row, "MFR"),
+      );
+    }
+    if (tagFilter === "CIVIL") {
+      return rows.filter((row) => isCivilianMember(row.user));
+    }
     return rows.filter((row) => row.days.some((d) => d === tagFilter));
   }, [rows, tagFilter]);
 
   const boardTagCodes = useMemo((): DailyTag[] => {
-    if (tagFilter === "all") return ledger.tagCodes;
-    return [tagFilter];
+    if (tagFilter === "FR" || tagFilter === "MFR" || tagFilter === "MS" || tagFilter === "CD") {
+      return [tagFilter];
+    }
+    return ledger.tagCodes;
   }, [tagFilter, ledger.tagCodes]);
 
   const demoBkDaysInRange = useMemo(() => {
@@ -218,7 +275,7 @@ export default function MessLedgerClient() {
 
   const bkDaysInRange = apiOn ? apiLedger.bkDays : demoBkDaysInRange;
 
-  function selectTagFilter(next: MessTagFilter) {
+  function selectTagFilter(next: MessChipFilter) {
     setTagFilter((cur) => (cur === next && next !== "all" ? "all" : next));
   }
 
@@ -297,7 +354,7 @@ export default function MessLedgerClient() {
           searchPlaceholder={t("cc.searchPlaceholder")}
           searchClassName="w-44 sm:w-48"
           filtersActive={filtersActive}
-          wrapTiles={false}
+          wrapTiles
           className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={
             <>
@@ -308,6 +365,38 @@ export default function MessLedgerClient() {
                 toneClass="border-primary/25 bg-primary/12 text-primary dark:border-primary/40 dark:bg-primary/25 dark:text-emerald-100"
                 selected={tagFilter === "all"}
                 onClick={() => setTagFilter("all")}
+              />
+              <MiniStat
+                icon={<IconStar className="h-3.5 w-3.5" />}
+                label="DAD"
+                value={String(totals.dad)}
+                toneClass="border-sky-200 bg-sky-100 text-sky-950 dark:border-sky-800 dark:bg-sky-900/55 dark:text-sky-100"
+                selected={tagFilter === "DAD"}
+                onClick={() => selectTagFilter("DAD")}
+              />
+              <MiniStat
+                icon={<IconStar className="h-3.5 w-3.5" />}
+                label="FR"
+                value={String(totals.fr)}
+                toneClass={tagCellClass("FR")}
+                selected={tagFilter === "FR"}
+                onClick={() => selectTagFilter("FR")}
+              />
+              <MiniStat
+                icon={<IconStar className="h-3.5 w-3.5" />}
+                label="MFR"
+                value={String(totals.mfr)}
+                toneClass={tagCellClass("MFR")}
+                selected={tagFilter === "MFR"}
+                onClick={() => selectTagFilter("MFR")}
+              />
+              <MiniStat
+                icon={<IconBuilding className="h-3.5 w-3.5" />}
+                label="CIVIL"
+                value={String(totals.civil)}
+                toneClass="border-stone-200 bg-stone-100 text-stone-900 dark:border-stone-700 dark:bg-stone-800/70 dark:text-stone-100"
+                selected={tagFilter === "CIVIL"}
+                onClick={() => selectTagFilter("CIVIL")}
               />
               <MiniStat
                 icon={<IconSoup className="h-3.5 w-3.5" />}

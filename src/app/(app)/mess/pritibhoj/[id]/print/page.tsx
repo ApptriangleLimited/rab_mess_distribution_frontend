@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { usePritibhojEvent } from "@/hooks/use-pritibhoj-event";
 import { useStore } from "@/hooks/use-store";
 import { formatDateLong } from "@/lib/date";
-import { isPaperApproved } from "@/lib/store/paper-reports";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { useI18n, useT } from "@/i18n/provider";
 
@@ -24,7 +23,6 @@ export default function MessPritibhojPrintPage() {
   const [printing, setPrinting] = useState(false);
   const { event, loading } = usePritibhojEvent(params.id);
   useStore();
-  const approved = event ? isPaperApproved("pritibhoj", event.id) : false;
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   const pdfName = event ? `pritibhoj-${event.date}.pdf` : "pritibhoj.pdf";
 
@@ -77,33 +75,24 @@ export default function MessPritibhojPrintPage() {
             </Button>
           }
           actions={
-            approved ? (
-              <Button
-                type="button"
-                variant="cta"
-                size="sm"
-                className="rounded-xl"
-                disabled={printing}
-                onClick={() => void onPrint()}
-              >
-                <IconPrinter className="h-4 w-4" />
-                {printing ? t("common.loading") : t("paperReports.print")}
-              </Button>
-            ) : null
+            <Button
+              type="button"
+              variant="cta"
+              size="sm"
+              className="rounded-xl"
+              disabled={printing}
+              onClick={() => void onPrint()}
+            >
+              <IconPrinter className="h-4 w-4" />
+              {printing ? t("common.loading") : t("paperReports.print")}
+            </Button>
           }
         />
       </div>
 
-      {approved ? (
-        <div ref={printRef}>
-          <PritibhojSheets event={event} dateLocale={dateLocale} />
-        </div>
-      ) : (
-        <EmptyState
-          title={t("paperReports.needApprove")}
-          description={t("paperReports.waitingAdmin")}
-        />
-      )}
+      <div ref={printRef}>
+        <PritibhojSheets event={event} dateLocale={dateLocale} />
+      </div>
     </PagePane>
   );
 }

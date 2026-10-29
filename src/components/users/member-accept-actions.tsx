@@ -45,6 +45,7 @@ export function MemberAcceptActions({
   iconOnly = false,
   after,
   onAccepted,
+  onRejected,
 }: {
   user: User;
   withTag?: boolean;
@@ -54,6 +55,8 @@ export function MemberAcceptActions({
   after?: ReactNode;
   /** After a successful accept: close preview and return to the list. */
   onAccepted?: () => void;
+  /** After reject the member is removed; leave the detail page. */
+  onRejected?: () => void;
 }) {
   const t = useT();
   const { toast } = useToast();
@@ -151,9 +154,11 @@ export function MemberAcceptActions({
           onAccepted?.();
         } else {
           await rejectMember(user.id);
+          rejectUser(user.id);
           notifyCcDataChange();
           setPendingAction(null);
           toast(t("daily.rejectedToast"), "success");
+          onRejected?.();
         }
       } catch (err) {
         toast(
@@ -214,6 +219,7 @@ export function MemberAcceptActions({
     rejectUser(user.id);
     setPendingAction(null);
     toast(t("daily.rejectedToast"), "success");
+    onRejected?.();
   }
 
   const copy =

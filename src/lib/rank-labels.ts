@@ -103,6 +103,30 @@ export function form1RankLabelBn(
   );
 }
 
+/** Short names on Daily manpower paper / PDF (not Settings official titles). */
+const MANPOWER_PAPER_WING: Record<string, string> = {
+  "r & d cell": "R&D Cell",
+  "r&d cell": "R&D Cell",
+  "research & development cell": "R&D Cell",
+  "research and development cell": "R&D Cell",
+  "training school": "Training School",
+  "srb forces training school": "Training School",
+  rfts: "Training School",
+  admin: "অ্যাডমিন উইং",
+  "admin & finance wing": "অ্যাডমিন উইং",
+  "comm & mis wg": "যোগাযোগ উইং",
+  "communication & mis wing": "যোগাযোগ উইং",
+};
+
+export function manpowerPaperWingLabel(
+  englishWing: string,
+  overrides?: Record<string, string>,
+): string {
+  const key = normalizeKey(englishWing);
+  if (MANPOWER_PAPER_WING[key]) return MANPOWER_PAPER_WING[key];
+  return wingLabelBn(englishWing, overrides);
+}
+
 /** Bangla wing name for print. Fallback = English short. Match still English. */
 export function wingLabelBn(
   englishWing: string,

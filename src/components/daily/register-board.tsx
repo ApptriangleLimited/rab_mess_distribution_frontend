@@ -53,13 +53,13 @@ import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import {
   canAssignOnDate,
-  canWriteMfrLockedTag,
+  canDailyWriteTag,
+  dailyRrAllowedTags,
   isBeforeJoin,
-  isFrTag,
+  isJlTag,
   isMfrLocked,
   isUserInactiveOnDate,
   rosterStart,
-  FR_TAG,
   MFR_TAG,
 } from "@/lib/store/daily";
 import { setBoroKhana } from "@/lib/store/boro-khana";
@@ -532,7 +532,7 @@ export function RegisterBoard({
         (!user || canAssignOnDate(user, date)),
     );
     if (dates.length === 0) return;
-    if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
+    if (user && !canDailyWriteTag(user, tag)) return;
     if (user && isMfrLocked(user) && !tag) return;
     const fromDate = dates[0]!;
     const toDate = dates[dates.length - 1]!;
@@ -864,7 +864,7 @@ export function RegisterBoard({
                     const painted = byUserDate.get(`${user.id}|${date}`)?.tag;
                     rowMeta.push({
                       date,
-                      stored: isFrTag(painted) ? painted : MFR_TAG,
+                      stored: isJlTag(painted) ? painted : MFR_TAG,
                       ghost: undefined,
                       afterOut: false,
                       beforeJoin: false,
@@ -1205,7 +1205,7 @@ export function RegisterBoard({
               ghost={Boolean(rangeMenu.ghostTag)}
               tag={rangeMenu.storedTag ?? rangeMenu.ghostTag}
               locale={locale}
-              allowedTags={rangeMfrLocked ? [FR_TAG] : undefined}
+              allowedTags={dailyRrAllowedTags(rangeMfrLocked, listAllTags())}
               allowClear={!rangeMfrLocked}
               fromDate={rangeMenu.fromDate}
               toDate={rangeMenu.toDate}

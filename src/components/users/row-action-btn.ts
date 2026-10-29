@@ -16,6 +16,8 @@ const tone = {
     "bg-amber-50 text-amber-800 ring-amber-200/80 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:ring-amber-800/60 dark:hover:bg-amber-950",
   print:
     "bg-violet-50 text-violet-700 ring-violet-200/80 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200 dark:ring-violet-800/60 dark:hover:bg-violet-950",
+  download:
+    "bg-teal-50 text-teal-700 ring-teal-200/80 hover:bg-teal-100 dark:bg-teal-950/50 dark:text-teal-200 dark:ring-teal-800/60 dark:hover:bg-teal-950",
   delete:
     "bg-rose-50 text-rose-600 ring-rose-200/80 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-200 dark:ring-rose-800/60 dark:hover:bg-rose-950",
 } as const;

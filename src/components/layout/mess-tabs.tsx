@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import {
   IconCake,
   IconClockHour4,
+  IconLayoutDashboard,
+  IconSettings,
   IconTags,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
@@ -12,6 +14,12 @@ import { useSession } from "@/hooks/use-session";
 import { useT } from "@/i18n/provider";
 
 const TABS = [
+  {
+    href: "/mess",
+    labelKey: "nav.messDashboard" as const,
+    icon: IconLayoutDashboard,
+    match: (path: string) => path === "/mess",
+  },
   {
     href: "/mess/ledger",
     labelKey: "nav.messLedger" as const,
@@ -32,6 +40,12 @@ const TABS = [
     icon: IconClockHour4,
     match: (path: string) =>
       path === "/mess/shifts" || path.startsWith("/mess/shifts/"),
+  },
+  {
+    href: "/settings",
+    labelKey: "nav.settings" as const,
+    icon: IconSettings,
+    match: (path: string) => path === "/settings" || path.startsWith("/settings/"),
   },
 ] as const;
 

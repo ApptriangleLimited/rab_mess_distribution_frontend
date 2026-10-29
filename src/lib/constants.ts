@@ -10,7 +10,7 @@ import type { MessageKey } from "@/i18n";
 export const ROLE_HOMES: Record<Role, string> = {
   cc: "/cc/users",
   daily: "/daily/tags",
-  mess: "/mess/ledger",
+  mess: "/mess",
   consume: "/consume/monthly/ledger",
   ration: "/ration/monthly",
   admin: "/admin",

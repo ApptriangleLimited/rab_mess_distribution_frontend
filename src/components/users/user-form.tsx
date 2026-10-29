@@ -74,6 +74,8 @@ import {
   listWingDescendants,
   memberWingCascade,
 } from "@/lib/store/org-options";
+import { dailyRrAllowedTags } from "@/lib/store/daily";
+import { listAllTags } from "@/lib/store/rates";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
 import { cn, digitsOnly, isValidBdPhone, normalizeBdPhone } from "@/lib/utils";
@@ -608,6 +610,7 @@ export function UserForm({
         force_rank: "cc.forceRankRequired",
         documents: "cc.documentsRequired",
         bank: "cc.bankRequired",
+        rab_id: "cc.rabIdRequired",
       }[missing] as "cc.personalNoRequired";
       toast(t(messageKey), "error");
       return;
@@ -712,9 +715,12 @@ export function UserForm({
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
                     allowedTags={
-                      mode === "edit" && values.default_tag === "MFR"
-                        ? ["FR", "MFR"]
-                        : undefined
+                      mode === "create"
+                        ? undefined
+                        : dailyRrAllowedTags(
+                            values.default_tag === "MFR",
+                            listAllTags(),
+                          )
                     }
                     onChange={(tag) => {
                       if (!tag) return;
@@ -738,10 +744,11 @@ export function UserForm({
                   placeholder={t("cc.placeholders.personalId")}
                 />
               </Field>
-              <Field label={t("cc.fields.rabId")}>
+              <Field label={t("cc.fields.rabId")} required={isPermanent}>
                 <Input
                   value={values.rab_id}
                   onChange={(e) => patch("rab_id", e.target.value)}
+                  required={isPermanent}
                   className={inputClass}
                   placeholder={t("cc.placeholders.rabId")}
                 />
@@ -856,9 +863,12 @@ export function UserForm({
                   <TagSelector
                     value={mode === "create" ? todayTag : values.default_tag}
                     allowedTags={
-                      mode === "edit" && values.default_tag === "MFR"
-                        ? ["FR", "MFR"]
-                        : undefined
+                      mode === "create"
+                        ? undefined
+                        : dailyRrAllowedTags(
+                            values.default_tag === "MFR",
+                            listAllTags(),
+                          )
                     }
                     onChange={(tag) => {
                       if (!tag) return;

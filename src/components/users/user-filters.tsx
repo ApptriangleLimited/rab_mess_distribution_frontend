@@ -141,7 +141,6 @@ export function UserFiltersBar({
               <SelectItem value="all">{t("common.allApproval")}</SelectItem>
               <SelectItem value="pending">{t("cc.approvalPending")}</SelectItem>
               <SelectItem value="approved">{t("cc.approvalApproved")}</SelectItem>
-              <SelectItem value="rejected">{t("cc.approvalRejected")}</SelectItem>
             </SelectContent>
           </Select>
         </div>

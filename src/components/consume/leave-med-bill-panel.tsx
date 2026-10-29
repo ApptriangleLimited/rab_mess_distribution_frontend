@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { MonthNav } from "@/components/shared/month-nav";
 import {
@@ -37,6 +37,12 @@ type Props = {
   onMonthChange: (month: string) => void;
   tiles?: ReactNode;
   source?: ReportSource;
+  q: string;
+  onQChange: (value: string) => void;
+  rank: string;
+  onRankChange: (value: string) => void;
+  wing: string;
+  onWingChange: (value: string) => void;
   memberType?: ConsumeMemberTypeFilter;
   onMemberTypeChange?: (value: ConsumeMemberTypeFilter) => void;
 };
@@ -46,15 +52,18 @@ export function LeaveMedBillPanel({
   onMonthChange,
   tiles,
   source,
+  q,
+  onQChange,
+  rank,
+  onRankChange,
+  wing,
+  onWingChange,
   memberType = "all",
   onMemberTypeChange,
 }: Props) {
   const t = useT();
   const state = useStore();
   const reduceMotion = useReducedMotion();
-  const [q, setQ] = useState("");
-  const [rank, setRank] = useState("all");
-  const [wing, setWing] = useState("all");
 
   const bill = useMemo(
     () =>
@@ -120,7 +129,7 @@ export function LeaveMedBillPanel({
           singleLine
           compact
           search={q}
-          onSearchChange={setQ}
+          onSearchChange={onQChange}
           searchPlaceholder={t("consume.searchPlaceholder")}
           className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={tiles}
@@ -128,13 +137,13 @@ export function LeaveMedBillPanel({
           <MonthNav compact month={month} onChange={onMonthChange} />
           <SettingsRankFilter
             value={rank}
-            onChange={setRank}
+            onChange={onRankChange}
             className="w-[7.25rem] shrink"
             triggerClassName={cn(fieldClass, "w-full")}
           />
           <SettingsWingFilter
             value={wing}
-            onChange={setWing}
+            onChange={onWingChange}
             rootsOnly
             className="w-[7.25rem] shrink"
             triggerClassName={cn(fieldClass, "w-full")}

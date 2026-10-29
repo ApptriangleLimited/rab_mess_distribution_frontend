@@ -70,8 +70,33 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       ? t("consume.cdBillTitle", titleParts)
       : t("consume.frBillTitle", titleParts);
   const pages = chunkBillRows(rows);
+  const multiPage = pages.length > 1;
   const colCount =
     7 + (showAllowance ? 1 : 0) + (showFuel || fuelOnly ? 1 : 0);
+
+  function moneyTotal(days: number, amount: number, fuel: number, grand: number) {
+    return (
+      <>
+        <td className="consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
+          {days}
+        </td>
+        {showAllowance ? (
+          <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
+            {formatBdt(amount)}
+          </td>
+        ) : null}
+        {showFuel || fuelOnly ? (
+          <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
+            {formatBdt(fuel)}
+          </td>
+        ) : null}
+        <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
+          {formatBdt(fuelOnly ? fuel : grand)}
+        </td>
+        <td className="border border-black px-1.5 py-1.5" />
+      </>
+    );
+  }
 
   return (
     <div
@@ -83,6 +108,11 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
       )}
     >
       {pages.map((pageRows, pageIndex) => {
+        const lastPage = pageIndex === pages.length - 1;
+        const pageDays = pageRows.reduce((s, r) => s + r.days, 0);
+        const pageAmount = pageRows.reduce((s, r) => s + r.amount, 0);
+        const pageFuel = pageRows.reduce((s, r) => s + r.fuelAmount, 0);
+        const pageGrand = pageRows.reduce((s, r) => s + r.grandTotal, 0);
         return (
       <section
         key={pageIndex}
@@ -174,31 +204,28 @@ export const TagBillPrint = forwardRef<HTMLDivElement, Props>(
               </td>
             </tr>
           ))}
-          <tr className="border border-black font-semibold">
-            <td
-              colSpan={4}
-              className="border border-black px-1.5 py-1.5 text-left"
-            >
-              {t("consume.billTotal")}
-            </td>
-            <td className="consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
-              {totalDays}
-            </td>
-            {showAllowance ? (
-              <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
-                {formatBdt(totalAmount)}
+          {multiPage ? (
+            <tr className="border border-black font-semibold">
+              <td
+                colSpan={4}
+                className="border border-black px-1.5 py-1.5 text-left"
+              >
+                {t("consume.colPageTotal")}
               </td>
-            ) : null}
-            {showFuel || fuelOnly ? (
-              <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
-                {formatBdt(totalFuel)}
+              {moneyTotal(pageDays, pageAmount, pageFuel, pageGrand)}
+            </tr>
+          ) : null}
+          {lastPage ? (
+            <tr className="border border-black font-bold">
+              <td
+                colSpan={4}
+                className="border border-black px-1.5 py-1.5 text-left"
+              >
+                {t("consume.billTotal")}
               </td>
-            ) : null}
-            <td className="consume-money consume-num border border-black px-1.5 py-1.5 text-right tabular-nums">
-              {formatBdt(fuelOnly ? totalFuel : grandTotal)}
-            </td>
-            <td className="border border-black px-1.5 py-1.5" />
-          </tr>
+              {moneyTotal(totalDays, totalAmount, totalFuel, grandTotal)}
+            </tr>
+          ) : null}
         </tbody>
       </table>
 

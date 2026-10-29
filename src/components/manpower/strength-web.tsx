@@ -110,7 +110,7 @@ function MetricRow({
 
 function AdminWingName({ wing }: { wing: string }) {
   if (wing === "সর্বমোট") return <>সর্বমোট</>;
-  return <WingName wing={wing} />;
+  return <WingName wing={wing} paper />;
 }
 
 function asciiDigits(raw: string) {
@@ -217,7 +217,7 @@ function BranchRows({
   );
   const wingCell = (
     <WingNameCell>
-      {form2 ? <AdminWingName wing={block.wing} /> : <WingName wing={block.wing} />}
+      {form2 ? <AdminWingName wing={block.wing} /> : <WingName wing={block.wing} paper />}
       {block.withoutRecord ? (
         <span className="mt-0.5 block text-[11px] font-normal text-neutral-500">
           রেকর্ড নেই
@@ -391,7 +391,7 @@ function HqAbsenceSection({
               {report.absence.map((row) => (
                 <tr key={row.wing}>
                   <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
-                    <WingName wing={row.wing} />
+                    <WingName wing={row.wing} paper />
                   </td>
                   <AbsenceCells row={row} bn />
                 </tr>
@@ -476,7 +476,7 @@ function HqAbsenceSection({
                     {form2 ? (
                       <AdminWingName wing={row.wing} />
                     ) : (
-                      <WingName wing={row.wing} />
+                      <WingName wing={row.wing} paper />
                     )}
                   </td>
                   {manual

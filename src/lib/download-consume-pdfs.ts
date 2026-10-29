@@ -139,7 +139,7 @@ function finiteRect(
 }
 
 /** Total row under the last autoTable — same colspan layout as print preview. */
-function drawConsumeTotalRow(doc: jsPDF, cells: TotalCell[]) {
+function drawConsumeTotalRow(doc: jsPDF, cells: TotalCell[], startY?: number) {
   const table = consumeTableColumns(doc);
   if (!table) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,7 +148,7 @@ function drawConsumeTotalRow(doc: jsPDF, cells: TotalCell[]) {
 
   const pageH = doc.internal.pageSize.getHeight();
   const rowH = 7;
-  let y = table.finalY;
+  let y = startY ?? table.finalY;
   if (y + rowH > pageH - 30) {
     doc.addPage();
     y = 16;
@@ -339,27 +339,59 @@ export function downloadTagBillPdf(args: {
       },
     });
 
-    const afterTable = drawConsumeTotalRow(
-      doc,
+    const lastPage = pageIndex === pageGroups.length - 1;
+    const multiPage = pageGroups.length > 1;
+    const tagTotalCells = (
+      label: string,
+      days: number,
+      amount: number,
+      fuel: number,
+      grand: number,
+    ): TotalCell[] =>
       fuelOnly
         ? [
-            { text: "Total", colSpan: 4, align: "left" },
-            { text: String(section.totalDays), align: "right" },
-            { text: amt(section.totalFuel), align: "right" },
-            { text: amt(section.totalFuel), align: "right" },
+            { text: label, colSpan: 4, align: "left" },
+            { text: String(days), align: "right" },
+            { text: amt(fuel), align: "right" },
+            { text: amt(fuel), align: "right" },
             { text: "" },
           ]
         : [
-            { text: "Total", colSpan: 4, align: "left" },
-            { text: String(section.totalDays), align: "right" },
-            { text: amt(section.totalAmount), align: "right" },
+            { text: label, colSpan: 4, align: "left" },
+            { text: String(days), align: "right" },
+            { text: amt(amount), align: "right" },
             ...(showFuel
-              ? [{ text: amt(section.totalFuel), align: "right" as const }]
+              ? [{ text: amt(fuel), align: "right" as const }]
               : []),
-            { text: amt(section.grandTotal), align: "right" },
+            { text: amt(grand), align: "right" },
             { text: "" },
-          ],
-    );
+          ];
+    let afterTable = 0;
+    if (multiPage) {
+      afterTable = drawConsumeTotalRow(
+        doc,
+        tagTotalCells(
+          "Page total",
+          pageRows.reduce((s, r) => s + r.days, 0),
+          pageRows.reduce((s, r) => s + r.amount, 0),
+          pageRows.reduce((s, r) => s + r.fuelAmount, 0),
+          pageRows.reduce((s, r) => s + r.grandTotal, 0),
+        ),
+      );
+    }
+    if (lastPage) {
+      afterTable = drawConsumeTotalRow(
+        doc,
+        tagTotalCells(
+          "Total",
+          section.totalDays,
+          section.totalAmount,
+          section.totalFuel,
+          section.grandTotal,
+        ),
+        afterTable || undefined,
+      );
+    }
     drawConsumeBillSigns(doc, afterTable + 12, true);
     });
   });
@@ -471,16 +503,54 @@ export function downloadLeaveMedBillPdf(args: {
       },
     });
 
-    const afterTable = drawConsumeTotalRow(doc, [
-      { text: "Total", colSpan: 4, align: "left" },
+    const lastPage = pageIndex === pageGroups.length - 1;
+    const multiPage = pageGroups.length > 1;
+    const leaveTotalCells = (
+      label: string,
+      tagCounts: Partial<Record<DailyTag, number>>,
+      days: number,
+      amount: number,
+    ): TotalCell[] => [
+      { text: label, colSpan: 4, align: "left" },
       ...tags.map((code) => ({
-        text: section.tagTotals[code] ? String(section.tagTotals[code]) : "",
+        text: tagCounts[code] ? String(tagCounts[code]) : "",
         align: "right" as const,
       })),
-      { text: section.totalDays ? String(section.totalDays) : "", align: "right" },
-      { text: amt(section.totalAmount), align: "right" },
+      { text: days ? String(days) : "", align: "right" },
+      { text: amt(amount), align: "right" },
       { text: "" },
-    ]);
+    ];
+    let afterTable = 0;
+    if (multiPage) {
+      const pageTagTotals: Partial<Record<DailyTag, number>> = {};
+      for (const code of tags) {
+        pageTagTotals[code] = pageRows.reduce(
+          (s, r) => s + (r.tagDays[code] ?? 0),
+          0,
+        );
+      }
+      afterTable = drawConsumeTotalRow(
+        doc,
+        leaveTotalCells(
+          "Page total",
+          pageTagTotals,
+          pageRows.reduce((s, r) => s + r.totalDays, 0),
+          pageRows.reduce((s, r) => s + r.amount, 0),
+        ),
+      );
+    }
+    if (lastPage) {
+      afterTable = drawConsumeTotalRow(
+        doc,
+        leaveTotalCells(
+          "Total",
+          section.tagTotals,
+          section.totalDays,
+          section.totalAmount,
+        ),
+        afterTable || undefined,
+      );
+    }
     drawConsumeBillSigns(doc, afterTable + 12, true);
     });
   });

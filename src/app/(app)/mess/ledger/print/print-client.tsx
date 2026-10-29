@@ -73,7 +73,7 @@ export default function MessLedgerPrintClient() {
         setApiLedger({
           rows: res.rows.map(ledgerRowApiToLedgerRow),
           dayCount: res.dates.length,
-          tagCodes: res.tag_codes as DailyTag[],
+          tagCodes: [...MESS_LEDGER_TAGS],
           columnDates: res.dates,
         });
       })

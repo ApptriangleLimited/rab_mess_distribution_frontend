@@ -19,6 +19,7 @@ import { DailyTabs } from "@/components/layout/daily-tabs";
 import { DatePicker } from "@/components/shared/date-picker";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { SettingsWingFilter } from "@/components/shared/settings-catalog-filters";
 import { Button } from "@/components/ui/button";
 import { PaperStatusBadge } from "@/components/reports/paper-status-badge";
 import { useToast } from "@/components/shared/toast-provider";
@@ -26,13 +27,16 @@ import { useManpowerDay } from "@/hooks/use-manpower-day";
 import { useStore } from "@/hooks/use-store";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { formatDateLong, todayISO } from "@/lib/date";
+import {
+  buildForceRankReport,
+  parseManpowerWingFilter,
+} from "@/lib/force-rank-report";
 import { buildManpowerReport } from "@/lib/manpower-report";
 import {
   getManpowerPaper,
   saveManpowerPaper,
   submitManpowerPaper,
 } from "@/lib/store/paper-reports";
-import { buildForceRankReport } from "@/lib/force-rank-report";
 import { buildStrengthReport } from "@/lib/strength-report";
 import { useI18n, useT } from "@/i18n/provider";
 
@@ -52,6 +56,7 @@ export default function ManpowerEditorClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const form = parseForm(searchParams.get("form"));
+  const wing = parseManpowerWingFilter(searchParams.get("wing"));
   const dateParam = searchParams.get("date");
   const [date, setDate] = useState(
     dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
@@ -84,14 +89,14 @@ export default function ManpowerEditorClient() {
     [date, state, reportSnapshot],
   );
   const form4 = useMemo(
-    () => buildForceRankReport(date, snapshot ?? undefined),
+    () => buildForceRankReport(date, reportSnapshot, wing),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, state, snapshot],
+    [date, state, reportSnapshot, wing],
   );
-
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
-  const printHref = `/daily/manpower/print?date=${encodeURIComponent(date)}&form=${form}`;
-  const listHref = `/daily/manpower?form=${form}`;
+  const wingQuery = form === "4" && wing !== "all" ? `&wing=${encodeURIComponent(wing)}` : "";
+  const printHref = `/daily/manpower/print?date=${encodeURIComponent(date)}&form=${form}${wingQuery}`;
+  const listHref = `/daily/manpower?form=${form}${wingQuery}`;
   const showReport = !loading;
   const formTitle =
     form === "1"
@@ -113,6 +118,15 @@ export default function ManpowerEditorClient() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("date", next);
     params.set("form", form);
+    router.replace(`/daily/manpower/new?${params.toString()}`);
+  }
+
+  function pushWing(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("date", date);
+    params.set("form", form);
+    if (!next || next === "all") params.delete("wing");
+    else params.set("wing", next);
     router.replace(`/daily/manpower/new?${params.toString()}`);
   }
 
@@ -178,7 +192,7 @@ export default function ManpowerEditorClient() {
                       className="h-9 gap-1.5 rounded-xl px-2.5"
                     >
                       <Link
-                        href={`/daily/manpower/new?date=${encodeURIComponent(date)}&form=${form}&edit=1`}
+                        href={`/daily/manpower/new?date=${encodeURIComponent(date)}&form=${form}&edit=1${wingQuery}`}
                       >
                         <IconEdit className="h-4 w-4" />
                         <span className="hidden sm:inline">{t("common.edit")}</span>
@@ -219,6 +233,22 @@ export default function ManpowerEditorClient() {
             />
           </div>
         </div>
+
+        {form === "4" ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-primary/15 bg-white p-3 dark:border-primary/30 dark:bg-neutral-950">
+            <span className="text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+              {t("cc.filterWing")}
+            </span>
+            <SettingsWingFilter
+              value={wing}
+              onChange={pushWing}
+              rootsOnly
+              namesOnly
+              className="w-[16rem] shrink-0"
+              triggerClassName="h-10 rounded-xl"
+            />
+          </div>
+        ) : null}
 
         <div className="rounded-2xl border border-primary/10 bg-neutral-50/80 dark:border-neutral-700 dark:bg-neutral-950/40">
           {loading ? (

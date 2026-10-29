@@ -55,6 +55,7 @@ export default function AdminReportRequestsClient() {
     const from = dateFrom <= dateTo || !dateTo ? dateFrom : dateTo;
     const to = dateFrom <= dateTo || !dateFrom ? dateTo : dateFrom;
     return rows.filter((row) => {
+      if (row.kind === "pritibhoj") return false;
       if (row.status === "draft") return false;
       if (filter !== "all" && row.status !== filter) return false;
       if (kind !== "all" && row.kind !== kind) return false;
@@ -80,9 +81,15 @@ export default function AdminReportRequestsClient() {
     });
   }, [rows, filter, kind, q, dateFrom, dateTo, t]);
 
-  const pending = rows.filter((row) => row.status === "submitted").length;
-  const verified = rows.filter((row) => row.status === "approved").length;
-  const allCount = rows.filter((row) => row.status !== "draft").length;
+  const pending = rows.filter(
+    (row) => row.kind !== "pritibhoj" && row.status === "submitted",
+  ).length;
+  const verified = rows.filter(
+    (row) => row.kind !== "pritibhoj" && row.status === "approved",
+  ).length;
+  const allCount = rows.filter(
+    (row) => row.kind !== "pritibhoj" && row.status !== "draft",
+  ).length;
   const filtersActive = kind !== "all" || Boolean(dateFrom || dateTo || q.trim());
 
   function onVerify(id: string) {
@@ -198,9 +205,6 @@ export default function AdminReportRequestsClient() {
               <SelectItem value="all">{t("paperReports.kindAll")}</SelectItem>
               <SelectItem value="manpower">
                 {t("paperReports.kindManpower")}
-              </SelectItem>
-              <SelectItem value="pritibhoj">
-                {t("paperReports.kindPritibhoj")}
               </SelectItem>
             </SelectContent>
           </Select>

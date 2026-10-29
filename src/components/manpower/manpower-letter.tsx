@@ -4,7 +4,10 @@ import { forwardRef, type ReactNode } from "react";
 import { CONSUME_REPORT_META } from "@/lib/constants";
 import { RankColumnHeader } from "@/components/manpower/rank-column-header";
 import { StrengthReportTitle } from "@/components/manpower/strength-title";
-import { ManpowerVerifiedByFooter } from "@/components/manpower/verified-by-footer";
+import {
+  ManpowerVerifiedByFooter,
+  ManpowerVerifiedWatermark,
+} from "@/components/manpower/verified-by-footer";
 import { WingName } from "@/components/manpower/wing-name";
 import { toBnDigits } from "@/lib/consume-official-reports";
 import {
@@ -36,7 +39,7 @@ function Cell({
   return (
     <td
       className={cn(
-        "border border-neutral-800 px-px py-0.5 text-center tabular-nums leading-tight",
+        "border border-neutral-800 px-px py-px text-center tabular-nums leading-tight",
         className,
       )}
     >
@@ -63,7 +66,7 @@ function MetricRow({
   return (
     <tr className={emphasize ? "bg-neutral-50 font-semibold" : undefined}>
       {wingCell}
-      <td className="border border-neutral-800 px-0.5 py-0.5 text-left text-[8px] font-medium leading-tight">
+      <td className="border border-neutral-800 px-px py-px text-left text-[7px] font-medium leading-tight">
         {label}
       </td>
       {categories.map((cat) => (
@@ -93,8 +96,10 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
     return (
       <div
         ref={ref}
-        className="manpower-letter mx-auto w-full max-w-[210mm] min-h-[297mm] bg-white p-2.5 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
+        className="manpower-letter relative mx-auto w-full max-w-[210mm] min-h-0 overflow-hidden bg-white p-1.5 text-neutral-900 shadow-sm print:min-h-0 print:max-w-none print:overflow-visible print:p-0 print:shadow-none"
       >
+        <ManpowerVerifiedWatermark show={verified} />
+        <div className="relative z-[1]">
         <StrengthReportTitle
           titleBn="দৈনিক জনবলের প্রতিবেদন"
           wingLabel={CONSUME_REPORT_META.orgNameBn}
@@ -138,8 +143,8 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
           : [{ id: "main", titleBn: "উইং", wings, absence } as ManpowerWingGroup]
         ).map((group) => (
           <div key={group.id}>
-            <p className="mt-5 text-[10px] font-semibold">{group.titleBn}</p>
-            <StrengthTable categories={categories} className="mt-1" withWing>
+            <p className="mt-2 text-[9px] font-semibold">{group.titleBn}</p>
+            <StrengthTable categories={categories} className="mt-0.5" withWing>
               {group.wings.map((block) => (
                 <WingGroup
                   key={block.wing}
@@ -161,7 +166,7 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
                 emphasize
               />
             </StrengthTable>
-            <p className="mt-4 text-[10px] font-semibold">
+            <p className="mt-2 text-[9px] font-semibold">
               * অনুপস্থিতির বিবরণ · {group.titleBn}
             </p>
             <LetterAbsenceTable rows={group.absence} />
@@ -169,6 +174,7 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
         ))}
 
         <ManpowerVerifiedByFooter show={verified} />
+        </div>
       </div>
     );
   },
@@ -177,6 +183,12 @@ export const ManpowerLetter = forwardRef<HTMLDivElement, Props>(
 function LetterAbsenceTable({ rows }: { rows: ManpowerAbsenceRow[] }) {
   return (
     <table className="mt-1 w-full table-fixed border-collapse text-[7px] leading-tight">
+      <colgroup>
+        <col className="w-[11%]" />
+        {Array.from({ length: 12 }).map((_, i) => (
+          <col key={i} className="w-[7%]" />
+        ))}
+      </colgroup>
       <thead>
         <tr className="bg-neutral-100">
           <th
@@ -251,7 +263,7 @@ function LetterAbsenceTable({ rows }: { rows: ManpowerAbsenceRow[] }) {
         {rows.map((row) => (
           <tr key={row.wing}>
             <td className="border border-neutral-800 px-0.5 py-0.5 text-left font-medium leading-tight">
-              <WingName wing={row.wing} />
+              <WingName wing={row.wing} paper />
             </td>
             <Cell value={row.cl} />
             <Cell value={row.pl} />
@@ -307,18 +319,26 @@ function StrengthTable({
   return (
     <table
       className={cn(
-        "w-full table-fixed border-collapse text-[7.5px] leading-tight",
+        "w-full table-fixed border-collapse text-[7px] leading-tight",
         className,
       )}
     >
+      <colgroup>
+        {withWing ? <col className="w-[9%]" /> : null}
+        <col className={withWing ? "w-[7%]" : "w-[10%]"} />
+        {categories.map((cat) => (
+          <col key={cat.id} />
+        ))}
+        <col className="w-[6%]" />
+      </colgroup>
       <thead>
         <tr className="bg-neutral-100">
           {withWing ? (
-            <th className="w-[14%] border border-neutral-800 px-0.5 py-1 text-left font-semibold leading-tight">
+            <th className="w-[9%] border border-neutral-800 px-px py-0.5 text-left font-semibold leading-tight">
               উইং
             </th>
           ) : null}
-          <th className="w-[11%] border border-neutral-800 px-0.5 py-1 text-left font-semibold leading-tight">
+          <th className="w-[7%] border border-neutral-800 px-px py-0.5 text-left font-semibold leading-tight">
             বিবরণ
           </th>
           {categories.map((cat) => (
@@ -366,11 +386,11 @@ function WingGroup({
           <td
             rowSpan={4}
             className={cn(
-              "border border-neutral-800 px-0.5 py-0.5 text-left align-middle text-[8px] font-bold leading-tight",
+              "border border-neutral-800 px-px py-px text-left align-middle text-[7px] font-bold leading-tight",
               emphasize ? "bg-neutral-50" : undefined,
             )}
           >
-            {isGrand ? "সর্বমোট" : <WingName wing={wing} />}
+            {isGrand ? "সর্বমোট" : <WingName wing={wing} paper />}
           </td>
         }
       />

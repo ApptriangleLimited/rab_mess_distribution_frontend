@@ -35,6 +35,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      pako: path.join(projectRoot, "node_modules/pako"),
+    };
+    return config;
+  },
   experimental: {
     proxyClientMaxBodySize: "8mb",
     serverActions: {

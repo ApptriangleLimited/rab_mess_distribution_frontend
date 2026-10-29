@@ -51,6 +51,7 @@ from wings import wing_family_names
 from extra import router as extra_router, seed_catalog
 from persist import router as persist_router, seed_persist
 from account import router as account_router
+from adms import router as adms_router
 from headers import SecurityHeadersMiddleware
 from permissions import seed_permissions
 from security import encrypt_secret, verify_login_mfa
@@ -58,7 +59,7 @@ from audit import write_audit
 import audit_user  # noqa: F401 — register au_entry_by / au_update_by flush hooks
 from config import settings
 from database import Base, SessionLocal, engine, get_db
-from models import Assignment, CatalogState, Member, Staff, TagRequest
+from models import Assignment, CatalogState, MealAssign, Member, Staff, SuppressedCarry, TagRequest
 from observability import RequestContextMiddleware, configure_logging, log_event
 from rate_limit import (
     client_ip,
@@ -101,6 +102,7 @@ app.include_router(daily_router)
 app.include_router(extra_router)
 app.include_router(persist_router)
 app.include_router(account_router)
+app.include_router(adms_router)
 
 _origins = settings.cors_origins
 app.add_middleware(
@@ -339,6 +341,30 @@ def find_member_by_rab(db: Session, rab_id: str, exclude_id: str | None = None) 
     if exclude_id:
         query = query.filter(Member.id != exclude_id)
     return query.first()
+
+
+def delete_member_row(db: Session, row: Member) -> None:
+    member_id = row.id
+    db.query(TagRequest).filter(TagRequest.user_id == member_id).delete(
+        synchronize_session=False
+    )
+    db.query(Assignment).filter(Assignment.user_id == member_id).delete(
+        synchronize_session=False
+    )
+    db.query(SuppressedCarry).filter(SuppressedCarry.user_id == member_id).delete(
+        synchronize_session=False
+    )
+    db.query(MealAssign).filter(MealAssign.member_id == member_id).delete(
+        synchronize_session=False
+    )
+    db.delete(row)
+
+
+def take_rejected_member_by_rab(db: Session, rab_id: str) -> None:
+    existing = find_member_by_rab(db, rab_id)
+    if existing is not None and existing.approval_status == "rejected":
+        delete_member_row(db, existing)
+        db.flush()
 
 
 def queue_counts(db: Session) -> dict[str, int]:
@@ -598,6 +624,8 @@ def list_members(
         query = query.filter(Member.status == status)
     if approval and approval != "all":
         query = query.filter(Member.approval_status == normalize_approval(approval, approval))
+    else:
+        query = query.filter(Member.approval_status != "rejected")
     if wing and wing != "all":
         if str(wing_family or "").lower() in {"1", "true", "yes"}:
             family = [name.lower() for name in wing_family_names(db, wing)]
@@ -659,6 +687,7 @@ def create_member(
 ):
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
+    take_rejected_member_by_rab(db, body.rab_id)
     if find_member_by_rab(db, body.rab_id):
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
 
@@ -707,6 +736,7 @@ def update_member(
     row = db.get(Member, member_id)
     if row is None:
         raise HTTPException(status_code=404, detail="User not found")
+    take_rejected_member_by_rab(db, body.rab_id)
     if find_member_by_rab(db, body.rab_id, exclude_id=member_id):
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     apply_member_fields(row, body)
@@ -770,14 +800,13 @@ def reject_member(
     row = db.get(Member, member_id)
     if row is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if row.approval_status != "pending":
+    if row.approval_status not in ("pending", "rejected"):
         raise HTTPException(status_code=409, detail="Request is no longer pending")
-    row.approval_status = "rejected"
-    row.updated_at = utcnow()
+    delete_member_row(db, row)
     db.commit()
-    db.refresh(row)
     bust_members()
-    return envelope(member_out(row), "Member request rejected.")
+    bust_daily()
+    return envelope({"id": member_id, "deleted": True}, "Member request rejected.")
 
 
 @app.patch("/api/v1/members/{member_id}/tag")
@@ -794,6 +823,11 @@ def change_member_tag(
         tag = normalize_tag(body.tag)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    current = (row.default_tag or "").upper()
+    if current == "MFR" and tag not in ("MFR", "JL"):
+        raise HTTPException(status_code=409, detail="MFR can only be changed to JL")
+    if current != "MFR" and tag == "MFR":
+        raise HTTPException(status_code=409, detail="Cannot change another tag to MFR")
     row.default_tag = tag
     row.updated_at = utcnow()
     db.commit()

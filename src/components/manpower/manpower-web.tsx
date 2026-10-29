@@ -66,7 +66,7 @@ function WingNameCell({
     <td
       rowSpan={rowSpan}
       className={cn(
-        "sticky left-0 z-[2] w-36 border border-neutral-200 px-3 py-1.5 text-left text-sm font-semibold align-middle dark:border-neutral-700",
+        "sticky left-0 z-[2] w-24 border border-neutral-200 px-1.5 py-1 text-left text-xs font-semibold align-middle dark:border-neutral-700",
         emphasize
           ? "bg-neutral-100 dark:bg-neutral-800/80"
           : "bg-white dark:bg-neutral-900",
@@ -504,7 +504,7 @@ function AbsenceTable({
               return (
                 <tr key={row.wing}>
                   <td className="sticky left-0 z-[1] border border-neutral-200 bg-white px-3 py-1.5 text-left text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900">
-                    <WingName wing={row.wing} />
+                    <WingName wing={row.wing} paper />
                   </td>
                   {ABSENCE_DETAIL_FIELDS.map((field) =>
                     manual ? (
@@ -622,7 +622,7 @@ export function ManpowerWeb({ report, readOnly = false }: Props) {
                     key={block.wing}
                     date={date}
                     wing={block.wing}
-                    wingLabel={<WingName wing={block.wing} />}
+                    wingLabel={<WingName wing={block.wing} paper />}
                     authorized={block.authorized}
                     held={block.held}
                     shortfall={block.shortfall}

@@ -282,8 +282,22 @@ body {
     display: block !important;
   }
   @page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 8mm;
+  }
+  .manpower-letter,
+  .strength-letter {
+    position: relative !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    padding: 2mm !important;
+  }
+  .manpower-verified-watermark {
+    position: absolute !important;
+    inset: 0 !important;
+    overflow: hidden !important;
   }
   .force-rank-letter {
     width: 100% !important;

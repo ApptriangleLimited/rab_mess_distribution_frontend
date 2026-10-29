@@ -16,7 +16,13 @@ import {
   isCarrySuppressed,
 } from "@/lib/store/assignments";
 import { canAssignOnDate } from "@/lib/store/daily";
-import { listForces } from "@/lib/store/org-options";
+import { manpowerPaperWingLabel } from "@/lib/rank-labels";
+import {
+  listForces,
+  listWingChildren,
+  memberFormWing,
+  memberMatchesWingFilter,
+} from "@/lib/store/org-options";
 import type { DailyTag } from "@/lib/types";
 
 /** RAB columns on the paper (Settings ranks). */
@@ -232,11 +238,20 @@ export type ForceRankCol = {
   span: number;
 };
 
+export type ForceRankWingBlock = {
+  wing: string;
+  labelBn: string;
+  forces: ForceRankForceRow[];
+  total: number;
+};
+
 export type ForceRankReport = {
   date: string;
   orgBn: string;
   titleBn: string;
+  filterWing: string;
   columns: ForceRankCol[];
+  wings: ForceRankWingBlock[];
   forces: ForceRankForceRow[];
   officerHeld: number;
   officerTotal: number;
@@ -400,6 +415,7 @@ function projectedTag(userId: string, date: string): DailyTag | "" {
 function countTaggedByForceRank(
   date: string,
   snapshot?: ManpowerSnapshot,
+  filterWing = "all",
 ): Map<string, number> {
   const state = getState();
   const tagFor =
@@ -416,6 +432,7 @@ function countTaggedByForceRank(
     } else if (!isManpowerCountableMember(user)) {
       continue;
     }
+    if (!memberMatchesWingFilter(user.wing, filterWing)) continue;
     const resolved = tagFor(user.id);
     const tag = (
       snapshot ? resolved : resolved || user.default_tag || ""
@@ -438,7 +455,12 @@ function countTaggedByForceRank(
       user.rank || stored?.rank || "",
     );
     if (!rank) continue;
-    const key = `${forceName.trim().toLowerCase()}||${rank}`;
+    const wingKey = (
+      memberFormWing(user.wing) ||
+      user.wing ||
+      "—"
+    ).trim();
+    const key = `${wingKey.toLowerCase()}||${forceName.trim().toLowerCase()}||${rank}`;
     buckets.set(key, (buckets.get(key) ?? 0) + 1);
   }
   return buckets;
@@ -448,12 +470,14 @@ function countForCell(
   buckets: Map<string, number>,
   force: string,
   rank: string,
+  wing: string,
 ): number {
   if (!rank) return 0;
   const forceKey = force.trim().toLowerCase();
+  const wingKey = wing.trim().toLowerCase();
   let total = 0;
   for (const rankKey of cellRankKeys(rank)) {
-    total += buckets.get(`${forceKey}||${rankKey}`) ?? 0;
+    total += buckets.get(`${wingKey}||${forceKey}||${rankKey}`) ?? 0;
   }
   return total;
 }
@@ -478,31 +502,19 @@ function padCells(
   return out;
 }
 
-export function buildForceRankReport(
-  date: string,
-  snapshot?: ManpowerSnapshot,
-): ForceRankReport {
+function buildForceRowsForWing(
+  tagged: Map<string, number>,
+  rabOrder: { id: string; rab: string; labelBn: string }[],
+  wing: string,
+): ForceRankForceRow[] {
   const state = getState();
-  const forces = paperForceList();
-  const tagged = countTaggedByForceRank(date, snapshot);
-  const rabOrder = FORCE_RANK_RANKS.map((col) => {
-    const fromCatalog = state.ranks.find(
-      (r) => r.toLowerCase() === col.rab.toLowerCase(),
-    );
-    return {
-      ...col,
-      rab: fromCatalog ?? col.rab,
-      labelBn: col.labelBn,
-    };
-  });
-
-  const forceRows: ForceRankForceRow[] = forces.map((force) => {
+  return paperForceList().map((force) => {
     const cells: Record<string, ForceRankCell[]> = {};
     for (const col of rabOrder) {
       const ranks = ranksForRab(force, col.id);
       if (col.id === "civil") {
         cells[col.id] = placeCivilCells(ranks, (rank) =>
-          countForCell(tagged, force, rank),
+          countForCell(tagged, force, rank, wing),
         );
         continue;
       }
@@ -519,7 +531,7 @@ export function buildForceRankReport(
         return {
           rank,
           labelBn: paperLabelBn(force, rank, custom),
-          count: countForCell(tagged, force, rank),
+          count: countForCell(tagged, force, rank, wing),
         };
       });
     }
@@ -530,25 +542,10 @@ export function buildForceRankReport(
       total: 0,
     };
   });
+}
 
-  const columns: ForceRankCol[] = rabOrder.map((col) => {
-    if (col.id === "civil") {
-      return { id: col.id, rab: col.rab, labelBn: col.labelBn, span: CIVIL_SLOTS.length };
-    }
-    if (col.id === "cook" || col.id === "nce") {
-      return { id: col.id, rab: col.rab, labelBn: col.labelBn, span: 1 };
-    }
-    if (col.id === "si" || col.id === "naik" || col.id === "constable") {
-      return { id: col.id, rab: col.rab, labelBn: col.labelBn, span: 2 };
-    }
-    let span = 1;
-    for (const row of forceRows) {
-      span = Math.max(span, row.cells[col.id]?.length || 1);
-    }
-    return { id: col.id, rab: col.rab, labelBn: col.labelBn, span };
-  });
-
-  for (const row of forceRows) {
+function finishForceRows(rows: ForceRankForceRow[], columns: ForceRankCol[]) {
+  for (const row of rows) {
     for (const col of columns) {
       row.cells[col.id] = padCells(
         row.cells[col.id] ?? [],
@@ -564,21 +561,109 @@ export function buildForceRankReport(
       0,
     );
   }
+}
+
+export function buildForceRankReport(
+  date: string,
+  snapshot?: ManpowerSnapshot,
+  filterWing = "all",
+): ForceRankReport {
+  const state = getState();
+  const tagged = countTaggedByForceRank(date, snapshot, filterWing);
+  const rabOrder = FORCE_RANK_RANKS.map((col) => {
+    const fromCatalog = state.ranks.find(
+      (r) => r.toLowerCase() === col.rab.toLowerCase(),
+    );
+    return {
+      ...col,
+      rab: fromCatalog ?? col.rab,
+      labelBn: col.labelBn,
+    };
+  });
+
+  const official = listWingChildren(null);
+  const foundWings = new Set<string>();
+  for (const key of tagged.keys()) {
+    const wing = key.split("||")[0] ?? "";
+    if (wing) foundWings.add(wing);
+  }
+  const matchedOfficial = official.filter((wing) =>
+    memberMatchesWingFilter(wing, filterWing),
+  );
+  const extraFound = [...foundWings].filter(
+    (wing) =>
+      memberMatchesWingFilter(wing, filterWing) &&
+      !official.some((row) => row.toLowerCase() === wing),
+  );
+  const uniqueWings = [
+    ...new Set(
+      (matchedOfficial.length ? matchedOfficial : extraFound).concat(
+        matchedOfficial.length ? extraFound : [],
+      ),
+    ),
+  ];
+  if (!uniqueWings.length) {
+    uniqueWings.push(
+      filterWing && filterWing !== "all" ? filterWing : official[0] || "—",
+    );
+  }
+
+  const draftWings = uniqueWings.map((wing) => ({
+    wing,
+    rows: buildForceRowsForWing(tagged, rabOrder, wing),
+  }));
+
+  const columns: ForceRankCol[] = rabOrder.map((col) => {
+    if (col.id === "civil") {
+      return { id: col.id, rab: col.rab, labelBn: col.labelBn, span: CIVIL_SLOTS.length };
+    }
+    if (col.id === "cook" || col.id === "nce") {
+      return { id: col.id, rab: col.rab, labelBn: col.labelBn, span: 1 };
+    }
+    if (col.id === "si" || col.id === "naik" || col.id === "constable") {
+      return { id: col.id, rab: col.rab, labelBn: col.labelBn, span: 2 };
+    }
+    let span = 1;
+    for (const block of draftWings) {
+      for (const row of block.rows) {
+        span = Math.max(span, row.cells[col.id]?.length || 1);
+      }
+    }
+    return { id: col.id, rab: col.rab, labelBn: col.labelBn, span };
+  });
+
+  const wings: ForceRankWingBlock[] = draftWings.map((block) => {
+    finishForceRows(block.rows, columns);
+    return {
+      wing: block.wing,
+      labelBn: manpowerPaperWingLabel(block.wing, state.wing_labels_bn),
+      forces: block.rows,
+      total: block.rows.reduce((sum, row) => sum + row.total, 0),
+    };
+  });
 
   const officerHeld = state.force_rank_officer?.[date]?.held ?? 0;
   const officerTotal = state.force_rank_officer?.[date]?.total ?? 0;
-  const forceSum = forceRows.reduce((sum, row) => sum + row.total, 0);
+  const forceSum = wings.reduce((sum, row) => sum + row.total, 0);
+  const forces = wings[0]?.forces ?? [];
 
   return {
     date,
     orgBn: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) সদর দপ্তর",
     titleBn: "দৈনিক শক্তি প্রতিবেদন",
+    filterWing: filterWing || "all",
     columns,
-    forces: forceRows,
+    wings,
+    forces,
     officerHeld,
     officerTotal,
     grandTotal: forceSum + (officerTotal || officerHeld),
   };
+}
+
+export function parseManpowerWingFilter(raw: string | null | undefined): string {
+  const wing = raw?.trim() ?? "";
+  return !wing || wing.toLowerCase() === "all" ? "all" : wing;
 }
 
 export function forceRankCells(

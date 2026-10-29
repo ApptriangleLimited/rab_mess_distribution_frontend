@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconRefresh } from "@tabler/icons-react";
 import { PritibhojForm } from "@/components/mess/pritibhoj-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
@@ -21,7 +21,6 @@ import {
   createPritibhojEventApi,
   updatePritibhojEventApi,
 } from "@/lib/api/pritibhoj";
-import { savePritibhojPaper } from "@/lib/store/paper-reports";
 import {
   createPritibhojEvent,
   defaultPritibhojAdminRows,
@@ -70,7 +69,7 @@ export default function MessPritibhojEditorClient({
     event ? eventToInput(event) : null,
   );
   const [saving, setSaving] = useState(false);
-  const { ctx, loading: countsLoading } = usePritibhojCountCtx(
+  const { ctx, loading: countsLoading, refresh } = usePritibhojCountCtx(
     value?.date ?? todayISO(),
   );
 
@@ -94,6 +93,22 @@ export default function MessPritibhojEditorClient({
   }
 
   const isEdit = Boolean(event);
+
+  async function onRefreshCounts() {
+    try {
+      const next = await refresh();
+      if (!next) {
+        toast(t("mess.pritibhoj.refreshFail"), "error");
+        return;
+      }
+      setValue((prev) =>
+        prev ? applyPritibhojInputLookups(lockPritibhojSheets(prev), next) : prev,
+      );
+      toast(t("mess.pritibhoj.refreshed"), "success");
+    } catch {
+      toast(t("mess.pritibhoj.refreshFail"), "error");
+    }
+  }
 
   function validate(): string | null {
     if (!value) return t("common.loading");
@@ -133,11 +148,6 @@ export default function MessPritibhojEditorClient({
         toast(t("mess.pritibhoj.missing"), "error");
         return;
       }
-      savePritibhojPaper({
-        eventId: saved.id,
-        title: saved.title,
-        date: saved.date,
-      });
       toast(t("mess.pritibhoj.saved"), "success");
       router.push(`/mess/pritibhoj/${saved.id}`);
     } catch (err) {
@@ -184,16 +194,29 @@ export default function MessPritibhojEditorClient({
               }
               center={<MessTabs />}
               actions={
-                <Button
-                  type="button"
-                  variant="cta"
-                  size="sm"
-                  className="h-10 rounded-xl shadow-sm shadow-primary/20"
-                  disabled={saving || !value || countsLoading || !ctx}
-                  onClick={() => void onSave()}
-                >
-                  {saving ? t("common.loading") : t("mess.pritibhoj.savePreview")}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 rounded-xl"
+                    disabled={!value || countsLoading}
+                    onClick={() => void onRefreshCounts()}
+                  >
+                    <IconRefresh className="h-4 w-4" />
+                    {countsLoading ? t("common.loading") : t("common.refresh")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="cta"
+                    size="sm"
+                    className="h-10 rounded-xl shadow-sm shadow-primary/20"
+                    disabled={saving || !value}
+                    onClick={() => void onSave()}
+                  >
+                    {saving ? t("common.loading") : t("common.save")}
+                  </Button>
+                </div>
               }
             />
           </div>
@@ -204,7 +227,12 @@ export default function MessPritibhojEditorClient({
             {countsLoading ? (
               <p className="text-sm text-neutral-500">{t("common.loading")}</p>
             ) : null}
-            <PritibhojForm value={value} onChange={handleChange} />
+            <PritibhojForm
+              value={value}
+              onChange={handleChange}
+              onRefresh={() => void onRefreshCounts()}
+              refreshing={countsLoading}
+            />
           </>
         ) : (
           <div className="flex flex-col gap-3">

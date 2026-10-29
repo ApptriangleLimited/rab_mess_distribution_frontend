@@ -3,7 +3,10 @@
 import { forwardRef, type ReactNode } from "react";
 import { RankColumnHeader } from "@/components/manpower/rank-column-header";
 import { StrengthReportTitle } from "@/components/manpower/strength-title";
-import { ManpowerVerifiedByFooter } from "@/components/manpower/verified-by-footer";
+import {
+  ManpowerVerifiedByFooter,
+  ManpowerVerifiedWatermark,
+} from "@/components/manpower/verified-by-footer";
 import { WingName } from "@/components/manpower/wing-name";
 import { toBnDigits } from "@/lib/consume-official-reports";
 import {
@@ -47,7 +50,7 @@ function CountCell({
 
 function AdminWingName({ wing }: { wing: string }) {
   if (wing === "সর্বমোট") return <>সর্বমোট</>;
-  return <WingName wing={wing} />;
+  return <WingName wing={wing} paper />;
 }
 
 function MetricRow({
@@ -139,7 +142,7 @@ function BranchBlock({
           colSpan={STRENGTH_CATEGORIES.length + 2}
           className="border border-neutral-800 bg-neutral-200/70 px-1 py-0.5 text-left text-[9px] font-bold"
         >
-          <WingName wing={block.wing} />
+          <WingName wing={block.wing} paper />
         </td>
       </tr>
       <MetricRow
@@ -202,7 +205,13 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
     return (
       <>
         <p className="mt-3 text-[10px] font-semibold">অনুপস্থিতির বিবরণ</p>
-        <table className="mt-1 w-full table-fixed border-collapse text-[7.5px] leading-tight">
+        <table className="mt-1 w-full table-fixed border-collapse text-[7px] leading-tight">
+          <colgroup>
+            <col className="w-[16%]" />
+            {Array.from({ length: 12 }).map((_, i) => (
+              <col key={i} className="w-[7%]" />
+            ))}
+          </colgroup>
           <thead>
             <tr className="bg-neutral-100">
               <th className="border border-neutral-800 px-1 py-1 text-left">
@@ -226,7 +235,7 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
             {report.absence.map((row) => (
               <tr key={row.wing}>
                 <td className="border border-neutral-800 px-1 py-0.5 text-left font-medium">
-                  <WingName wing={row.wing} />
+                  <WingName wing={row.wing} paper />
                 </td>
                 <AbsencePrintCells row={row} bn />
               </tr>
@@ -238,7 +247,13 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
   }
 
   return (
-    <table className="mt-3 w-full table-fixed border-collapse text-[7.5px] leading-tight">
+    <table className="mt-3 w-full table-fixed border-collapse text-[7px] leading-tight">
+        <colgroup>
+          <col className="w-[16%]" />
+          {Array.from({ length: 12 }).map((_, i) => (
+            <col key={i} className="w-[7%]" />
+          ))}
+        </colgroup>
         <thead>
           <tr className="bg-neutral-100">
             <th colSpan={6} className="border border-neutral-800" />
@@ -256,7 +271,7 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
             <th className="border border-neutral-800 px-0.5 py-0.5">আরএল</th>
             <th className="border border-neutral-800 px-0.5 py-0.5">এমএল</th>
             <th className="border border-neutral-800 px-0.5 py-0.5">
-              * মাতৃত্বকালীন ছুটি
+              মাতৃত্ব
             </th>
             <th className="border border-neutral-800 px-0.5 py-0.5">প্রশিক্ষণ</th>
             <th className="border border-neutral-800 px-0.5 py-0.5">সাক্ষী</th>
@@ -274,7 +289,7 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
                 {form2 ? (
                   <AdminWingName wing={row.wing} />
                 ) : (
-                  <WingName wing={row.wing} />
+                  <WingName wing={row.wing} paper />
                 )}
               </td>
               <AbsencePrintCells row={row} bn />
@@ -298,8 +313,10 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
     return (
       <div
         ref={ref}
-        className="strength-letter mx-auto w-full max-w-[210mm] min-h-[297mm] bg-white p-2.5 text-neutral-900 shadow-sm print:max-w-none print:p-0 print:shadow-none"
+        className="strength-letter relative mx-auto w-full max-w-[210mm] min-h-0 overflow-hidden bg-white p-2.5 text-neutral-900 shadow-sm print:min-h-0 print:max-w-none print:overflow-visible print:p-0 print:shadow-none"
       >
+        <ManpowerVerifiedWatermark show={verified} />
+        <div className="relative z-[1]">
         <StrengthReportTitle
           titleBn={report.titleBn}
           wingLabel={report.wingLabel}
@@ -309,7 +326,14 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
         />
 
         {/* Top summary */}
-        <table className="mt-3 w-full table-fixed border-collapse text-[7.5px] leading-tight">
+        <table className="mt-3 w-full table-fixed border-collapse text-[7px] leading-tight">
+          <colgroup>
+            <col className="w-[12%]" />
+            {STRENGTH_CATEGORIES.map((c) => (
+              <col key={c.id} />
+            ))}
+            <col className="w-[6%]" />
+          </colgroup>
           <thead>
             <tr className="bg-neutral-100">
               <th className="border border-neutral-800 px-1 py-1 text-left font-semibold">
@@ -334,7 +358,15 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
         </table>
 
         {/* Branch breakdown */}
-        <table className="mt-3 w-full table-fixed border-collapse text-[7.5px] leading-tight">
+        <table className="mt-3 w-full table-fixed border-collapse text-[7px] leading-tight">
+          <colgroup>
+            {report.formNo === 2 ? <col className="w-[12%]" /> : null}
+            <col className="w-[10%]" />
+            {STRENGTH_CATEGORIES.map((c) => (
+              <col key={`br-${c.id}`} />
+            ))}
+            <col className="w-[6%]" />
+          </colgroup>
           <thead>
             <tr className="bg-neutral-100">
               {report.formNo === 2 ? (
@@ -377,7 +409,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
                     {report.grandTotal.wing === "সর্বমোট" ? (
                       "সর্বমোট"
                     ) : (
-                      <WingName wing={report.grandTotal.wing} />
+                      <WingName wing={report.grandTotal.wing} paper />
                     )}
                   </td>
                 </tr>
@@ -421,6 +453,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
         ) : null}
 
         <ManpowerVerifiedByFooter show={verified} />
+        </div>
       </div>
     );
   },

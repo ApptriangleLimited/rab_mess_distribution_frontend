@@ -10,6 +10,7 @@ import {
   IconFileReport,
   IconUsersGroup,
   IconCake,
+  IconLayoutDashboard,
   IconSettings,
   type Icon,
 } from "@tabler/icons-react";
@@ -64,6 +65,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   mess: [
     {
+      href: "/mess",
+      labelKey: "nav.messDashboard",
+      icon: IconLayoutDashboard,
+      chip: "emerald",
+    },
+    {
       href: "/mess/ledger",
       labelKey: "nav.messLedger",
       icon: IconTags,
@@ -80,6 +87,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.shifts",
       icon: IconClockHour4,
       chip: "violet",
+    },
+    {
+      href: "/settings",
+      labelKey: "nav.settings",
+      icon: IconSettings,
+      chip: "neutral",
     },
   ],
   consume: [

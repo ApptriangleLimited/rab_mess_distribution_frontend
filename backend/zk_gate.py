@@ -47,7 +47,10 @@ _state: dict = {
     "rows_date": "",
     "event_stamp": "",
     "shift_stamp": "",
+    "adms_at": 0.0,
+    "adms_sn": "",
 }
+ADMS_HOLD_SEC = 90
 
 
 def mess_today() -> date:
@@ -156,12 +159,71 @@ def _snapshot() -> dict:
             "last_sync": _state["last_sync"],
             "date": _state["date"] or mess_today().isoformat(),
             "rows": list(_state["rows"]),
+            "adms": bool(_state.get("adms_sn")) and (
+                time.monotonic() - float(_state.get("adms_at") or 0)
+            ) < ADMS_HOLD_SEC,
+            "serial": str(_state.get("adms_sn") or ""),
         }
 
 
 def _set(**values) -> None:
     with _state_lock:
         _state.update(values)
+
+
+def adms_fresh() -> bool:
+    with _state_lock:
+        seen = float(_state.get("adms_at") or 0)
+    return seen > 0 and (time.monotonic() - seen) < ADMS_HOLD_SEC
+
+
+def _mark_offline(message: str) -> None:
+    if adms_fresh():
+        return
+    _set(
+        reachable=False,
+        host=settings.zk_host,
+        port=settings.zk_port,
+        error=(message or "ZK device did not answer")[:300],
+        date=mess_today().isoformat(),
+    )
+
+
+def note_adms(serial: str, info: dict | None = None) -> None:
+    """The terminal dialed this API over ADMS. That is the live session."""
+    values: dict = {
+        "reachable": True,
+        "host": settings.zk_host,
+        "port": settings.zk_port,
+        "error": "",
+        "date": mess_today().isoformat(),
+        "adms_at": time.monotonic(),
+    }
+    if serial:
+        values["adms_sn"] = serial
+    if info:
+        name = str(info.get("DeviceName") or info.get("~DeviceName") or "").strip()
+        if name:
+            values["adms_name"] = name
+    _set(**values)
+
+
+def ingest_adms_attendance(db: Session, records: list[tuple[str, datetime]]) -> int:
+    day = mess_today()
+    known_by_key, ms_ids, _, shifts = _today_maps(db, day)
+    accepted = 0
+    for pin, punched in records:
+        if punched.date() != day:
+            continue
+        _append_live_punch(pin, punched, known_by_key, ms_ids, shifts, {}, {})
+        accepted += 1
+    _set(
+        reachable=True,
+        error="",
+        adms_at=time.monotonic(),
+        date=day.isoformat(),
+    )
+    return accepted
 
 
 def _load_shifts(db: Session) -> list[dict]:
@@ -572,13 +634,7 @@ def _append_live_punch(
 
 def _open_and_run(db: Session, write: bool) -> None:
     if not settings.zk_enabled or not settings.zk_host:
-        _set(
-            reachable=False,
-            host=settings.zk_host,
-            port=settings.zk_port,
-            error="ZK device is turned off",
-            date=mess_today().isoformat(),
-        )
+        _mark_offline("ZK device is turned off")
         return
     day = mess_today()
     known_by_key, ms_ids, rfid_by_pin, shifts = _today_maps(db, day)
@@ -608,13 +664,7 @@ def _open_and_run(db: Session, write: bool) -> None:
                     pass
             _set(last_sync=datetime.now(DHAKA).strftime("%Y-%m-%d %H:%M"))
     except Exception as exc:
-        _set(
-            reachable=False,
-            host=settings.zk_host,
-            port=settings.zk_port,
-            error=str(exc)[:300] or "ZK device did not answer",
-            date=day.isoformat(),
-        )
+        _mark_offline(str(exc) or "ZK device did not answer")
     finally:
         if conn is not None:
             try:
@@ -698,13 +748,7 @@ def _watch_once(db: Session) -> None:
             _set(reachable=True, error="", enrolled=len(rfid_by_pin))
             time.sleep(WATCH_IDLE_SEC)
     except Exception as exc:
-        _set(
-            reachable=False,
-            host=settings.zk_host,
-            port=settings.zk_port,
-            error=str(exc)[:300] or "ZK device did not answer",
-            date=mess_today().isoformat(),
-        )
+        _mark_offline(str(exc) or "ZK device did not answer")
     finally:
         if conn is not None:
             try:
@@ -720,8 +764,11 @@ def _watch_once(db: Session) -> None:
 def _watch_loop(session_factory) -> None:
     while True:
         if not settings.zk_enabled or not settings.zk_host:
-            _set(reachable=False, error="ZK device is turned off")
+            _mark_offline("ZK device is turned off")
             time.sleep(WATCH_RETRY_SEC)
+            continue
+        if adms_fresh():
+            time.sleep(2)
             continue
         if _pause_watch.is_set() or bool(_state.get("syncing")):
             time.sleep(0.15)

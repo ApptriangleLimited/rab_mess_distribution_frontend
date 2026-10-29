@@ -58,8 +58,7 @@ import { listAllTags } from "@/lib/store/rates";
 import {
   applyDueJlInactivations,
   canAssignOnDate,
-  canWriteMfrLockedTag,
-  isMfrLocked,
+  canDailyWriteTag,
 } from "@/lib/store/daily";
 import { countRegisterTags } from "@/lib/store/register-totals";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
@@ -267,8 +266,7 @@ export default function TagsPageClient() {
   ) {
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
-    if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
-    if (user && isMfrLocked(user) && !tag) return;
+    if (user && !canDailyWriteTag(user, tag)) return;
     if (apiOn) void cockpit.onTagChange(userId, date, tag, trgTone);
     else if (!tag) clearTag(userId, date);
     else setTag(userId, date, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
@@ -282,8 +280,7 @@ export default function TagsPageClient() {
   ) {
     const user = users.find((u) => u.id === userId);
     if (user && dates.every((d) => !canAssignOnDate(user, d))) return;
-    if (user && isMfrLocked(user) && tag && !canWriteMfrLockedTag(tag)) return;
-    if (user && isMfrLocked(user) && !tag) return;
+    if (user && !canDailyWriteTag(user, tag)) return;
     if (apiOn) void cockpit.onPaintRange(userId, dates, tag, trgTone);
     else setTagRange(userId, dates, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
   }

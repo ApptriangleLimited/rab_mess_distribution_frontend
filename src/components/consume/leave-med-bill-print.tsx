@@ -56,6 +56,7 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
     const t = useT();
     const monthLabel = formatMonthDash(month);
     const pages = chunkBillRows(rows);
+    const multiPage = pages.length > 1;
 
     return (
       <div
@@ -67,6 +68,16 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
         )}
       >
         {pages.map((pageRows, pageIndex) => {
+          const lastPage = pageIndex === pages.length - 1;
+          const pageTagTotals: Partial<Record<DailyTag, number>> = {};
+          for (const code of tags) {
+            pageTagTotals[code] = pageRows.reduce(
+              (s, r) => s + (r.tagDays[code] ?? 0),
+              0,
+            );
+          }
+          const pageDays = pageRows.reduce((s, r) => s + r.totalDays, 0);
+          const pageAmount = pageRows.reduce((s, r) => s + r.amount, 0);
           return (
         <section
           key={pageIndex}
@@ -145,29 +156,56 @@ export const LeaveMedBillPrint = forwardRef<HTMLDivElement, Props>(
                 <td className="border border-black px-1 py-0.5">{row.remarks}</td>
               </tr>
             ))}
-            <tr className="border border-black font-semibold">
-              <td
-                colSpan={4}
-                className="border border-black px-1 py-1 text-left"
-              >
-                Total
-              </td>
-              {tags.map((code) => (
+            {multiPage ? (
+              <tr className="border border-black font-semibold">
                 <td
-                  key={code}
-                  className="consume-num border border-black px-1 py-1 text-right tabular-nums"
+                  colSpan={4}
+                  className="border border-black px-1 py-1 text-left"
                 >
-                  {cell(tagTotals[code] ?? 0)}
+                  {t("consume.colPageTotal")}
                 </td>
-              ))}
-              <td className="consume-num border border-black px-1 py-1 text-right tabular-nums">
-                {cell(totalDays)}
-              </td>
-              <td className="consume-money consume-num border border-black px-1 py-1 text-right tabular-nums">
-                {formatBdtAmount(totalAmount)}
-              </td>
-              <td className="border border-black px-1 py-1" />
-            </tr>
+                {tags.map((code) => (
+                  <td
+                    key={code}
+                    className="consume-num border border-black px-1 py-1 text-right tabular-nums"
+                  >
+                    {cell(pageTagTotals[code] ?? 0)}
+                  </td>
+                ))}
+                <td className="consume-num border border-black px-1 py-1 text-right tabular-nums">
+                  {cell(pageDays)}
+                </td>
+                <td className="consume-money consume-num border border-black px-1 py-1 text-right tabular-nums">
+                  {formatBdtAmount(pageAmount)}
+                </td>
+                <td className="border border-black px-1 py-1" />
+              </tr>
+            ) : null}
+            {lastPage ? (
+              <tr className="border border-black font-bold">
+                <td
+                  colSpan={4}
+                  className="border border-black px-1 py-1 text-left"
+                >
+                  {t("consume.billTotal")}
+                </td>
+                {tags.map((code) => (
+                  <td
+                    key={code}
+                    className="consume-num border border-black px-1 py-1 text-right tabular-nums"
+                  >
+                    {cell(tagTotals[code] ?? 0)}
+                  </td>
+                ))}
+                <td className="consume-num border border-black px-1 py-1 text-right tabular-nums">
+                  {cell(totalDays)}
+                </td>
+                <td className="consume-money consume-num border border-black px-1 py-1 text-right tabular-nums">
+                  {formatBdtAmount(totalAmount)}
+                </td>
+                <td className="border border-black px-1 py-1" />
+              </tr>
+            ) : null}
           </tbody>
         </table>
 

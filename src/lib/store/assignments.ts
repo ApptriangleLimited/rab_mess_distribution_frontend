@@ -2,15 +2,13 @@ import { eachISODate, isDailyDateEditable, nowISO, todayISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import {
   canAssignOnDate,
-  canWriteMfrLockedTag,
-  isFrTag,
+  canDailyWriteTag,
+  isJlTag,
   isMfrLocked,
-  isMfrTag,
   isUserInactiveOnDate,
   rosterStart,
   syncUsersAfterJl,
-  FR_TAG,
-  MFR_TAG,
+  JL_TAG,
 } from "@/lib/store/daily";
 import { isCockpitMember } from "@/lib/store/users";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
@@ -54,10 +52,7 @@ function canWriteTag(
   if (!isDailyDateEditable(date)) return false;
   const user = findUser(userId);
   if (!user || !isCockpitMember(user) || !canAssignOnDate(user, date)) return false;
-  if (isMfrLocked(user) && !isMfrTag(tag) && !canWriteMfrLockedTag(tag)) {
-    return false;
-  }
-  return true;
+  return canDailyWriteTag(user, tag);
 }
 
 /** Persist default_tag on empty days before `before` so a new paint cannot rewrite them. */
@@ -118,7 +113,7 @@ function addDays(iso: string, delta: number): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Lock on MFR; unlock to FR so the member paints like others. */
+/** Unlock MFR when Daily paints JL. */
 function withJlSync(
   users: User[],
   assignments: DailyAssignment[],
@@ -144,14 +139,9 @@ function applyMfrDefaultTag(
   tag: DailyTag | "",
 ): User[] {
   const ids = new Set(userIds);
-  if (isMfrTag(tag)) {
+  if (isJlTag(tag)) {
     return users.map((u) =>
-      ids.has(u.id) ? { ...u, default_tag: MFR_TAG } : u,
-    );
-  }
-  if (isFrTag(tag)) {
-    return users.map((u) =>
-      ids.has(u.id) && isMfrLocked(u) ? { ...u, default_tag: FR_TAG } : u,
+      ids.has(u.id) && isMfrLocked(u) ? { ...u, default_tag: JL_TAG } : u,
     );
   }
   return users;

@@ -39,7 +39,9 @@ export function listPaperReports(kind?: PaperReportKind): PaperReportRequest[] {
 }
 
 export function pendingPaperReportCount() {
-  return listAll().filter((row) => row.status === "submitted").length;
+  return listAll().filter(
+    (row) => row.status === "submitted" && row.kind !== "pritibhoj",
+  ).length;
 }
 
 export function getManpowerPaper(

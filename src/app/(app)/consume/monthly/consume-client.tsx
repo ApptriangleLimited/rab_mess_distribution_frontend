@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
@@ -46,9 +46,37 @@ import {
   formatBdt,
   withReportSource,
 } from "@/lib/reports";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import type { DailyTag } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
+
+type ConsumeBillUser = {
+  name: string;
+  personal_id: string;
+  rab_id: string;
+  rank: string;
+  wing: string;
+  member_type: string;
+};
+
+function matchesConsumeBillFilters(
+  user: ConsumeBillUser,
+  q: string,
+  rank: string,
+  wing: string,
+  memberType: ConsumeMemberTypeFilter,
+) {
+  if (rank !== "all" && user.rank !== rank) return false;
+  if (!memberMatchesWingFilter(user.wing, wing)) return false;
+  if (!memberMatchesTypeFilter(user.member_type, memberType)) return false;
+  const query = q.trim().toLowerCase();
+  if (!query) return true;
+  return [user.name, user.personal_id, user.rab_id, user.wing, user.rank]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -72,6 +100,9 @@ export default function ConsumeMonthlyClient() {
   const [filterPending, startFilterTransition] = useTransition();
   const filter = parseConsumeFilter(searchParams.get("tag"));
   const memberType = parseConsumeMemberType(searchParams.get("member_type"));
+  const [q, setQ] = useState("");
+  const [rank, setRank] = useState("all");
+  const [wing, setWing] = useState("all");
   const filterTags = CONSUME_FILTER_TAGS[filter];
   const filterLabel = consumeFilterLabel(filter);
 
@@ -126,9 +157,9 @@ export default function ConsumeMonthlyClient() {
   }, [state.assignments, state.users, state.rates, month, source]);
 
   const counts = useMemo(() => {
-    const match = <T extends { user: { member_type: string } }>(rows: T[]) =>
+    const match = <T extends { user: ConsumeBillUser }>(rows: T[]) =>
       rows.filter((row) =>
-        memberMatchesTypeFilter(row.user.member_type, memberType),
+        matchesConsumeBillFilters(row.user, q, rank, wing, memberType),
       );
     return {
       "fr-mfr": match(allBills.fr.rows).length,
@@ -136,12 +167,12 @@ export default function ConsumeMonthlyClient() {
       "leave-med": match(allBills.leave.rows).length,
       fuel: match(allBills.fuel.rows).length,
     } satisfies Record<ConsumeFilter, number>;
-  }, [allBills, memberType]);
+  }, [allBills, q, rank, wing, memberType]);
 
   const headerStats = useMemo(() => {
     if (leaveBill) {
       const rows = leaveBill.rows.filter((row) =>
-        memberMatchesTypeFilter(row.user.member_type, memberType),
+        matchesConsumeBillFilters(row.user, q, rank, wing, memberType),
       );
       const days = rows.reduce((s, row) => s + row.totalDays, 0);
       return {
@@ -152,7 +183,7 @@ export default function ConsumeMonthlyClient() {
       };
     }
     const rows = (tagBill?.rows ?? []).filter((row) =>
-      memberMatchesTypeFilter(row.user.member_type, memberType),
+      matchesConsumeBillFilters(row.user, q, rank, wing, memberType),
     );
     return {
       days: rows.reduce((s, row) => s + row.days, 0),
@@ -163,7 +194,7 @@ export default function ConsumeMonthlyClient() {
         0,
       ),
     };
-  }, [leaveBill, tagBill, filter, memberType]);
+  }, [leaveBill, tagBill, filter, q, rank, wing, memberType]);
 
   function patchQuery(patch: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -189,17 +220,23 @@ export default function ConsumeMonthlyClient() {
     });
   }
 
-  const printHref =
-    memberType === "all"
-      ? `/consume/monthly/print?month=${month}&tag=${filter}`
-      : `/consume/monthly/print?month=${month}&tag=${filter}&member_type=${memberType}`;
+  const printHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("month", month);
+    params.set("tag", filter);
+    if (memberType !== "all") params.set("member_type", memberType);
+    if (q.trim()) params.set("q", q.trim());
+    if (rank !== "all") params.set("rank", rank);
+    if (wing !== "all") params.set("wing", wing);
+    return `/consume/monthly/print?${params.toString()}`;
+  }, [month, filter, memberType, q, rank, wing]);
   const exportDisabled = headerStats.members === 0;
 
   function onDownload() {
     if (exportDisabled) return;
     if (filter === "leave-med" && leaveBill) {
       const rows = leaveBill.rows.filter((row) =>
-        memberMatchesTypeFilter(row.user.member_type, memberType),
+        matchesConsumeBillFilters(row.user, q, rank, wing, memberType),
       );
       downloadLeaveMedBillPdf({
         month,
@@ -231,7 +268,7 @@ export default function ConsumeMonthlyClient() {
     }
     if (!tagBill) return;
     const rows = tagBill.rows.filter((row) =>
-      memberMatchesTypeFilter(row.user.member_type, memberType),
+      matchesConsumeBillFilters(row.user, q, rank, wing, memberType),
     );
     const fuelOnly = filter === "fuel";
     const showFuel = fuelOnly || tagBill.tags.includes("FR") || tagBill.fuelRate > 0;
@@ -378,6 +415,12 @@ export default function ConsumeMonthlyClient() {
                 key={`${month}-leave-med`}
                 month={month}
                 onMonthChange={setMonth}
+                q={q}
+                onQChange={setQ}
+                rank={rank}
+                onRankChange={setRank}
+                wing={wing}
+                onWingChange={setWing}
                 memberType={memberType}
                 onMemberTypeChange={setMemberType}
                 tiles={statsTiles}
@@ -390,6 +433,12 @@ export default function ConsumeMonthlyClient() {
                 tag={filterTags}
                 displayTag={filter === "fuel" ? "FR+MFR" : filterLabel}
                 onMonthChange={setMonth}
+                q={q}
+                onQChange={setQ}
+                rank={rank}
+                onRankChange={setRank}
+                wing={wing}
+                onWingChange={setWing}
                 memberType={memberType}
                 onMemberTypeChange={setMemberType}
                 tiles={statsTiles}

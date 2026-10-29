@@ -18,11 +18,8 @@ import {
   rateApiToAllowanceRate,
 } from "@/lib/api/settings";
 import { resetToSeed } from "@/lib/store";
-import {
-  STORE_KEY,
-  isRationFamily,
-  rolesForPicker,
-} from "@/lib/constants";
+import { STORE_KEY, rolesForPicker } from "@/lib/constants";
+import { MessTabs } from "@/components/layout/mess-tabs";
 import { useSession } from "@/hooks/use-session";
 import { switchToSeedRole } from "@/lib/api/switch-role";
 import { homeForRole } from "@/lib/session";
@@ -56,6 +53,7 @@ import { MealShiftsSection } from "@/components/settings/meal-shifts-section";
 import { OrgListSection } from "@/components/settings/org-list-section";
 import {
   parseSettingsTab,
+  settingsTabAccess,
   SettingsSectionTabs,
   type SettingsTabId,
 } from "@/components/settings/settings-section-tabs";
@@ -87,19 +85,22 @@ function SettingsPageInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
-  const isRation = isRationFamily(session?.role);
-  const canManageStaff = session?.role === "admin" || session?.role === "mess";
+  const access = useMemo(
+    () => settingsTabAccess(session?.role),
+    [session?.role],
+  );
+  const { isRation, canManageStaff, hideRates } = access;
 
-  const tab = parseSettingsTab(searchParams.get("tab"), isRation, canManageStaff);
+  const tab = parseSettingsTab(searchParams.get("tab"), access);
 
   useEffect(() => {
     const raw = searchParams.get("tab");
-    const next = parseSettingsTab(raw, isRation, canManageStaff);
+    const next = parseSettingsTab(raw, access);
     if (raw === next) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
     router.replace(`${pathname}?${params.toString()}`);
-  }, [searchParams, isRation, canManageStaff, pathname, router]);
+  }, [searchParams, access, pathname, router]);
 
   function setTab(id: SettingsTabId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -456,7 +457,13 @@ function SettingsPageInner() {
             <PageHeader
               title={t("settings.title")}
               subtitle={t("settings.subtitle")}
-              center={isRation ? <RationTabs /> : null}
+              center={
+                isRation ? (
+                  <RationTabs />
+                ) : session?.role === "mess" ? (
+                  <MessTabs />
+                ) : null
+              }
             />
           </div>
         </div>
@@ -464,14 +471,13 @@ function SettingsPageInner() {
         <SettingsSectionTabs
           value={tab}
           onChange={setTab}
-          isRation={isRation}
-          canManageStaff={canManageStaff}
+          access={access}
         />
 
         {tab === "staff" && canManageStaff ? (
           <StaffAccountsSection static />
         ) : null}
-        {tab === "rates" ? ratesPanel : null}
+        {tab === "rates" && !hideRates ? ratesPanel : null}
         {tab === "rank" ? (
           <OrgListSection kind="rank" icon={IconMilitaryRank} />
         ) : null}

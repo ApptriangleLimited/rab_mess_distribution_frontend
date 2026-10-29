@@ -131,6 +131,7 @@ function expandForPrintPage(
   root.style.display = "block";
 
   root.querySelectorAll<HTMLElement>("*").forEach((node) => {
+    if (node.closest(".manpower-verified-watermark")) return;
     if (node.closest(BANK_LETTER_SELECTOR)) {
       if (node.tagName === "TABLE") {
         node.style.width = "100%";
@@ -178,6 +179,8 @@ function consumePrintRoot(node: HTMLElement) {
         ".wing-food-list-print",
         ".wing-summary-print",
         ".month-ledger-print",
+        ".manpower-letter",
+        ".strength-letter",
       ].join(", "),
     ),
   );
@@ -679,28 +682,62 @@ function letterSheetCss() {
   }
   .manpower-letter,
   .strength-letter {
+    position: relative !important;
     width: 100% !important;
     max-width: 100% !important;
+    overflow: visible !important;
+  }
+  .manpower-verified-watermark {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+  }
+  .manpower-verified-watermark > div {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    width: 140% !important;
+    transform: translate(-50%, -50%) rotate(-32deg) !important;
+    text-align: center !important;
+    font-size: 42mm !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    color: rgba(6, 95, 70, 0.14) !important;
   }
   .manpower-letter table,
   .strength-letter table {
     table-layout: fixed !important;
     width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
   }
   .manpower-letter th,
   .manpower-letter td,
   .strength-letter th,
   .strength-letter td {
     padding: 1px 1px !important;
-    font-size: 7.5px !important;
+    font-size: 7px !important;
     line-height: 1.15 !important;
+    overflow: hidden !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
     white-space: normal !important;
+    vertical-align: middle !important;
   }
   .force-rank-letter {
+    position: relative !important;
     width: 100% !important;
     max-width: 100% !important;
+  }
+  .force-rank-letter .force-rank-wing + .force-rank-wing {
+    margin-top: 10px !important;
+  }
+  .force-rank-letter .force-rank-wing-title {
+    font-weight: 700 !important;
+    margin: 0 0 4px !important;
   }
   .force-rank-letter .force-rank-header {
     display: grid !important;
@@ -924,6 +961,33 @@ function copyDocumentStyles(fromDoc: Document, toDoc: Document) {
   });
 }
 
+function lockPrintOrientation(
+  doc: Document,
+  orientation: "portrait" | "landscape",
+) {
+  const { page } = pageCssSize(orientation);
+  const style = doc.createElement("style");
+  style.setAttribute("data-print-orientation", orientation);
+  style.textContent = `
+    @page { size: ${page}; margin: 8mm; }
+    html, body {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: 0 !important;
+      height: auto !important;
+    }
+    .print-page,
+    .manpower-letter,
+    .strength-letter {
+      min-height: 0 !important;
+      height: auto !important;
+      page-break-after: auto !important;
+      break-after: auto !important;
+    }
+  `;
+  doc.head.appendChild(style);
+}
+
 async function waitForPrintAssets(win: Window) {
   await waitForPaint(win);
   try {
@@ -1061,7 +1125,10 @@ function prepareClone(
     clone.style.width = "100%";
     clone.style.maxWidth = "100%";
     clone.style.height = "auto";
-    clone.style.minHeight = consumePrintRoot(clone) ? "0" : `calc(${h} - 16mm)`;
+    clone.style.minHeight = "0";
+    if (!consumePrintRoot(clone)) {
+      clone.style.minHeight = `calc(${h} - 16mm)`;
+    }
     clone.style.boxSizing = "border-box";
     clone.style.padding = "0";
     clone.style.border = "none";
@@ -1367,7 +1434,7 @@ export async function printLetterElement(
   // Do not use noopener — Chrome then returns null and leaves an empty about:blank.
   const printWin = window.open(
     "",
-    "mess-print",
+    orientation === "portrait" ? "mess-print-portrait" : "mess-print-landscape",
     `width=${orientation === "landscape" ? 1100 : 800},height=${orientation === "landscape" ? 800 : 1000}`,
   );
 
@@ -1377,6 +1444,7 @@ export async function printLetterElement(
       printWin.document.write(html);
       printWin.document.close();
       if (preserveColors) copyDocumentStyles(document, printWin.document);
+      lockPrintOrientation(printWin.document, orientation);
       printWin.document.body.appendChild(
         printWin.document.importNode(clone, true),
       );
@@ -1414,6 +1482,7 @@ export async function printLetterElement(
     doc.write(html);
     doc.close();
     if (preserveColors) copyDocumentStyles(document, doc);
+    lockPrintOrientation(doc, orientation);
     doc.body.appendChild(doc.importNode(clone, true));
     await waitForPrintAssets(win);
     await printAndWait(win);

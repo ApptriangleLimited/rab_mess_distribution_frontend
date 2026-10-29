@@ -8,7 +8,7 @@ import {
 } from "@/lib/store/assignments";
 import {
   canAssignOnDate,
-  canWriteMfrLockedTag,
+  canDailyWriteTag,
   isMfrLocked,
   isUserInactiveOnDate,
   MFR_TAG,
@@ -242,7 +242,7 @@ export function createTagRequest(
   const fromDate = rawFrom <= rawTo ? rawFrom : rawTo;
   const toDate = rawFrom <= rawTo ? rawTo : rawFrom;
   if (!canRequestTag(user, fromDate)) return null;
-  if (isMfrLocked(user) && !canWriteMfrLockedTag(toTag)) return null;
+  if (!canDailyWriteTag(user, toTag)) return null;
   const assignable = eachISODate(fromDate, toDate).filter((d) =>
     canAssignOnDate(user, d),
   );
@@ -299,7 +299,7 @@ export function createDutyTagRequest(input: {
 }): TagRequest | null {
   const user = getState().users.find((u) => u.id === input.userId);
   if (!user || !input.toTag) return null;
-  if (isMfrLocked(user) && !canWriteMfrLockedTag(input.toTag)) return null;
+  if (!canDailyWriteTag(user, input.toTag)) return null;
   const fromDate = input.fromDate || todayISO();
   const toDate = input.toDate || fromDate;
   const fromTag = getCockpitTagOnDate(user, fromDate);

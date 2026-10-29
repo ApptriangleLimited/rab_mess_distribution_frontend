@@ -1,4 +1,5 @@
-import { canonicalWingName } from "@/lib/constants";
+import { canonicalRankName } from "@/lib/constants";
+import { todayISO } from "@/lib/date";
 import {
   finalizePritibhojRow,
   isPritibhojAdminMainRow,
@@ -6,8 +7,10 @@ import {
   pritibhojLookupWings,
   pritibhojWingDef,
 } from "@/lib/pritibhoj-demo";
-import { canAssignOnDate, isMfrLocked, MFR_TAG } from "@/lib/store/daily";
-import { isCockpitMember } from "@/lib/store/users";
+import { canAssignOnDate } from "@/lib/store/daily";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
+import { registerCountedTag } from "@/lib/store/register-totals";
+import { isCivilianMember, isCockpitMember } from "@/lib/store/users";
 import type { DailyAssignment, DailyTag, PritibhojRow, User } from "@/lib/types";
 
 export type PritibhojCountCtx = {
@@ -24,13 +27,20 @@ export type PritibhojWingCounts = {
 };
 
 function isDadRank(user: User): boolean {
-  return user.rank.trim().toLowerCase() === "dad";
+  return canonicalRankName(user.rank) === "DAD";
 }
 
-function isCivilMember(user: User): boolean {
-  if (user.member_type === "civilian") return true;
-  const rank = user.rank.trim().toLowerCase();
-  return rank === "civill" || rank === "civil" || rank === "civilian";
+function sheetWingLabels(sheetWing: string): string[] {
+  return isPritibhojAdminMainRow(sheetWing)
+    ? pritibhojAdminLookupWings()
+    : pritibhojLookupWings(sheetWing);
+}
+
+/** Member wing belongs to this sheet row, including child / related catalog wings. */
+function matchesRelatedWing(userWing: string, sheetWing: string): boolean {
+  return sheetWingLabels(sheetWing).some((label) =>
+    memberMatchesWingFilter(userWing, label),
+  );
 }
 
 function assignmentOnDate(
@@ -52,21 +62,24 @@ function isCarrySuppressed(
   return (ctx.suppressed_carries ?? []).includes(`${userId}|${date}`);
 }
 
-/** Same projection Daily Cockpit uses for a member on `date`. */
+/** Same tag Daily RR totals use for a member on `date`. */
 export function projectedCockpitTag(
   user: User,
   date: string,
   ctx: PritibhojCountCtx,
+  today = todayISO(),
 ): DailyTag | "" {
-  if (!canAssignOnDate(user, date)) return "";
-  if (isMfrLocked(user)) return MFR_TAG;
-  const stored = assignmentOnDate(ctx, user.id, date)?.tag;
-  if (stored) return stored;
-  if (isCarrySuppressed(ctx, user.id, date)) return "";
-  return user.default_tag || "";
+  return registerCountedTag(
+    user,
+    date,
+    assignmentOnDate(ctx, user.id, date)?.tag,
+    isCarrySuppressed(ctx, user.id, date),
+    today,
+  );
 }
 
-function isOnCockpit(user: User, date: string): boolean {
+/** Same people Daily RR lists: approved, active, cockpit, assignable that day. */
+function isOnDailyRr(user: User, date: string): boolean {
   return (
     user.approval_status === "approved" &&
     user.status === "1" &&
@@ -79,26 +92,25 @@ function isIslam(religion: string): boolean {
   return religion.trim().toLowerCase() === "islam";
 }
 
-function matchesPritibhojWing(user: User, date: string, sheetWing: string, ctx: PritibhojCountCtx) {
+function matchesPritibhojWing(
+  user: User,
+  date: string,
+  sheetWing: string,
+  ctx: PritibhojCountCtx,
+  today: string,
+) {
   const def = pritibhojWingDef(sheetWing);
   if (def?.tag) {
-    return projectedCockpitTag(user, date, ctx) === def.tag;
+    return projectedCockpitTag(user, date, ctx, today) === def.tag;
   }
-  const keys = new Set<string>();
-  const labels = isPritibhojAdminMainRow(sheetWing)
-    ? pritibhojAdminLookupWings()
-    : pritibhojLookupWings(sheetWing);
-  for (const raw of labels) {
-    keys.add(raw);
-    keys.add(canonicalWingName(raw));
-  }
-  return keys.has(user.wing) || keys.has(canonicalWingName(user.wing));
+  return matchesRelatedWing(user.wing, sheetWing);
 }
 
 export function pritibhojWingCounts(
   date: string,
   wing: string,
   ctx: PritibhojCountCtx,
+  today = todayISO(),
 ): PritibhojWingCounts {
   const key = wing.trim();
   if (!key) return { dad: 0, others: 0, civilian: 0, nonMuslim: 0 };
@@ -110,27 +122,22 @@ export function pritibhojWingCounts(
   let nonMuslim = 0;
 
   for (const user of ctx.users) {
-    if (!matchesPritibhojWing(user, date, key, ctx)) continue;
+    if (!matchesPritibhojWing(user, date, key, ctx, today)) continue;
 
     if (
       !specialTag &&
       user.approval_status === "approved" &&
       user.status === "1" &&
-      user.member_type === "civilian"
+      isCivilianMember(user)
     ) {
       civilian += 1;
+      continue;
     }
 
-    if (!isOnCockpit(user, date)) continue;
+    if (!isOnDailyRr(user, date)) continue;
 
-    if (specialTag) {
-      dad += 1;
-      if (user.member_type === "civilian") civilian += 1;
-    } else if (projectedCockpitTag(user, date, ctx) === MFR_TAG) {
-      dad += 1;
-    }
-
-    if (!isDadRank(user) && !isCivilMember(user)) others += 1;
+    if (isDadRank(user)) dad += 1;
+    else others += 1;
 
     const religion = user.religion?.trim() ?? "";
     if (religion && !isIslam(religion)) nonMuslim += 1;
@@ -144,8 +151,9 @@ export function applyPritibhojLookups(
   date: string,
   ctx: PritibhojCountCtx,
 ): PritibhojRow[] {
+  const today = todayISO();
   return rows.map((row) => {
-    const counts = pritibhojWingCounts(date, row.wing, ctx);
+    const counts = pritibhojWingCounts(date, row.wing, ctx, today);
     return finalizePritibhojRow({
       ...row,
       dad: counts.dad,

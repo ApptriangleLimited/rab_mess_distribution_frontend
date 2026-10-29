@@ -18,7 +18,16 @@ from auth import current_staff, hash_password, require_roles
 from security import decrypt_secret, encrypt_secret, validate_password
 from rate_limit import enforce_register_limit
 from database import SessionLocal, get_db
-from models import Assignment, BoroKhanaDay, FileObject, Member, Rate, Sender, Staff
+from models import (
+    Assignment,
+    BoroKhanaDay,
+    FileObject,
+    Member,
+    Rate,
+    Sender,
+    Staff,
+    SuppressedCarry,
+)
 from persist import CATALOG_KEYS
 from schemas import DUTY_TAGS, MemberIn
 from storage import IMAGE_MAX_BYTES, StorageError, checksum, put_bytes, sniff_image_mime
@@ -831,11 +840,12 @@ async def public_upload_file(
 
 @router.post("/api/v1/public/register")
 def public_register(body: MemberIn, request: Request, db: Session = Depends(get_db)):
-    from main import apply_member_fields, find_member_by_rab
+    from main import apply_member_fields, find_member_by_rab, take_rejected_member_by_rab
 
     enforce_register_limit(request)
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
+    take_rejected_member_by_rab(db, body.rab_id)
     if find_member_by_rab(db, body.rab_id):
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     row = Member(id=new_id("u"), created_by=None)
@@ -965,13 +975,20 @@ def mess_ledger(
         for row in db.query(Member).filter(Member.approval_status == "approved")
         if _match_member(row, q, rank, wing)
     ]
+    from daily import project_cell
+
     assigns = db.query(Assignment).filter(
         Assignment.date >= start,
         Assignment.date <= end,
     ).all()
-    by_user: dict[str, dict[date, str]] = {}
-    for row in assigns:
-        by_user.setdefault(row.user_id, {})[row.date] = row.tag
+    stored_map = {(row.user_id, row.date): row for row in assigns}
+    suppressed = {
+        (row.user_id, row.date)
+        for row in db.query(SuppressedCarry).filter(
+            SuppressedCarry.date >= start,
+            SuppressedCarry.date <= end,
+        )
+    }
     boro_days = {
         row.date
         for row in db.query(BoroKhanaDay).filter(
@@ -979,16 +996,22 @@ def mess_ledger(
             BoroKhanaDay.date <= end,
         )
     }
-    tag_codes = sorted({tag for mapping in by_user.values() for tag in mapping.values()})
+    tag_codes = ["MS", "CD"]
     rows = []
     for member in members:
-        mapping = by_user.get(member.id, {})
-        cells = [mapping.get(day, "") for day in days]
+        cells: list[str] = []
         counts: dict[str, int] = {}
-        for tag in cells:
-            if not tag:
-                continue
-            counts[tag] = counts.get(tag, 0) + 1
+        for day in days:
+            cell = project_cell(
+                member,
+                day,
+                stored_map.get((member.id, day)),
+                suppressed,
+            )
+            tag = str(cell.get("tag") or "")
+            cells.append(tag)
+            if tag:
+                counts[tag] = counts.get(tag, 0) + 1
         if not any(cells):
             continue
         rows.append(

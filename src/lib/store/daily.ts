@@ -30,9 +30,29 @@ export function isJlTag(tag: DailyTag | "" | undefined): boolean {
   return (tag ?? "").toUpperCase() === JL_TAG;
 }
 
-/** MFR can only move to FR; after that they paint like everyone else. */
+/** Daily RR: MFR can only move to JL. */
 export function canWriteMfrLockedTag(tag: DailyTag | "" | undefined): boolean {
-  return isFrTag(tag);
+  return isJlTag(tag);
+}
+
+/** Daily cannot paint MFR onto any other tag. MFR cells may stay MFR or become JL. */
+export function canDailyWriteTag(
+  user: Pick<User, "default_tag">,
+  tag: DailyTag | "" | undefined,
+): boolean {
+  if (!tag) return !isMfrLocked(user);
+  if (isMfrTag(tag)) return isMfrLocked(user);
+  if (isMfrLocked(user)) return canWriteMfrLockedTag(tag);
+  return true;
+}
+
+/** Tag picker for Daily RR / Daily default-tag. */
+export function dailyRrAllowedTags(
+  mfrLocked: boolean,
+  allTags: readonly DailyTag[],
+): DailyTag[] {
+  if (mfrLocked) return [JL_TAG];
+  return allTags.filter((code) => !isMfrTag(code));
 }
 
 /**
@@ -185,7 +205,15 @@ export function approveUser(id: string) {
 }
 
 export function rejectUser(id: string) {
-  return patchUser(id, { approval_status: "rejected" });
+  const existing = getState().users.find((u) => u.id === id) ?? null;
+  if (!existing) return null;
+  setState((prev) => ({
+    ...prev,
+    users: prev.users.filter((u) => u.id !== id),
+    assignments: prev.assignments.filter((a) => a.user_id !== id),
+    tag_requests: prev.tag_requests.filter((r) => r.user_id !== id),
+  }));
+  return existing;
 }
 
 export function endEntry(id: string) {

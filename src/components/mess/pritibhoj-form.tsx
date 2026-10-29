@@ -1,6 +1,8 @@
 "use client";
 
+import { IconRefresh } from "@tabler/icons-react";
 import { DatePicker } from "@/components/shared/date-picker";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { finalizePritibhojRow, sumPritibhojRows } from "@/lib/pritibhoj-demo";
@@ -218,9 +220,13 @@ function EditableTable({
 export function PritibhojForm({
   value,
   onChange,
+  onRefresh,
+  refreshing = false,
 }: {
   value: PritibhojInput;
   onChange: (next: PritibhojInput) => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const t = useT();
 
@@ -247,11 +253,27 @@ export function PritibhojForm({
         </div>
         <div className="space-y-1.5">
           <Label>{t("mess.pritibhoj.date")}</Label>
-          <DatePicker
-            value={value.date}
-            onChange={(date) => onChange({ ...value, date })}
-            allowClear={false}
-          />
+          <div className="flex items-center gap-2">
+            <DatePicker
+              value={value.date}
+              onChange={(date) => onChange({ ...value, date })}
+              allowClear={false}
+              className="min-w-0 flex-1"
+            />
+            {onRefresh ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 shrink-0 rounded-xl"
+                disabled={refreshing}
+                onClick={onRefresh}
+              >
+                <IconRefresh className="h-4 w-4" />
+                {refreshing ? t("common.loading") : t("common.refresh")}
+              </Button>
+            ) : null}
+          </div>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="pb-org">{t("mess.pritibhoj.org")}</Label>

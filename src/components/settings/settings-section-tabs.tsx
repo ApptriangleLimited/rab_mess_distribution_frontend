@@ -16,6 +16,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n";
+import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export type SettingsTabId =
@@ -36,10 +37,27 @@ type TabDef = {
   icon: Icon;
   rationOnly?: boolean;
   staffOnly?: boolean;
+  hideForMess?: boolean;
 };
 
+export type SettingsTabAccess = {
+  isRation: boolean;
+  canManageStaff: boolean;
+  hideRates: boolean;
+};
+
+export function settingsTabAccess(role?: Role | null): SettingsTabAccess {
+  const isAdmin = role === "admin";
+  const isMess = role === "mess";
+  return {
+    isRation: role === "ration" || isAdmin,
+    canManageStaff: isAdmin || isMess,
+    hideRates: isMess,
+  };
+}
+
 const TABS: TabDef[] = [
-  { id: "rates", labelKey: "settings.tabRates", icon: IconCoin },
+  { id: "rates", labelKey: "settings.tabRates", icon: IconCoin, hideForMess: true },
   { id: "staff", labelKey: "settings.tabStaff", icon: IconUsers, staffOnly: true },
   { id: "rank", labelKey: "settings.tabRank", icon: IconMilitaryRank },
   { id: "wing", labelKey: "settings.tabWing", icon: IconTopologyStar3 },
@@ -65,48 +83,44 @@ const TABS: TabDef[] = [
   { id: "qr", labelKey: "settings.tabQr", icon: IconQrcode },
 ];
 
-export function settingsTabsForRole(
-  isRation: boolean,
-  canManageStaff = false,
-): TabDef[] {
-  return TABS.filter(
-    (tab) =>
-      (!tab.rationOnly || isRation) && (!tab.staffOnly || canManageStaff),
-  );
+export function settingsTabsForRole(access: SettingsTabAccess): TabDef[] {
+  return TABS.filter((tab) => {
+    if (tab.rationOnly && !access.isRation) return false;
+    if (tab.staffOnly && !access.canManageStaff) return false;
+    if (tab.hideForMess && access.hideRates) return false;
+    return true;
+  });
 }
 
 export function parseSettingsTab(
   raw: string | null,
-  isRation: boolean,
-  canManageStaff = false,
+  access: SettingsTabAccess,
 ): SettingsTabId {
-  const allowed = settingsTabsForRole(isRation, canManageStaff).map((t) => t.id);
+  const allowed = settingsTabsForRole(access).map((t) => t.id);
   if (raw && (allowed as string[]).includes(raw)) {
     return raw as SettingsTabId;
   }
-  return allowed[0] ?? "rates";
+  return allowed[0] ?? "rank";
 }
 
 /** In-page Settings sections — Rates / Ranks / Wings / Forces / Shifts / SRB Bank / Member Bank / Authorized / QR. */
 export function SettingsSectionTabs({
   value,
   onChange,
-  isRation,
-  canManageStaff = false,
+  access,
   className,
   /** Sit inside RoleNavTabs `after` — no own border chrome. */
   embedded = false,
 }: {
   value: SettingsTabId;
   onChange: (id: SettingsTabId) => void;
-  isRation: boolean;
-  canManageStaff?: boolean;
+  access: SettingsTabAccess;
   className?: string;
   embedded?: boolean;
 }) {
   const t = useT();
   const reduceMotion = useReducedMotion();
-  const tabs = settingsTabsForRole(isRation, canManageStaff);
+  const tabs = settingsTabsForRole(access);
   const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {

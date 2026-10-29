@@ -147,16 +147,16 @@ def is_mfr_locked(member: Member) -> bool:
 def can_write_tag(member: Member, day: date, tag: str) -> bool:
     if not can_assign(member, day):
         return False
-    if is_mfr_locked(member) and tag and tag not in ("MFR", "FR"):
+    if tag == "MFR" and not is_mfr_locked(member):
+        return False
+    if is_mfr_locked(member) and tag and tag not in ("MFR", "JL"):
         return False
     return True
 
 
 def apply_mfr_default(member: Member, tag: str) -> None:
-    if tag == "MFR":
-        member.default_tag = "MFR"
-    elif tag == "FR" and is_mfr_locked(member):
-        member.default_tag = "FR"
+    if tag == "JL" and is_mfr_locked(member):
+        member.default_tag = "JL"
 
 
 def member_matches(

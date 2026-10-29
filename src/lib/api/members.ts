@@ -178,11 +178,15 @@ export async function listAllMembers() {
 }
 
 /** Every approved member, paging past the first 500. Default: active only. */
-export async function listAllApprovedMembers(opts?: { status?: string }) {
+export async function listAllApprovedMembers(opts?: {
+  status?: string;
+  member_type?: string;
+}) {
   const pageSize = 2000;
   const query = {
     approval: "approved" as const,
     status: opts?.status ?? "1",
+    member_type: opts?.member_type,
     page_size: pageSize,
   };
   const first = await listMembers({ ...query, page: 1 });
@@ -285,7 +289,7 @@ export function acceptMember(id: string, tag?: DailyTag) {
 }
 
 export function rejectMember(id: string) {
-  return apiJson<MemberApiRow>(`/api/v1/members/${id}/reject`, {
+  return apiJson<{ id: string; deleted?: boolean }>(`/api/v1/members/${id}/reject`, {
     method: "PATCH",
   });
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconCake,
+  IconDownload,
   IconEdit,
   IconEyeFilled,
   IconPlus,
@@ -28,9 +29,8 @@ import {
   deletePritibhojEventApi,
   listPritibhojEventsApi,
 } from "@/lib/api/pritibhoj";
-import { PaperStatusBadge } from "@/components/reports/paper-status-badge";
+import { downloadPritibhojPdf } from "@/lib/download-pritibhoj-pdf";
 import { formatDateDisplay } from "@/lib/date";
-import { getPritibhojPaper } from "@/lib/store/paper-reports";
 import {
   deletePritibhojEvent,
   eventManpower,
@@ -47,6 +47,7 @@ export default function MessPritibhojClient() {
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
   const [deleting, setDeleting] = useState<PritibhojEvent | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
   const [apiLoading, setApiLoading] = useState(
@@ -177,14 +178,11 @@ export default function MessPritibhojClient() {
                     <th className="px-4 py-3">{t("mess.pritibhoj.title")}</th>
                     <th className="px-4 py-3">{t("mess.pritibhoj.occasion")}</th>
                     <th className="px-4 py-3">{t("mess.pritibhoj.colManpower")}</th>
-                    <th className="px-4 py-3">{t("paperReports.colStatus")}</th>
                     <th className="px-4 py-3 text-right">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((event) => {
-                    const paper = getPritibhojPaper(event.id);
-                    return (
+                  {filtered.map((event) => (
                     <tr
                       key={event.id}
                       className="border-t border-neutral-100 transition hover:bg-neutral-50/80 dark:border-neutral-800 dark:hover:bg-neutral-900/60"
@@ -205,9 +203,6 @@ export default function MessPritibhojClient() {
                       </td>
                       <td className="px-4 py-3 tabular-nums text-neutral-700 dark:text-neutral-300">
                         {eventManpower(event)}
-                      </td>
-                      <td className="px-4 py-3">
-                        {paper ? <PaperStatusBadge status={paper.status} /> : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1.5">
@@ -237,21 +232,40 @@ export default function MessPritibhojClient() {
                               <IconEdit className="h-4 w-4" />
                             </Link>
                           </Button>
-                          {paper?.status === "approved" ? (
-                            <Button
-                              asChild
-                              variant="ghost"
-                              size="icon"
-                              className={rowActionClass("print")}
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className={rowActionClass("print")}
+                          >
+                            <Link
+                              href={`/mess/pritibhoj/${event.id}/print`}
+                              aria-label={t("paperReports.print")}
                             >
-                              <Link
-                                href={`/mess/pritibhoj/${event.id}/print`}
-                                aria-label={t("paperReports.print")}
-                              >
-                                <IconPrinter className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          ) : null}
+                              <IconPrinter className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={rowActionClass("download")}
+                            disabled={downloadingId === event.id}
+                            aria-label={t("common.download")}
+                            onClick={() => {
+                              setDownloadingId(event.id);
+                              try {
+                                downloadPritibhojPdf(event);
+                                toast(t("mess.pritibhoj.downloaded"), "success");
+                              } catch {
+                                toast(t("mess.pritibhoj.missing"), "error");
+                              } finally {
+                                setDownloadingId(null);
+                              }
+                            }}
+                          >
+                            <IconDownload className="h-4 w-4" />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
@@ -265,8 +279,7 @@ export default function MessPritibhojClient() {
                         </div>
                       </td>
                     </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>

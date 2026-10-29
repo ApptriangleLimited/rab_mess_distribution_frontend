@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  IconDownload,
   IconEdit,
   IconEyeFilled,
   IconPlus,
   IconPrinter,
   IconUsersGroup,
 } from "@tabler/icons-react";
+import { ManpowerDownloadLetter } from "@/components/manpower/manpower-download-letter";
 import { DailyTabs } from "@/components/layout/daily-tabs";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
@@ -18,11 +20,15 @@ import { PagePane } from "@/components/shared/page-pane";
 import { PaperStatusBadge } from "@/components/reports/paper-status-badge";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { SearchFilterBar } from "@/components/shared/search-filter-bar";
+import { SettingsWingFilter } from "@/components/shared/settings-catalog-filters";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/shared/toast-provider";
 import { rowActionClass } from "@/components/users/row-action-btn";
 import { useStore } from "@/hooks/use-store";
 import { formatDateDisplay } from "@/lib/date";
+import { parseManpowerWingFilter } from "@/lib/force-rank-report";
 import { listPaperReports } from "@/lib/store/paper-reports";
+import type { ManpowerFormId } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n/provider";
 
@@ -35,12 +41,21 @@ function parseForm(raw: string | null): FormId {
 
 export default function ManpowerClient() {
   const t = useT();
+  const { toast } = useToast();
   const reduceMotion = useReducedMotion();
   const state = useStore();
   const router = useRouter();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [pdfJob, setPdfJob] = useState<{
+    key: string;
+    form: ManpowerFormId;
+    date: string;
+    wing: string;
+  } | null>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const form = parseForm(searchParams.get("form"));
+  const wing = parseManpowerWingFilter(searchParams.get("wing"));
   const [q, setQ] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -94,11 +109,32 @@ export default function ManpowerClient() {
     });
   }, [rows, q, dateFrom, dateTo]);
 
-  const createHref = `/daily/manpower/new?form=${form}`;
+  const wingQuery = form === "4" && wing !== "all" ? `&wing=${encodeURIComponent(wing)}` : "";
+  const createHref = `/daily/manpower/new?form=${form}${wingQuery}`;
 
   function pushForm(next: FormId) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("form", next);
+    if (next !== "4") params.delete("wing");
+    router.replace(`${pathname}?${params.toString()}`);
+  }
+
+  const finishPdf = useCallback(
+    (ok: boolean) => {
+      toast(ok ? t("paperReports.downloaded") : t("common.tryAgain"), ok ? "success" : "error");
+      setPdfJob(null);
+      setDownloadingId(null);
+    },
+    [t, toast],
+  );
+  const onPdfDone = useCallback(() => finishPdf(true), [finishPdf]);
+  const onPdfError = useCallback(() => finishPdf(false), [finishPdf]);
+
+  function pushWing(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("form", form);
+    if (!next || next === "all") params.delete("wing");
+    else params.set("wing", next);
     router.replace(`${pathname}?${params.toString()}`);
   }
 
@@ -187,6 +223,16 @@ export default function ManpowerClient() {
             label={t("common.dateRange")}
             triggerClassName="h-10 min-w-[13.5rem] rounded-xl px-3 text-sm"
           />
+          {form === "4" ? (
+            <SettingsWingFilter
+              value={wing}
+              onChange={pushWing}
+              rootsOnly
+              namesOnly
+              className="w-[14rem] shrink-0"
+              triggerClassName="h-10 rounded-xl"
+            />
+          ) : null}
         </SearchFilterBar>
 
         {filtered.length === 0 ? (
@@ -233,9 +279,14 @@ export default function ManpowerClient() {
                 </thead>
                 <tbody>
                   {filtered.map((row) => {
-                    const href = `/daily/manpower/new?date=${encodeURIComponent(row.ref)}&form=${row.form ?? form}`;
+                    const rowForm = row.form ?? form;
+                    const rowWing =
+                      rowForm === "4" && wing !== "all"
+                        ? `&wing=${encodeURIComponent(wing)}`
+                        : "";
+                    const href = `/daily/manpower/new?date=${encodeURIComponent(row.ref)}&form=${rowForm}${rowWing}`;
                     const editHref = `${href}&edit=1`;
-                    const printHref = `/daily/manpower/print?date=${encodeURIComponent(row.ref)}&form=${row.form ?? form}`;
+                    const printHref = `/daily/manpower/print?date=${encodeURIComponent(row.ref)}&form=${rowForm}${rowWing}`;
                     return (
                       <tr
                         key={row.id}
@@ -295,6 +346,32 @@ export default function ManpowerClient() {
                                 </Link>
                               </Button>
                             ) : null}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={rowActionClass("download")}
+                              disabled={downloadingId === row.id}
+                              aria-label={t("common.download")}
+                              onClick={() => {
+                                const paperForm =
+                                  row.form === "2" ||
+                                  row.form === "3" ||
+                                  row.form === "4"
+                                    ? row.form
+                                    : form;
+                                const nextWing = paperForm === "4" ? wing : "all";
+                                setDownloadingId(row.id);
+                                setPdfJob({
+                                  key: `${row.id}-${paperForm}-${row.ref}-${nextWing}`,
+                                  form: paperForm,
+                                  date: row.ref,
+                                  wing: nextWing,
+                                });
+                              }}
+                            >
+                              <IconDownload className="h-4 w-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -305,6 +382,15 @@ export default function ManpowerClient() {
             </div>
           </section>
         )}
+        {pdfJob ? (
+          <ManpowerDownloadLetter
+            form={pdfJob.form}
+            date={pdfJob.date}
+            wing={pdfJob.wing}
+            onDone={onPdfDone}
+            onError={onPdfError}
+          />
+        ) : null}
       </motion.div>
     </PagePane>
   );

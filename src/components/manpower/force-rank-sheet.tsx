@@ -7,7 +7,9 @@ import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import { formatDateDmy } from "@/lib/date";
 import {
   forceRankCells,
+  type ForceRankForceRow,
   type ForceRankReport,
+  type ForceRankWingBlock,
 } from "@/lib/force-rank-report";
 import { setForceRankOfficer } from "@/lib/store/org-options";
 import { cn } from "@/lib/utils";
@@ -74,6 +76,95 @@ function OfficerCountInput({
   );
 }
 
+function fallbackWing(report: ForceRankReport): ForceRankWingBlock[] {
+  if (report.forces.length) {
+    return [
+      {
+        wing: report.filterWing || "—",
+        labelBn: report.filterWing && report.filterWing !== "all" ? report.filterWing : "—",
+        forces: report.forces,
+        total: report.forces.reduce((sum, row) => sum + row.total, 0),
+      },
+    ];
+  }
+  return [];
+}
+
+function ForceRankWingTable({
+  report,
+  forces,
+  compact,
+  head,
+  cell,
+}: {
+  report: ForceRankReport;
+  forces: ForceRankForceRow[];
+  compact?: boolean;
+  head: string;
+  cell: string;
+}) {
+  return (
+    <table className="force-rank-main w-full border-collapse">
+      <thead>
+        <tr>
+          <th className={cn(head, "text-left")}>বাহিনী</th>
+          {report.columns.map((col) => (
+            <th key={col.id} className={head} colSpan={col.span}>
+              {col.labelBn}
+            </th>
+          ))}
+          <th className={head}>মোট</th>
+        </tr>
+      </thead>
+      <tbody>
+        {forces.map((row) => (
+          <Fragment key={row.force}>
+            <tr>
+              <th
+                rowSpan={2}
+                className={cn(
+                  "border border-black px-1.5 py-1 text-left font-bold align-middle",
+                  compact ? "text-[10px]" : "text-[12px]",
+                )}
+              >
+                {row.labelBn}
+              </th>
+              {report.columns.map((col) =>
+                forceRankCells(row, col).map((item, i) => (
+                  <td
+                    key={`${row.force}-${col.id}-n-${i}`}
+                    colSpan={item.span || 1}
+                    className={cn(cell, "font-medium leading-tight")}
+                  >
+                    {item.labelBn}
+                  </td>
+                )),
+              )}
+              <td className={cn(cell, "font-bold")}>মোট</td>
+            </tr>
+            <tr>
+              {report.columns.map((col) =>
+                forceRankCells(row, col).map((item, i) => (
+                  <td
+                    key={`${row.force}-${col.id}-c-${i}`}
+                    colSpan={item.span || 1}
+                    className={cn(cell, "tabular-nums")}
+                  >
+                    {countText(item.count)}
+                  </td>
+                )),
+              )}
+              <td className={cn(cell, "font-bold tabular-nums")}>
+                {countText(row.total)}
+              </td>
+            </tr>
+          </Fragment>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export function ForceRankSheet({
   report,
   compact,
@@ -128,64 +219,30 @@ export function ForceRankSheet({
         </p>
       </header>
 
-      <table className="force-rank-main w-full border-collapse">
-        <thead>
-          <tr>
-            <th className={cn(head, "text-left")}>বাহিনী</th>
-            {report.columns.map((col) => (
-              <th key={col.id} className={head} colSpan={col.span}>
-                {col.labelBn}
-              </th>
-            ))}
-            <th className={head}>মোট</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.forces.map((row) => (
-            <Fragment key={row.force}>
-              <tr>
-                <th
-                  rowSpan={2}
-                  className={cn(
-                    "border border-black px-1.5 py-1 text-left font-bold align-middle",
-                    compact ? "text-[10px]" : "text-[12px]",
-                  )}
-                >
-                  {row.labelBn}
-                </th>
-                {report.columns.map((col) =>
-                  forceRankCells(row, col).map((item, i) => (
-                    <td
-                      key={`${row.force}-${col.id}-n-${i}`}
-                      colSpan={item.span || 1}
-                      className={cn(cell, "font-medium leading-tight")}
-                    >
-                      {item.labelBn}
-                    </td>
-                  )),
-                )}
-                <td className={cn(cell, "font-bold")}>মোট</td>
-              </tr>
-              <tr>
-                {report.columns.map((col) =>
-                  forceRankCells(row, col).map((item, i) => (
-                    <td
-                      key={`${row.force}-${col.id}-c-${i}`}
-                      colSpan={item.span || 1}
-                      className={cn(cell, "tabular-nums")}
-                    >
-                      {countText(item.count)}
-                    </td>
-                  )),
-                )}
-                <td className={cn(cell, "font-bold tabular-nums")}>
-                  {countText(row.total)}
-                </td>
-              </tr>
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+      {(report.wings.length ? report.wings : fallbackWing(report)).map(
+        (block) => (
+          <section
+            key={block.wing}
+            className="force-rank-wing mt-3 break-inside-avoid first:mt-0"
+          >
+            <h3
+              className={cn(
+                "force-rank-wing-title mb-1 font-bold",
+                compact ? "text-[11px]" : "text-sm",
+              )}
+            >
+              {`উইং: ${block.labelBn}`}
+            </h3>
+            <ForceRankWingTable
+              report={report}
+              forces={block.forces}
+              compact={compact}
+              head={head}
+              cell={cell}
+            />
+          </section>
+        ),
+      )}
 
       <table className="force-rank-footer mt-3 w-full border-collapse">
         <tbody>

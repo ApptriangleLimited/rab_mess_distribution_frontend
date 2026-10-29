@@ -22,7 +22,8 @@ import { notifyCcDataChange, onCcDataChange } from "@/lib/api/cc-events";
 import { TagSelector } from "@/components/daily/tag-selector";
 import { getMember, memberToUser, updateMemberStatus, updateMemberTag } from "@/lib/api/members";
 import { isDailyApiEnabled } from "@/lib/api/mode";
-import { setUserStatus } from "@/lib/store/daily";
+import { dailyRrAllowedTags, isMfrLocked, setUserStatus } from "@/lib/store/daily";
+import { listAllTags } from "@/lib/store/rates";
 import { updateUser } from "@/lib/store/users";
 import { userToFormValues } from "@/components/users/user-form";
 import { dailyUserEditHref, safeDailyBack } from "@/lib/daily-back";
@@ -197,6 +198,7 @@ function DailyUserDetail() {
               user={user}
               withTag
               onAccepted={() => router.replace(backHref)}
+              onRejected={() => router.replace(backHref)}
               after={
                 <Button
                   asChild
@@ -232,9 +234,7 @@ function DailyUserDetail() {
                 <TagSelector
                   value={user.default_tag || ""}
                   disabled={busy}
-                  allowedTags={
-                    user.default_tag === "MFR" ? ["FR", "MFR"] : undefined
-                  }
+                  allowedTags={dailyRrAllowedTags(isMfrLocked(user), listAllTags())}
                   onChange={(tag) => {
                     if (!tag || tag === user.default_tag) return;
                     void onDefaultTag(tag);

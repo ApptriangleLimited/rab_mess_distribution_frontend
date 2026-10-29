@@ -8,7 +8,7 @@ import {
   memberMatchesWingFilter,
 } from "@/lib/store/org-options";
 import { getState, setState } from "@/lib/store";
-import { applyStatusToSpans, isMfrLocked, isUserInactiveOnDate, FR_TAG, MFR_TAG } from "@/lib/store/daily";
+import { applyStatusToSpans, isJlTag, isMfrLocked, isMfrTag, isUserInactiveOnDate, JL_TAG, MFR_TAG } from "@/lib/store/daily";
 import type {
   ApprovalStatus,
   DailyTag,
@@ -71,13 +71,15 @@ export type UserFormRequiredField =
   | "hq_wing"
   | "force_rank"
   | "documents"
-  | "bank";
+  | "bank"
+  | "rab_id";
 
-/** First missing required member field, else null. SRB ID is optional. */
+/** First missing required member field, else null. SRB ID is required only for permanent. */
 export function missingUserFormRequired(
   input: Pick<
     UserInput,
     | "personal_id"
+    | "rab_id"
     | "name"
     | "rank"
     | "wing"
@@ -106,6 +108,9 @@ export function missingUserFormRequired(
   if (isAdminRootName(input.wing)) return "sub_wing";
   if (isHqBranchName(input.wing)) return "hq_wing";
   if (!input.documents?.length) return "documents";
+  if (input.member_type === "permanent" && !input.rab_id.trim()) {
+    return "rab_id";
+  }
   if (input.member_type === "permanent") {
     if (
       !input.bank_name.trim() ||
@@ -242,6 +247,7 @@ export function findUserByRabId(rabId: string, excludeId?: string) {
     getState().users.find(
       (u) =>
         u.rab_id.trim().toLowerCase() === normalized &&
+        u.approval_status !== "rejected" &&
         (!excludeId || u.id !== excludeId),
     ) ?? null
   );
@@ -285,7 +291,21 @@ export function createUser(
     created_at: ts,
     updated_at: ts,
   };
-  setState((prev) => ({ ...prev, users: [user, ...prev.users] }));
+  const rabKey = user.rab_id.trim().toLowerCase();
+  setState((prev) => ({
+    ...prev,
+    users: [
+      user,
+      ...prev.users.filter(
+        (u) =>
+          !(
+            u.approval_status === "rejected" &&
+            rabKey &&
+            u.rab_id.trim().toLowerCase() === rabKey
+          ),
+      ),
+    ],
+  }));
   return user;
 }
 
@@ -320,10 +340,12 @@ export function updateUser(id: string, input: UserInput): User | null {
         ? !!input.documents_verified
         : false,
     default_tag: (isMfrLocked(existing)
-      ? input.default_tag === FR_TAG
-        ? FR_TAG
+      ? isJlTag(input.default_tag)
+        ? JL_TAG
         : MFR_TAG
-      : input.default_tag || existing.default_tag || "") as DailyTag,
+      : isMfrTag(input.default_tag)
+        ? existing.default_tag || ""
+        : input.default_tag || existing.default_tag || "") as DailyTag,
     jl_end_date: input.status === "1" ? "" : existing.jl_end_date,
     inactive_spans,
     updated_at: nowISO(),
@@ -425,6 +447,12 @@ export function filterUsers(users: User[], filters: UserFilters) {
         filters.approval &&
         filters.approval !== "all" &&
         u.approval_status !== filters.approval
+      ) {
+        return false;
+      }
+      if (
+        (!filters.approval || filters.approval === "all") &&
+        u.approval_status === "rejected"
       ) {
         return false;
       }
