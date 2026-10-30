@@ -707,6 +707,7 @@ export function PritibhojMemberDialog({
         <div ref={printRef} className="pritibhoj-member-print hidden">
           <header className="pb-member-head">
             {eventOrg ? <p className="pb-member-org">{eventOrg}</p> : null}
+            <div className="pb-member-rule" />
             <h1>প্রীতিভোজ সদস্য তালিকা</h1>
             {eventTitle ? <p className="pb-member-event">{eventTitle}</p> : null}
             {eventOccasion && eventOccasion !== eventTitle ? (
@@ -717,11 +718,12 @@ export function PritibhojMemberDialog({
             </h2>
             <p className="pb-member-meta">
               {sheetLabel}
-              {"  ·  "}
+              <br />
               তারিখঃ {dateLabel}
               {"  ·  "}
               সদস্য সংখ্যাঃ {members.length}
             </p>
+            <div className="pb-member-rule" />
           </header>
           <table className="pritibhoj-member-table w-full border-collapse text-sm">
             <thead>{tableHead}</thead>

@@ -915,20 +915,29 @@ function colorSheetCss() {
     max-width: 100% !important;
     color: #111 !important;
   }
-  .pritibhoj-member-print .pb-member-head {
+  .pritibhoj-member-print .pb-member-head,
+  .pritibhoj-member-print .pb-member-head p,
+  .pritibhoj-member-print .pb-member-head h1,
+  .pritibhoj-member-print .pb-member-head h2 {
     text-align: center !important;
-    margin: 0 0 5mm !important;
+    width: 100% !important;
+  }
+  .pritibhoj-member-print .pb-member-head {
+    display: block !important;
+    margin: 0 auto 6mm !important;
   }
   .pritibhoj-member-print .pb-member-org {
     margin: 0 !important;
-    font-size: 12px !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
   }
   .pritibhoj-member-print h1 {
-    margin: 1mm 0 0 !important;
-    font-size: 16px !important;
+    margin: 1.5mm 0 0 !important;
+    font-size: 18px !important;
     font-weight: 800 !important;
     line-height: 1.3 !important;
+    letter-spacing: 0.03em !important;
   }
   .pritibhoj-member-print .pb-member-event {
     margin: 1mm 0 0 !important;
@@ -936,14 +945,23 @@ function colorSheetCss() {
     font-weight: 600 !important;
   }
   .pritibhoj-member-print h2 {
-    margin: 3mm 0 0 !important;
-    font-size: 14px !important;
+    margin: 2.5mm 0 0 !important;
+    font-size: 13px !important;
     font-weight: 800 !important;
-    line-height: 1.3 !important;
+    line-height: 1.35 !important;
   }
   .pritibhoj-member-print .pb-member-meta {
-    margin: 1mm 0 0 !important;
-    font-size: 11px !important;
+    margin: 1.5mm 0 0 !important;
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+  }
+  .pritibhoj-member-print .pb-member-rule {
+    display: block !important;
+    width: 38mm !important;
+    height: 0 !important;
+    margin: 2.5mm auto !important;
+    border: 0 !important;
+    border-top: 1.25px solid #111 !important;
   }
   .pritibhoj-member-table {
     width: 100% !important;
@@ -1169,25 +1187,45 @@ function lockPrintOrientation(
       max-width: 100% !important;
       color: #111 !important;
     }
-    .pritibhoj-member-print .pb-member-head {
+    .pritibhoj-member-print .pb-member-head,
+    .pritibhoj-member-print .pb-member-head p,
+    .pritibhoj-member-print .pb-member-head h1,
+    .pritibhoj-member-print .pb-member-head h2 {
       text-align: center !important;
-      margin: 0 0 5mm !important;
+      width: 100% !important;
+    }
+    .pritibhoj-member-print .pb-member-head {
+      display: block !important;
+      margin: 0 auto 6mm !important;
     }
     .pritibhoj-member-print h1 {
-      font-size: 16px !important;
+      font-size: 18px !important;
       font-weight: 800 !important;
-      margin: 1mm 0 0 !important;
+      margin: 1.5mm 0 0 !important;
+      letter-spacing: 0.03em !important;
     }
     .pritibhoj-member-print h2 {
-      font-size: 14px !important;
+      font-size: 13px !important;
       font-weight: 800 !important;
-      margin: 3mm 0 0 !important;
+      margin: 2.5mm 0 0 !important;
     }
-    .pritibhoj-member-print .pb-member-org,
+    .pritibhoj-member-print .pb-member-org {
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.04em !important;
+      margin: 0 !important;
+    }
     .pritibhoj-member-print .pb-member-event,
     .pritibhoj-member-print .pb-member-meta {
-      font-size: 11px !important;
+      font-size: 10px !important;
       margin: 1mm 0 0 !important;
+    }
+    .pritibhoj-member-print .pb-member-rule {
+      display: block !important;
+      width: 38mm !important;
+      margin: 2.5mm auto !important;
+      border: 0 !important;
+      border-top: 1.25px solid #111 !important;
     }
     .pritibhoj-member-table {
       width: 100% !important;
