@@ -812,51 +812,142 @@ function colorSheetCss() {
   }
   .pritibhoj-sheets {
     width: 100% !important;
+    max-width: 100% !important;
     overflow: visible !important;
-    gap: 3mm !important;
+    gap: 4mm !important;
     page: pritibhoj-page;
-    break-inside: avoid;
-    page-break-inside: avoid;
   }
   @page pritibhoj-page {
     size: A4 portrait;
-    margin: 6mm;
+    margin: 8mm;
   }
   .pritibhoj-sheets section {
+    width: 100% !important;
+    margin: 0 0 4mm !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
     page-break-inside: avoid;
     break-inside: avoid;
-    page-break-before: avoid;
-    break-before: avoid;
-    margin: 0 0 3mm !important;
-    overflow: visible !important;
   }
   .pritibhoj-sheets section > div:first-child {
-    padding: 1.5mm 2mm !important;
+    padding: 2.5mm 3mm !important;
   }
   .pritibhoj-sheets h2 {
-    font-size: 12px !important;
-    line-height: 1.2 !important;
+    font-size: 14px !important;
+    line-height: 1.25 !important;
     margin: 0 !important;
+  }
+  .pritibhoj-sheets section p {
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+    margin: 1px 0 0 !important;
   }
   .pritibhoj-table {
     width: 100% !important;
-    table-layout: auto !important;
-    border: 1px solid #d4d4d4 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border: 1px solid #222 !important;
     border-collapse: collapse !important;
   }
+  .pb-col-sl { width: 5% !important; }
+  .pb-col-wing { width: 17% !important; }
+  .pb-col-num { width: 7.09% !important; }
   .pritibhoj-table th,
   .pritibhoj-table td,
   .pb-cell {
     box-sizing: border-box !important;
-    padding: 2px 4px !important;
-    font-size: 8px !important;
-    line-height: 1.2 !important;
-    overflow: visible !important;
-    white-space: nowrap !important;
-    overflow-wrap: normal !important;
-    word-break: keep-all !important;
+    padding: 4px 2px !important;
+    font-size: 9px !important;
+    line-height: 1.25 !important;
+    text-align: center !important;
+    vertical-align: middle !important;
     position: static !important;
     left: auto !important;
+    border: 1px solid #222 !important;
+  }
+  .pritibhoj-table th {
+    font-size: 7.5px !important;
+    font-weight: 700 !important;
+    padding: 4px 1px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
+  .pritibhoj-table td {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    word-break: keep-all !important;
+  }
+  .pritibhoj-table th:nth-child(2),
+  .pritibhoj-table tbody tr td:nth-child(2) {
+    text-align: left !important;
+    padding-left: 4px !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+  .pritibhoj-member-print {
+    width: 100% !important;
+    max-width: 100% !important;
+    color: #111 !important;
+  }
+  .pritibhoj-member-print .pb-member-head {
+    text-align: center !important;
+    margin: 0 0 5mm !important;
+  }
+  .pritibhoj-member-print .pb-member-org {
+    margin: 0 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+  }
+  .pritibhoj-member-print h1 {
+    margin: 1mm 0 0 !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+  }
+  .pritibhoj-member-print .pb-member-event {
+    margin: 1mm 0 0 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+  }
+  .pritibhoj-member-print h2 {
+    margin: 3mm 0 0 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+  }
+  .pritibhoj-member-print .pb-member-meta {
+    margin: 1mm 0 0 !important;
+    font-size: 11px !important;
+  }
+  .pritibhoj-member-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+  .pritibhoj-member-table th,
+  .pritibhoj-member-table td {
+    border: 1px solid #222 !important;
+    padding: 5px 6px !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    text-align: left !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    vertical-align: middle !important;
+    color: #111 !important;
+    background: #fff !important;
+  }
+  .pritibhoj-member-table th {
+    background: #f3f4f6 !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+  }
+  .pritibhoj-member-table td:first-child,
+  .pritibhoj-member-table th:first-child {
+    width: 8% !important;
+    text-align: center !important;
   }
   .pritibhoj-table button {
     all: unset !important;
@@ -1001,54 +1092,102 @@ function lockPrintOrientation(
       page-break-after: auto !important;
       break-after: auto !important;
     }
-    .pritibhoj-sheets {
-      width: auto !important;
-      max-width: none !important;
-      min-width: 0 !important;
-      overflow: visible !important;
-      page: pritibhoj-page;
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-    }
-    @page pritibhoj-page { size: A4 portrait; margin: 6mm; }
+    .pritibhoj-sheets,
+    .pritibhoj-sheets section,
     .pritibhoj-table {
-      width: auto !important;
-      max-width: none !important;
-      table-layout: auto !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      zoom: 1 !important;
+    }
+    .pritibhoj-table {
+      table-layout: fixed !important;
       border-collapse: collapse !important;
     }
+    .pb-col-sl { width: 5% !important; }
+    .pb-col-wing { width: 17% !important; }
+    .pb-col-num { width: 7.09% !important; }
     .pritibhoj-table th,
     .pritibhoj-table td {
       position: static !important;
       left: auto !important;
       width: auto !important;
       max-width: none !important;
-      min-width: 0 !important;
+      text-align: center !important;
+      vertical-align: middle !important;
+      font-size: 9px !important;
+      line-height: 1.25 !important;
+      padding: 4px 2px !important;
+      border: 1px solid #222 !important;
+    }
+    .pritibhoj-table th {
+      font-size: 7.5px !important;
+      font-weight: 700 !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+    }
+    .pritibhoj-table td {
       white-space: nowrap !important;
-      overflow: visible !important;
-      overflow-wrap: normal !important;
       word-break: keep-all !important;
-      font-size: 8px !important;
-      line-height: 1.2 !important;
-      padding: 2px 4px !important;
+    }
+    .pritibhoj-table th:nth-child(2),
+    .pritibhoj-table tbody tr td:nth-child(2) {
+      text-align: left !important;
+      white-space: normal !important;
+      word-break: break-word !important;
+    }
+    .pritibhoj-member-print {
+      width: 100% !important;
+      max-width: 100% !important;
+      color: #111 !important;
+    }
+    .pritibhoj-member-print .pb-member-head {
+      text-align: center !important;
+      margin: 0 0 5mm !important;
+    }
+    .pritibhoj-member-print h1 {
+      font-size: 16px !important;
+      font-weight: 800 !important;
+      margin: 1mm 0 0 !important;
+    }
+    .pritibhoj-member-print h2 {
+      font-size: 14px !important;
+      font-weight: 800 !important;
+      margin: 3mm 0 0 !important;
+    }
+    .pritibhoj-member-print .pb-member-org,
+    .pritibhoj-member-print .pb-member-event,
+    .pritibhoj-member-print .pb-member-meta {
+      font-size: 11px !important;
+      margin: 1mm 0 0 !important;
+    }
+    .pritibhoj-member-table {
+      width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+    }
+    .pritibhoj-member-table th,
+    .pritibhoj-member-table td {
+      border: 1px solid #222 !important;
+      padding: 5px 6px !important;
+      font-size: 11px !important;
+      text-align: left !important;
+      white-space: normal !important;
+      word-break: break-word !important;
+      background: #fff !important;
+      color: #111 !important;
+    }
+    .pritibhoj-member-table th {
+      background: #f3f4f6 !important;
+      font-weight: 700 !important;
+      text-align: center !important;
+    }
+    .pritibhoj-member-table td:first-child {
+      text-align: center !important;
     }
   `;
   doc.head.appendChild(style);
-}
-
-/** Keep Pritibhoj on one portrait page. Columns stay nowrap; the sheet scales as a whole. */
-function fitPritibhojOnOnePortraitPage(doc: Document) {
-  const root = doc.querySelector(".pritibhoj-sheets") as HTMLElement | null;
-  if (!root) return;
-  const pxPerMm = 96 / 25.4;
-  const maxW = (210 - 12) * pxPerMm;
-  const maxH = (297 - 12) * pxPerMm;
-  const scale = Math.min(
-    1,
-    maxW / Math.max(root.scrollWidth, 1),
-    maxH / Math.max(root.scrollHeight, 1),
-  );
-  if (scale < 0.999) root.style.zoom = String(scale);
 }
 
 async function waitForPrintAssets(win: Window) {
@@ -1512,7 +1651,6 @@ export async function printLetterElement(
         printWin.document.importNode(clone, true),
       );
       await waitForPrintAssets(printWin);
-      fitPritibhojOnOnePortraitPage(printWin.document);
       await printAndWait(printWin);
       try {
         printWin.close();
@@ -1549,7 +1687,6 @@ export async function printLetterElement(
     lockPrintOrientation(doc, orientation);
     doc.body.appendChild(doc.importNode(clone, true));
     await waitForPrintAssets(win);
-    fitPritibhojOnOnePortraitPage(doc);
     await printAndWait(win);
     iframe.remove();
   } finally {

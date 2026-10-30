@@ -13,7 +13,8 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useT } from "@/i18n/provider";
+import { useI18n, useT } from "@/i18n/provider";
+import { formatDateLong } from "@/lib/date";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import {
   addPritibhojMember,
@@ -57,6 +58,20 @@ function downloadCsv(filename: string, header: string[], rows: string[][]) {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+const COLUMN_PRINT_BN: Record<PritibhojColumn, string> = {
+  officer: "অফিসার",
+  dad: "ডিএডি",
+  azadHall: "আজাদ হল",
+  distribution: "বিতরণ (ডিএডি)",
+  others: "অন্যান্য পদ",
+  civilian: "বেসামরিক",
+  nonMuslim: "নন-মুসলিম",
+  total: "মোট",
+  azadHallDist: "আজাদ হল বিতরণ",
+  distribution2: "বিতরণ (অন্যান্য)",
+  totalDistribution: "মোট বিতরণ",
+};
 
 function columnLabel(
   t: ReturnType<typeof useT>,
@@ -115,6 +130,7 @@ export function PritibhojMemberDialog({
   date,
   ctx,
   roster,
+  report,
   onClose,
   onRoster,
 }: {
@@ -126,10 +142,12 @@ export function PritibhojMemberDialog({
   date: string;
   ctx: PritibhojCountCtx;
   roster: PritibhojRoster | undefined;
+  report?: { title?: string; org?: string; occasion?: string };
   onClose: () => void;
   onRoster: (next: PritibhojRoster) => Promise<void>;
 }) {
   const t = useT();
+  const { locale } = useI18n();
   const printRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [addQuery, setAddQuery] = useState("");
@@ -328,10 +346,14 @@ export function PritibhojMemberDialog({
     }
   }
 
-  const title = t("mess.pritibhoj.membersTitle", {
-    column: columnLabel(t, column),
-    wing: wing === "*" ? t("mess.pritibhoj.membersAllWings") : wing,
-  });
+  const columnBn = COLUMN_PRINT_BN[column];
+  const wingLabel = wing === "*" ? "সকল উইং" : wing;
+  const sheetLabel = sheet === "admin" ? "প্রশাসন ও অর্থ উইং" : "মূল উইং";
+  const dateLabel = formatDateLong(date, locale === "bn" ? "bn-BD" : "en-GB");
+  const eventTitle = report?.title?.trim() || "";
+  const eventOrg = report?.org?.trim() || "";
+  const eventOccasion = report?.occasion?.trim() || "";
+  const title = `${columnBn} — ${wingLabel}`;
   const manualEmpty =
     isManualPritibhojColumn(column) &&
     members.length === 0 &&
@@ -411,6 +433,10 @@ export function PritibhojMemberDialog({
           <div>
             <h2 className="text-base font-semibold">{title}</h2>
             <p className="mt-0.5 text-xs text-neutral-500">
+              {sheetLabel}
+              {" · "}
+              {dateLabel}
+              {" · "}
               {t("mess.pritibhoj.membersListed", { count: members.length })}
               {sheetCount !== members.length
                 ? ` · ${t("mess.pritibhoj.membersCountDiff", {
@@ -678,9 +704,26 @@ export function PritibhojMemberDialog({
           </Button>
         </div>
 
-        <div ref={printRef} className="hidden">
-          <h2 style={{ fontSize: "14px", marginBottom: "8px" }}>{title}</h2>
-          <table className="w-full border-collapse text-sm">
+        <div ref={printRef} className="pritibhoj-member-print hidden">
+          <header className="pb-member-head">
+            {eventOrg ? <p className="pb-member-org">{eventOrg}</p> : null}
+            <h1>প্রীতিভোজ সদস্য তালিকা</h1>
+            {eventTitle ? <p className="pb-member-event">{eventTitle}</p> : null}
+            {eventOccasion && eventOccasion !== eventTitle ? (
+              <p className="pb-member-event">{eventOccasion}</p>
+            ) : null}
+            <h2>
+              {columnBn} — {wingLabel}
+            </h2>
+            <p className="pb-member-meta">
+              {sheetLabel}
+              {"  ·  "}
+              তারিখঃ {dateLabel}
+              {"  ·  "}
+              সদস্য সংখ্যাঃ {members.length}
+            </p>
+          </header>
+          <table className="pritibhoj-member-table w-full border-collapse text-sm">
             <thead>{tableHead}</thead>
             <tbody>{memberRows(members)}</tbody>
           </table>

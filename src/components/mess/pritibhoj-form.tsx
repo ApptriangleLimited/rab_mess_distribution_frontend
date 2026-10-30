@@ -458,6 +458,11 @@ export function PritibhojForm({
           date={value.date}
           ctx={ctx}
           roster={value.roster}
+          report={{
+            title: value.title,
+            org: value.org,
+            occasion: value.occasion,
+          }}
           onClose={() => setOpen(null)}
           onRoster={async (next) => {
             await onRoster(next);
