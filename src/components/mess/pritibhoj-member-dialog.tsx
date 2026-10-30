@@ -40,10 +40,6 @@ import type {
   User,
 } from "@/lib/types";
 
-function bnDigits(n: number) {
-  return String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]!);
-}
-
 function csvCell(value: string) {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
   return value;
@@ -368,13 +364,13 @@ export function PritibhojMemberDialog({
     </tr>
   );
 
-  function memberRows(list: User[], bangla: boolean) {
+  function memberRows(list: User[]) {
     return list.map((user, index) => {
       const text = textOf(user);
       return (
         <tr key={user.id}>
           <td className="border border-neutral-300 px-2 py-1.5 text-center tabular-nums dark:border-neutral-600">
-            {bangla ? bnDigits(index + 1) : index + 1}
+            {index + 1}
           </td>
           <td className="border border-neutral-300 px-2 py-1.5 dark:border-neutral-600">
             {user.rab_id}
@@ -499,7 +495,7 @@ export function PritibhojMemberDialog({
                     return (
                       <tr key={user.id} className="odd:bg-neutral-50/70 dark:odd:bg-neutral-900/40">
                         <td className="border border-neutral-200 px-2 py-1.5 text-center tabular-nums dark:border-neutral-700">
-                          {bnDigits(members.indexOf(user) + 1)}
+                          {members.indexOf(user) + 1}
                         </td>
                         <td className="border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
                           {user.rab_id}
@@ -686,7 +682,7 @@ export function PritibhojMemberDialog({
           <h2 style={{ fontSize: "14px", marginBottom: "8px" }}>{title}</h2>
           <table className="w-full border-collapse text-sm">
             <thead>{tableHead}</thead>
-            <tbody>{memberRows(members, true)}</tbody>
+            <tbody>{memberRows(members)}</tbody>
           </table>
         </div>
       </div>
