@@ -31,7 +31,7 @@ import {
 } from "@/lib/store/pritibhoj";
 import { lockPritibhojSheets } from "@/lib/pritibhoj-demo";
 import { applyPritibhojInputLookups } from "@/lib/store/pritibhoj-counts";
-import type { PritibhojEvent } from "@/lib/types";
+import type { PritibhojEvent, PritibhojRoster } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
 export function emptyPritibhojInput(org: string): PritibhojInput {
@@ -91,6 +91,14 @@ export default function MessPritibhojEditorClient({
   function handleChange(next: PritibhojInput) {
     const locked = lockPritibhojSheets(next);
     setValue(ctx ? applyPritibhojInputLookups(locked, ctx) : locked);
+  }
+
+  function onRoster(roster: PritibhojRoster) {
+    setValue((prev) => {
+      if (!prev) return prev;
+      const next = lockPritibhojSheets({ ...prev, roster });
+      return ctx ? applyPritibhojInputLookups(next, ctx) : next;
+    });
   }
 
   const isEdit = Boolean(event);
@@ -233,6 +241,8 @@ export default function MessPritibhojEditorClient({
               onChange={handleChange}
               onRefresh={() => void onRefreshCounts()}
               refreshing={countsLoading}
+              ctx={ctx}
+              onRoster={onRoster}
             />
           </>
         ) : (

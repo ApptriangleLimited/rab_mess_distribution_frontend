@@ -820,9 +820,9 @@ function colorSheetCss() {
     overflow: visible !important;
   }
   .pritibhoj-sheets section {
-    page-break-inside: avoid;
-    break-inside: avoid;
-    margin-bottom: 6mm;
+    page-break-inside: auto;
+    break-inside: auto;
+    margin-bottom: 4mm;
     overflow: visible !important;
   }
   .pritibhoj-table {
@@ -837,19 +837,19 @@ function colorSheetCss() {
   .pritibhoj-table td,
   .pb-cell {
     box-sizing: border-box !important;
-    padding: 2px 1px !important;
-    font-size: 7px !important;
-    line-height: 1.25 !important;
-    overflow: hidden !important;
+    padding: 1px !important;
+    font-size: 6.5px !important;
+    line-height: 1.15 !important;
+    overflow: visible !important;
+    white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
+    position: static !important;
+    left: auto !important;
   }
-  .pritibhoj-table th:nth-child(1),
-  .pritibhoj-table td:nth-child(1) { width: 4%; }
-  .pritibhoj-table th:nth-child(2),
-  .pritibhoj-table td:nth-child(2) { width: 16%; }
-  .pritibhoj-table th:nth-child(n+3),
-  .pritibhoj-table td:nth-child(n+3) { width: 7.27%; }
+  .pritibhoj-table col:nth-child(1) { width: 5% !important; }
+  .pritibhoj-table col:nth-child(2) { width: 15% !important; }
+  .pritibhoj-table col:nth-child(n+3) { width: 7.27% !important; }
   .pritibhoj-table button {
     all: unset !important;
     display: inline !important;
@@ -993,6 +993,35 @@ function lockPrintOrientation(
       page-break-after: auto !important;
       break-after: auto !important;
     }
+    .pritibhoj-sheets,
+    .pritibhoj-sheets section,
+    .pritibhoj-sheets div,
+    .pritibhoj-table {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      overflow: visible !important;
+      position: static !important;
+    }
+    .pritibhoj-table {
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+    }
+    .pritibhoj-table th,
+    .pritibhoj-table td {
+      position: static !important;
+      left: auto !important;
+      white-space: normal !important;
+      overflow: visible !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+      font-size: 6.5px !important;
+      line-height: 1.15 !important;
+      padding: 1px !important;
+    }
+    .pritibhoj-table col:nth-child(1) { width: 5% !important; }
+    .pritibhoj-table col:nth-child(2) { width: 15% !important; }
+    .pritibhoj-table col:nth-child(n+3) { width: 7.27% !important; }
   `;
   doc.head.appendChild(style);
 }

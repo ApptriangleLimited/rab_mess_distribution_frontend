@@ -92,47 +92,62 @@ function PritibhojTable({
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="pritibhoj-table w-full min-w-[920px] border-collapse text-sm">
+    <div className="w-full">
+      <table className="pritibhoj-table w-full table-fixed border-collapse text-[10px] sm:text-[11px]">
+        <colgroup>
+          <col className="w-[5%]" />
+          <col className="w-[15%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.27%]" />
+          <col className="w-[7.28%]" />
+        </colgroup>
         <thead>
-          <tr className="pb-head bg-neutral-100 text-[11px] font-semibold dark:bg-neutral-800">
-            <th className="pb-cell sticky left-0 z-[1] border border-neutral-300 bg-neutral-100 px-2 py-2 dark:border-neutral-600 dark:bg-neutral-800">
+          <tr className="pb-head bg-neutral-100 text-[10px] font-semibold dark:bg-neutral-800">
+            <th className="pb-cell border border-neutral-300 bg-neutral-100 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600 dark:bg-neutral-800">
               ক্রমিক
             </th>
-            <th className="pb-cell sticky left-10 z-[1] border border-neutral-300 bg-neutral-100 px-2 py-2 text-left dark:border-neutral-600 dark:bg-neutral-800">
+            <th className="pb-cell border border-neutral-300 bg-neutral-100 px-0.5 py-1 text-left whitespace-normal break-words dark:border-neutral-600 dark:bg-neutral-800">
               উইং/শাখা/সেল
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               অফিসার
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               ডিএডি
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               আজাদ হল
             </th>
-            <th className="pb-cell pb-sky border border-neutral-300 bg-sky-100 px-2 py-2 dark:border-neutral-600 dark:bg-sky-950/50">
+            <th className="pb-cell pb-sky border border-neutral-300 bg-sky-100 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600 dark:bg-sky-950/50">
               বিতরণ
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               অন্যান্য
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               বেসামরিক
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               নন-মুসলিম
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               মোট
             </th>
-            <th className="pb-cell border border-neutral-300 px-2 py-2 dark:border-neutral-600">
+            <th className="pb-cell border border-neutral-300 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600">
               আজাদ হল
             </th>
-            <th className="pb-cell pb-sky border border-neutral-300 bg-sky-100 px-2 py-2 dark:border-neutral-600 dark:bg-sky-950/50">
+            <th className="pb-cell pb-sky border border-neutral-300 bg-sky-100 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600 dark:bg-sky-950/50">
               বিতরণ
             </th>
-            <th className="pb-cell pb-amber border border-neutral-300 bg-amber-100 px-2 py-2 dark:border-neutral-600 dark:bg-amber-950/40">
+            <th className="pb-cell pb-amber border border-neutral-300 bg-amber-100 px-0.5 py-1 whitespace-normal break-words dark:border-neutral-600 dark:bg-amber-950/40">
               মোট বিতরণ
             </th>
           </tr>
@@ -143,10 +158,10 @@ function PritibhojTable({
               key={`${row.wing}-${i}`}
               className="hover:bg-neutral-50/80 dark:hover:bg-neutral-900/50"
             >
-              <td className="pb-cell sticky left-0 z-[1] border border-neutral-300 bg-white px-2 py-1.5 text-center tabular-nums dark:border-neutral-600 dark:bg-neutral-950">
+              <td className="pb-cell border border-neutral-300 bg-white px-0.5 py-1 text-center tabular-nums dark:border-neutral-600 dark:bg-neutral-950">
                 {bnDigits(i + 1)}
               </td>
-              <td className="pb-cell sticky left-10 z-[1] border border-neutral-300 bg-white px-2 py-1.5 text-left font-medium dark:border-neutral-600 dark:bg-neutral-950">
+              <td className="pb-cell border border-neutral-300 bg-white px-0.5 py-1 text-left font-medium whitespace-normal break-words dark:border-neutral-600 dark:bg-neutral-950">
                 {row.wing}
               </td>
               {COUNT_COLUMNS.map((col) => (
@@ -166,7 +181,7 @@ function PritibhojTable({
           <tr className="pb-foot bg-sky-50 font-semibold dark:bg-sky-950/40">
             <td
               colSpan={2}
-              className="pb-cell sticky left-0 z-[1] border border-neutral-300 bg-sky-50 px-2 py-2 text-left dark:border-neutral-600 dark:bg-sky-950/40"
+              className="pb-cell border border-neutral-300 bg-sky-50 px-0.5 py-1 text-left whitespace-normal break-words dark:border-neutral-600 dark:bg-sky-950/40"
             >
               {footLabel}
             </td>
@@ -263,7 +278,7 @@ export function PritibhojSheets({
         className,
       )}
     >
-      <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+      <section className="overflow-visible rounded-2xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
         <div className="border-b border-neutral-200 px-4 py-3 text-center dark:border-neutral-700">
           <div className="no-print mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 print:hidden">
             <IconCake className="h-5 w-5" />
@@ -292,7 +307,7 @@ export function PritibhojSheets({
         />
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+      <section className="overflow-visible rounded-2xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
         <div className="border-b border-neutral-200 px-4 py-3 text-center dark:border-neutral-700">
           <h2 className="text-sm font-bold text-neutral-900 dark:text-white sm:text-base">
             {PRITIBHOJ_DEMO_META.adminTitleBn}
