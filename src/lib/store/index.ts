@@ -147,7 +147,8 @@ export function applyApiSnapshot(partial: Partial<AppState>) {
   writeStorage(memory);
   listeners.forEach((l) => l());
   persistPaused = false;
-  persistHook?.(memory);
+  // Do not write this snapshot back. A full save of the loaded copy races
+  // with Settings and puts the old rank catalog back after a new rank is added.
 }
 
 type LegacyUser = User & {

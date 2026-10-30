@@ -36,6 +36,22 @@ function branchNameCell(user: User): string {
   return location || district || EMPTY;
 }
 
+/**
+ * Daily member list. Leading columns are fixed; everything else keeps
+ * the original serial order.
+ * SL, Personal no, SRB ID, Force Rank, SRB Rank, Name, Wing, Phone, then the rest.
+ */
+export const DAILY_MEMBER_LIST_COLUMN_ORDER = [
+  0, 2, 3, 7, 5, 1, 8, 11, 4, 6, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19,
+];
+
+export function orderMemberListColumns<T>(
+  cells: readonly T[],
+  order: readonly number[] = DAILY_MEMBER_LIST_COLUMN_ORDER,
+): T[] {
+  return order.map((index) => cells[index]!);
+}
+
 export function fullMemberListHeaders(t: Translate): string[] {
   return [
     t("cc.fields.sl"),

@@ -7,6 +7,7 @@ import { memberListFilterChips } from "@/lib/member-list-report";
 import {
   fullMemberListHeaders,
   fullMemberListRows,
+  orderMemberListColumns,
 } from "@/lib/member-full-list-report";
 import type { UserFilters } from "@/lib/store/users";
 import type { User } from "@/lib/types";
@@ -18,11 +19,13 @@ type Props = {
   filters: UserFilters;
   wingLabels?: Record<string, string>;
   title?: string;
+  /** Daily list only. CC keeps the original column order. */
+  columnOrder?: readonly number[];
 };
 
 export const MemberFullListLetter = forwardRef<HTMLDivElement, Props>(
   function MemberFullListLetter(
-    { users, filters, wingLabels = {}, title },
+    { users, filters, wingLabels = {}, title, columnOrder },
     ref,
   ) {
     const t = useT();
@@ -32,8 +35,15 @@ export const MemberFullListLetter = forwardRef<HTMLDivElement, Props>(
     const wingLabel = (wing: string) =>
       wing ? wingOfficialName(wing, wingLabels) : "—";
     const chips = memberListFilterChips(filters, t, wingLabel);
-    const headers = fullMemberListHeaders(t);
-    const rows = fullMemberListRows(users, t);
+    const headers = columnOrder
+      ? orderMemberListColumns(fullMemberListHeaders(t), columnOrder)
+      : fullMemberListHeaders(t);
+    const rows = fullMemberListRows(users, t).map((row) =>
+      columnOrder ? orderMemberListColumns(row, columnOrder) : row,
+    );
+    const monoCols = columnOrder
+      ? new Set([0, 1, 2, 7])
+      : new Set([0, 3, 12]);
 
     return (
       <div
@@ -79,8 +89,10 @@ export const MemberFullListLetter = forwardRef<HTMLDivElement, Props>(
                     key={`${i}-${col}`}
                     className={cn(
                       "border border-neutral-800 px-1.5 py-1 align-top",
-                      col <= 4 ? "whitespace-nowrap" : "min-w-[4.5rem]",
-                      (col === 0 || col === 3 || col === 12) && "font-mono tabular-nums",
+                      (columnOrder ? col <= 7 : col <= 4)
+                        ? "whitespace-nowrap"
+                        : "min-w-[4.5rem]",
+                      monoCols.has(col) && "font-mono tabular-nums",
                     )}
                   >
                     {value}

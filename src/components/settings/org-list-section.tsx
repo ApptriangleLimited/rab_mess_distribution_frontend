@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/shared/toast-provider";
+import { ApiClientError } from "@/lib/api/client";
+import { persistAppStateNow } from "@/lib/api/app-sync";
 import { useStore } from "@/hooks/use-store";
 import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n";
@@ -323,7 +325,22 @@ export function OrgListSection({
     return rankDisplayLabel(short, force, overrides);
   }
 
-  function onSaveForceRank() {
+  async function finishSave(message: string) {
+    try {
+      await persistAppStateNow();
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError
+          ? err.detail
+          : "Could not save. Try again.",
+        "error",
+      );
+      return;
+    }
+    toast(message, "success");
+  }
+
+  async function onSaveForceRank() {
     if (!forceRankForce) return;
     const short =
       canonicalForceServiceRank(forceRankShort.trim()) ||
@@ -352,8 +369,8 @@ export function OrgListSection({
         toast(t("settings.orgLabelDuplicate"), "error");
         return;
       }
-      toast(t("settings.forceRankSaved"), "success");
       closeForceRankForm();
+      await finishSave(t("settings.forceRankSaved"));
       return;
     }
     const created = addForceRank(
@@ -367,18 +384,18 @@ export function OrgListSection({
       toast(t("settings.orgLabelDuplicate"), "error");
       return;
     }
-    toast(t("settings.forceRankAdded"), "success");
     closeForceRankForm();
+    await finishSave(t("settings.forceRankAdded"));
   }
 
-  function onDeleteForceRank() {
+  async function onDeleteForceRank() {
     if (!deleteForceRank) return;
     removeForceRank(deleteForceRank.force, deleteForceRank.rank);
     setDeleteForceRank(null);
-    toast(t("settings.forceRankDeleted"), "success");
+    await finishSave(t("settings.forceRankDeleted"));
   }
 
-  function onSave() {
+  async function onSave() {
     const label = formValue.trim();
     const full = formElaborate.trim();
     const bangla = formBangla.trim();
@@ -462,8 +479,8 @@ export function OrgListSection({
           return next;
         });
       }
-      toast(t("settings.orgLabelSaved"), "success");
       closeForm();
+      await finishSave(t("settings.orgLabelSaved"));
       return;
     }
     const created =
@@ -476,11 +493,11 @@ export function OrgListSection({
       toast(t("settings.orgLabelDuplicate"), "error");
       return;
     }
-    toast(t(copy.added), "success");
     closeForm();
+    await finishSave(t(copy.added));
   }
 
-  function onDelete() {
+  async function onDelete() {
     if (!deleteLabel) return;
     if (kind === "rank") {
       removeRank(deleteLabel);
@@ -499,7 +516,7 @@ export function OrgListSection({
       });
     }
     setDeleteLabel(null);
-    toast(t(copy.deleted), "success");
+    await finishSave(t(copy.deleted));
   }
 
   function toggleExpand(label: string) {

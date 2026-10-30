@@ -28,8 +28,10 @@ import {
 } from "@/lib/download-member-full-list";
 import { memberListFilterChips } from "@/lib/member-list-report";
 import {
+  DAILY_MEMBER_LIST_COLUMN_ORDER,
   fullMemberListHeaders,
   fullMemberListRows,
+  orderMemberListColumns,
 } from "@/lib/member-full-list-report";
 import {
   filterUsers,
@@ -112,6 +114,8 @@ export default function MemberFullListReportClient({
   }, [apiOn, filters, toast]);
 
   const users = apiOn ? apiUsers : filterUsers(state.users, filters);
+  const dailyList = listHref.startsWith("/daily/");
+  const columnOrder = dailyList ? DAILY_MEMBER_LIST_COLUMN_ORDER : undefined;
   const backHref = `${listHref}?${userFiltersToSearchParams(filters).toString()}`;
   const canAct = users.length > 0;
   const reportTitle = t("cc.fullMemberListReportTitle");
@@ -125,8 +129,12 @@ export default function MemberFullListReportClient({
       title: reportTitle,
       countLabel: `${t("cc.memberListReportCount", { count: users.length })} · ${formatDateDisplay(todayISO())}`,
       chips: memberListFilterChips(filters, t, wingLabel),
-      headers: fullMemberListHeaders(t),
-      rows: fullMemberListRows(users, t),
+      headers: columnOrder
+        ? orderMemberListColumns(fullMemberListHeaders(t), columnOrder)
+        : fullMemberListHeaders(t),
+      rows: fullMemberListRows(users, t).map((row) =>
+        columnOrder ? orderMemberListColumns(row, columnOrder) : row,
+      ),
     };
   }
 
@@ -203,6 +211,7 @@ export default function MemberFullListReportClient({
           filters={filters}
           wingLabels={state.wing_labels}
           title={reportTitle}
+          columnOrder={columnOrder}
         />
       )}
     </PagePane>
