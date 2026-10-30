@@ -52,9 +52,44 @@ function sheetWingLabels(sheetWing: string): string[] {
 
 /** Member wing belongs to this sheet row, including child / related catalog wings. */
 function matchesRelatedWing(userWing: string, sheetWing: string): boolean {
-  return sheetWingLabels(sheetWing).some((label) =>
+  const key = `${userWing}\0${sheetWing}`;
+  const hit = wingMatchCache.get(key);
+  if (hit !== undefined) return hit;
+  const ok = sheetWingLabels(sheetWing).some((label) =>
     memberMatchesWingFilter(userWing, label),
   );
+  wingMatchCache.set(key, ok);
+  return ok;
+}
+
+type DayScan = {
+  assignByUser: Map<string, DailyAssignment>;
+  suppressed: Set<string>;
+};
+
+const dayScans = new WeakMap<PritibhojCountCtx, Map<string, DayScan>>();
+const wingMatchCache = new Map<string, boolean>();
+
+function dayScan(ctx: PritibhojCountCtx, date: string): DayScan {
+  let byDate = dayScans.get(ctx);
+  if (!byDate) {
+    byDate = new Map();
+    dayScans.set(ctx, byDate);
+  }
+  const cached = byDate.get(date);
+  if (cached) return cached;
+  const assignByUser = new Map<string, DailyAssignment>();
+  for (const row of ctx.assignments) {
+    if (row.date === date) assignByUser.set(row.user_id, row);
+  }
+  const suppressed = new Set<string>();
+  const suffix = `|${date}`;
+  for (const key of ctx.suppressed_carries ?? []) {
+    if (key.endsWith(suffix)) suppressed.add(key.slice(0, -suffix.length));
+  }
+  const scan = { assignByUser, suppressed };
+  byDate.set(date, scan);
+  return scan;
 }
 
 function assignmentOnDate(
@@ -62,10 +97,7 @@ function assignmentOnDate(
   userId: string,
   date: string,
 ): DailyAssignment | null {
-  return (
-    ctx.assignments.find((row) => row.user_id === userId && row.date === date) ??
-    null
-  );
+  return dayScan(ctx, date).assignByUser.get(userId) ?? null;
 }
 
 function isCarrySuppressed(
@@ -73,7 +105,7 @@ function isCarrySuppressed(
   userId: string,
   date: string,
 ): boolean {
-  return (ctx.suppressed_carries ?? []).includes(`${userId}|${date}`);
+  return dayScan(ctx, date).suppressed.has(userId);
 }
 
 /** Same tag Daily RR totals use for a member on `date`. */

@@ -126,7 +126,7 @@ function EditableTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full table-fixed border-collapse text-[10px] sm:text-xs [&_th]:whitespace-normal [&_th]:break-words [&_th]:px-0.5">
+      <table className="w-full border-collapse text-xs [&_th]:whitespace-nowrap [&_th]:px-1.5">
         <thead>
           <tr className="bg-neutral-100 text-[11px] font-semibold dark:bg-neutral-800">
             <th className="border border-neutral-300 px-2 py-2 dark:border-neutral-600">
@@ -421,7 +421,7 @@ export function PritibhojForm({
           rows={value.main_rows}
           onChange={(main_rows) => onChange({ ...value, main_rows })}
           footLabel="মোট জনবল ="
-          othersHeader="অন্যান্য"
+          othersHeader="অন্যান্য পদ"
           onOpen={
             interactive
               ? (wing, column, count) =>

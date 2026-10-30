@@ -10,7 +10,7 @@ const HEADERS = [
   "ডিএডি",
   "আজাদ হল",
   "বিতরণ",
-  "অন্যান্য",
+  "অন্যান্য পদ",
   "বেসামরিক",
   "নন-মুসলিম",
   "মোট",
@@ -95,7 +95,6 @@ function drawSheet(
 export function downloadPritibhojPdf(event: PritibhojEvent) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.text(event.title || "Pritibhoj", pageW / 2, 12, { align: "center" });
@@ -109,11 +108,9 @@ export function downloadPritibhojPdf(event: PritibhojEvent) {
     "মূল উইং",
     event.main_rows,
     "মোট জনবল =",
-    24,
+    22,
   );
-  const nextY = afterMain + 10 > pageH - 40 ? 16 : afterMain + 10;
-  if (afterMain + 10 > pageH - 40) doc.addPage();
-  drawSheet(doc, "প্রশাসন ও অর্থ", event.admin_rows, "মোট =", nextY);
+  drawSheet(doc, "প্রশাসন ও অর্থ", event.admin_rows, "মোট =", afterMain + 6);
 
   const stem = `pritibhoj-${event.date || "sheet"}`.replace(/[^\w.-]+/g, "-");
   doc.save(`${stem}.pdf`);
