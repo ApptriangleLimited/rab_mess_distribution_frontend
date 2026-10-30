@@ -62,10 +62,7 @@ export default function AdminReportRequestsClient() {
       if (from && row.date < from) return false;
       if (to && row.date > to) return false;
       if (!query) return true;
-      const kindLabel =
-        row.kind === "pritibhoj"
-          ? t("paperReports.kindPritibhoj")
-          : t("paperReports.kindManpower");
+      const kindLabel = t("paperReports.kindManpower");
       return [
         row.title,
         row.date,
@@ -250,9 +247,7 @@ export default function AdminReportRequestsClient() {
                       className="border-t border-neutral-100 dark:border-neutral-800"
                     >
                       <td className="px-4 py-3 font-medium text-neutral-700 dark:text-neutral-300">
-                        {row.kind === "pritibhoj"
-                          ? t("paperReports.kindPritibhoj")
-                          : t("paperReports.kindManpower")}
+                        {t("paperReports.kindManpower")}
                         {row.form ? ` · ${row.form}` : ""}
                       </td>
                       <td className="px-4 py-3 font-semibold text-neutral-900 dark:text-white">
