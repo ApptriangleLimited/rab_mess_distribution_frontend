@@ -33,6 +33,7 @@ export type PritibhojInput = {
   org: string;
   main_rows: PritibhojRow[];
   admin_rows: PritibhojRow[];
+  roster?: PritibhojEvent["roster"];
 };
 
 function normalizeEvent(input: PritibhojInput): Omit<PritibhojEvent, "id" | "created_at"> {
@@ -44,6 +45,7 @@ function normalizeEvent(input: PritibhojInput): Omit<PritibhojEvent, "id" | "cre
     org: input.org.trim(),
     main_rows: locked.main_rows,
     admin_rows: locked.admin_rows,
+    roster: input.roster ?? {},
   };
 }
 

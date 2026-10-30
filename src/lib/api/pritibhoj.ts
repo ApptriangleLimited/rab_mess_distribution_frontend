@@ -56,6 +56,7 @@ export function serializePritibhojInput(input: PritibhojInput) {
     org: locked.org.trim(),
     main_rows: locked.main_rows.map(serializeRow),
     admin_rows: locked.admin_rows.map(serializeRow),
+    roster: locked.roster ?? {},
   };
 }
 

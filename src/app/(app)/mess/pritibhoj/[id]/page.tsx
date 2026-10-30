@@ -12,6 +12,7 @@ import { PagePane } from "@/components/shared/page-pane";
 import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
 import { usePritibhojEvent } from "@/hooks/use-pritibhoj-event";
+import { usePritibhojRosterEditor } from "@/hooks/use-pritibhoj-roster";
 import { formatDateLong } from "@/lib/date";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { useI18n, useT } from "@/i18n/provider";
@@ -24,6 +25,7 @@ export default function MessPritibhojPreviewPage() {
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
   const { event, loading } = usePritibhojEvent(params.id);
+  const { ctx, saveRoster } = usePritibhojRosterEditor(event);
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
 
   async function onPrint() {
@@ -34,7 +36,7 @@ export default function MessPritibhojPreviewPage() {
       await printLetterElement(
         el,
         event ? `pritibhoj-${event.date}.pdf` : "pritibhoj.pdf",
-        "landscape",
+        "portrait",
         { preserveColors: true },
       );
     } finally {
@@ -114,7 +116,12 @@ export default function MessPritibhojPreviewPage() {
         </div>
 
         <div ref={printRef}>
-          <PritibhojSheets event={event} dateLocale={dateLocale} />
+          <PritibhojSheets
+            event={event}
+            dateLocale={dateLocale}
+            ctx={ctx}
+            onRoster={saveRoster}
+          />
         </div>
       </motion.div>
     </PagePane>

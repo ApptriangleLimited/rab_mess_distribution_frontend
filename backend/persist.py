@@ -367,6 +367,7 @@ def pritibhoj_out(row: PritibhojEvent) -> dict:
         "org": row.org,
         "main_rows": row.main_rows or [],
         "admin_rows": row.admin_rows or [],
+        "roster": row.roster or {},
         "created_at": row.created_at.isoformat() if row.created_at else "",
     }
 
@@ -388,6 +389,11 @@ def upsert_pritibhoj(db: Session, raw: dict) -> PritibhojEvent | None:
     row.org = str(raw.get("org") or "").strip()
     row.main_rows = raw.get("main_rows") or []
     row.admin_rows = raw.get("admin_rows") or []
+    roster = raw.get("roster")
+    if isinstance(roster, dict):
+        row.roster = roster
+    elif row.roster is None:
+        row.roster = {}
     return row
 
 
@@ -398,6 +404,7 @@ class PritibhojIn(BaseModel):
     org: str = ""
     main_rows: list = Field(default_factory=list)
     admin_rows: list = Field(default_factory=list)
+    roster: dict = Field(default_factory=dict)
 
 
 def build_snapshot(db: Session) -> dict:

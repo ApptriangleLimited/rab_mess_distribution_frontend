@@ -20,6 +20,8 @@ import {
   Bar,
   BarChart,
   Cell,
+  LabelList,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -54,7 +56,7 @@ import {
 } from "@/lib/api/mess-checkins";
 import { listPritibhojEventsApi } from "@/lib/api/pritibhoj";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
-import { todayISO } from "@/lib/date";
+import { eachISODate, todayISO } from "@/lib/date";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import { listGuestMeals } from "@/lib/store/guest-meals";
 import { listMealAssigns } from "@/lib/store/meal-assigns";
@@ -68,6 +70,7 @@ import {
   listPritibhojEvents,
   replaceLocalPritibhojEvents,
 } from "@/lib/store/pritibhoj";
+import { isCivilianMember } from "@/lib/store/users";
 import type { PritibhojEvent } from "@/lib/types";
 import type { MealShiftId, User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
@@ -285,8 +288,10 @@ export default function MessDashboardClient() {
   const otherMeals = guestCount + groupCount;
 
   const branchBars = useMemo(() => {
-    const counts = new Map<string, number>();
+    const msCounts = new Map<string, number>();
+    const civilCounts = new Map<string, number>();
     for (const row of filteredLedgerRows) {
+      if (isCivilianMember(row.user)) continue;
       let ms = 0;
       for (const tag of row.days) {
         if (tag === "MS") ms += 1;
@@ -294,19 +299,48 @@ export default function MessDashboardClient() {
       if (!ms) continue;
       const label =
         memberFormWing(row.user.wing) || t("mess.dashboard.unknownBranch");
-      counts.set(label, (counts.get(label) ?? 0) + ms);
+      msCounts.set(label, (msCounts.get(label) ?? 0) + ms);
     }
-    const bars = [...counts.entries()]
-      .map(([name, value], i) => ({
-        name,
-        value,
-        fill: BRANCH_COLORS[i % BRANCH_COLORS.length],
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
+    const dayCount = Math.max(1, eachISODate(range.from, range.to).length);
+    for (const user of state.users) {
+      if (user.approval_status !== "approved" || user.status !== "1") continue;
+      if (!isCivilianMember(user)) continue;
+      if (!memberMatchesWingFilter(user.wing, wing)) continue;
+      const label =
+        memberFormWing(user.wing) || t("mess.dashboard.unknownBranch");
+      civilCounts.set(label, (civilCounts.get(label) ?? 0) + dayCount);
+    }
+    const bars = [...new Set([...msCounts.keys(), ...civilCounts.keys()])]
+      .map((name) => {
+        const ms = msCounts.get(name) ?? 0;
+        const civilian = civilCounts.get(name) ?? 0;
+        return { name, ms, civilian, total: ms + civilian };
+      })
+      .filter((row) => row.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .map((row, i) => ({
+        ...row,
+        fill: BRANCH_COLORS[i % BRANCH_COLORS.length]!,
+      }));
     if (bars.length) return bars;
-    return [{ name: t("mess.dashboard.noBranch"), value: 0, fill: BRANCH_COLORS[0] }];
-  }, [filteredLedgerRows, t]);
+    return [
+      {
+        name: t("mess.dashboard.noBranch"),
+        ms: 0,
+        civilian: 0,
+        total: 0,
+        fill: BRANCH_COLORS[0]!,
+      },
+    ];
+  }, [
+    filteredLedgerRows,
+    range.from,
+    range.to,
+    state.users,
+    state.wing_parent,
+    wing,
+    t,
+  ]);
 
   const remaining = Math.max(0, planned - uniqueConsume);
   const donut = [
@@ -515,16 +549,44 @@ export default function MessDashboardClient() {
             <h2 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
               {t("mess.dashboard.branchOverview")}
             </h2>
-            <div className="mt-3 h-64">
+            <div className="mt-3 h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={branchBars} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                <BarChart data={branchBars} margin={{ top: 16, right: 8, left: 0, bottom: 8 }}>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11 }}
+                    interval={0}
+                    height={branchBars.length > 7 ? 58 : 30}
+                    angle={branchBars.length > 7 ? -28 : 0}
+                    textAnchor={branchBars.length > 7 ? "end" : "middle"}
+                  />
                   <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                   <Tooltip />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  <Legend />
+                  <Bar
+                    dataKey="ms"
+                    name={t("mess.dashboard.msSeries")}
+                    stackId="wing"
+                  >
                     {branchBars.map((row) => (
                       <Cell key={row.name} fill={row.fill} />
                     ))}
+                  </Bar>
+                  <Bar
+                    dataKey="civilian"
+                    name={t("mess.dashboard.civilianSeries")}
+                    stackId="wing"
+                    fill="#7c3aed"
+                    radius={[6, 6, 0, 0]}
+                  >
+                    <LabelList
+                      dataKey="civilian"
+                      position="top"
+                      formatter={(value) => {
+                        const count = Number(value);
+                        return count > 0 ? String(count) : "";
+                      }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

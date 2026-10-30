@@ -53,6 +53,7 @@ export function eventToInput(event: PritibhojEvent): PritibhojInput {
     org: event.org,
     main_rows: event.main_rows,
     admin_rows: event.admin_rows,
+    roster: event.roster ?? {},
   });
 }
 

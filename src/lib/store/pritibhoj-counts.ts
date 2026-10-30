@@ -7,11 +7,25 @@ import {
   pritibhojLookupWings,
   pritibhojWingDef,
 } from "@/lib/pritibhoj-demo";
+import { readPritibhojCell } from "@/lib/pritibhoj-roster";
 import { canAssignOnDate } from "@/lib/store/daily";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { registerCountedTag } from "@/lib/store/register-totals";
-import { isCivilianMember, isCockpitMember } from "@/lib/store/users";
-import type { DailyAssignment, DailyTag, PritibhojRow, User } from "@/lib/types";
+import {
+  compareUsersByRankSerial,
+  isCivilianMember,
+  isCockpitMember,
+} from "@/lib/store/users";
+import type {
+  DailyAssignment,
+  DailyTag,
+  PritibhojBucket,
+  PritibhojColumn,
+  PritibhojRoster,
+  PritibhojRow,
+  PritibhojSheetId,
+  User,
+} from "@/lib/types";
 
 export type PritibhojCountCtx = {
   users: User[];
@@ -106,20 +120,26 @@ function matchesPritibhojWing(
   return matchesRelatedWing(user.wing, sheetWing);
 }
 
-export function pritibhojWingCounts(
+type AutoBuckets = {
+  dad: User[];
+  others: User[];
+  civilian: User[];
+  nonMuslim: User[];
+};
+
+function autoBucketUsers(
   date: string,
   wing: string,
   ctx: PritibhojCountCtx,
-  today = todayISO(),
-): PritibhojWingCounts {
+  today: string,
+): AutoBuckets {
   const key = wing.trim();
-  if (!key) return { dad: 0, others: 0, civilian: 0, nonMuslim: 0 };
-
+  const empty = { dad: [], others: [], civilian: [], nonMuslim: [] };
+  if (!key) return empty;
   const specialTag = pritibhojWingDef(key)?.tag;
-  let dad = 0;
-  let others = 0;
-  let civilian = 0;
-  let nonMuslim = 0;
+  const dad: User[] = [];
+  const others: User[] = [];
+  const civilian: User[] = [];
 
   for (const user of ctx.users) {
     if (!matchesPritibhojWing(user, date, key, ctx, today)) continue;
@@ -130,46 +150,280 @@ export function pritibhojWingCounts(
       user.status === "1" &&
       isCivilianMember(user)
     ) {
-      civilian += 1;
+      civilian.push(user);
       continue;
     }
 
     if (!isOnDailyRr(user, date)) continue;
 
-    if (isDadRank(user)) dad += 1;
-    else others += 1;
-
-    const religion = user.religion?.trim() ?? "";
-    if (religion && !isIslam(religion)) nonMuslim += 1;
+    if (isDadRank(user)) dad.push(user);
+    else others.push(user);
   }
 
-  return { dad, others, civilian, nonMuslim };
+  return { dad, others, civilian, nonMuslim: [] };
+}
+
+function applyCellList(
+  auto: User[],
+  removed: string[],
+  added: string[],
+  byId: Map<string, User>,
+): User[] {
+  const drop = new Set(removed);
+  const seen = new Set<string>();
+  const out: User[] = [];
+  for (const user of auto) {
+    if (drop.has(user.id) || seen.has(user.id)) continue;
+    seen.add(user.id);
+    out.push(user);
+  }
+  for (const id of added) {
+    if (drop.has(id) || seen.has(id)) continue;
+    const user = byId.get(id);
+    if (!user) continue;
+    seen.add(id);
+    out.push(user);
+  }
+  out.sort(compareUsersByRankSerial);
+  return out;
+}
+
+export type PritibhojWingLists = Record<PritibhojBucket, User[]> & {
+  officerManaged: boolean;
+  azadHallManaged: boolean;
+  azadHallDistManaged: boolean;
+};
+
+export function pritibhojWingMemberLists(
+  date: string,
+  wing: string,
+  ctx: PritibhojCountCtx,
+  roster: PritibhojRoster | undefined,
+  sheet: PritibhojSheetId,
+  today = todayISO(),
+): PritibhojWingLists {
+  const byId = new Map(ctx.users.map((user) => [user.id, user]));
+  const auto = autoBucketUsers(date, wing, ctx, today);
+  const cell = (bucket: PritibhojBucket) =>
+    readPritibhojCell(roster, sheet, wing, bucket);
+  const officer = cell("officer");
+  const azadHall = cell("azadHall");
+  const azadHallDist = cell("azadHallDist");
+  const dad = cell("dad");
+  const others = cell("others");
+  const civilian = cell("civilian");
+  const nonMuslim = cell("nonMuslim");
+  const dadList = applyCellList(auto.dad, dad.removed, dad.added, byId);
+  const othersList = applyCellList(auto.others, others.removed, others.added, byId);
+  const nonMuslimAuto = [...dadList, ...othersList].filter((user) => {
+    const religion = user.religion?.trim() ?? "";
+    return Boolean(religion) && !isIslam(religion);
+  });
+  return {
+    officer: applyCellList([], officer.removed, officer.added, byId),
+    dad: dadList,
+    azadHall: applyCellList([], azadHall.removed, azadHall.added, byId),
+    others: othersList,
+    civilian: applyCellList(auto.civilian, civilian.removed, civilian.added, byId),
+    nonMuslim: applyCellList(
+      nonMuslimAuto,
+      nonMuslim.removed,
+      nonMuslim.added,
+      byId,
+    ),
+    azadHallDist: applyCellList(
+      [],
+      azadHallDist.removed,
+      azadHallDist.added,
+      byId,
+    ),
+    officerManaged: officer.managed === true,
+    azadHallManaged: azadHall.managed === true,
+    azadHallDistManaged: azadHallDist.managed === true,
+  };
+}
+
+function uniqueUsers(groups: User[][]): User[] {
+  const seen = new Set<string>();
+  const out: User[] = [];
+  for (const group of groups) {
+    for (const user of group) {
+      if (seen.has(user.id)) continue;
+      seen.add(user.id);
+      out.push(user);
+    }
+  }
+  return out;
+}
+
+export function pritibhojColumnMembersFromLists(
+  column: PritibhojColumn,
+  lists: PritibhojWingLists,
+): User[] {
+  const azadIds = new Set(lists.azadHall.map((user) => user.id));
+  const distribution = lists.azadHallManaged
+    ? lists.dad.filter((user) => !azadIds.has(user.id))
+    : lists.dad;
+  const totalPeople = uniqueUsers([lists.others, lists.civilian, lists.nonMuslim]);
+  const distIds = new Set(lists.azadHallDist.map((user) => user.id));
+  const distribution2 = lists.azadHallDistManaged
+    ? totalPeople.filter((user) => !distIds.has(user.id))
+    : totalPeople;
+  switch (column) {
+    case "officer":
+      return lists.officer;
+    case "dad":
+      return lists.dad;
+    case "azadHall":
+      return lists.azadHall;
+    case "distribution":
+      return distribution;
+    case "others":
+      return lists.others;
+    case "civilian":
+      return lists.civilian;
+    case "nonMuslim":
+      return lists.nonMuslim;
+    case "total":
+      return totalPeople;
+    case "azadHallDist":
+      return lists.azadHallDist;
+    case "distribution2":
+      return distribution2;
+    case "totalDistribution":
+      return uniqueUsers([distribution, distribution2]);
+  }
+}
+
+export function pritibhojColumnMembers(
+  date: string,
+  wing: string,
+  column: PritibhojColumn,
+  ctx: PritibhojCountCtx,
+  roster: PritibhojRoster | undefined,
+  sheet: PritibhojSheetId,
+): User[] {
+  return pritibhojColumnMembersFromLists(
+    column,
+    pritibhojWingMemberLists(date, wing, ctx, roster, sheet),
+  );
+}
+
+export function pritibhojSheetColumnMembers(
+  date: string,
+  rows: PritibhojRow[],
+  column: PritibhojColumn,
+  ctx: PritibhojCountCtx,
+  roster: PritibhojRoster | undefined,
+  sheet: PritibhojSheetId,
+): User[] {
+  return uniqueUsers(
+    rows.map((row) =>
+      pritibhojColumnMembers(date, row.wing, column, ctx, roster, sheet),
+    ),
+  );
+}
+
+export function pritibhojBucketsHolding(
+  date: string,
+  wing: string,
+  ctx: PritibhojCountCtx,
+  roster: PritibhojRoster | undefined,
+  sheet: PritibhojSheetId,
+  memberId: string,
+  buckets: PritibhojBucket[],
+): PritibhojBucket[] {
+  const lists = pritibhojWingMemberLists(date, wing, ctx, roster, sheet);
+  return buckets.filter((bucket) =>
+    lists[bucket].some((user) => user.id === memberId),
+  );
+}
+
+export function memberFitsPritibhojBucket(
+  user: User,
+  bucket: PritibhojBucket,
+): boolean {
+  if (user.approval_status !== "approved") return false;
+  switch (bucket) {
+    case "dad":
+    case "azadHall":
+      return isDadRank(user);
+    case "others":
+      return isCockpitMember(user) && !isDadRank(user);
+    case "civilian":
+      return isCivilianMember(user);
+    case "nonMuslim": {
+      const religion = user.religion?.trim() ?? "";
+      return Boolean(religion) && !isIslam(religion);
+    }
+    case "officer":
+    case "azadHallDist":
+      return true;
+  }
+}
+
+export function pritibhojWingCounts(
+  date: string,
+  wing: string,
+  ctx: PritibhojCountCtx,
+  today = todayISO(),
+): PritibhojWingCounts {
+  const lists = pritibhojWingMemberLists(date, wing, ctx, undefined, "main", today);
+  return {
+    dad: lists.dad.length,
+    others: lists.others.length,
+    civilian: lists.civilian.length,
+    nonMuslim: lists.nonMuslim.length,
+  };
 }
 
 export function applyPritibhojLookups(
   rows: PritibhojRow[],
   date: string,
   ctx: PritibhojCountCtx,
+  roster?: PritibhojRoster,
+  sheet: PritibhojSheetId = "main",
 ): PritibhojRow[] {
-  const today = todayISO();
   return rows.map((row) => {
-    const counts = pritibhojWingCounts(date, row.wing, ctx, today);
+    const lists = pritibhojWingMemberLists(date, row.wing, ctx, roster, sheet);
     return finalizePritibhojRow({
       ...row,
-      dad: counts.dad,
-      others: counts.others,
-      civilian: counts.civilian,
-      nonMuslim: counts.nonMuslim,
+      dad: lists.dad.length,
+      others: lists.others.length,
+      civilian: lists.civilian.length,
+      nonMuslim: lists.nonMuslim.length,
+      officer: lists.officerManaged ? lists.officer.length : row.officer,
+      azadHall: lists.azadHallManaged ? lists.azadHall.length : row.azadHall,
+      azadHallDist: lists.azadHallDistManaged
+        ? lists.azadHallDist.length
+        : row.azadHallDist,
     });
   });
 }
 
 export function applyPritibhojInputLookups<
-  T extends { date: string; main_rows: PritibhojRow[]; admin_rows: PritibhojRow[] },
+  T extends {
+    date: string;
+    main_rows: PritibhojRow[];
+    admin_rows: PritibhojRow[];
+    roster?: PritibhojRoster;
+  },
 >(input: T, ctx: PritibhojCountCtx): T {
   return {
     ...input,
-    main_rows: applyPritibhojLookups(input.main_rows, input.date, ctx),
-    admin_rows: applyPritibhojLookups(input.admin_rows, input.date, ctx),
+    main_rows: applyPritibhojLookups(
+      input.main_rows,
+      input.date,
+      ctx,
+      input.roster,
+      "main",
+    ),
+    admin_rows: applyPritibhojLookups(
+      input.admin_rows,
+      input.date,
+      ctx,
+      input.roster,
+      "admin",
+    ),
   };
 }

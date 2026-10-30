@@ -75,8 +75,8 @@ function drawSheet(
       totalCells(rows, foot),
     ],
     styles: {
-      fontSize: 7,
-      cellPadding: 1.1,
+      fontSize: 6,
+      cellPadding: 0.8,
       halign: "center",
       valign: "middle",
     },
@@ -85,7 +85,7 @@ function drawSheet(
       textColor: 30,
       fontStyle: "bold",
     },
-    columnStyles: { 1: { halign: "left", cellWidth: 38 } },
+    columnStyles: { 1: { halign: "left", cellWidth: 28 } },
     margin: { left: 8, right: 8 },
   });
   return (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
@@ -93,8 +93,9 @@ function drawSheet(
 }
 
 export function downloadPritibhojPdf(event: PritibhojEvent) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.text(event.title || "Pritibhoj", pageW / 2, 12, { align: "center" });
@@ -110,7 +111,9 @@ export function downloadPritibhojPdf(event: PritibhojEvent) {
     "মোট জনবল =",
     24,
   );
-  drawSheet(doc, "প্রশাসন ও অর্থ", event.admin_rows, "মোট =", afterMain + 10);
+  const nextY = afterMain + 10 > pageH - 40 ? 16 : afterMain + 10;
+  if (afterMain + 10 > pageH - 40) doc.addPage();
+  drawSheet(doc, "প্রশাসন ও অর্থ", event.admin_rows, "মোট =", nextY);
 
   const stem = `pritibhoj-${event.date || "sheet"}`.replace(/[^\w.-]+/g, "-");
   doc.save(`${stem}.pdf`);

@@ -837,8 +837,8 @@ function colorSheetCss() {
   .pritibhoj-table td,
   .pb-cell {
     box-sizing: border-box !important;
-    padding: 3px 2px !important;
-    font-size: 8.5px !important;
+    padding: 2px 1px !important;
+    font-size: 7px !important;
     line-height: 1.25 !important;
     overflow: hidden !important;
     overflow-wrap: anywhere !important;
@@ -850,6 +850,15 @@ function colorSheetCss() {
   .pritibhoj-table td:nth-child(2) { width: 16%; }
   .pritibhoj-table th:nth-child(n+3),
   .pritibhoj-table td:nth-child(n+3) { width: 7.27%; }
+  .pritibhoj-table button {
+    all: unset !important;
+    display: inline !important;
+    font: inherit !important;
+    color: inherit !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+  }
   .register-cover {
     background: #f4e25a !important;
     min-height: calc(210mm - 16mm);

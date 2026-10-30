@@ -298,6 +298,48 @@ export type PritibhojRow = {
   totalDistribution: number;
 };
 
+export type PritibhojBucket =
+  | "officer"
+  | "dad"
+  | "azadHall"
+  | "others"
+  | "civilian"
+  | "nonMuslim"
+  | "azadHallDist";
+
+export type PritibhojColumn =
+  | PritibhojBucket
+  | "distribution"
+  | "total"
+  | "distribution2"
+  | "totalDistribution";
+
+export type PritibhojSheetId = "main" | "admin";
+
+/** Name and phone shown on this Pritibhoj list only. */
+export type PritibhojMemberEdit = {
+  name?: string;
+  phone?: string;
+};
+
+/**
+ * Per wing, per count. `removed` drops someone Daily RR included.
+ * `added` puts someone on this count even if another wing owns them.
+ * Manual counts (officer, Azad Hall) follow the list once `managed` is set.
+ */
+export type PritibhojCellRoster = {
+  removed: string[];
+  added: string[];
+  edits: Record<string, PritibhojMemberEdit>;
+  managed?: boolean;
+};
+
+/** Key is `${sheet}:${wing}`. */
+export type PritibhojRoster = Record<
+  string,
+  Partial<Record<PritibhojBucket, PritibhojCellRoster>>
+>;
+
 export type PritibhojEvent = {
   id: string;
   title: string;
@@ -307,6 +349,7 @@ export type PritibhojEvent = {
   created_at: string;
   main_rows: PritibhojRow[];
   admin_rows: PritibhojRow[];
+  roster?: PritibhojRoster;
 };
 
 export type PaperReportKind = "manpower" | "pritibhoj";

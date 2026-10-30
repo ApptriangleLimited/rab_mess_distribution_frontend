@@ -1,5 +1,6 @@
 /** Demo Pritibhoj feast manpower — mirrors HQ farewell sheet layout. */
 
+import { normalizePritibhojRoster } from "@/lib/pritibhoj-roster";
 import type { DailyTag, PritibhojEvent, PritibhojRow } from "@/lib/types";
 
 export type { PritibhojEvent, PritibhojRow };
@@ -644,6 +645,7 @@ export function normalizePritibhojEvent(raw: unknown): PritibhojEvent | null {
     date,
     org: String(event.org ?? "").trim(),
     created_at: String(event.created_at ?? ""),
+    roster: normalizePritibhojRoster(event.roster),
     main_rows: Array.isArray(event.main_rows)
       ? event.main_rows
           .map(normalizePritibhojRow)

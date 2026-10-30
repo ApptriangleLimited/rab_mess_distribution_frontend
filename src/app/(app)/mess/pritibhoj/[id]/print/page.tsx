@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
 import { usePritibhojEvent } from "@/hooks/use-pritibhoj-event";
+import { usePritibhojRosterEditor } from "@/hooks/use-pritibhoj-roster";
 import { useStore } from "@/hooks/use-store";
 import { formatDateLong } from "@/lib/date";
 import { printLetterElement } from "@/lib/print-letter-pdf";
@@ -22,6 +23,7 @@ export default function MessPritibhojPrintPage() {
   const printRef = useRef<HTMLDivElement>(null);
   const [printing, setPrinting] = useState(false);
   const { event, loading } = usePritibhojEvent(params.id);
+  const { ctx, saveRoster } = usePritibhojRosterEditor(event);
   useStore();
   const dateLocale = locale === "bn" ? "bn-BD" : "en-GB";
   const pdfName = event ? `pritibhoj-${event.date}.pdf` : "pritibhoj.pdf";
@@ -50,7 +52,7 @@ export default function MessPritibhojPrintPage() {
     if (!el || printing) return;
     setPrinting(true);
     try {
-      await printLetterElement(el, pdfName, "landscape", {
+      await printLetterElement(el, pdfName, "portrait", {
         preserveColors: true,
       });
     } finally {
@@ -91,7 +93,12 @@ export default function MessPritibhojPrintPage() {
       </div>
 
       <div ref={printRef}>
-        <PritibhojSheets event={event} dateLocale={dateLocale} />
+        <PritibhojSheets
+          event={event}
+          dateLocale={dateLocale}
+          ctx={ctx}
+          onRoster={saveRoster}
+        />
       </div>
     </PagePane>
   );

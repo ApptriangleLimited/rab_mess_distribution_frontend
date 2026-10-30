@@ -1,15 +1,41 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { IconCake } from "@tabler/icons-react";
+import { PritibhojMemberDialog } from "@/components/mess/pritibhoj-member-dialog";
 import { formatDateLong } from "@/lib/date";
 import {
   lockPritibhojSheets,
   PRITIBHOJ_DEMO_META,
   sumPritibhojRows,
 } from "@/lib/pritibhoj-demo";
-import type { PritibhojEvent, PritibhojRow } from "@/lib/types";
+import { applyPritibhojLookups } from "@/lib/store/pritibhoj-counts";
+import type { PritibhojCountCtx } from "@/lib/store/pritibhoj-counts";
+import type {
+  PritibhojColumn,
+  PritibhojEvent,
+  PritibhojRoster,
+  PritibhojRow,
+  PritibhojSheetId,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const COUNT_COLUMNS: { key: PritibhojColumn; className?: string }[] = [
+  { key: "officer" },
+  { key: "dad" },
+  { key: "azadHall" },
+  { key: "distribution", className: "pb-sky-soft bg-sky-50 dark:bg-sky-950/30" },
+  { key: "others" },
+  { key: "civilian" },
+  { key: "nonMuslim" },
+  { key: "total", className: "font-semibold" },
+  { key: "azadHallDist" },
+  { key: "distribution2", className: "pb-sky-soft bg-sky-50 dark:bg-sky-950/30" },
+  {
+    key: "totalDistribution",
+    className: "pb-amber-soft bg-amber-50 font-semibold dark:bg-amber-950/30",
+  },
+];
 
 function bnDigits(n: number) {
   return String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]!);
@@ -18,10 +44,13 @@ function bnDigits(n: number) {
 function NumCell({
   value,
   className,
+  onOpen,
 }: {
   value: number;
   className?: string;
+  onOpen?: () => void;
 }) {
+  const label = bnDigits(value);
   return (
     <td
       className={cn(
@@ -29,7 +58,17 @@ function NumCell({
         className,
       )}
     >
-      {bnDigits(value)}
+      {onOpen ? (
+        <button
+          type="button"
+          className="w-full rounded-md bg-transparent font-[inherit] text-inherit underline-offset-2 hover:underline"
+          onClick={onOpen}
+        >
+          {label}
+        </button>
+      ) : (
+        label
+      )}
     </td>
   );
 }
@@ -38,12 +77,19 @@ function PritibhojTable({
   rows,
   showGrand,
   footLabel,
+  onOpen,
 }: {
   rows: PritibhojRow[];
   showGrand?: boolean;
   footLabel: string;
+  onOpen?: (wing: string, column: PritibhojColumn, count: number) => void;
 }) {
   const totals = useMemo(() => sumPritibhojRows(rows), [rows]);
+  const footClass: Partial<Record<PritibhojColumn, string>> = {
+    distribution: "pb-sky bg-sky-100 dark:bg-sky-950/50",
+    distribution2: "pb-sky bg-sky-100 dark:bg-sky-950/50",
+    totalDistribution: "pb-amber bg-amber-100 dark:bg-amber-950/40",
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -103,26 +149,18 @@ function PritibhojTable({
               <td className="pb-cell sticky left-10 z-[1] border border-neutral-300 bg-white px-2 py-1.5 text-left font-medium dark:border-neutral-600 dark:bg-neutral-950">
                 {row.wing}
               </td>
-              <NumCell value={row.officer} />
-              <NumCell value={row.dad} />
-              <NumCell value={row.azadHall} />
-              <NumCell
-                value={row.distribution}
-                className="pb-sky-soft bg-sky-50 dark:bg-sky-950/30"
-              />
-              <NumCell value={row.others} />
-              <NumCell value={row.civilian} />
-              <NumCell value={row.nonMuslim} />
-              <NumCell value={row.total} className="font-semibold" />
-              <NumCell value={row.azadHallDist} />
-              <NumCell
-                value={row.distribution2}
-                className="pb-sky-soft bg-sky-50 dark:bg-sky-950/30"
-              />
-              <NumCell
-                value={row.totalDistribution}
-                className="pb-amber-soft bg-amber-50 font-semibold dark:bg-amber-950/30"
-              />
+              {COUNT_COLUMNS.map((col) => (
+                <NumCell
+                  key={col.key}
+                  value={row[col.key]}
+                  className={col.className}
+                  onOpen={
+                    onOpen
+                      ? () => onOpen(row.wing, col.key, row[col.key])
+                      : undefined
+                  }
+                />
+              ))}
             </tr>
           ))}
           <tr className="pb-foot bg-sky-50 font-semibold dark:bg-sky-950/40">
@@ -132,26 +170,18 @@ function PritibhojTable({
             >
               {footLabel}
             </td>
-            <NumCell value={totals.officer} />
-            <NumCell value={totals.dad} />
-            <NumCell value={totals.azadHall} />
-            <NumCell
-              value={totals.distribution}
-              className="pb-sky bg-sky-100 dark:bg-sky-950/50"
-            />
-            <NumCell value={totals.others} />
-            <NumCell value={totals.civilian} />
-            <NumCell value={totals.nonMuslim} />
-            <NumCell value={totals.total} />
-            <NumCell value={totals.azadHallDist} />
-            <NumCell
-              value={totals.distribution2}
-              className="pb-sky bg-sky-100 dark:bg-sky-950/50"
-            />
-            <NumCell
-              value={totals.totalDistribution}
-              className="pb-amber bg-amber-100 dark:bg-amber-950/40"
-            />
+            {COUNT_COLUMNS.map((col) => (
+              <NumCell
+                key={col.key}
+                value={totals[col.key]}
+                className={footClass[col.key]}
+                onOpen={
+                  onOpen
+                    ? () => onOpen("*", col.key, totals[col.key])
+                    : undefined
+                }
+              />
+            ))}
           </tr>
           {showGrand ? (
             <tr className="pb-grand bg-sky-100 font-bold dark:bg-sky-900/50">
@@ -159,7 +189,18 @@ function PritibhojTable({
                 colSpan={13}
                 className="pb-cell border border-neutral-300 px-3 py-2.5 text-center dark:border-neutral-600"
               >
-                সর্বমোট জনবল = {bnDigits(totals.total)}
+                সর্বমোট জনবল ={" "}
+                {onOpen ? (
+                  <button
+                    type="button"
+                    className="bg-transparent font-[inherit] text-inherit underline-offset-2 hover:underline"
+                    onClick={() => onOpen("*", "total", totals.total)}
+                  >
+                    {bnDigits(totals.total)}
+                  </button>
+                ) : (
+                  bnDigits(totals.total)
+                )}
               </td>
             </tr>
           ) : null}
@@ -174,15 +215,46 @@ export function PritibhojSheets({
   event,
   dateLocale,
   className,
+  ctx,
+  onRoster,
 }: {
   event: PritibhojEvent;
   dateLocale: string;
   className?: string;
+  ctx?: PritibhojCountCtx | null;
+  onRoster?: (roster: PritibhojRoster) => Promise<void>;
 }) {
   const dateLabel = formatDateLong(event.date, dateLocale);
   const heading = event.title || event.occasion || PRITIBHOJ_DEMO_META.titleBn;
   const org = event.org || PRITIBHOJ_DEMO_META.orgBn;
-  const sheets = lockPritibhojSheets(event);
+  const [open, setOpen] = useState<{
+    sheet: PritibhojSheetId;
+    wing: string;
+    column: PritibhojColumn;
+    count: number;
+  } | null>(null);
+  const sheets = useMemo(() => {
+    const locked = lockPritibhojSheets(event);
+    if (!ctx || ctx.users.length === 0) return locked;
+    return lockPritibhojSheets({
+      ...locked,
+      main_rows: applyPritibhojLookups(
+        locked.main_rows,
+        event.date,
+        ctx,
+        event.roster,
+        "main",
+      ),
+      admin_rows: applyPritibhojLookups(
+        locked.admin_rows,
+        event.date,
+        ctx,
+        event.roster,
+        "admin",
+      ),
+    });
+  }, [ctx, event]);
+  const interactive = Boolean(ctx && ctx.users.length > 0 && onRoster);
 
   return (
     <div
@@ -211,6 +283,12 @@ export function PritibhojSheets({
           rows={sheets.main_rows}
           showGrand
           footLabel="মোট জনবল ="
+          onOpen={
+            interactive
+              ? (wing, column, count) =>
+                  setOpen({ sheet: "main", wing, column, count })
+              : undefined
+          }
         />
       </section>
 
@@ -223,8 +301,31 @@ export function PritibhojSheets({
             {org}
           </p>
         </div>
-        <PritibhojTable rows={sheets.admin_rows} footLabel="মোট =" />
+        <PritibhojTable
+          rows={sheets.admin_rows}
+          footLabel="মোট ="
+          onOpen={
+            interactive
+              ? (wing, column, count) =>
+                  setOpen({ sheet: "admin", wing, column, count })
+              : undefined
+          }
+        />
       </section>
+      {open && ctx && onRoster ? (
+        <PritibhojMemberDialog
+          sheet={open.sheet}
+          wing={open.wing}
+          column={open.column}
+          sheetCount={open.count}
+          rows={open.sheet === "main" ? sheets.main_rows : sheets.admin_rows}
+          date={event.date}
+          ctx={ctx}
+          roster={event.roster}
+          onClose={() => setOpen(null)}
+          onRoster={onRoster}
+        />
+      ) : null}
     </div>
   );
 }
