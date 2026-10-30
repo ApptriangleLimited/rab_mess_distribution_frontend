@@ -839,8 +839,10 @@ function colorSheetCss() {
     overflow: visible !important;
   }
   .pritibhoj-sheets {
-    gap: 4mm !important;
+    gap: 2mm !important;
     page: pritibhoj-page;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   @page pritibhoj-page {
     size: A4 portrait;
@@ -848,11 +850,11 @@ function colorSheetCss() {
   }
   .pritibhoj-sheets section {
     width: 100% !important;
-    margin: 0 0 4mm !important;
+    margin: 0 0 2mm !important;
     overflow: visible !important;
     border-radius: 0 !important;
-    page-break-inside: avoid;
-    break-inside: avoid;
+    page-break-inside: auto;
+    break-inside: auto;
   }
   .pritibhoj-sheets section > div:first-child {
     padding: 2.5mm 3mm !important;
@@ -1213,6 +1215,22 @@ function lockPrintOrientation(
     }
   `;
   doc.head.appendChild(style);
+}
+
+/** Shrink the whole Pritibhoj sheet just enough to stay on one portrait page. */
+function fitPritibhojOnOnePortraitPage(doc: Document) {
+  const root = doc.querySelector(".pritibhoj-sheets") as HTMLElement | null;
+  if (!root) return;
+  root.style.zoom = "1";
+  const pxPerMm = 96 / 25.4;
+  const maxW = (210 - 16) * pxPerMm;
+  const maxH = (297 - 16) * pxPerMm;
+  const scale = Math.min(
+    1,
+    maxW / Math.max(root.scrollWidth, 1),
+    maxH / Math.max(root.scrollHeight, 1),
+  );
+  if (scale < 0.995) root.style.zoom = String(Math.max(0.62, scale * 0.98));
 }
 
 async function waitForPrintAssets(win: Window) {
@@ -1676,6 +1694,8 @@ export async function printLetterElement(
         printWin.document.importNode(clone, true),
       );
       await waitForPrintAssets(printWin);
+      fitPritibhojOnOnePortraitPage(printWin.document);
+      await waitForPaint(printWin);
       await printAndWait(printWin);
       try {
         printWin.close();
@@ -1712,6 +1732,8 @@ export async function printLetterElement(
     lockPrintOrientation(doc, orientation);
     doc.body.appendChild(doc.importNode(clone, true));
     await waitForPrintAssets(win);
+    fitPritibhojOnOnePortraitPage(doc);
+    await waitForPaint(win);
     await printAndWait(win);
     iframe.remove();
   } finally {
