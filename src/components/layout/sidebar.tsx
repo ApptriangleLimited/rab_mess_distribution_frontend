@@ -87,10 +87,10 @@ function SidebarBrand({ role, collapsed }: { role: Role; collapsed: boolean }) {
     >
       <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
         <div
-          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-sm font-bold text-white shadow-md shadow-primary/30"
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-[10px] font-bold tracking-tight text-white shadow-md shadow-primary/30"
           title={collapsed ? t("common.productName") : undefined}
         >
-          MD
+          DRC
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-sidebar bg-emerald-400 dark:border-[#0c1512]" />
         </div>
         {!collapsed ? (
@@ -226,8 +226,8 @@ export function MobileDrawer({
       >
         <div className="border-b border-sidebar-edge px-4 py-5 dark:border-white/10">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-xs font-bold text-white">
-              MD
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-[9px] font-bold tracking-tight text-white">
+              DRC
             </div>
             <div className="min-w-0">
               <p className="text-sm font-bold uppercase tracking-[0.12em] text-nav-accent">

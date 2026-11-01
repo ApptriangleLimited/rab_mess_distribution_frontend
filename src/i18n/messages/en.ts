@@ -1,11 +1,13 @@
 export const en = {
   meta: {
-    titleDefault: "Mess Distribution",
-    titleTemplate: "%s · Mess Distribution",
-    description: "Special Response Battalion (SRB) Mess Distribution",
+    titleDefault: "DRCMMS",
+    titleTemplate: "%s · DRCMMS",
+    description:
+      "DRCMMS — Daily Ration Consume & Mess Management Software",
   },
   common: {
-    productName: "MESS DISTRIBUTION",
+    productName: "DRCMMS",
+    productFullName: "Daily Ration Consume & Mess Management Software",
     prototype: "Prototype",
     rab: "Special Response Battalion (SRB)",
     menu: "Menu",

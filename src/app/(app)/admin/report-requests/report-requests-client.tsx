@@ -28,10 +28,10 @@ import {
 } from "@/lib/store/paper-reports";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
-import type { PaperReportKind, PaperReportStatus } from "@/lib/types";
+import type { PaperReportStatus } from "@/lib/types";
 
 type StatusFilter = "submitted" | "approved" | "all";
-type KindFilter = "all" | PaperReportKind;
+type KindFilter = "all" | "manpower";
 
 export default function AdminReportRequestsClient() {
   const t = useT();
@@ -45,7 +45,7 @@ export default function AdminReportRequestsClient() {
   const [dateTo, setDateTo] = useState("");
 
   const rows = useMemo(
-    () => listPaperReports(),
+    () => listPaperReports("manpower"),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state.paper_report_requests],
   );
@@ -54,15 +54,14 @@ export default function AdminReportRequestsClient() {
     const query = q.trim().toLowerCase();
     const from = dateFrom <= dateTo || !dateTo ? dateFrom : dateTo;
     const to = dateFrom <= dateTo || !dateFrom ? dateTo : dateFrom;
+    const kindLabel = t("paperReports.kindManpower");
     return rows.filter((row) => {
-      if (row.kind === "pritibhoj") return false;
       if (row.status === "draft") return false;
       if (filter !== "all" && row.status !== filter) return false;
       if (kind !== "all" && row.kind !== kind) return false;
       if (from && row.date < from) return false;
       if (to && row.date > to) return false;
       if (!query) return true;
-      const kindLabel = t("paperReports.kindManpower");
       return [
         row.title,
         row.date,
@@ -78,15 +77,9 @@ export default function AdminReportRequestsClient() {
     });
   }, [rows, filter, kind, q, dateFrom, dateTo, t]);
 
-  const pending = rows.filter(
-    (row) => row.kind !== "pritibhoj" && row.status === "submitted",
-  ).length;
-  const verified = rows.filter(
-    (row) => row.kind !== "pritibhoj" && row.status === "approved",
-  ).length;
-  const allCount = rows.filter(
-    (row) => row.kind !== "pritibhoj" && row.status !== "draft",
-  ).length;
+  const pending = rows.filter((row) => row.status === "submitted").length;
+  const verified = rows.filter((row) => row.status === "approved").length;
+  const allCount = rows.filter((row) => row.status !== "draft").length;
   const filtersActive = kind !== "all" || Boolean(dateFrom || dateTo || q.trim());
 
   function onVerify(id: string) {

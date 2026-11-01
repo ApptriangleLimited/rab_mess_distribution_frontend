@@ -14,8 +14,9 @@ logger = logging.getLogger("rab.api")
 def configure_logging() -> None:
     logging.basicConfig(
         level=logging.INFO,
-        format="%(message)s",
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
+    logging.getLogger("zkteco.adms").setLevel(logging.INFO)
 
 
 def log_event(level: int, **fields) -> None:

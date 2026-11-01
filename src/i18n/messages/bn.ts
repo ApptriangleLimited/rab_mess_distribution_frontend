@@ -1,12 +1,14 @@
 /** Bangla copy — edit here; keep same key tree as en.ts. */
 export const bn = {
   meta: {
-    titleDefault: "মেস ডিস্ট্রিবিউশন",
-    titleTemplate: "%s · মেস ডিস্ট্রিবিউশন",
-    description: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি) মেস ডিস্ট্রিবিউশন",
+    titleDefault: "DRCMMS",
+    titleTemplate: "%s · DRCMMS",
+    description:
+      "DRCMMS — ডেইলি রেশন, কনজিউম ও মেস ম্যানেজমেন্ট সফটওয়্যার",
   },
   common: {
-    productName: "মেস ডিস্ট্রিবিউশন",
+    productName: "DRCMMS",
+    productFullName: "ডেইলি রেশন, কনজিউম ও মেস ম্যানেজমেন্ট সফটওয়্যার",
     prototype: "প্রোটোটাইপ",
     rab: "স্পেশাল রেসপন্স ব্যাটালিয়ন (এসআরবি)",
     menu: "মেনু",

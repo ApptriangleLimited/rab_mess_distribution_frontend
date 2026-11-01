@@ -1,6 +1,11 @@
 import logging
 import os
 import uuid
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -92,7 +97,7 @@ configure_logging()
 settings.assert_secure()
 
 app = FastAPI(
-    title="Special Response Battalion (SRB) Mess CC API",
+    title="DRCMMS API",
     version="0.2.0",
     docs_url=None if settings.is_production else "/docs",
     redoc_url=None if settings.is_production else "/redoc",
@@ -302,6 +307,12 @@ def normalize_approval(value: str | None, default: str = "pending") -> str:
     if value in ("pending", "approved", "rejected", "ended"):
         return value
     raise HTTPException(status_code=400, detail="Invalid approval status")
+
+
+def push_member_card(row: Member) -> None:
+    from zk_gate import sync_member_to_device
+
+    sync_member_to_device(row)
 
 
 def apply_member_fields(row: Member, body: MemberIn) -> None:
@@ -716,6 +727,7 @@ def create_member(
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists") from exc
     db.refresh(row)
     bust_members()
+    push_member_card(row)
     return envelope(member_out(row), "Member request sent successfully", 201)
 
 
@@ -765,6 +777,7 @@ def update_member(
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists") from exc
     db.refresh(row)
     bust_members()
+    push_member_card(row)
     return envelope(member_out(row), "Member updated")
 
 
@@ -801,6 +814,7 @@ def accept_member(
     db.refresh(row)
     bust_members()
     bust_daily()
+    push_member_card(row)
     return envelope(member_out(row), "Member request accepted.")
 
 

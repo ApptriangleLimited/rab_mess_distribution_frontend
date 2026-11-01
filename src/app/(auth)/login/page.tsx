@@ -319,8 +319,8 @@ export default function LoginPage() {
           className="relative max-w-lg"
         >
           <div className="mb-10 flex items-center gap-4">
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-primary-light to-primary-dark text-[11px] font-semibold tracking-[0.18em] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_12px_28px_rgba(6,121,87,0.35)]">
-              MD
+            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-primary-light to-primary-dark text-[9px] font-semibold tracking-[0.04em] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_12px_28px_rgba(6,121,87,0.35)]">
+              DRC
               <span className="absolute inset-[2px] rounded-full border border-white/10" />
             </div>
             <div className="min-w-0">
@@ -343,6 +343,9 @@ export default function LoginPage() {
               </span>
             ))}
           </h1>
+          <p className="mt-4 max-w-md text-[13px] font-medium uppercase leading-6 tracking-[0.08em] text-white/70">
+            {t("common.productFullName")}
+          </p>
           <div className="mt-6 h-px w-24 bg-gradient-to-r from-primary-light via-primary to-transparent" />
 
           <p className="mt-7 max-w-md text-[15px] leading-7 text-white/58">

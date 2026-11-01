@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import os
 import threading
 import time
 from datetime import date, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -51,6 +55,16 @@ _state: dict = {
     "adms_sn": "",
 }
 ADMS_HOLD_SEC = 90
+_adms_cmd_lock = threading.Lock()
+_adms_cmd_seq = 0
+_adms_cmds: list[dict] = []
+_adms_log = logging.getLogger("zkteco.adms")
+ADMS_CMD_PATH = Path(
+    os.environ.get("ADMS_CMD_PATH", "/var/lib/rab-mess/files/adms_cmds.json")
+)
+ADMS_PUNCH_PATH = Path(
+    os.environ.get("ADMS_PUNCH_PATH", "/var/lib/rab-mess/files/adms_punches.json")
+)
 
 
 def mess_today() -> date:
@@ -80,9 +94,10 @@ def rfid_card(raw: str | None) -> int:
 
 def lookup_keys(member: Member) -> list[str]:
     keys: list[str] = []
-    pin = device_pin(member.rab_id)
-    if pin:
-        keys.append(pin)
+    for raw in (member.rab_id, getattr(member, "personal_id", "")):
+        pin = device_pin(raw)
+        if pin and pin not in keys:
+            keys.append(pin)
     digits = rfid_digits(member.rfid)
     if digits:
         keys.append(digits)
@@ -147,7 +162,7 @@ def _aware(stamped: datetime) -> datetime:
 
 def _snapshot() -> dict:
     with _state_lock:
-        return {
+        state = {
             "reachable": bool(_state["reachable"]),
             "host": _state["host"] or settings.zk_host,
             "port": int(_state["port"] or settings.zk_port),
@@ -164,6 +179,14 @@ def _snapshot() -> dict:
             ) < ADMS_HOLD_SEC,
             "serial": str(_state.get("adms_sn") or ""),
         }
+    state["adms_queue"] = len(pending_adms_commands())
+    board = _load_punch_board()
+    if board.get("rows") and board.get("date") == state["date"]:
+        disk_latest = max((str(row.get("punched_at") or "") for row in board["rows"]), default="")
+        mem_latest = max((str(row.get("punched_at") or "") for row in state["rows"]), default="")
+        if disk_latest >= mem_latest:
+            state["rows"] = list(board["rows"])
+    return state
 
 
 def _set(**values) -> None:
@@ -187,6 +210,136 @@ def _mark_offline(message: str) -> None:
         error=(message or "ZK device did not answer")[:300],
         date=mess_today().isoformat(),
     )
+
+
+def _lock_adms_file(handle) -> None:
+    try:
+        import fcntl
+
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    except (ImportError, OSError):
+        pass
+
+
+def _read_adms_store(handle) -> dict:
+    handle.seek(0)
+    raw = handle.read()
+    if not raw.strip():
+        return {"seq": 0, "cmds": []}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"seq": 0, "cmds": []}
+    if not isinstance(data, dict):
+        return {"seq": 0, "cmds": []}
+    cmds = data.get("cmds")
+    if not isinstance(cmds, list):
+        cmds = []
+    return {"seq": int(data.get("seq") or 0), "cmds": cmds}
+
+
+def _write_adms_store(handle, data: dict) -> None:
+    handle.seek(0)
+    handle.truncate()
+    json.dump(data, handle)
+    handle.flush()
+    os.fsync(handle.fileno())
+
+
+def _open_adms_store():
+    ADMS_CMD_PATH.parent.mkdir(parents=True, exist_ok=True)
+    return open(ADMS_CMD_PATH, "a+", encoding="utf-8")
+
+
+def _load_punch_board() -> dict:
+    try:
+        if not ADMS_PUNCH_PATH.exists():
+            return {"date": "", "rows": []}
+        data = json.loads(ADMS_PUNCH_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"date": "", "rows": []}
+    if not isinstance(data, dict):
+        return {"date": "", "rows": []}
+    rows = data.get("rows")
+    return {
+        "date": str(data.get("date") or ""),
+        "rows": list(rows) if isinstance(rows, list) else [],
+    }
+
+
+def _save_punch_board(day: str, rows: list[dict]) -> None:
+    ADMS_PUNCH_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ADMS_PUNCH_PATH.write_text(
+        json.dumps({"date": day, "rows": rows}),
+        encoding="utf-8",
+    )
+
+
+def pending_adms_commands() -> list[dict]:
+    with _adms_cmd_lock:
+        try:
+            with _open_adms_store() as handle:
+                _lock_adms_file(handle)
+                return list(_read_adms_store(handle)["cmds"])
+        except OSError:
+            return []
+
+
+def enroll_pin(member: Member) -> str:
+    return device_pin(getattr(member, "personal_id", "") or "") or device_pin(member.rab_id)
+
+
+def queue_adms_userinfo(member: Member, pin: str | None = None) -> str:
+    """Queue a Security PUSH user write. The device picks it up on GET /iclock/getrequest."""
+    pin = device_pin(pin or enroll_pin(member))
+    card = rfid_card(member.rfid)
+    if not pin or card <= 0:
+        raise ValueError("Member needs an SRB ID and RFID")
+    name = device_name(member.name)
+    with _adms_cmd_lock:
+        with _open_adms_store() as handle:
+            _lock_adms_file(handle)
+            data = _read_adms_store(handle)
+            data["seq"] = int(data.get("seq") or 0) + 1
+            cmd_id = data["seq"]
+            line = (
+                f"C:{cmd_id}:DATA UPDATE user Pin={pin}\tName={name}\t"
+                f"Privilege=0\tPassword=\tCardNo={card}\tGroup=1\t"
+                f"StartTime=0\tEndTime=0"
+            )
+            data["cmds"].append({"id": cmd_id, "line": line})
+            _write_adms_store(handle, data)
+    _adms_log.info("ADMS queued cmd=%r", line)
+    return line
+
+
+def sync_member_to_device(member: Member) -> str:
+    """Queue an RFID write after Daily saves a card. Safe to call from API handlers."""
+    if str(member.status) != "1" or (member.approval_status or "") != "approved":
+        return ""
+    try:
+        return queue_adms_userinfo(member)
+    except (ValueError, OSError) as exc:
+        _adms_log.warning("ADMS skip member=%s err=%s", getattr(member, "id", ""), exc)
+        return ""
+
+
+def pop_adms_command() -> str:
+    with _adms_cmd_lock:
+        try:
+            with _open_adms_store() as handle:
+                _lock_adms_file(handle)
+                data = _read_adms_store(handle)
+                if not data["cmds"]:
+                    return ""
+                item = data["cmds"].pop(0)
+                _write_adms_store(handle, data)
+        except OSError:
+            return ""
+    line = str(item.get("line") or "")
+    if line:
+        _adms_log.info("ADMS popped cmd=%r", line)
+    return line
 
 
 def note_adms(serial: str, info: dict | None = None) -> None:
@@ -639,6 +792,7 @@ def _append_live_punch(
                 "record_count": (int(count) + 1) if isinstance(count, int) else count,
             }
         )
+    _save_punch_board(day.isoformat(), rows)
 
 
 def _open_and_run(db: Session, write: bool) -> None:
