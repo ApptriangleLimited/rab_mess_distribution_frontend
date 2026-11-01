@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -365,8 +365,6 @@ def project_cell(
     day: date,
     stored: Assignment | None,
     suppressed: set[tuple[str, date]],
-    carry_tag: str | None = None,
-    carry_tone: str | None = None,
     mfr_lock: bool = True,
 ) -> dict:
     key = (member.id, day)
@@ -401,20 +399,15 @@ def project_cell(
             "tag": "MFR",
             "source": "carry",
         }
-    # Last painted tag continues across the month boundary. default_tag
-    # fills only when nothing has been painted yet.
-    tag = (carry_tag or member.default_tag or "").upper()
+    # A saved tag covers only that day. Later empty days return to default_tag.
+    tag = (member.default_tag or "").upper()
     if tag:
-        tone = carry_tone if tag == "TRG" and carry_tag else None
-        cell = {
+        return {
             "member_id": member.id,
             "date": day.isoformat(),
             "tag": tag,
             "source": "carry",
         }
-        if tone in ("black", "red"):
-            cell["trg_tone"] = tone
-        return cell
     return {
         "member_id": member.id,
         "date": day.isoformat(),
@@ -488,65 +481,23 @@ def load_window(
     return members, stored_map, suppressed
 
 
-def prior_tags_before(
-    db: Session,
-    ids: list[str],
-    before: date,
-) -> dict[str, Assignment]:
-    """Latest stored tag strictly before `before`, so a new month keeps the previous tag."""
-    if not ids:
-        return {}
-    latest = (
-        db.query(
-            Assignment.user_id.label("user_id"),
-            func.max(Assignment.date).label("max_date"),
-        )
-        .filter(Assignment.user_id.in_(ids), Assignment.date < before)
-        .group_by(Assignment.user_id)
-        .subquery()
-    )
-    rows = (
-        db.query(Assignment)
-        .join(
-            latest,
-            and_(
-                Assignment.user_id == latest.c.user_id,
-                Assignment.date == latest.c.max_date,
-            ),
-        )
-        .all()
-    )
-    return {row.user_id: row for row in rows}
-
-
 def cells_for_member(
     member: Member,
     days: list[date],
     stored_map: dict,
     suppressed: set[tuple[str, date]],
-    prior: Assignment | None = None,
     mfr_lock: bool = True,
 ) -> list[dict]:
-    running = (prior.tag or "").upper() if prior and prior.tag else None
-    tone = prior.trg_tone if prior else None
-    cells: list[dict] = []
-    for day in days:
-        stored = stored_map.get((member.id, day))
-        cells.append(
-            project_cell(
-                member,
-                day,
-                stored,
-                suppressed,
-                carry_tag=running,
-                carry_tone=tone,
-                mfr_lock=mfr_lock,
-            )
+    return [
+        project_cell(
+            member,
+            day,
+            stored_map.get((member.id, day)),
+            suppressed,
+            mfr_lock=mfr_lock,
         )
-        if stored is not None and stored.tag:
-            running = (stored.tag or "").upper()
-            tone = stored.trg_tone
-    return cells
+        for day in days
+    ]
 
 
 def unlock_date(db: Session, day: date) -> None:
@@ -720,7 +671,6 @@ def list_assignments(
     members, stored_map, suppressed = load_window(
         db, start, end, q, rank, wing, member_id, wing_family
     )
-    priors = prior_tags_before(db, [member.id for member in members], start)
     days = list(each_date(start, end))
     items = []
     for member in members:
@@ -730,7 +680,6 @@ def list_assignments(
                 days,
                 stored_map,
                 suppressed,
-                priors.get(member.id),
                 mfr_lock=False,
             )
         )
@@ -818,14 +767,11 @@ def assignment_summary(
     members, stored_map, suppressed = load_window(
         db, start, end, q, rank, wing, member_id, wing_family
     )
-    priors = prior_tags_before(db, [member.id for member in members], start)
     days = list(each_date(start, end))
     items = []
     for member in members:
         items.extend(
-            cells_for_member(
-                member, days, stored_map, suppressed, priors.get(member.id)
-            )
+            cells_for_member(member, days, stored_map, suppressed)
         )
     data = _summary_from_items(items, start, end, len(members))
     cache_set(key, data)

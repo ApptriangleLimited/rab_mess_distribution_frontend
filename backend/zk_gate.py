@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from config import settings
-from daily import prior_tags_before, project_cell
+from daily import project_cell
 from models import Assignment, MealShift, Member, SuppressedCarry
 
 DHAKA = ZoneInfo("Asia/Dhaka")
@@ -421,7 +421,6 @@ def _today_maps(
             SuppressedCarry.date == day,
         ):
             suppressed.add((row.user_id, day))
-    priors = prior_tags_before(db, ids, day)
     known_by_key: dict[str, Member] = {}
     ms_ids: set[str] = set()
     rfid_by_pin: dict[str, Member] = {}
@@ -432,14 +431,11 @@ def _today_maps(
         rfid_by_pin[pin] = member
         for key in lookup_keys(member):
             known_by_key.setdefault(key, member)
-        prior = priors.get(member.id)
         cell = project_cell(
             member,
             day,
             stored.get((member.id, day)),
             suppressed,
-            carry_tag=prior.tag if prior else None,
-            carry_tone=prior.trg_tone if prior else None,
         )
         if is_ms_today(member, cell.get("tag")):
             ms_ids.add(member.id)

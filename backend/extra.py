@@ -975,7 +975,7 @@ def mess_ledger(
         for row in db.query(Member).filter(Member.approval_status == "approved")
         if _match_member(row, q, rank, wing)
     ]
-    from daily import cells_for_member, prior_tags_before
+    from daily import cells_for_member
 
     assigns = db.query(Assignment).filter(
         Assignment.date >= start,
@@ -997,7 +997,6 @@ def mess_ledger(
         )
     }
     tag_codes = ["MS", "CD"]
-    priors = prior_tags_before(db, [member.id for member in members], start)
     rows = []
     for member in members:
         cells: list[str] = []
@@ -1007,7 +1006,6 @@ def mess_ledger(
             days,
             stored_map,
             suppressed,
-            priors.get(member.id),
         ):
             tag = str(cell.get("tag") or "")
             cells.append(tag)

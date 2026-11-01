@@ -394,8 +394,8 @@ export function markDateApproved(date: string) {
 
 /**
  * Tags for a Daily RR range.
- * A painted tag continues through later empty days, including into the next
- * month, until another saved tag. Inactive days keep only a saved tag.
+ * A saved tag covers only that day. Empty days show the member's default tag,
+ * including after a temporary range such as CL. Inactive days keep only a saved tag.
  */
 export function projectRangeCarry(
   users: User[],
@@ -404,47 +404,32 @@ export function projectRangeCarry(
   suppressed: readonly string[] = [],
 ): DailyAssignment[] {
   if (!dates.length || !users.length) return [];
-  const start = dates[0];
   const byKey = new Map<string, DailyAssignment>();
-  const prior = new Map<string, DailyAssignment>();
   for (const row of assignments) {
     if (!row.tag) continue;
-    if (row.date < start) {
-      const current = prior.get(row.user_id);
-      if (!current || row.date > current.date) prior.set(row.user_id, row);
-      continue;
-    }
     byKey.set(`${row.user_id}|${row.date}`, row);
   }
   const suppressedSet = new Set(suppressed);
   const out: DailyAssignment[] = [];
   for (const user of users) {
-    let running: DailyTag | null = prior.get(user.id)?.tag ?? null;
-    let tone = prior.get(user.id)?.trg_tone;
+    const fallback = user.default_tag || null;
     for (const date of dates) {
       const stored = byKey.get(`${user.id}|${date}`);
       if (stored?.tag) {
         out.push(stored);
-        running = stored.tag;
-        tone = stored.trg_tone;
         continue;
       }
       if (suppressedSet.has(`${user.id}|${date}`)) continue;
       if (!canAssignOnDate(user, date)) continue;
-      const tag: DailyTag | null = running || user.default_tag || null;
-      if (!tag) continue;
-      const row: DailyAssignment = {
+      if (!fallback) continue;
+      out.push({
         id: `carry|${user.id}|${date}`,
         user_id: user.id,
         date,
-        tag,
+        tag: fallback,
         updated_by: "carry",
         updated_at: "",
-      };
-      if (tag === "TRG" && (tone === "black" || tone === "red")) {
-        row.trg_tone = tone;
-      }
-      out.push(row);
+      });
     }
   }
   return out;
