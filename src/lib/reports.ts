@@ -449,7 +449,11 @@ export function buildTagBill(
   const primary = tags[0] ?? "FR";
   const consume = buildConsumeMonth(month);
   const rates = rateMap();
-  const rate = rates.get(primary);
+  // The FR bill rolls MFR days into the same column and prints one allowance
+  // rate. Price both tags at the Fresh Ration rate so the cells match the header.
+  const frAndMfr = tags.includes("FR") && tags.includes("MFR");
+  const frRate = rates.get("FR") ?? 0;
+  const rate = frAndMfr ? frRate || (rates.get("MFR") ?? 0) : (rates.get(primary) ?? 0);
   const fuelRate = tags.includes("FR") ? getFuelRatePerDay() : 0;
   const needsTrg = tags.some((code) => isTrgTag(code));
   const forces = needsTrg ? forceByUserId() : null;
@@ -471,7 +475,11 @@ export function buildTagBill(
           : (row.tagDays[code] ?? 0);
         if (!n) continue;
         days += n;
-        amount = roundPaisa(amount + moneyDays(n, rates.get(code)));
+        const tagRate =
+          frAndMfr && (code === "FR" || code === "MFR")
+            ? rate
+            : (rates.get(code) ?? 0);
+        amount = roundPaisa(amount + moneyDays(n, tagRate));
       }
       if (!days) return null;
       const frDays = tags.includes("FR") ? (row.tagDays.FR ?? 0) : 0;
