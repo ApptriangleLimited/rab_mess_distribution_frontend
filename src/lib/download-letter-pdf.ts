@@ -61,8 +61,20 @@ function transferColumnStyles(headers: readonly string[]) {
         ...(/^srb id$/i.test(col) ? { cellWidth: 16 } : {}),
         ...(/^personal no$/i.test(col) ? { cellWidth: 16 } : {}),
         ...(/^ref\.?\s*no$/i.test(col)
-          ? { cellWidth: 34, overflow: "visible" as const }
+          ? {
+              cellWidth: 30,
+              overflow: "visible" as const,
+              cellPadding: { top: 0.5, right: 0.4, bottom: 0.5, left: 0.4 },
+            }
           : {}),
+        ...(/^type$/i.test(col)
+          ? {
+              cellWidth: 9,
+              overflow: "visible" as const,
+              cellPadding: { top: 0.5, right: 0.4, bottom: 0.5, left: 0.4 },
+            }
+          : {}),
+        ...(/receiver account name/i.test(col) ? { cellWidth: 42 } : {}),
       },
     ]),
   );

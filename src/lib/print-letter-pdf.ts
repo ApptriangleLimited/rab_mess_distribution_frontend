@@ -302,8 +302,35 @@ function letterSheetCss() {
   .trust-bank-letter .beftn-ref,
   .community-bank-letter .beftn-ref,
   .sonali-bank-letter .beftn-ref {
-    width: 34mm !important;
-    min-width: 34mm !important;
+    width: 26mm !important;
+    min-width: 26mm !important;
+    max-width: 26mm !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+  .trust-bank-letter .beftn-type,
+  .community-bank-letter .beftn-type,
+  .sonali-bank-letter .beftn-type {
+    width: 9mm !important;
+    max-width: 9mm !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+  .trust-bank-letter .beftn-acct,
+  .community-bank-letter .beftn-acct,
+  .sonali-bank-letter .beftn-acct {
+    width: 42mm !important;
+    min-width: 42mm !important;
+  }
+  .trust-bank-letter th.beftn-acct,
+  .community-bank-letter th.beftn-acct,
+  .sonali-bank-letter th.beftn-acct {
     white-space: nowrap !important;
     overflow-wrap: normal !important;
     word-break: keep-all !important;
@@ -1583,8 +1610,29 @@ function bankLetterPrintCss() {
     padding-right: 1px !important;
   }
   .beftn-ref {
-    width: 34mm !important;
-    min-width: 34mm !important;
+    width: 26mm !important;
+    min-width: 26mm !important;
+    max-width: 26mm !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+  .beftn-type {
+    width: 9mm !important;
+    max-width: 9mm !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+  .beftn-acct {
+    width: 42mm !important;
+    min-width: 42mm !important;
+  }
+  th.beftn-acct {
     white-space: nowrap !important;
     overflow-wrap: normal !important;
     word-break: keep-all !important;

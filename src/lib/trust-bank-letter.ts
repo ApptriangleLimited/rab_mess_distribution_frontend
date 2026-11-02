@@ -65,6 +65,8 @@ export function beftnAlignClass(col: string, kind: "head" | "body") {
 export function beftnWidthClass(col: string) {
   if (/^ser$/i.test(col)) return "beftn-ser";
   if (/^ref\.?\s*no$/i.test(col)) return "beftn-ref";
+  if (/^type$/i.test(col)) return "beftn-type";
+  if (/receiver account name/i.test(col)) return "beftn-acct";
   return "";
 }
 
