@@ -520,10 +520,22 @@ def fill_missing_default_tags(
     stored_map: dict,
     suppressed: set[tuple[str, date]],
 ) -> int:
-    """Insert the default tag on days that have no row.
+    """Insert the default tag on empty days in the current month only.
 
-    Existing assignment rows are never updated or deleted.
+    A day that already has a saved tag is never updated or deleted.
+    Previous months are left exactly as stored.
     """
+    today = date.today()
+    month_start = date(today.year, today.month, 1)
+    month_end = (
+        date(today.year, 12, 31)
+        if today.month == 12
+        else date(today.year, today.month + 1, 1) - timedelta(days=1)
+    )
+    if start < month_start:
+        start = month_start
+    if end > month_end:
+        end = month_end
     if not members or start > end:
         return 0
     now = utcnow()
@@ -1001,6 +1013,8 @@ def approve_day(
     db: Session = Depends(get_db),
 ):
     target = parse_day(day)
+    if not daily_day_writable(target):
+        raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if sync_due_jl(db):
         db.commit()
         bust_daily()
