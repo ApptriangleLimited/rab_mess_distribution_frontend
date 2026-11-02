@@ -1,9 +1,8 @@
-import { eachISODate, isDailyDateEditable, nowISO, todayISO } from "@/lib/date";
+import { isDailyDateEditable, nowISO } from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import {
   canAssignOnDate,
   isUserInactiveOnDate,
-  rosterStart,
   syncUsersAfterJl,
 } from "@/lib/store/daily";
 import { isCockpitMember } from "@/lib/store/users";
@@ -49,64 +48,6 @@ function canWriteTag(
   const user = findUser(userId);
   if (!user || !isCockpitMember(user) || !canAssignOnDate(user, date)) return false;
   return true;
-}
-
-/** Persist default_tag on empty days before `before` so a new paint cannot rewrite them. */
-function freezePriorTags(
-  assignments: DailyAssignment[],
-  users: User[],
-  userId: string,
-  before: string,
-  updatedBy: string,
-): DailyAssignment[] {
-  const user = users.find((u) => u.id === userId);
-  const fill = user?.default_tag;
-  if (!user || !fill) return assignments;
-  const today = todayISO();
-  const roster = rosterStart(user);
-  const start =
-    roster && roster > addDays(before, -90) ? roster : addDays(before, -90);
-  if (!start || start >= before) return assignments;
-  const have = new Set(
-    assignments
-      .filter((row) => row.user_id === userId && row.date < before)
-      .map((row) => row.date),
-  );
-  const suppressed = new Set(
-    (getState().suppressed_carries ?? [])
-      .filter((key) => key.startsWith(`${userId}|`))
-      .map((key) => key.slice(userId.length + 1)),
-  );
-  const next = [...assignments];
-  const ts = nowISO();
-  for (const date of eachISODate(start, addDays(before, -1))) {
-    if (date >= before || date >= today) continue;
-    if (have.has(date) || suppressed.has(date)) continue;
-    if (!canAssignOnDate(user, date)) continue;
-    const trg_tone = trgToneForWrite(userId, fill);
-    const row: DailyAssignment = {
-      id: newId(),
-      user_id: userId,
-      date,
-      tag: fill,
-      trg_tone,
-      updated_by: updatedBy,
-      updated_at: ts,
-    };
-    if (!trg_tone) delete row.trg_tone;
-    next.push(row);
-    have.add(date);
-  }
-  return next;
-}
-
-function addDays(iso: string, delta: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 /** Unlock MFR when Daily paints JL. */
@@ -165,14 +106,7 @@ export function setTag(
     };
     if (!trg_tone) delete updated.trg_tone;
     setState((prev) => {
-      const frozen = freezePriorTags(
-        prev.assignments,
-        prev.users,
-        userId,
-        date,
-        updatedBy,
-      );
-      const assignments = frozen.map((a) =>
+      const assignments = prev.assignments.map((a) =>
         a.id === existing.id ? updated : a,
       );
       const synced = withJlSync(prev.users, assignments, [userId]);
@@ -197,10 +131,7 @@ export function setTag(
   };
   if (!trg_tone) delete created.trg_tone;
   setState((prev) => {
-    const assignments = [
-      ...freezePriorTags(prev.assignments, prev.users, userId, date, updatedBy),
-      created,
-    ];
+    const assignments = [...prev.assignments, created];
     const synced = withJlSync(prev.users, assignments, [userId]);
     return {
       ...prev,
@@ -223,10 +154,7 @@ export function setTagBulk(
   const eligible = userIds.filter((id) => canWriteTag(id, date, tag));
   if (eligible.length === 0) return 0;
   setState((prev) => {
-    let next = [...prev.assignments];
-    for (const userId of eligible) {
-      next = freezePriorTags(next, prev.users, userId, date, updatedBy);
-    }
+    const next = [...prev.assignments];
     for (const userId of eligible) {
       const trg_tone = trgToneForWrite(userId, tag, meta);
       const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
@@ -269,24 +197,9 @@ export function setTagBulk(
 }
 
 export function clearTag(userId: string, date: string) {
-  if (!canWriteTag(userId, date, "")) return;
-  setState((prev) => {
-    const assignments = freezePriorTags(
-      prev.assignments,
-      prev.users,
-      userId,
-      date,
-      "daily",
-    ).filter((a) => !(a.user_id === userId && a.date === date));
-    const synced = withJlSync(prev.users, assignments, [userId]);
-    return {
-      ...prev,
-      ...synced,
-      approved_dates: unmarkDate(prev.approved_dates, date),
-      // Explicit no-tag: hide carry ghost until Approve restores
-      suppressed_carries: withCarry(prev.suppressed_carries, userId, date),
-    };
-  });
+  const fill = findUser(userId)?.default_tag;
+  if (!fill) return;
+  setTag(userId, date, fill, "daily");
 }
 
 /** Set or clear one user's tags across many dates in one store write. */
@@ -301,40 +214,31 @@ export function setTagRange(
   if (allowed.length === 0) return 0;
   const ts = nowISO();
   const dateSet = new Set(allowed);
-  const trg_tone = trgToneForWrite(userId, tag, meta);
+  const writeTag = tag || findUser(userId)?.default_tag || "";
+  if (!writeTag) return 0;
+  const trg_tone = trgToneForWrite(userId, writeTag, tag ? meta : undefined);
   setState((prev) => {
-    const earliest = allowed.reduce((min, d) => (d < min ? d : min), allowed[0]!);
-    const next = freezePriorTags(
-      prev.assignments,
-      prev.users,
-      userId,
-      earliest,
-      updatedBy,
-    ).filter((a) => !(a.user_id === userId && dateSet.has(a.date)));
-    if (tag) {
-      for (const date of allowed) {
-        const row: DailyAssignment = {
-          id: newId(),
-          user_id: userId,
-          date,
-          tag,
-          trg_tone,
-          updated_by: updatedBy,
-          updated_at: ts,
-        };
-        if (!trg_tone) delete row.trg_tone;
-        next.push(row);
-      }
+    const next = prev.assignments.filter(
+      (a) => !(a.user_id === userId && dateSet.has(a.date)),
+    );
+    for (const date of allowed) {
+      const row: DailyAssignment = {
+        id: newId(),
+        user_id: userId,
+        date,
+        tag: writeTag,
+        trg_tone,
+        updated_by: updatedBy,
+        updated_at: ts,
+      };
+      if (!trg_tone) delete row.trg_tone;
+      next.push(row);
     }
     let approved = prev.approved_dates ?? [];
     let suppressed = prev.suppressed_carries ?? [];
     for (const date of allowed) {
       approved = unmarkDate(approved, date);
-      if (tag) {
-        suppressed = withoutCarry(suppressed, userId, date);
-      } else {
-        suppressed = withCarry(suppressed, userId, date);
-      }
+      suppressed = withoutCarry(suppressed, userId, date);
     }
     const synced = withJlSync(prev.users, next, [userId]);
     return {
@@ -366,12 +270,6 @@ function withoutCarry(
 ) {
   const k = carryKey(userId, date);
   return (keys ?? []).filter((x) => x !== k);
-}
-
-function withCarry(keys: string[] | undefined, userId: string, date: string) {
-  const k = carryKey(userId, date);
-  const cur = keys ?? [];
-  return cur.includes(k) ? cur : [...cur, k];
 }
 
 export function isCarrySuppressed(userId: string, date: string) {

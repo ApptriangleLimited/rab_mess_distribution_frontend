@@ -843,6 +843,12 @@ def month_bounds(month: str) -> tuple[date, date]:
 
 def consume_month_data(db: Session, month: str) -> dict:
     start, end = month_bounds(month)
+    from daily import fill_missing_default_tags, load_window
+
+    members, stored_map, suppressed = load_window(db, start, end, None, None, None)
+    if fill_missing_default_tags(db, members, start, end, stored_map, suppressed):
+        db.commit()
+        bust_daily()
     rates = {row.tag: float(row.amount_per_day) for row in db.query(Rate).all()}
     rows = (
         db.query(Assignment)
@@ -903,7 +909,7 @@ def consume_month_report(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    key = cache_key("reports", kind="consume", month=month)
+    key = cache_key("reports", kind="consume2", month=month)
     cached = cache_get(key)
     if cached is not None:
         return envelope(cached)
@@ -918,7 +924,7 @@ def ration_month_report(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    key = cache_key("reports", kind="ration", month=month)
+    key = cache_key("reports", kind="ration2", month=month)
     cached = cache_get(key)
     if cached is not None:
         return envelope(cached)
@@ -930,9 +936,13 @@ def ration_month_report(
 
 def manpower_day_data(db: Session, target: date) -> dict:
     """Roster + projected Daily tags for one day (same rules as the cockpit)."""
-    from daily import can_assign, load_window, project_cell
+    from daily import can_assign, fill_missing_default_tags, load_window, project_cell
 
     members, stored_map, suppressed = load_window(db, target, target, None, None, None)
+    if fill_missing_default_tags(db, members, target, target, stored_map, suppressed):
+        db.commit()
+        bust_daily()
+        members, stored_map, suppressed = load_window(db, target, target, None, None, None)
     items = []
     for member in members:
         if member.status != "1":
@@ -1012,7 +1022,7 @@ def manpower_report(
     target = parse_day(day)
     if not target:
         raise HTTPException(status_code=400, detail="Invalid date")
-    key = cache_key("reports", kind="manpower", day=target.isoformat())
+    key = cache_key("reports", kind="manpower2", day=target.isoformat())
     cached = cache_get(key)
     if cached is not None:
         return envelope(cached)

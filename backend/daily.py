@@ -512,61 +512,61 @@ def set_suppressed(db: Session, user_id: str, day: date, on: bool) -> None:
         db.delete(existing)
 
 
-def session_member_dates(db: Session, model, member_id: str) -> set[date]:
-    """Dates already staged in this session (unflushed inserts/updates)."""
-    dates: set[date] = set()
-    for obj in list(db.new) + list(db.dirty):
-        if isinstance(obj, model) and getattr(obj, "user_id", None) == member_id:
-            day = getattr(obj, "date", None)
-            if day is not None:
-                dates.add(day)
-    return dates
+def fill_missing_default_tags(
+    db: Session,
+    members: list[Member],
+    start: date,
+    end: date,
+    stored_map: dict,
+    suppressed: set[tuple[str, date]],
+) -> int:
+    """Insert the default tag on days that have no row.
 
-
-def freeze_prior_tags(db: Session, member: Member, before: date, staff: Staff) -> None:
-    """Lock empty days before `before` as stored default tags so later paints cannot rewrite them."""
-    default = (member.default_tag or "").upper()
-    if not default or before <= date.min:
-        return
-    window_start = before - timedelta(days=90)
-    start = roster_start(member)
-    if start and start > window_start:
-        window_start = start
-    if window_start >= before:
-        return
-    last = before - timedelta(days=1)
-    existing = {
-        row.date
-        for row in db.query(Assignment.date).filter(
-            Assignment.user_id == member.id,
-            Assignment.date >= window_start,
-            Assignment.date <= last,
-        )
-    } | session_member_dates(db, Assignment, member.id)
-    suppressed = {
-        row.date
-        for row in db.query(SuppressedCarry.date).filter(
-            SuppressedCarry.user_id == member.id,
-            SuppressedCarry.date >= window_start,
-            SuppressedCarry.date <= last,
-        )
-    } | session_member_dates(db, SuppressedCarry, member.id)
+    Existing assignment rows are never updated or deleted.
+    """
+    if not members or start > end:
+        return 0
     now = utcnow()
-    for day in each_date(window_start, last):
-        if day in existing or day in suppressed:
+    values: list[dict] = []
+    seen = set(stored_map.keys()) | set(suppressed)
+    for member in members:
+        if member.status != "1":
             continue
-        if not can_assign(member, day):
+        default = (member.default_tag or "").upper()
+        if not default:
             continue
-        db.add(
-            Assignment(
-                id=new_id("a"),
-                user_id=member.id,
-                date=day,
-                tag=default,
-                updated_by=staff.id,
-                updated_at=now,
+        tone = infer_trg_tone(member.force) if default == "TRG" else None
+        for day in each_date(start, end):
+            key = (member.id, day)
+            if key in seen:
+                continue
+            if not can_assign(member, day):
+                continue
+            seen.add(key)
+            values.append(
+                {
+                    "id": new_id("a"),
+                    "user_id": member.id,
+                    "date": day,
+                    "tag": default,
+                    "trg_tone": tone,
+                    "updated_by": "default",
+                    "updated_at": now,
+                    "au_entry_by": "",
+                    "au_update_by": "",
+                }
             )
-        )
+    if not values:
+        return 0
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    table = Assignment.__table__
+    for offset in range(0, len(values), 500):
+        chunk = values[offset : offset + 500]
+        stmt = pg_insert(table).values(chunk)
+        stmt = stmt.on_conflict_do_nothing(index_elements=["user_id", "date"])
+        db.execute(stmt)
+    return len(values)
 
 
 def infer_trg_tone(force: str | None, trg_tone: str | None = None) -> str:
@@ -586,7 +586,6 @@ def upsert_assignment(
     staff: Staff,
     trg_tone: str | None = None,
 ) -> Assignment:
-    freeze_prior_tags(db, member, day, staff)
     row = (
         db.query(Assignment)
         .filter(Assignment.user_id == member.id, Assignment.date == day)
@@ -651,7 +650,7 @@ def list_assignments(
     start, end = resolve_range(month, date_from, date_to, day)
     key = cache_key(
         "assignments",
-        kind="list",
+        kind="list2",
         start=start.isoformat(),
         end=end.isoformat(),
         member_id=member_id,
@@ -671,6 +670,12 @@ def list_assignments(
     members, stored_map, suppressed = load_window(
         db, start, end, q, rank, wing, member_id, wing_family
     )
+    if fill_missing_default_tags(db, members, start, end, stored_map, suppressed):
+        db.commit()
+        bust_daily()
+        members, stored_map, suppressed = load_window(
+            db, start, end, q, rank, wing, member_id, wing_family
+        )
     days = list(each_date(start, end))
     items = []
     for member in members:
@@ -687,7 +692,7 @@ def list_assignments(
     cache_set(key, data)
     summary_key = cache_key(
         "assignments",
-        kind="summary",
+        kind="summary2",
         start=start.isoformat(),
         end=end.isoformat(),
         member_id=member_id,
@@ -734,7 +739,7 @@ def assignment_summary(
     start, end = resolve_range(month, date_from, date_to, day)
     key = cache_key(
         "assignments",
-        kind="summary",
+        kind="summary2",
         start=start.isoformat(),
         end=end.isoformat(),
         member_id=member_id,
@@ -748,7 +753,7 @@ def assignment_summary(
         return envelope(cached)
     list_key = cache_key(
         "assignments",
-        kind="list",
+        kind="list2",
         start=start.isoformat(),
         end=end.isoformat(),
         member_id=member_id,
@@ -767,6 +772,12 @@ def assignment_summary(
     members, stored_map, suppressed = load_window(
         db, start, end, q, rank, wing, member_id, wing_family
     )
+    if fill_missing_default_tags(db, members, start, end, stored_map, suppressed):
+        db.commit()
+        bust_daily()
+        members, stored_map, suppressed = load_window(
+            db, start, end, q, rank, wing, member_id, wing_family
+        )
     days = list(each_date(start, end))
     items = []
     for member in members:
@@ -813,7 +824,14 @@ def put_assignment(
         "updated_by": row.updated_by,
     }
     kept = [] if last_jl is not None and row.date > last_jl else [painted]
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Could not save this tag. Try again.",
+        ) from exc
     db.refresh(member)
     if kept:
         db.refresh(row)
@@ -846,16 +864,22 @@ def delete_assignment(
         raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if not can_assign(member, target):
         raise HTTPException(status_code=409, detail="Cannot clear tag on this date")
-    freeze_prior_tags(db, member, target, staff)
-    db.query(Assignment).filter(
-        Assignment.user_id == member_id, Assignment.date == target
-    ).delete()
-    set_suppressed(db, member_id, target, True)
-    unlock_date(db, target)
+    default = (member.default_tag or "").upper()
+    if not default:
+        raise HTTPException(status_code=409, detail="Member has no default tag")
+    row = upsert_assignment(db, member, target, default, staff)
     member.updated_at = utcnow()
     sync_member_jl(db, member)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Could not restore the default tag. Try again.",
+        ) from exc
     db.refresh(member)
+    db.refresh(row)
     bust_daily()
     bust_members()
     last_jl = (
@@ -867,16 +891,19 @@ def delete_assignment(
         {
             "items": [
                 {
-                    "member_id": member_id,
-                    "date": target.isoformat(),
-                    "tag": None,
-                    "source": "suppressed",
+                    "member_id": row.user_id,
+                    "date": row.date.isoformat(),
+                    "tag": row.tag,
+                    "source": "stored",
+                    "trg_tone": row.trg_tone,
+                    "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
+                    "updated_by": row.updated_by,
                 },
                 *empty_cells_after(member.id, last_jl),
             ],
             "member": member_jl_state(member),
         },
-        "Tag cleared",
+        "Default tag restored",
     )
 
 
@@ -923,17 +950,19 @@ def put_assignment_range(
         else:
             if not can_assign(member, day):
                 continue
-            db.query(Assignment).filter(
-                Assignment.user_id == member.id, Assignment.date == day
-            ).delete()
-            set_suppressed(db, member.id, day, True)
-            unlock_date(db, day)
+            default = (member.default_tag or "").upper()
+            if not default:
+                continue
+            row = upsert_assignment(db, member, day, default, staff)
             items.append(
                 {
-                    "member_id": member.id,
-                    "date": day.isoformat(),
-                    "tag": None,
-                    "source": "suppressed",
+                    "member_id": row.user_id,
+                    "date": row.date.isoformat(),
+                    "tag": row.tag,
+                    "source": "stored",
+                    "trg_tone": row.trg_tone,
+                    "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
+                    "updated_by": row.updated_by,
                 }
             )
             updated += 1
