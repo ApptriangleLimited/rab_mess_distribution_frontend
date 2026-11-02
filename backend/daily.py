@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import current_staff, require_roles
-from cache import bust_boro, bust_daily, cache_get, cache_key, cache_set
+from cache import bust_boro, bust_daily, bust_members, cache_get, cache_key, cache_set
 from database import get_db
 from models import Assignment, BoroKhanaDay, DayLock, Member, Staff, SuppressedCarry
 from schemas import normalize_tag
