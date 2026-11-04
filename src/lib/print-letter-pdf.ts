@@ -866,35 +866,38 @@ function colorSheetCss() {
     overflow: visible !important;
   }
   .pritibhoj-sheets {
-    gap: 2mm !important;
+    gap: 1.5mm !important;
     page: pritibhoj-page;
     break-inside: avoid;
     page-break-inside: avoid;
   }
   @page pritibhoj-page {
     size: A4 portrait;
-    margin: 8mm;
+    margin: 6mm 5mm;
   }
   .pritibhoj-sheets section {
     width: 100% !important;
-    margin: 0 0 2mm !important;
+    margin: 0 !important;
     overflow: visible !important;
     border-radius: 0 !important;
     page-break-inside: auto;
     break-inside: auto;
   }
+  .pritibhoj-sheets .pb-sheet-head,
   .pritibhoj-sheets section > div:first-child {
-    padding: 2.5mm 3mm !important;
+    padding: 0.4mm 1mm 0 !important;
+    margin: 0 !important;
+    border-bottom: 0 !important;
   }
   .pritibhoj-sheets h2 {
-    font-size: 14px !important;
-    line-height: 1.25 !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
     margin: 0 !important;
   }
   .pritibhoj-sheets section p {
     font-size: 10px !important;
-    line-height: 1.3 !important;
-    margin: 1px 0 0 !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
   }
   .pritibhoj-table {
     width: 100% !important;
@@ -903,37 +906,40 @@ function colorSheetCss() {
     border: 1px solid #222 !important;
     border-collapse: collapse !important;
   }
-  .pb-col-sl { width: 4.5% !important; }
-  .pb-col-wing { width: 14% !important; }
-  .pb-col-num { width: 7.409% !important; }
+  .pb-col-sl { width: 4% !important; }
+  .pb-col-wing { width: 15% !important; }
+  .pb-col-num { width: 7.3636% !important; }
   .pritibhoj-table th,
   .pritibhoj-table td,
   .pb-cell {
     box-sizing: border-box !important;
     min-width: 0 !important;
     max-width: none !important;
-    padding: 3px 1px !important;
-    font-size: 8px !important;
+    padding: 2px 1px !important;
+    font-size: 10px !important;
     line-height: 1.2 !important;
     text-align: center !important;
     vertical-align: middle !important;
     position: static !important;
     left: auto !important;
     overflow: hidden !important;
-    white-space: normal !important;
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
+    white-space: nowrap !important;
     border: 1px solid #222 !important;
   }
   .pritibhoj-table th {
-    font-size: 7px !important;
+    font-size: 8px !important;
     font-weight: 700 !important;
-    padding: 3px 1px !important;
+    padding: 2px 1px !important;
+    white-space: normal !important;
+    line-height: 1.15 !important;
+  }
+  .pritibhoj-table td:nth-child(n + 3) {
+    white-space: nowrap !important;
   }
   .pritibhoj-table th:nth-child(2),
   .pritibhoj-table tbody tr td:nth-child(2) {
     text-align: left !important;
-    padding-left: 4px !important;
+    padding-left: 2px !important;
     white-space: normal !important;
     word-break: break-word !important;
   }
@@ -1168,7 +1174,6 @@ function lockPrintOrientation(
       width: 100% !important;
       max-width: 100% !important;
       min-width: 0 !important;
-      zoom: 1 !important;
     }
     .pritibhoj-table {
       table-layout: fixed !important;
@@ -1179,9 +1184,28 @@ function lockPrintOrientation(
       width: 100% !important;
       max-width: 100% !important;
     }
-    .pb-col-sl { width: 4.5% !important; }
-    .pb-col-wing { width: 14% !important; }
-    .pb-col-num { width: 7.409% !important; }
+    @page pritibhoj-page { size: A4 portrait; margin: 6mm 5mm; }
+    .pritibhoj-sheets { page: pritibhoj-page; gap: 1.5mm !important; }
+    .pritibhoj-sheets section { margin: 0 !important; }
+    .pritibhoj-sheets .pb-sheet-head,
+    .pritibhoj-sheets section > div:first-child {
+      padding: 0.4mm 1mm 0 !important;
+      margin: 0 !important;
+      border-bottom: 0 !important;
+    }
+    .pritibhoj-sheets h2 {
+      margin: 0 !important;
+      font-size: 13px !important;
+      line-height: 1.2 !important;
+    }
+    .pritibhoj-sheets section p {
+      margin: 0 !important;
+      font-size: 10px !important;
+      line-height: 1.2 !important;
+    }
+    .pb-col-sl { width: 4% !important; }
+    .pb-col-wing { width: 15% !important; }
+    .pb-col-num { width: 7.3636% !important; }
     .pritibhoj-table th,
     .pritibhoj-table td {
       position: static !important;
@@ -1189,23 +1213,24 @@ function lockPrintOrientation(
       min-width: 0 !important;
       max-width: 100% !important;
       overflow: hidden !important;
-      white-space: normal !important;
-      overflow-wrap: anywhere !important;
-      word-break: break-word !important;
+      white-space: nowrap !important;
       text-align: center !important;
       vertical-align: middle !important;
-      font-size: 8px !important;
+      font-size: 10px !important;
       line-height: 1.2 !important;
-      padding: 3px 1px !important;
+      padding: 2px 1px !important;
       border: 1px solid #222 !important;
     }
     .pritibhoj-table th {
-      font-size: 7px !important;
+      font-size: 8px !important;
       font-weight: 700 !important;
+      white-space: normal !important;
+      line-height: 1.15 !important;
     }
     .pritibhoj-table th:nth-child(2),
     .pritibhoj-table tbody tr td:nth-child(2) {
       text-align: left !important;
+      padding-left: 2px !important;
       white-space: normal !important;
       word-break: break-word !important;
     }
@@ -1286,16 +1311,20 @@ function lockPrintOrientation(
 function fitPritibhojOnOnePortraitPage(doc: Document) {
   const root = doc.querySelector(".pritibhoj-sheets") as HTMLElement | null;
   if (!root) return;
-  root.style.zoom = "1";
   const pxPerMm = 96 / 25.4;
-  const maxW = (210 - 16) * pxPerMm;
-  const maxH = (297 - 16) * pxPerMm;
-  const scale = Math.min(
-    1,
-    maxW / Math.max(root.scrollWidth, 1),
-    maxH / Math.max(root.scrollHeight, 1),
-  );
-  if (scale < 0.995) root.style.zoom = String(Math.max(0.62, scale * 0.98));
+  const pageW = (210 - 10) * pxPerMm;
+  const pageH = (297 - 16) * pxPerMm;
+  doc.body.style.margin = "0";
+  doc.body.style.width = `${pageW}px`;
+  root.style.zoom = "1";
+  root.style.width = "100%";
+  const naturalH = root.scrollHeight;
+  const scale = Math.min(1, pageH / Math.max(naturalH, 1));
+  if (scale < 0.995) {
+    root.style.zoom = String(
+      Math.max(0.55, Math.round(scale * 0.98 * 1000) / 1000),
+    );
+  }
 }
 
 async function waitForPrintAssets(win: Window) {

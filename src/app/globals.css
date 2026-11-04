@@ -142,6 +142,70 @@ body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  @page pritibhoj-page {
+    size: A4 portrait;
+    margin: 6mm 5mm;
+  }
+  .pritibhoj-sheets {
+    page: pritibhoj-page;
+    gap: 1.5mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .pritibhoj-sheets section {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  .pritibhoj-sheets .pb-sheet-head {
+    padding: 0.4mm 1mm 0 !important;
+    margin: 0 !important;
+    border-bottom: 0 !important;
+  }
+  .pritibhoj-sheets h2 {
+    margin: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+  }
+  .pritibhoj-sheets section p {
+    margin: 0 !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+  .pritibhoj-sheets .pritibhoj-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+  .pritibhoj-sheets .pb-col-sl { width: 4% !important; }
+  .pritibhoj-sheets .pb-col-wing { width: 15% !important; }
+  .pritibhoj-sheets .pb-col-num { width: 7.3636% !important; }
+  .pritibhoj-sheets .pritibhoj-table th,
+  .pritibhoj-sheets .pritibhoj-table td {
+    padding: 2px 1px !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+    overflow: hidden !important;
+  }
+  .pritibhoj-sheets .pritibhoj-table td:nth-child(n + 3) {
+    white-space: nowrap !important;
+  }
+  .pritibhoj-sheets .pritibhoj-table th {
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    white-space: normal !important;
+    line-height: 1.15 !important;
+  }
+  .pritibhoj-sheets .pritibhoj-table th:nth-child(2),
+  .pritibhoj-sheets .pritibhoj-table td:nth-child(2) {
+    text-align: left !important;
+    padding-left: 2px !important;
+    white-space: normal !important;
+  }
   html,
   body {
     background: white !important;

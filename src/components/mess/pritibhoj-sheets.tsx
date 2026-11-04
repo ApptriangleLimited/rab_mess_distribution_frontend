@@ -279,7 +279,7 @@ export function PritibhojSheets({
       )}
     >
       <section className="overflow-visible rounded-2xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
-        <div className="border-b border-neutral-200 px-4 py-3 text-center dark:border-neutral-700">
+        <div className="pb-sheet-head border-b border-neutral-200 px-4 py-3 text-center dark:border-neutral-700">
           <div className="no-print mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 print:hidden">
             <IconCake className="h-5 w-5" />
           </div>
@@ -308,7 +308,7 @@ export function PritibhojSheets({
       </section>
 
       <section className="overflow-visible rounded-2xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
-        <div className="border-b border-neutral-200 px-4 py-3 text-center dark:border-neutral-700">
+        <div className="pb-sheet-head border-b border-neutral-200 px-4 py-3 text-center dark:border-neutral-700">
           <h2 className="text-sm font-bold text-neutral-900 dark:text-white sm:text-base">
             {PRITIBHOJ_DEMO_META.adminTitleBn}
           </h2>
