@@ -94,7 +94,7 @@ export default function DailyRegisterPrintClient() {
         if (wing !== "all" && !memberMatchesWingFilter(u.wing, wing))
           return false;
         if (!query) return true;
-        return [u.name, u.rab_id, u.wing, u.rank]
+        return [u.name, u.personal_id, u.rab_id, u.wing, u.rank]
           .join(" ")
           .toLowerCase()
           .includes(query);

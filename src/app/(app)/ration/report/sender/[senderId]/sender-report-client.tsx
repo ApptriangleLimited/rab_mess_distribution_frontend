@@ -132,6 +132,7 @@ export default function RationSenderReportClient() {
       if (!query) return true;
       return [
         row.user.name,
+        row.user.personal_id,
         row.user.rab_id,
         row.user.account_number,
         row.user.bank_name,

@@ -55,7 +55,7 @@ export function AllConsumePanel({
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
-      return [row.user.name, row.user.rab_id, row.user.wing, row.user.rank]
+      return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.wing, row.user.rank]
         .join(" ")
         .toLowerCase()
         .includes(query);

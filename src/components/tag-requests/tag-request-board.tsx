@@ -251,7 +251,7 @@ export function TagRequestBoard({
         if (dateFrom && day < dateFrom) return false;
         if (dateTo && day > dateTo) return false;
         if (!query) return true;
-        return [user.name, user.rab_id, user.rank, user.wing, req.to_tag]
+        return [user.name, user.personal_id, user.rab_id, user.rank, user.wing, req.to_tag]
           .join(" ")
           .toLowerCase()
           .includes(query);

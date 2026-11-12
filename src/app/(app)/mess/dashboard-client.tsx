@@ -93,6 +93,7 @@ type ActivityRow = {
   id: string;
   name: string;
   code: string;
+  personalId: string;
   wing: string;
   shiftId: MealShiftId;
   time: string;
@@ -356,6 +357,7 @@ export default function MessDashboardClient() {
         id: row.id,
         name: user?.name || t("mess.dashboard.unknownMember"),
         code: user?.rab_id || user?.personal_id || row.member_id,
+        personalId: user?.personal_id || "",
         wing: memberFormWing(user?.wing ?? "") || "—",
         shiftId: row.shift_id,
         time: row.check_in_time,
@@ -367,6 +369,7 @@ export default function MessDashboardClient() {
         id: row.id,
         name: row.guest_name || t("mess.dashboard.guestMeal"),
         code: row.ref_info || row.guest_info || row.id,
+        personalId: "",
         wing: t("mess.dashboard.guestMeal"),
         shiftId: row.shift_id,
         time: row.check_in_time,
@@ -379,6 +382,7 @@ export default function MessDashboardClient() {
         id: event.id,
         name: event.title || t("nav.pritibhoj"),
         code: event.occasion || event.org || event.id,
+        personalId: "",
         wing: event.org || t("nav.pritibhoj"),
         shiftId: shifts[0]?.id ?? "lunch",
         time: event.date,
@@ -389,7 +393,10 @@ export default function MessDashboardClient() {
     const query = search.trim().toLowerCase();
     return (query
       ? rows.filter((row) =>
-          [row.name, row.code, row.wing].join(" ").toLowerCase().includes(query),
+          [row.name, row.code, row.personalId, row.wing]
+            .join(" ")
+            .toLowerCase()
+            .includes(query),
         )
       : rows
     ).slice(0, 8);

@@ -180,7 +180,7 @@ export default function MessLedgerClient() {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (wing !== "all" && row.user.wing !== wing) return false;
       if (!query) return true;
-      return [row.user.name, row.user.rab_id, row.user.rank, row.user.wing]
+      return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -205,7 +205,7 @@ export default function MessLedgerClient() {
       if (rank !== "all" && user.rank !== rank) return false;
       if (!memberMatchesWingFilter(user.wing, wing)) return false;
       if (!query) return true;
-      return [user.name, user.rab_id, user.rank, user.wing]
+      return [user.name, user.personal_id, user.rab_id, user.rank, user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);

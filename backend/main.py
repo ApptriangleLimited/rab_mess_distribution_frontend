@@ -972,6 +972,7 @@ def list_tag_requests(
             or_(
                 Member.name.ilike(like),
                 Member.rab_id.ilike(like),
+                Member.personal_id.ilike(like),
                 Member.rank.ilike(like),
                 Member.wing.ilike(like),
                 TagRequest.to_tag.ilike(like),

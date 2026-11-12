@@ -104,7 +104,7 @@ export default function RationMembersPage() {
         if (rank !== "all" && u.rank !== rank) return false;
         if (wing !== "all" && u.wing !== wing) return false;
         if (!query) return true;
-        return [u.name, u.rab_id, u.rank, u.wing, u.account_number, u.bank_name]
+        return [u.name, u.personal_id, u.rab_id, u.rank, u.wing, u.account_number, u.bank_name]
           .join(" ")
           .toLowerCase()
           .includes(query);

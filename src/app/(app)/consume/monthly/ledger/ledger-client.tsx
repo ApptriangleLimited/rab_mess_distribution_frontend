@@ -129,7 +129,7 @@ export default function ConsumeLedgerClient() {
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (memberType !== "all" && row.user.member_type !== memberType) return false;
       if (!query) return true;
-      return [row.user.name, row.user.rab_id, row.user.rank, row.user.wing]
+      return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);

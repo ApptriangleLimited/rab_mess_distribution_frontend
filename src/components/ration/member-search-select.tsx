@@ -36,7 +36,7 @@ export function MemberSearchSelect({
     const query = q.trim().toLowerCase();
     if (!query) return users;
     return users.filter((u) =>
-      [u.name, u.rab_id, u.rank, u.wing]
+      [u.name, u.personal_id, u.rab_id, u.rank, u.wing]
         .join(" ")
         .toLowerCase()
         .includes(query),

@@ -412,7 +412,7 @@ export default function MessReportsClient() {
         if (wing !== "all" && u.wing !== wing) continue;
         if (
           query &&
-          ![u.name, u.rab_id, u.rank, u.wing]
+          ![u.name, u.personal_id, u.rab_id, u.rank, u.wing]
             .join(" ")
             .toLowerCase()
             .includes(query)
@@ -468,7 +468,15 @@ export default function MessReportsClient() {
           if (wing !== "all" && row.wing !== wing) continue;
           if (
             query &&
-            ![row.name, row.rab_id, row.rank, row.wing, row.zk_user_id, row.info]
+            ![
+              row.name,
+              usersById.get(row.member_id ?? "")?.personal_id,
+              row.rab_id,
+              row.rank,
+              row.wing,
+              row.zk_user_id,
+              row.info,
+            ]
               .join(" ")
               .toLowerCase()
               .includes(query)
@@ -500,7 +508,7 @@ export default function MessReportsClient() {
           if (wing !== "all" && member?.wing !== wing) continue;
           if (
             query &&
-            ![member?.name, member?.rab_id, member?.rank, member?.wing]
+            ![member?.name, member?.personal_id, member?.rab_id, member?.rank, member?.wing]
               .join(" ")
               .toLowerCase()
               .includes(query)
