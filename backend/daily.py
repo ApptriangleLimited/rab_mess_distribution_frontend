@@ -581,6 +581,44 @@ def fill_missing_default_tags(
     return len(values)
 
 
+def auto_default_clear_range(today: date) -> tuple[date, date] | None:
+    """Days after the inactive day, through the end of the current month."""
+    start = today + timedelta(days=1)
+    month_end = (
+        date(today.year, 12, 31)
+        if today.month == 12
+        else date(today.year, today.month + 1, 1) - timedelta(days=1)
+    )
+    if start > month_end:
+        return None
+    return start, month_end
+
+
+def clear_auto_defaults_after_today(db: Session, member: Member) -> int:
+    """Drop automatic default tags after today through the end of this month.
+
+    The day the member goes inactive stays. Hand-painted tags stay.
+    Earlier months and later months stay.
+    """
+    window = auto_default_clear_range(date.today())
+    default = (member.default_tag or "").upper()
+    if window is None or not default:
+        return 0
+    start, month_end = window
+    removed = (
+        db.query(Assignment)
+        .filter(
+            Assignment.user_id == member.id,
+            Assignment.date >= start,
+            Assignment.date <= month_end,
+            Assignment.updated_by == "default",
+            func.upper(Assignment.tag) == default,
+        )
+        .delete(synchronize_session=False)
+    )
+    return int(removed or 0)
+
+
 def infer_trg_tone(force: str | None, trg_tone: str | None = None) -> str:
     if trg_tone in ("black", "red"):
         return trg_tone

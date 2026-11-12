@@ -1,3 +1,6 @@
+from datetime import date
+
+from daily import auto_default_clear_range
 from permissions import filter_snapshot_body
 from security import hash_token, validate_password, verify_login_mfa
 from storage import StorageError, sniff_image_mime, sniff_mime
@@ -11,6 +14,15 @@ class DummyStaff:
         self.mfa_enabled = mfa_enabled
         self.mfa_secret = mfa_secret
         self.mfa_recovery = mfa_recovery
+
+
+def test_inactive_clears_only_the_rest_of_this_month():
+    assert auto_default_clear_range(date(2026, 11, 12)) == (
+        date(2026, 11, 13),
+        date(2026, 11, 30),
+    )
+    assert auto_default_clear_range(date(2026, 11, 30)) is None
+    assert auto_default_clear_range(date(2026, 12, 31)) is None
 
 
 def test_password_policy_rejects_short_and_common():

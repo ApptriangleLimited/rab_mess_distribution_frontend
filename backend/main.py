@@ -47,6 +47,7 @@ from cache import (
 )
 from daily import (
     can_assign,
+    clear_auto_defaults_after_today,
     daily_day_writable,
     each_date,
     router as daily_router,
@@ -757,6 +758,7 @@ def update_member(
     if find_member_by_rab(db, body.rab_id, exclude_id=member_id):
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     apply_member_fields(row, body)
+    became_inactive = False
     if body.status in ("0", "1"):
         if body.status != row.status or (
             body.status == "1"
@@ -765,8 +767,12 @@ def update_member(
                 for span in (row.inactive_spans or [])
             )
         ):
+            if body.status == "0" and body.status != row.status:
+                became_inactive = True
             apply_status_spans(row, body.status)
         row.status = body.status
+    if became_inactive:
+        clear_auto_defaults_after_today(db, row)
     if body.approval_status:
         row.approval_status = normalize_approval(body.approval_status, row.approval_status)
     row.updated_at = utcnow()
@@ -777,6 +783,8 @@ def update_member(
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists") from exc
     db.refresh(row)
     bust_members()
+    if became_inactive:
+        bust_daily()
     push_member_card(row)
     return envelope(member_out(row), "Member updated")
 
@@ -899,6 +907,8 @@ def set_member_status(
         raise HTTPException(status_code=409, detail="Only accepted members can change status")
     if row.status != body.status:
         apply_status_spans(row, body.status)
+        if body.status == "0":
+            clear_auto_defaults_after_today(db, row)
         row.status = body.status
         row.updated_at = utcnow()
         db.commit()
