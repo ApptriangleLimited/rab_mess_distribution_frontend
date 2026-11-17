@@ -224,26 +224,39 @@ function downloadPeople(title: string, rows: PersonLine[]) {
 }
 
 function printPeople(title: string, rows: PersonLine[]) {
-  const popup = window.open("", "_blank", "noopener,noreferrer");
-  if (!popup) return;
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(frame);
+  const doc = frame.contentDocument;
+  const view = frame.contentWindow;
+  if (!doc || !view) {
+    frame.remove();
+    return;
+  }
   const body = rows
     .map((row) => `<tr>${reportCells(row).map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
     .join("");
-  popup.document.write(`<!DOCTYPE html><html><head><title>${escapeHtml(title)}</title>
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><title>${escapeHtml(title)}</title>
     <style>
-      body { font-family: sans-serif; padding: 16px; color: #111; }
-      h1 { font-size: 16px; margin: 0 0 12px; }
+      @page { size: A4 landscape; margin: 10mm; }
+      body { font-family: sans-serif; color: #111; }
+      h1 { font-size: 14px; margin: 0 0 8px; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; font-size: 11px; }
-      th { background: #f3f4f6; }
+      th, td { border: 1px solid #111; padding: 4px 5px; text-align: left; font-size: 10px; }
+      th { background: #e5e7eb; }
     </style></head><body>
     <h1>${escapeHtml(title)} (${rows.length})</h1>
     <table><thead><tr>${REPORT_HEADERS.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
     <tbody>${body || `<tr><td colspan="${REPORT_HEADERS.length}">—</td></tr>`}</tbody></table>
     </body></html>`);
-  popup.document.close();
-  popup.focus();
-  popup.print();
+  doc.close();
+  view.addEventListener("afterprint", () => frame.remove(), { once: true });
+  window.setTimeout(() => {
+    view.focus();
+    view.print();
+  }, 250);
 }
 
 function escapeHtml(value: string) {
