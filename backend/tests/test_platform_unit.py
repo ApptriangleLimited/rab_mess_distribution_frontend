@@ -1,7 +1,7 @@
 from datetime import date
 
 from daily import auto_default_clear_range
-from zk_gate import device_card_number, same_rfid
+from zk_gate import access_user_command, device_card_number, same_rfid
 from permissions import filter_snapshot_body
 from security import hash_token, validate_password, verify_login_mfa
 from storage import StorageError, sniff_image_mime, sniff_mime
@@ -22,6 +22,14 @@ def test_device_verifies_the_stored_rfid_without_replacing_it():
     assert device_card_number("7502842") == 4918042
     assert same_rfid("7502842", 4918042)
     assert same_rfid("7502842", 7502842)
+
+
+def test_access_command_sends_the_device_card_number():
+    line = access_user_command(1393, "1006837", "Md Bellal Hossain", 4918042)
+    assert line == (
+        "C:1393:DATA UPDATE user CardNo=4918042 Name=MdBellalHossain "
+        "Pin=1006837 Password= Group=1 StartTime=0 EndTime=0 Privilege=0"
+    )
 
 
 def test_inactive_clears_only_the_rest_of_this_month():

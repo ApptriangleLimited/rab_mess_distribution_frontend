@@ -319,23 +319,28 @@ def enroll_pin(member: Member) -> str:
     return device_pin(getattr(member, "personal_id", "") or "") or device_pin(member.rab_id)
 
 
+def access_user_command(cmd_id: int, pin: str, name: str, card: int) -> str:
+    """Security PUSH 3.1.2 user write. Fields are space-separated, card is CardNo."""
+    safe_name = "".join(device_name(name).split()) or "Member"
+    return (
+        f"C:{cmd_id}:DATA UPDATE user CardNo={card} Name={safe_name} "
+        f"Pin={pin} Password= Group=1 StartTime=0 EndTime=0 Privilege=0"
+    )
+
+
 def queue_adms_userinfo(member: Member, pin: str | None = None) -> str:
     """Queue a Security PUSH user write. The device picks it up on GET /iclock/getrequest."""
     pin = device_pin(pin or enroll_pin(member))
     card = device_card_number(member.rfid)
     if not pin or card <= 0:
         raise ValueError("Member needs an SRB ID and RFID")
-    name = device_name(member.name)
     with _adms_cmd_lock:
         with _open_adms_store() as handle:
             _lock_adms_file(handle)
             data = _read_adms_store(handle)
             data["seq"] = int(data.get("seq") or 0) + 1
             cmd_id = data["seq"]
-            line = (
-                f"C:{cmd_id}:DATA UPDATE USERINFO PIN={pin}\tName={name}\t"
-                f"Pri=0\tPasswd=\tCard={card}\tGrp=1"
-            )
+            line = access_user_command(cmd_id, pin, member.name, card)
             data["cmds"].append({"id": cmd_id, "line": line})
             _write_adms_store(handle, data)
     _adms_log.info("ADMS queued cmd=%r", line)

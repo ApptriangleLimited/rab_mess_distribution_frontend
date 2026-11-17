@@ -32,6 +32,34 @@ router = APIRouter(
 )
 
 
+REGISTRY_CODE = "RabMessAdms01"
+SESSION_ID = "RABMESSADMSSESSION000000000001"
+
+
+def registry_body() -> str:
+    """Access devices stay in the 15s register loop until they receive this code."""
+    return f"RegistryCode={REGISTRY_CODE}\r\n"
+
+
+def push_body() -> str:
+    """Server settings the device downloads after RegistryCode, before getrequest."""
+    lines = [
+        "ServerVersion=3.0.1",
+        "ServerName=ADMS",
+        "PushVersion=3.0.1",
+        "ErrorDelay=60",
+        "RequestDelay=2",
+        "TransTimes=00:00;14:05",
+        "TransInterval=1",
+        "TransTables=User Transaction",
+        "Realtime=1",
+        f"SessionID={SESSION_ID}",
+        "TimeoutSec=10",
+        "",
+    ]
+    return "\r\n".join(lines)
+
+
 def handshake_options(serial_number: str) -> str:
     """Options this SenseFace will accept before it asks for commands.
 
@@ -370,7 +398,18 @@ async def device_registry(request: Request) -> Response:
     if serial_number:
         note_adms(serial_number)
         _mark_registered(serial_number)
-    return plain_text("OK\r\n")
+    return plain_text(registry_body())
+
+
+@router.api_route("/push", methods=["GET", "POST"])
+async def device_push(request: Request) -> Response:
+    serial_number = request.query_params.get("SN", "").strip()
+    body = (await request.body()).decode("utf-8", errors="replace")
+    _audit("push", request, f"serial={serial_number} body={body!r}")
+    if serial_number:
+        note_adms(serial_number)
+        _mark_registered(serial_number)
+    return plain_text(push_body())
 
 
 @router.api_route("/ping", methods=["GET", "POST"])
