@@ -61,7 +61,8 @@ import { listPritibhojEventsApi } from "@/lib/api/pritibhoj";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
 import { fetchZkDisplay, type ZkGateRow, type ZkGateStatus } from "@/lib/api/zk-gate";
 import { eachISODate, todayISO } from "@/lib/date";
-import { downloadMemberFullListPdf } from "@/lib/download-member-full-list";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import { listGuestMeals } from "@/lib/store/guest-meals";
 import { listMealAssigns } from "@/lib/store/meal-assigns";
@@ -111,7 +112,10 @@ type PersonLine = {
   sortKey: string;
 };
 
+const REPORT_TITLE = "Meal Assignments Report";
+
 const REPORT_HEADERS = [
+  "SL",
   "Personal ID",
   "SRB ID",
   "Rank",
@@ -123,6 +127,12 @@ const REPORT_HEADERS = [
   "Check-in-Date-Time",
   "Status",
 ];
+
+function generatedOnLabel(now = new Date()) {
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `Generated on: ${date} at ${time}`;
+}
 
 function memberPlace(storedWing: string) {
   const cascade = memberWingCascade(storedWing);
@@ -155,8 +165,9 @@ function checkInLabel(raw: string) {
   return `${date}, ${time}`;
 }
 
-function reportCells(row: PersonLine) {
+function reportCells(row: PersonLine, index: number) {
   return [
+    String(index + 1),
     row.personalId || "—",
     row.rabId || "—",
     row.rank || "—",
@@ -211,19 +222,40 @@ function punchStatus(row: ZkGateRow): ZkGateStatus {
   return row.allowed ? "accepted" : "not_allowed";
 }
 
-function downloadPeople(title: string, rows: PersonLine[]) {
-  downloadMemberFullListPdf({
-    org: "SRB HQ",
-    title,
-    countLabel: String(rows.length),
-    chips: [],
-    headers: REPORT_HEADERS,
-    rows: rows.map(reportCells),
-    filename: `${title.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+function downloadPeople(rows: PersonLine[]) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(17, 17, 17);
+  doc.text(REPORT_TITLE, pageW / 2, 16, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.text(generatedOnLabel(), pageW / 2, 24, { align: "center" });
+  autoTable(doc, {
+    startY: 30,
+    head: [REPORT_HEADERS],
+    body: rows.map((row, index) => reportCells(row, index)),
+    styles: {
+      fontSize: 8,
+      cellPadding: 1.6,
+      halign: "center",
+      valign: "middle",
+      lineColor: [180, 180, 180],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: [32, 32, 32],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    columnStyles: { 0: { cellWidth: 12 } },
+    margin: { left: 8, right: 8 },
   });
+  doc.save("meal-assignments-report.pdf");
 }
 
-function printPeople(title: string, rows: PersonLine[]) {
+function printPeople(rows: PersonLine[]) {
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
@@ -235,19 +267,21 @@ function printPeople(title: string, rows: PersonLine[]) {
     return;
   }
   const body = rows
-    .map((row) => `<tr>${reportCells(row).map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+    .map((row, index) => `<tr>${reportCells(row, index).map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
     .join("");
   doc.open();
-  doc.write(`<!DOCTYPE html><html><head><title>${escapeHtml(title)}</title>
+  doc.write(`<!DOCTYPE html><html><head><title>${escapeHtml(REPORT_TITLE)}</title>
     <style>
       @page { size: A4 landscape; margin: 10mm; }
       body { font-family: sans-serif; color: #111; }
-      h1 { font-size: 14px; margin: 0 0 8px; }
+      h1 { font-size: 22px; margin: 0 0 6px; text-align: center; }
+      p { font-size: 14px; margin: 0 0 12px; text-align: center; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #111; padding: 4px 5px; text-align: left; font-size: 10px; }
-      th { background: #e5e7eb; }
+      th, td { border: 1px solid #ccc; padding: 4px 5px; text-align: center; font-size: 10px; }
+      th { background: #202020; color: #fff; }
     </style></head><body>
-    <h1>${escapeHtml(title)} (${rows.length})</h1>
+    <h1>${escapeHtml(REPORT_TITLE)}</h1>
+    <p>${escapeHtml(generatedOnLabel())}</p>
     <table><thead><tr>${REPORT_HEADERS.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
     <tbody>${body || `<tr><td colspan="${REPORT_HEADERS.length}">—</td></tr>`}</tbody></table>
     </body></html>`);
@@ -1201,7 +1235,7 @@ function PersonList({
             <p className="text-xs text-neutral-500">{rows.length}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" className="h-8 rounded-lg" onClick={() => printPeople(title, rows)}>
+            <Button type="button" variant="outline" className="h-8 rounded-lg" onClick={() => printPeople(rows)}>
               <IconPrinter className="mr-1.5 h-4 w-4" />
               {labels.print}
             </Button>
@@ -1209,7 +1243,7 @@ function PersonList({
               type="button"
               variant="outline"
               className="h-8 rounded-lg"
-              onClick={() => downloadPeople(title, rows)}
+              onClick={() => downloadPeople(rows)}
             >
               <IconDownload className="mr-1.5 h-4 w-4" />
               {labels.download}
@@ -1239,7 +1273,7 @@ function PersonList({
               {rows.length ? (
                 rows.map((row, index) => (
                   <tr key={`${row.rabId}-${row.sortKey}-${index}`} className="border-t border-neutral-100 dark:border-neutral-800">
-                    {reportCells(row).map((cell, cellIndex) => (
+                    {reportCells(row, index).map((cell, cellIndex) => (
                       <td
                         key={REPORT_HEADERS[cellIndex]}
                         className={cn(
