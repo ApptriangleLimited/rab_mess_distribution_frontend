@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -14,12 +15,13 @@ from schemas import normalize_tag
 from wings import wing_family_names, wing_in_family
 
 DAILY_WRITE = ("daily", "admin")
+DHAKA = ZoneInfo("Asia/Dhaka")
 router = APIRouter()
 
 
 def daily_day_writable(day: date) -> bool:
-    """Today and future days can be painted. Earlier days stay as they are."""
-    return day >= date.today()
+    """After 12:00 AM in Dhaka, that day can no longer be painted, even in this month."""
+    return day >= datetime.now(DHAKA).date()
 
 
 def utcnow() -> datetime:
