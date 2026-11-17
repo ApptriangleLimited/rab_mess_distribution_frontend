@@ -47,6 +47,10 @@ class Settings:
     zk_timeout: int
     zk_password: int
     zk_force_udp: bool
+    zk_hazz_enabled: bool
+    zk_hazz_host: str
+    zk_hazz_port: int
+    zk_hazz_password: int
 
     def __init__(self) -> None:
         self.app_env = os.getenv("APP_ENV", "development").strip().lower()
@@ -104,6 +108,13 @@ class Settings:
         except ValueError:
             self.zk_password = 0
         self.zk_force_udp = _flag("ZK_FORCE_UDP", "false")
+        self.zk_hazz_enabled = _flag("ZK_HAZZ_ENABLED", "false")
+        self.zk_hazz_host = os.getenv("ZK_HAZZ_HOST", "").strip()
+        self.zk_hazz_port = int(os.getenv("ZK_HAZZ_PORT", "4370") or "4370")
+        try:
+            self.zk_hazz_password = int(os.getenv("ZK_HAZZ_PASSWORD", "0") or "0")
+        except ValueError:
+            self.zk_hazz_password = 0
 
     @property
     def is_production(self) -> bool:

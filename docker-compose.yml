@@ -75,6 +75,10 @@ services:
       ZK_TIMEOUT: ${ZK_TIMEOUT:-10}
       ZK_PASSWORD: ${ZK_PASSWORD:-0}
       ZK_FORCE_UDP: ${ZK_FORCE_UDP:-false}
+      ZK_HAZZ_ENABLED: ${ZK_HAZZ_ENABLED:-false}
+      ZK_HAZZ_HOST: ${ZK_HAZZ_HOST:-}
+      ZK_HAZZ_PORT: ${ZK_HAZZ_PORT:-4370}
+      ZK_HAZZ_PASSWORD: ${ZK_HAZZ_PASSWORD:-0}
     ports:
       - "${API_PORT:-8000}:8000"
       - "8088:8000"

@@ -523,6 +523,12 @@ export default function LoginPage() {
             >
               {t("zkGate.openDisplay")}
             </Link>
+            <Link
+              href="/device/hazz-camp"
+              className="block w-full text-center text-sm font-medium text-neutral-500 hover:text-primary hover:underline"
+            >
+              {t("zkGate.openHazzDisplay")}
+            </Link>
           </div>
         </motion.form>
       </section>

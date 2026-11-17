@@ -474,6 +474,12 @@ def on_startup() -> None:
         start_periodic_sync()
     except Exception:
         log_event(logging.WARNING, service="api", event="zk_sync_not_started")
+    try:
+        from zk_hazz import start_hazz_watch
+
+        start_hazz_watch()
+    except Exception:
+        log_event(logging.WARNING, service="api", event="hazz_watch_not_started")
     log_event(
         logging.INFO,
         service="api",

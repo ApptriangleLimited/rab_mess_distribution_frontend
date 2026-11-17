@@ -1825,5 +1825,6 @@ export const bn = {
     back: "ফিরে যান",
     noShift: "খাবারের সময়ের বাইরে",
     openDisplay: "ডিভাইস স্ক্রিন",
+    openHazzDisplay: "Hazz Camp ডিভাইস স্ক্রিন",
   },
 };

@@ -1822,6 +1822,7 @@ export const en = {
     back: "Back",
     noShift: "Outside meal time",
     openDisplay: "Device screen",
+    openHazzDisplay: "Hazz Camp device screen",
   },
 } as const;
 

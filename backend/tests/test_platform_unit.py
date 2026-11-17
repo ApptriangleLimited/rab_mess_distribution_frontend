@@ -24,6 +24,14 @@ def test_device_verifies_the_stored_rfid_without_replacing_it():
     assert same_rfid("7502842", 7502842)
 
 
+def test_hazz_camp_keeps_its_own_punch_board():
+    from config import settings
+    from zk_hazz import HAZZ_PUNCH_PATH
+
+    assert HAZZ_PUNCH_PATH.name == "hazz_punches.json"
+    assert settings.zk_hazz_host != settings.zk_host
+
+
 def test_access_command_sends_the_device_card_number():
     line = access_user_command(1393, "1006837", "Md Bellal Hossain", 4918042)
     assert line == (

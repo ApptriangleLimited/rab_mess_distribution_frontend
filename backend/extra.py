@@ -1075,6 +1075,15 @@ def zk_gate_display():
     return envelope(apply_saved_shifts(SessionLocal))
 
 
+@router.get("/api/v1/zk/hazz-camp/display")
+def hazz_camp_display():
+    """Punch board for the Hazz Camp terminal. Separate from /device."""
+    from zk_hazz import hazz_snapshot, start_hazz_watch
+
+    start_hazz_watch(SessionLocal)
+    return envelope(hazz_snapshot())
+
+
 @router.get("/api/v1/zk/gate")
 def zk_gate_list(_staff: Staff = Depends(require_roles("admin"))):
     start_live_watch(SessionLocal)

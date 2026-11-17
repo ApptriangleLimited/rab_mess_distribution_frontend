@@ -36,20 +36,26 @@ function punchClock(value: string) {
   return clock.length >= 5 ? clock.slice(0, 8) : value;
 }
 
-export function DeviceBoard() {
+export function DeviceBoard({
+  title = "",
+  loadDisplay = fetchZkDisplay,
+}: {
+  title?: string;
+  loadDisplay?: () => Promise<ZkGateSnapshot>;
+}) {
   const t = useT();
   const [data, setData] = useState<ZkGateSnapshot | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const next = await fetchZkDisplay();
+      const next = await loadDisplay();
       setData(next);
       setError(next.error || "");
     } catch (err) {
       setError(err instanceof ApiClientError ? err.detail : t("common.tryAgain"));
     }
-  }, [t]);
+  }, [loadDisplay, t]);
 
   useEffect(() => {
     void load();
@@ -79,6 +85,11 @@ export function DeviceBoard() {
 
   return (
     <div className="flex h-dvh flex-col bg-neutral-950 text-white">
+      {title ? (
+        <p className="shrink-0 px-4 pt-4 text-center text-sm font-semibold uppercase tracking-[0.28em] text-white/70">
+          {title}
+        </p>
+      ) : null}
       {error ? (
         <p className="mx-4 mt-4 shrink-0 rounded-lg border border-amber-400/40 bg-amber-950/50 px-3 py-2 text-sm text-amber-100">
           {error}
