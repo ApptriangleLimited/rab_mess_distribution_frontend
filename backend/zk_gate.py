@@ -333,9 +333,8 @@ def queue_adms_userinfo(member: Member, pin: str | None = None) -> str:
             data["seq"] = int(data.get("seq") or 0) + 1
             cmd_id = data["seq"]
             line = (
-                f"C:{cmd_id}:DATA UPDATE user Pin={pin}\tName={name}\t"
-                f"Privilege=0\tPassword=\tCardNo={card}\tGroup=1\t"
-                f"StartTime=0\tEndTime=0"
+                f"C:{cmd_id}:DATA UPDATE USERINFO PIN={pin}\tName={name}\t"
+                f"Pri=0\tPasswd=\tCard={card}\tGrp=1"
             )
             data["cmds"].append({"id": cmd_id, "line": line})
             _write_adms_store(handle, data)

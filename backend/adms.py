@@ -33,27 +33,29 @@ router = APIRouter(
 
 
 def handshake_options(serial_number: str) -> str:
-    return chr(10).join(
-        [
-            "GET OPTION FROM: " + serial_number,
-            "ATTLOGStamp=None",
-            "OPERLOGStamp=None",
-            "ATTPHOTOStamp=None",
-            "ErrorDelay=30",
-            "Delay=10",
-            "TransTimes=00:00;14:05",
-            "TransInterval=1",
-            "TransFlag=TransData AttLog OpLog AttPhoto EnrollUser ChgUser EnrollFP ChgFP UserPic",
-            "TimeZone=6",
-            "Realtime=1",
-            "Encrypt=None",
-            "ServerVer=3.1.2",
-            "PushProtVer=3.1.2",
-            "PushOptionsFlag=1",
-            "PushOptions=RegDeviceType,FingerFunOn,FaceFunOn,FPVersion,FaceVersion,NetworkType,HardwareId3,HardwareId5,HardwareId56,LicenseStatus3,LicenseStatus5,LicenseStatus56",
-            "",
-        ]
-    )
+    """Options this SenseFace will accept before it asks for commands.
+
+    PushOptionsFlag=1 makes it register again forever and never call getrequest.
+    """
+    lines = [
+        f"GET OPTION FROM: {serial_number}",
+        "ATTLOGStamp=0",
+        "OPERLOGStamp=0",
+        "ATTPHOTOStamp=0",
+        "ErrorDelay=60",
+        "Delay=5",
+        "TransTimes=00:00;14:05",
+        "TransInterval=1",
+        "TransFlag=111111111111",
+        "TimeZone=6",
+        "Realtime=1",
+        "Encrypt=None",
+        "ServerVer=3.1.2",
+        "PushProtVer=3.1.2",
+        "PushOptionsFlag=0",
+        "",
+    ]
+    return "\r\n".join(lines)
 
 
 def plain_text(content: str = "OK") -> Response:
@@ -96,8 +98,10 @@ def _take_command() -> str:
     except Exception as exc:
         logger.warning("ADMS pop failed: %s", exc)
         return ""
-    if command and not command.endswith("\n"):
-        return f"{command}\n"
+    if command:
+        command = command.replace("\r\n", "\n").replace("\n", "\r\n")
+        if not command.endswith("\r\n"):
+            command = f"{command}\r\n"
     return command
 
 
@@ -366,7 +370,7 @@ async def device_registry(request: Request) -> Response:
     if serial_number:
         note_adms(serial_number)
         _mark_registered(serial_number)
-    return plain_text("OK")
+    return plain_text("OK\r\n")
 
 
 @router.api_route("/ping", methods=["GET", "POST"])
