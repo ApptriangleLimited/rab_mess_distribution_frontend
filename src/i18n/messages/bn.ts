@@ -1321,7 +1321,7 @@ export const bn = {
       colPersonal: "পার্সোনাল আইডি",
       colTime: "সময়",
       printList: "প্রিন্ট",
-      downloadList: "ডাউনলোড",
+      downloadList: "পিডিএফ ডাউনলোড",
       listEmpty: "এই তালিকায় কেউ নেই।",
       closeList: "বন্ধ",
       otherMeals: "অন্য খাবার",

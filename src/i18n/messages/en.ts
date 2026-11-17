@@ -1319,7 +1319,7 @@ export const en = {
       colPersonal: "Personal ID",
       colTime: "Time",
       printList: "Print",
-      downloadList: "Download",
+      downloadList: "Download PDF",
       listEmpty: "No one in this list.",
       closeList: "Close",
       otherMeals: "Other Meals",

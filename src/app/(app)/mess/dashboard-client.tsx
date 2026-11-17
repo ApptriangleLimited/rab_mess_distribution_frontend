@@ -61,13 +61,17 @@ import { listPritibhojEventsApi } from "@/lib/api/pritibhoj";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
 import { fetchZkDisplay, type ZkGateRow, type ZkGateStatus } from "@/lib/api/zk-gate";
 import { eachISODate, todayISO } from "@/lib/date";
+import { downloadMemberFullListPdf } from "@/lib/download-member-full-list";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import { listGuestMeals } from "@/lib/store/guest-meals";
 import { listMealAssigns } from "@/lib/store/meal-assigns";
 import { listMealShifts, mealShiftLabel } from "@/lib/store/meal-shifts";
 import {
+  formatMemberWing,
+  isHqBranchName,
   memberFormWing,
   memberMatchesWingFilter,
+  memberWingCascade,
 } from "@/lib/store/org-options";
 import {
   eventManpower,
@@ -97,8 +101,101 @@ type PersonLine = {
   name: string;
   rabId: string;
   personalId: string;
-  when: string;
+  rank: string;
+  wg: string;
+  br: string;
+  mess: string;
+  sift: string;
+  checkIn: string;
+  status: string;
+  sortKey: string;
 };
+
+const REPORT_HEADERS = [
+  "Personal ID",
+  "SRB ID",
+  "Rank",
+  "Name",
+  "Wg",
+  "Br",
+  "Mess",
+  "Sift",
+  "Check-in-Date-Time",
+  "Status",
+];
+
+function memberPlace(storedWing: string) {
+  const cascade = memberWingCascade(storedWing);
+  const branch =
+    cascade.leaf || (cascade.sub && !isHqBranchName(cascade.sub) ? cascade.sub : "");
+  return {
+    wg: formatMemberWing(storedWing) || "—",
+    br: branch || "—",
+  };
+}
+
+function memberRank(user: User | undefined) {
+  return (user?.force_rank || user?.rank || "").trim() || "—";
+}
+
+function checkInLabel(raw: string) {
+  if (!raw.trim()) return "—";
+  const d = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return raw;
+  const date = d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const time = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  return `${date}, ${time}`;
+}
+
+function reportCells(row: PersonLine) {
+  return [
+    row.personalId || "—",
+    row.rabId || "—",
+    row.rank || "—",
+    row.name || "—",
+    row.wg || "—",
+    row.br || "—",
+    row.mess || "—",
+    row.sift || "—",
+    row.checkIn || "—",
+    row.status || "—",
+  ];
+}
+
+function personLine(
+  user: User | undefined,
+  fields: {
+    name: string;
+    rabId: string;
+    status: string;
+    sift: string;
+    checkIn: string;
+    sortKey: string;
+  },
+): PersonLine {
+  const place = memberPlace(user?.wing ?? "");
+  return {
+    name: fields.name,
+    rabId: user?.rab_id || fields.rabId,
+    personalId: user?.personal_id || "",
+    rank: memberRank(user),
+    wg: place.wg,
+    br: place.br,
+    mess: "SRB HQ",
+    sift: fields.sift || "—",
+    checkIn: fields.checkIn || "—",
+    status: fields.status,
+    sortKey: fields.sortKey,
+  };
+}
 
 type ListKind = "planned" | "accepted" | "duplicate" | "punches";
 
@@ -114,50 +211,35 @@ function punchStatus(row: ZkGateRow): ZkGateStatus {
   return row.allowed ? "accepted" : "not_allowed";
 }
 
-function csvCell(value: string) {
-  return `"${value.replaceAll('"', '""')}"`;
-}
-
-function downloadPeople(filename: string, rows: PersonLine[], headers: string[]) {
-  const lines = [
-    headers.map(csvCell).join(","),
-    ...rows.map((row) =>
-      [row.name, row.rabId, row.personalId, row.when].slice(0, headers.length).map(csvCell).join(","),
-    ),
-  ];
-  const blob = new Blob([`\uFEFF${lines.join("\n")}`], {
-    type: "text/csv;charset=utf-8",
+function downloadPeople(title: string, rows: PersonLine[]) {
+  downloadMemberFullListPdf({
+    org: "SRB HQ",
+    title,
+    countLabel: String(rows.length),
+    chips: [],
+    headers: REPORT_HEADERS,
+    rows: rows.map(reportCells),
+    filename: `${title.replace(/\s+/g, "-").toLowerCase()}.pdf`,
   });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
-function printPeople(title: string, rows: PersonLine[], headers: string[]) {
+function printPeople(title: string, rows: PersonLine[]) {
   const popup = window.open("", "_blank", "noopener,noreferrer");
   if (!popup) return;
   const body = rows
-    .map(
-      (row) =>
-        `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.rabId)}</td><td>${escapeHtml(row.personalId)}</td>${
-          headers.length > 3 ? `<td>${escapeHtml(row.when)}</td>` : ""
-        }</tr>`,
-    )
+    .map((row) => `<tr>${reportCells(row).map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
     .join("");
   popup.document.write(`<!DOCTYPE html><html><head><title>${escapeHtml(title)}</title>
     <style>
-      body { font-family: sans-serif; padding: 24px; color: #111; }
-      h1 { font-size: 18px; margin: 0 0 12px; }
+      body { font-family: sans-serif; padding: 16px; color: #111; }
+      h1 { font-size: 16px; margin: 0 0 12px; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 13px; }
+      th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; font-size: 11px; }
       th { background: #f3f4f6; }
     </style></head><body>
     <h1>${escapeHtml(title)} (${rows.length})</h1>
-    <table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
-    <tbody>${body || `<tr><td colspan="${headers.length}">—</td></tr>`}</tbody></table>
+    <table><thead><tr>${REPORT_HEADERS.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+    <tbody>${body || `<tr><td colspan="${REPORT_HEADERS.length}">—</td></tr>`}</tbody></table>
     </body></html>`);
   popup.document.close();
   popup.focus();
@@ -409,24 +491,32 @@ export default function MessDashboardClient() {
     for (const row of source) {
       if (!memberMatchesWingFilter(row.user.wing, wing)) continue;
       if (!row.days.some((tag) => tag === "MS")) continue;
-      lines.push({
-        name: row.user.name,
-        rabId: row.user.rab_id,
-        personalId: row.user.personal_id,
-        when: "",
-      });
+      lines.push(
+        personLine(row.user, {
+          name: row.user.name,
+          rabId: row.user.rab_id,
+          status: "Planned",
+          sift: "—",
+          checkIn: "—",
+          sortKey: row.user.name,
+        }),
+      );
     }
     if (!apiOn && !(range.from === today && range.to === today)) {
       for (const row of state.assignments) {
         if (row.date !== today || row.tag !== "MS") continue;
         const user = state.users.find((item) => item.id === row.user_id);
         if (!user || !memberMatchesWingFilter(user.wing, wing)) continue;
-        lines.push({
-          name: user.name,
-          rabId: user.rab_id,
-          personalId: user.personal_id,
-          when: "",
-        });
+        lines.push(
+          personLine(user, {
+            name: user.name,
+            rabId: user.rab_id,
+            status: "Planned",
+            sift: "—",
+            checkIn: "—",
+            sortKey: user.name,
+          }),
+        );
       }
     }
     lines.sort((a, b) => a.name.localeCompare(b.name));
@@ -444,17 +534,21 @@ export default function MessDashboardClient() {
       if (shift !== "all" && row.shift_id !== shift) continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
-      const line: PersonLine = {
+      const line = personLine(user, {
         name: user?.name || row.name,
-        rabId: user?.rab_id || row.rab_id,
-        personalId: user?.personal_id || "",
-        when: (row.punched_at || "").slice(11, 19),
-      };
+        rabId: row.rab_id,
+        status: status === "accepted" ? "Consumption" : "Duplicate",
+        sift: row.shift_id
+          ? mealShiftLabel(row.shift_id, shifts.find((item) => item.id === row.shift_id)?.name ?? row.shift_name ?? row.shift_id, t)
+          : "—",
+        checkIn: checkInLabel(row.punched_at || ""),
+        sortKey: row.punched_at || "",
+      });
       if (status === "accepted") accepted.push(line);
       else duplicate.push(line);
     }
     return { accepted, duplicate };
-  }, [devicePunches, shift, today, userByKey, wing]);
+  }, [devicePunches, shift, shifts, t, today, userByKey, wing]);
 
   const todayPlanned = plannedLines.length;
   const todayAccepted = deviceLines.accepted.length;
@@ -976,15 +1070,10 @@ export default function MessDashboardClient() {
                   : openList === "duplicate"
                     ? deviceLines.duplicate
                     : [...deviceLines.accepted, ...deviceLines.duplicate].sort((a, b) =>
-                        b.when.localeCompare(a.when),
+                        b.sortKey.localeCompare(a.sortKey),
                       )
             }
-            showTime={openList !== "planned"}
             labels={{
-              name: t("mess.dashboard.colName"),
-              srb: t("mess.dashboard.colSrb"),
-              personal: t("mess.dashboard.colPersonal"),
-              time: t("mess.dashboard.colTime"),
               print: t("mess.dashboard.printList"),
               download: t("mess.dashboard.downloadList"),
               empty: t("mess.dashboard.listEmpty"),
@@ -1077,18 +1166,12 @@ function StatCard({
 function PersonList({
   title,
   rows,
-  showTime,
   labels,
   onClose,
 }: {
   title: string;
   rows: PersonLine[];
-  showTime: boolean;
   labels: {
-    name: string;
-    srb: string;
-    personal: string;
-    time: string;
     print: string;
     download: string;
     empty: string;
@@ -1096,20 +1179,16 @@ function PersonList({
   };
   onClose: () => void;
 }) {
-  const headers = showTime
-    ? [labels.name, labels.srb, labels.personal, labels.time]
-    : [labels.name, labels.srb, labels.personal];
-  const file = `${title.replace(/\s+/g, "-").toLowerCase()}.csv`;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-950">
+      <div className="flex max-h-[85vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-950">
         <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
           <div>
             <h2 className="text-base font-semibold text-neutral-900 dark:text-white">{title}</h2>
             <p className="text-xs text-neutral-500">{rows.length}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" className="h-8 rounded-lg" onClick={() => printPeople(title, rows, headers)}>
+            <Button type="button" variant="outline" className="h-8 rounded-lg" onClick={() => printPeople(title, rows)}>
               <IconPrinter className="mr-1.5 h-4 w-4" />
               {labels.print}
             </Button>
@@ -1117,7 +1196,7 @@ function PersonList({
               type="button"
               variant="outline"
               className="h-8 rounded-lg"
-              onClick={() => downloadPeople(file, rows, headers)}
+              onClick={() => downloadPeople(title, rows)}
             >
               <IconDownload className="mr-1.5 h-4 w-4" />
               {labels.download}
@@ -1136,8 +1215,8 @@ function PersonList({
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-neutral-50 text-left text-xs text-neutral-500 dark:bg-neutral-900">
               <tr>
-                {headers.map((header) => (
-                  <th key={header} className="px-4 py-2 font-medium">
+                {REPORT_HEADERS.map((header) => (
+                  <th key={header} className="whitespace-nowrap px-3 py-2 font-medium">
                     {header}
                   </th>
                 ))}
@@ -1146,16 +1225,23 @@ function PersonList({
             <tbody>
               {rows.length ? (
                 rows.map((row, index) => (
-                  <tr key={`${row.rabId}-${row.when}-${index}`} className="border-t border-neutral-100 dark:border-neutral-800">
-                    <td className="px-4 py-2 text-neutral-900 dark:text-neutral-100">{row.name}</td>
-                    <td className="px-4 py-2 tabular-nums">{row.rabId || "—"}</td>
-                    <td className="px-4 py-2 tabular-nums">{row.personalId || "—"}</td>
-                    {showTime ? <td className="px-4 py-2 tabular-nums">{row.when || "—"}</td> : null}
+                  <tr key={`${row.rabId}-${row.sortKey}-${index}`} className="border-t border-neutral-100 dark:border-neutral-800">
+                    {reportCells(row).map((cell, cellIndex) => (
+                      <td
+                        key={REPORT_HEADERS[cellIndex]}
+                        className={cn(
+                          "whitespace-nowrap px-3 py-2",
+                          cellIndex === 3 && "text-neutral-900 dark:text-neutral-100",
+                        )}
+                      >
+                        {cell}
+                      </td>
+                    ))}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={headers.length} className="px-4 py-8 text-center text-neutral-500">
+                  <td colSpan={REPORT_HEADERS.length} className="px-4 py-8 text-center text-neutral-500">
                     {labels.empty}
                   </td>
                 </tr>
