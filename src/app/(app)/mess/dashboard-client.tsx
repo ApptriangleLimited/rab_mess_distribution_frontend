@@ -59,7 +59,12 @@ import {
 } from "@/lib/api/mess-checkins";
 import { listPritibhojEventsApi } from "@/lib/api/pritibhoj";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
-import { fetchZkDisplay, type ZkGateRow, type ZkGateStatus } from "@/lib/api/zk-gate";
+import {
+  fetchHazzDisplay,
+  fetchZkDisplay,
+  type ZkGateRow,
+  type ZkGateStatus,
+} from "@/lib/api/zk-gate";
 import { eachISODate, todayISO } from "@/lib/date";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -181,6 +186,8 @@ function reportCells(row: PersonLine, index: number) {
   ];
 }
 
+type BoardPunch = ZkGateRow & { mess: string };
+
 function personLine(
   user: User | undefined,
   fields: {
@@ -190,6 +197,7 @@ function personLine(
     sift: string;
     checkIn: string;
     sortKey: string;
+    mess?: string;
   },
 ): PersonLine {
   const place = memberPlace(user?.wing ?? "");
@@ -200,7 +208,7 @@ function personLine(
     rank: memberRank(user),
     wg: place.wg,
     br: place.br,
-    mess: "SRB HQ",
+    mess: fields.mess || "SRB HQ",
     sift: fields.sift || "—",
     checkIn: fields.checkIn || "—",
     status: fields.status,
@@ -367,7 +375,7 @@ export default function MessDashboardClient() {
   const [apiData, setApiData] = useState<MessCheckinsData | null>(null);
   const [ledgerRows, setLedgerRows] = useState<LedgerRow[]>([]);
   const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
-  const [devicePunches, setDevicePunches] = useState<ZkGateRow[]>([]);
+  const [devicePunches, setDevicePunches] = useState<BoardPunch[]>([]);
   const [todayLedger, setTodayLedger] = useState<LedgerRow[]>([]);
   const [openList, setOpenList] = useState<ListKind | null>(null);
 
@@ -438,13 +446,16 @@ export default function MessDashboardClient() {
     }
     let cancelled = false;
     const load = () => {
-      void fetchZkDisplay()
-        .then((snapshot) => {
-          if (!cancelled) setDevicePunches(snapshot.rows ?? []);
-        })
-        .catch(() => {
-          if (!cancelled) setDevicePunches([]);
-        });
+      void Promise.all([
+        fetchZkDisplay().catch(() => null),
+        fetchHazzDisplay().catch(() => null),
+      ]).then(([hq, hazz]) => {
+        if (cancelled) return;
+        setDevicePunches([
+          ...(hq?.rows ?? []).map((row) => ({ ...row, mess: "SRB HQ" })),
+          ...(hazz?.rows ?? []).map((row) => ({ ...row, mess: "Haji camp" })),
+        ]);
+      });
     };
     load();
     const timer = window.setInterval(load, 10000);
@@ -590,6 +601,7 @@ export default function MessDashboardClient() {
           : "—",
         checkIn: checkInLabel(row.punched_at || ""),
         sortKey: row.punched_at || "",
+        mess: row.mess,
       });
       if (status === "accepted") accepted.push(line);
       else duplicate.push(line);
@@ -688,7 +700,7 @@ export default function MessDashboardClient() {
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
       rows.push({
-        id: `${row.rab_id}-${row.punched_at}`,
+        id: `${row.mess}-${row.rab_id}-${row.punched_at}`,
         name: user?.name || row.name || t("mess.dashboard.unknownMember"),
         code: user?.rab_id || row.rab_id,
         personalId: user?.personal_id || "",
