@@ -1833,7 +1833,7 @@ export const bn = {
     refresh: "রিফ্রেশ",
     back: "ফিরে যান",
     noShift: "খাবারের সময়ের বাইরে",
-    openDisplay: "ডিভাইস স্ক্রিন",
-    openHazzDisplay: "Hazz Camp ডিভাইস স্ক্রিন",
+    openDisplay: "SRB HQ ডিভাইস স্ক্রিন",
+    openHazzDisplay: "Haji camp ডিভাইস স্ক্রিন",
   },
 };

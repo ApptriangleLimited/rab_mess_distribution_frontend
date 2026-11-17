@@ -1830,8 +1830,8 @@ export const en = {
     refresh: "Refresh",
     back: "Back",
     noShift: "Outside meal time",
-    openDisplay: "Device screen",
-    openHazzDisplay: "Hazz Camp device screen",
+    openDisplay: "SRB HQ device screen",
+    openHazzDisplay: "Haji camp device screen",
   },
 } as const;
 

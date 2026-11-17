@@ -100,7 +100,7 @@ type PersonLine = {
   when: string;
 };
 
-type ListKind = "planned" | "accepted" | "duplicate";
+type ListKind = "planned" | "accepted" | "duplicate" | "punches";
 
 function punchStatus(row: ZkGateRow): ZkGateStatus {
   if (
@@ -180,7 +180,7 @@ type ActivityRow = {
   wing: string;
   shiftId: MealShiftId;
   time: string;
-  kind: "consumption" | "guest" | "group";
+  kind: "consumption" | "duplicate" | "guest" | "group";
 };
 
 function initials(name: string) {
@@ -538,17 +538,23 @@ export default function MessDashboardClient() {
 
   const activities = useMemo(() => {
     const rows: ActivityRow[] = [];
-    for (const row of assigns) {
-      const user = memberById.get(row.member_id);
+    for (const row of devicePunches) {
+      const day = (row.punched_at || "").slice(0, 10);
+      if (day < range.from || day > range.to) continue;
+      const status = punchStatus(row);
+      if (status !== "accepted" && status !== "already_accepted") continue;
+      if (shift !== "all" && row.shift_id !== shift) continue;
+      const user = userByKey.get(row.rab_id);
+      if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
       rows.push({
-        id: row.id,
-        name: user?.name || t("mess.dashboard.unknownMember"),
-        code: user?.rab_id || user?.personal_id || row.member_id,
+        id: `${row.rab_id}-${row.punched_at}`,
+        name: user?.name || row.name || t("mess.dashboard.unknownMember"),
+        code: user?.rab_id || row.rab_id,
         personalId: user?.personal_id || "",
         wing: memberFormWing(user?.wing ?? "") || "—",
-        shiftId: row.shift_id,
-        time: row.check_in_time,
-        kind: "consumption",
+        shiftId: row.shift_id || "lunch",
+        time: (row.punched_at || "").replace(" ", "T"),
+        kind: status === "accepted" ? "consumption" : "duplicate",
       });
     }
     for (const row of guests) {
@@ -587,7 +593,7 @@ export default function MessDashboardClient() {
         )
       : rows
     ).slice(0, 8);
-  }, [assigns, guests, memberById, pritibhojEvents, range, search, shifts, t]);
+  }, [devicePunches, guests, pritibhojEvents, range, search, shift, shifts, state.wing_parent, t, userByKey, wing]);
 
   const filtersDirty =
     wing !== "all" || shift !== "all" || dateFrom !== today || dateTo !== today;
@@ -880,13 +886,14 @@ export default function MessDashboardClient() {
               <h2 className="text-sm font-semibold text-sky-800 dark:text-sky-200">
                 {t("mess.dashboard.recentActivities")}
               </h2>
-              <Link
-                href="/mess/ledger"
+              <button
+                type="button"
+                onClick={() => setOpenList("punches")}
                 className="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
               >
                 {t("mess.dashboard.seeMore")}
                 <IconArrowRight className="h-3.5 w-3.5" />
-              </Link>
+              </button>
             </div>
             <ul className="mt-3 flex flex-col gap-2">
               {activities.length === 0 ? (
@@ -916,7 +923,7 @@ export default function MessDashboardClient() {
                         </span>
                       </p>
                       <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
-                        <span>{row.wing}</span>
+                        <span>{row.personalId || row.wing}</span>
                         <span>·</span>
                         <span>{shiftName(row.shiftId)}</span>
                         <span
@@ -926,14 +933,18 @@ export default function MessDashboardClient() {
                               ? "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
                               : row.kind === "group"
                                 ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-200"
-                                : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200",
+                                : row.kind === "duplicate"
+                                  ? "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200"
+                                  : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200",
                           )}
                         >
                           {row.kind === "guest"
                             ? t("mess.dashboard.guestMeal")
                             : row.kind === "group"
                               ? t("nav.pritibhoj")
-                              : t("mess.dashboard.consumption")}
+                              : row.kind === "duplicate"
+                                ? t("zkGate.alreadyAccepted")
+                                : t("zkGate.accepted")}
                         </span>
                       </p>
                     </div>
@@ -953,14 +964,20 @@ export default function MessDashboardClient() {
                 ? t("mess.dashboard.plannedMeals")
                 : openList === "accepted"
                   ? t("mess.dashboard.totalConsumption")
-                  : t("mess.dashboard.duplicateAttempts")
+                  : openList === "duplicate"
+                    ? t("mess.dashboard.duplicateAttempts")
+                    : t("mess.dashboard.recentActivities")
             }
             rows={
               openList === "planned"
                 ? plannedLines
                 : openList === "accepted"
                   ? deviceLines.accepted
-                  : deviceLines.duplicate
+                  : openList === "duplicate"
+                    ? deviceLines.duplicate
+                    : [...deviceLines.accepted, ...deviceLines.duplicate].sort((a, b) =>
+                        b.when.localeCompare(a.when),
+                      )
             }
             showTime={openList !== "planned"}
             labels={{
