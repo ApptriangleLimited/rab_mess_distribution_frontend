@@ -609,6 +609,7 @@ def _punch_row(
     status, shift = _classify(member, punched, ms_ids, shifts, accepted_keys)
     return {
         "name": member.name if member is not None else device_names.get(pin, ""),
+        "pin": pin,
         "rab_id": member.rab_id if member is not None else pin,
         "rfid": member.rfid if member is not None else (device_cards.get(pin) or pin),
         "punched_at": punched.strftime("%Y-%m-%d %H:%M:%S"),
@@ -789,6 +790,24 @@ def _read_rows(
     return True
 
 
+def _combined_rows(day: date) -> list[dict]:
+    """Memory after a restart is empty. Keep the punches already saved for this day."""
+    board = _load_punch_board()
+    disk = list(board.get("rows") or []) if board.get("date") == day.isoformat() else []
+    with _state_lock:
+        mem_day = str(_state.get("date") or "")
+        memory = list(_state["rows"]) if mem_day == day.isoformat() else []
+    merged: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for row in disk + memory:
+        key = (str(row.get("rab_id") or ""), str(row.get("punched_at") or ""))
+        if not key[1] or key in seen:
+            continue
+        seen.add(key)
+        merged.append(row)
+    return merged
+
+
 def _append_live_punch(
     pin: str,
     punched: datetime,
@@ -802,20 +821,21 @@ def _append_live_punch(
     if day != mess_today():
         return
     stamp = punched.strftime("%Y-%m-%d %H:%M:%S")
+    existing = _combined_rows(day)
+    if any(
+        (device_pin(row.get("rab_id")) or str(row.get("rab_id") or "")) == pin
+        and str(row.get("punched_at") or "") == stamp
+        for row in existing
+    ):
+        return
     with _state_lock:
-        existing = list(_state["rows"])
-        if any(
-            (device_pin(row.get("rab_id")) or str(row.get("rab_id") or "")) == pin
-            and str(row.get("punched_at") or "") == stamp
-            for row in existing
-        ):
-            return
         events: list[tuple[str, datetime]] = []
         for row in reversed(existing):
             when = _parse_punched_at(str(row.get("punched_at") or ""))
             if when is None:
                 continue
-            events.append((device_pin(row.get("rab_id")) or str(row.get("rab_id") or ""), when))
+            saved_pin = str(row.get("pin") or "").strip()
+            events.append((saved_pin or device_pin(row.get("rab_id")) or str(row.get("rab_id") or ""), when))
         events.append((pin, punched))
         events.sort(key=lambda item: item[1])
         rows = _build_rows(events, known_by_key, ms_ids, shifts, device_names, device_cards)

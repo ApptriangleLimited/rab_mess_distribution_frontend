@@ -24,6 +24,23 @@ def test_device_verifies_the_stored_rfid_without_replacing_it():
     assert same_rfid("7502842", 7502842)
 
 
+def test_restart_keeps_saved_punches_for_the_day(tmp_path, monkeypatch):
+    import zk_gate
+
+    day = date(2026, 11, 17)
+    saved = tmp_path / "adms_punches.json"
+    saved.write_text(
+        '{"date":"2026-11-17","rows":[{"rab_id":"429672","punched_at":"2026-11-17 12:04:16"}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(zk_gate, "ADMS_PUNCH_PATH", saved)
+    with zk_gate._state_lock:
+        zk_gate._state["rows"] = []
+        zk_gate._state["date"] = day.isoformat()
+    rows = zk_gate._combined_rows(day)
+    assert [row["rab_id"] for row in rows] == ["429672"]
+
+
 def test_hazz_camp_keeps_its_own_punch_board():
     from config import settings
     from zk_hazz import HAZZ_PUNCH_PATH, is_hazz_serial
