@@ -352,10 +352,17 @@ def sync_member_to_device(member: Member) -> str:
     if str(member.status) != "1" or (member.approval_status or "") != "approved":
         return ""
     try:
-        return queue_adms_userinfo(member)
+        line = queue_adms_userinfo(member)
     except (ValueError, OSError) as exc:
         _adms_log.warning("ADMS skip member=%s err=%s", getattr(member, "id", ""), exc)
         return ""
+    try:
+        from zk_hazz import queue_hazz_userinfo
+
+        queue_hazz_userinfo(member)
+    except Exception:
+        pass
+    return line
 
 
 def pop_adms_command() -> str:

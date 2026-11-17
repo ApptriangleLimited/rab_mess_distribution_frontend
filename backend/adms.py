@@ -120,9 +120,30 @@ def _audit(kind: str, request: Request, extra: str = "") -> None:
     logger.info("%s", line.strip())
 
 
-def _take_command() -> str:
+def _remember(serial_number: str) -> None:
+    if not serial_number:
+        return
+    from zk_hazz import is_hazz_serial, note_hazz_adms
+
+    if is_hazz_serial(serial_number):
+        note_hazz_adms(serial_number)
+        return
+    note_adms(serial_number)
+
+
+def _take_command(serial_number: str = "") -> str:
+    from zk_hazz import ensure_hazz_cards, is_hazz_serial, pop_hazz_command
+
     try:
-        command = pop_adms_command() or pop_file_command()
+        if is_hazz_serial(serial_number):
+            db = SessionLocal()
+            try:
+                ensure_hazz_cards(db)
+            finally:
+                db.close()
+            command = pop_hazz_command()
+        else:
+            command = pop_adms_command() or pop_file_command()
     except Exception as exc:
         logger.warning("ADMS pop failed: %s", exc)
         return ""
@@ -247,7 +268,7 @@ def _rtlog_punches(body: str) -> list[tuple[str, datetime]]:
     return [(row["key"], row["punched"]) for row in _rtlog_rows(body)]
 
 
-def _save_punches(body: str, table_name: str) -> None:
+def _save_punches(body: str, table_name: str, serial_number: str = "") -> None:
     if table_name in {"", "ATTLOG"}:
         records = _punches(body)
     elif table_name == "RTLOG":
@@ -258,9 +279,14 @@ def _save_punches(body: str, table_name: str) -> None:
         return
     if not records:
         return
+    from zk_hazz import ingest_hazz_attendance, is_hazz_serial
+
     db = SessionLocal()
     try:
-        ingest_adms_attendance(db, records)
+        if is_hazz_serial(serial_number):
+            ingest_hazz_attendance(db, records)
+        else:
+            ingest_adms_attendance(db, records)
     finally:
         db.close()
 
@@ -272,8 +298,7 @@ async def device_handshake(request: Request) -> Response:
 
     _audit("cdata_get", request, f"serial={serial_number} query={query}")
 
-    if serial_number:
-        note_adms(serial_number)
+    _remember(serial_number)
 
     current_timestamp = int(datetime.now(timezone.utc).timestamp())
     options_all = str(query.get("options") or "").lower() == "all"
@@ -321,9 +346,8 @@ async def receive_device_data(request: Request) -> Response:
         f"serial={serial_number} table={table_name} records={len(records)} body={body!r}",
     )
 
-    if serial_number:
-        note_adms(serial_number)
-    _save_punches(body, table_name)
+    _remember(serial_number)
+    _save_punches(body, table_name, serial_number)
 
     if table_name in {"", "OPTIONS", "OPERLOG", "USERINFO"}:
         return plain_text("OK")
@@ -335,10 +359,9 @@ async def device_getrequest(request: Request) -> Response:
     serial_number = request.query_params.get("SN", "").strip()
     _audit("getrequest_get", request, f"serial={serial_number}")
 
-    if serial_number:
-        note_adms(serial_number)
+    _remember(serial_number)
 
-    command = _take_command()
+    command = _take_command(serial_number)
     _audit("getrequest_cmd", request, f"serial={serial_number} cmd={command!r}")
     if command:
         return plain_text(command)
@@ -350,10 +373,9 @@ async def device_getrequest_post(request: Request) -> Response:
     serial_number = request.query_params.get("SN", "").strip()
     body = (await request.body()).decode("utf-8", errors="replace")
 
-    if serial_number:
-        note_adms(serial_number)
+    _remember(serial_number)
 
-    command = _take_command()
+    command = _take_command(serial_number)
     _audit(
         "getrequest_post",
         request,
@@ -370,8 +392,7 @@ async def device_command_get(request: Request) -> Response:
 
     _audit("devicecmd_get", request, f"serial={serial_number}")
 
-    if serial_number:
-        note_adms(serial_number)
+    _remember(serial_number)
 
     return plain_text("OK")
 
@@ -383,9 +404,13 @@ async def device_command_post(request: Request) -> Response:
 
     _audit("devicecmd_post", request, f"serial={serial_number} body={body!r}")
 
-    if serial_number:
-        note_adms(serial_number)
-    _drop_acked(body)
+    _remember(serial_number)
+    from zk_hazz import drop_hazz_acked, is_hazz_serial
+
+    if is_hazz_serial(serial_number):
+        drop_hazz_acked(body)
+    else:
+        _drop_acked(body)
 
     return plain_text("OK")
 
@@ -395,8 +420,8 @@ async def device_registry(request: Request) -> Response:
     serial_number = request.query_params.get("SN", "").strip()
     body = (await request.body()).decode("utf-8", errors="replace")
     _audit("registry", request, f"serial={serial_number} body={body!r}")
+    _remember(serial_number)
     if serial_number:
-        note_adms(serial_number)
         _mark_registered(serial_number)
     return plain_text(registry_body())
 
@@ -406,8 +431,8 @@ async def device_push(request: Request) -> Response:
     serial_number = request.query_params.get("SN", "").strip()
     body = (await request.body()).decode("utf-8", errors="replace")
     _audit("push", request, f"serial={serial_number} body={body!r}")
+    _remember(serial_number)
     if serial_number:
-        note_adms(serial_number)
         _mark_registered(serial_number)
     return plain_text(push_body())
 
@@ -416,8 +441,7 @@ async def device_push(request: Request) -> Response:
 async def device_ping(request: Request) -> Response:
     serial_number = request.query_params.get("SN", "").strip()
     _audit("ping", request, f"serial={serial_number}")
-    if serial_number:
-        note_adms(serial_number)
+    _remember(serial_number)
     return plain_text("OK")
 
 

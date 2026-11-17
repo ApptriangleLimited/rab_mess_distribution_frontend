@@ -51,6 +51,7 @@ class Settings:
     zk_hazz_host: str
     zk_hazz_port: int
     zk_hazz_password: int
+    adms_main_serial: str
 
     def __init__(self) -> None:
         self.app_env = os.getenv("APP_ENV", "development").strip().lower()
@@ -115,6 +116,7 @@ class Settings:
             self.zk_hazz_password = int(os.getenv("ZK_HAZZ_PASSWORD", "0") or "0")
         except ValueError:
             self.zk_hazz_password = 0
+        self.adms_main_serial = os.getenv("ADMS_MAIN_SERIAL", "NYU7254702036").strip()
 
     @property
     def is_production(self) -> bool:

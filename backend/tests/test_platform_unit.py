@@ -26,10 +26,12 @@ def test_device_verifies_the_stored_rfid_without_replacing_it():
 
 def test_hazz_camp_keeps_its_own_punch_board():
     from config import settings
-    from zk_hazz import HAZZ_PUNCH_PATH
+    from zk_hazz import HAZZ_PUNCH_PATH, is_hazz_serial
 
     assert HAZZ_PUNCH_PATH.name == "hazz_punches.json"
-    assert settings.zk_hazz_host != settings.zk_host
+    assert is_hazz_serial(settings.adms_main_serial) is False
+    assert is_hazz_serial("HAZZ-OTHER") is True
+    assert is_hazz_serial("") is False
 
 
 def test_access_command_sends_the_device_card_number():

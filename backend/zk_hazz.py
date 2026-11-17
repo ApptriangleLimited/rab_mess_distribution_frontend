@@ -1,4 +1,4 @@
-"""Hazz Camp terminal. Its punches never mix with the main device screen."""
+"""Hazz Camp ADMS terminal. Punches and card commands stay off the main device."""
 
 from __future__ import annotations
 
@@ -12,44 +12,58 @@ from pathlib import Path
 from config import settings
 from zk_gate import (
     _build_rows,
-    _collect_events,
-    _device_users,
     _today_maps,
+    access_user_command,
+    device_card_number,
+    enroll_pin,
     mess_today,
 )
 
 HAZZ_PUNCH_PATH = Path(
     os.environ.get("HAZZ_PUNCH_PATH", "/var/lib/rab-mess/files/hazz_punches.json")
 )
-POLL_SEC = 1.0
+HAZZ_CMD_PATH = Path(
+    os.environ.get("HAZZ_CMD_PATH", "/var/lib/rab-mess/files/hazz_cmds.json")
+)
+HAZZ_SEEN_PATH = Path(
+    os.environ.get("HAZZ_SEEN_PATH", "/var/lib/rab-mess/files/hazz_adms.json")
+)
+HAZZ_SEED_PATH = Path(
+    os.environ.get("HAZZ_SEED_PATH", "/var/lib/rab-mess/files/hazz_cards_seeded.txt")
+)
+FRESH_SEC = 90
 
 _lock = threading.Lock()
-_state: dict = {
-    "reachable": False,
-    "host": "",
-    "port": 4370,
-    "error": "",
-    "syncing": False,
-    "enrolled": 0,
-    "removed": 0,
-    "skipped": 0,
-    "last_sync": None,
-    "date": "",
-    "rows": [],
-    "rows_date": "",
-    "record_count": None,
-    "watching": False,
-}
+_rows: list[dict] = []
+_date = ""
 
 
-def _enabled() -> bool:
-    return bool(settings.zk_hazz_enabled and settings.zk_hazz_host)
+def is_hazz_serial(serial: str) -> bool:
+    serial = (serial or "").strip()
+    main = (settings.adms_main_serial or "").strip()
+    return bool(serial) and serial != main
+
+
+def note_hazz_adms(serial: str) -> None:
+    if not serial:
+        return
+    HAZZ_SEEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    HAZZ_SEEN_PATH.write_text(
+        json.dumps({"serial": serial, "seen": time.time()}),
+        encoding="utf-8",
+    )
+
+
+def _seen() -> dict:
+    try:
+        data = json.loads(HAZZ_SEEN_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _load_board() -> dict:
     try:
-        if not HAZZ_PUNCH_PATH.exists():
-            return {"date": "", "rows": []}
         data = json.loads(HAZZ_PUNCH_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {"date": "", "rows": []}
@@ -71,172 +85,169 @@ def _save_board(day: str, rows: list[dict]) -> None:
 
 
 def hazz_snapshot() -> dict:
+    seen = _seen()
+    fresh = time.time() - float(seen.get("seen") or 0) < FRESH_SEC
+    day = mess_today().isoformat()
     with _lock:
-        state = {
-            "reachable": bool(_state["reachable"]),
-            "host": _state["host"] or settings.zk_hazz_host,
-            "port": int(_state["port"] or settings.zk_hazz_port),
-            "error": _state["error"] or "",
-            "syncing": False,
-            "enrolled": int(_state["enrolled"] or 0),
-            "removed": 0,
-            "skipped": 0,
-            "last_sync": _state["last_sync"],
-            "date": _state["date"] or mess_today().isoformat(),
-            "rows": list(_state["rows"]),
-        }
+        rows = list(_rows)
+        mem_date = _date
     board = _load_board()
-    if board.get("rows") and board.get("date") == state["date"]:
+    if board.get("date") == day and board.get("rows"):
         disk_latest = max((str(row.get("punched_at") or "") for row in board["rows"]), default="")
-        mem_latest = max((str(row.get("punched_at") or "") for row in state["rows"]), default="")
-        if disk_latest >= mem_latest:
-            state["rows"] = list(board["rows"])
-    if not _enabled() and not state["error"]:
-        state["reachable"] = False
-        state["error"] = "Hazz Camp device is turned off"
-    return state
+        mem_latest = max((str(row.get("punched_at") or "") for row in rows), default="")
+        if mem_date != day or disk_latest >= mem_latest:
+            rows = list(board["rows"])
+    return {
+        "reachable": fresh,
+        "host": str(seen.get("serial") or ""),
+        "port": 8088,
+        "error": "",
+        "syncing": False,
+        "enrolled": 0,
+        "removed": 0,
+        "skipped": 0,
+        "last_sync": None,
+        "date": day,
+        "rows": rows,
+    }
 
 
-def _connect():
-    from zk import ZK
-
-    last: Exception | None = None
-    wait = max(int(settings.zk_timeout or 8), 2)
-    for force_udp in (False, True):
-        zk = ZK(
-            settings.zk_hazz_host,
-            port=settings.zk_hazz_port,
-            timeout=wait,
-            password=int(settings.zk_hazz_password or 0),
-            force_udp=force_udp,
-            ommit_ping=True,
-        )
-        try:
-            return zk.connect()
-        except Exception as exc:
-            last = exc
-    if last is not None:
-        raise last
-    raise RuntimeError("Hazz Camp device did not answer")
-
-
-def _names_and_cards(conn) -> tuple[dict[str, str], dict[str, str]]:
-    names: dict[str, str] = {}
-    cards: dict[str, str] = {}
-    try:
-        for user in _device_users(conn):
-            pin = str(getattr(user, "user_id", "") or "").strip()
-            if not pin:
-                continue
-            names[pin] = str(getattr(user, "name", "") or "").strip()
-            card = int(getattr(user, "card", 0) or 0)
-            if card:
-                cards[pin] = str(card)
-    except Exception:
-        return {}, {}
-    return names, cards
-
-
-def _poll(db) -> None:
-    day = mess_today()
-    known_by_key, ms_ids, _rfid_by_pin, shifts = _today_maps(db, day)
-    conn = None
-    try:
-        conn = _connect()
-        record_count = None
-        try:
-            if conn.read_sizes():
-                record_count = int(getattr(conn, "records", 0))
-        except Exception:
-            record_count = None
-        with _lock:
-            same_log = (
-                record_count is not None
-                and record_count == _state.get("record_count")
-                and _state.get("rows_date") == day.isoformat()
-            )
-        if not same_log:
-            logs = conn.get_attendance() or []
-            names, cards = _names_and_cards(conn)
-            events = _collect_events(logs, day)
-            rows = _build_rows(events, known_by_key, ms_ids, shifts, names, cards)
-            with _lock:
-                _state.update(
-                    {
-                        "rows": rows,
-                        "record_count": record_count,
-                        "rows_date": day.isoformat(),
-                        "date": day.isoformat(),
-                    }
-                )
-            _save_board(day.isoformat(), rows)
-        with _lock:
-            _state.update(
-                {
-                    "reachable": True,
-                    "host": settings.zk_hazz_host,
-                    "port": settings.zk_hazz_port,
-                    "error": "",
-                    "date": day.isoformat(),
-                    "last_sync": datetime.now().astimezone().strftime("%Y-%m-%d %H:%M"),
-                }
-            )
-    finally:
-        if conn is not None:
+def _append_punch(pin: str, punched: datetime, known_by_key, ms_ids, shifts) -> None:
+    global _date
+    day = punched.date()
+    if day != mess_today():
+        return
+    stamp = punched.strftime("%Y-%m-%d %H:%M:%S")
+    with _lock:
+        if _date == day.isoformat():
+            existing = list(_rows)
+        else:
+            board = _load_board()
+            existing = board["rows"] if board.get("date") == day.isoformat() else []
+        if any(
+            str(row.get("rab_id") or "") == pin and str(row.get("punched_at") or "") == stamp
+            for row in existing
+        ):
+            return
+        events: list[tuple[str, datetime]] = []
+        for row in existing:
+            text = str(row.get("punched_at") or "")
             try:
-                conn.disconnect()
-            except Exception:
-                pass
+                when = datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+            events.append((str(row.get("rab_id") or ""), when))
+        events.append((pin, punched.replace(tzinfo=None)))
+        events.sort(key=lambda item: item[1])
+        rows = _build_rows(events, known_by_key, ms_ids, shifts, {}, {})
+        _rows[:] = rows
+        _date = day.isoformat()
+    _save_board(day.isoformat(), rows)
 
 
-def _loop(session_factory) -> None:
-    while True:
-        if not _enabled():
-            with _lock:
-                _state.update(
-                    {
-                        "reachable": False,
-                        "host": settings.zk_hazz_host,
-                        "port": settings.zk_hazz_port,
-                        "error": "Hazz Camp device is turned off",
-                    }
-                )
-            time.sleep(5)
+def ingest_hazz_attendance(db, records: list[tuple[str, datetime]]) -> int:
+    day = mess_today()
+    known_by_key, ms_ids, _, shifts = _today_maps(db, day)
+    kept = 0
+    for pin, punched in records:
+        if punched.date() != day:
             continue
-        db = session_factory()
-        try:
-            _poll(db)
-        except Exception as exc:
-            with _lock:
-                _state.update(
-                    {
-                        "reachable": False,
-                        "host": settings.zk_hazz_host,
-                        "port": settings.zk_hazz_port,
-                        "error": str(exc) or "Hazz Camp device did not answer",
-                    }
-                )
-        finally:
-            db.close()
-        time.sleep(POLL_SEC)
+        _append_punch(pin, punched, known_by_key, ms_ids, shifts)
+        kept += 1
+    return kept
+
+
+def _read_cmds() -> dict:
+    try:
+        data = json.loads(HAZZ_CMD_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    cmds = data.get("cmds")
+    data["cmds"] = list(cmds) if isinstance(cmds, list) else []
+    data["seq"] = int(data.get("seq") or 0)
+    return data
+
+
+def _write_cmds(data: dict) -> None:
+    HAZZ_CMD_PATH.parent.mkdir(parents=True, exist_ok=True)
+    HAZZ_CMD_PATH.write_text(json.dumps(data), encoding="utf-8")
+
+
+def queue_hazz_userinfo(member) -> str:
+    """One card update for a later edit. The first full list is sent when the device asks."""
+    if not HAZZ_SEED_PATH.exists():
+        return ""
+    pin = enroll_pin(member)
+    card = device_card_number(member.rfid)
+    if not pin or card <= 0:
+        return ""
+    with _lock:
+        data = _read_cmds()
+        data["seq"] += 1
+        line = access_user_command(data["seq"], pin, member.name, card)
+        data["cmds"].append({"id": data["seq"], "line": line})
+        _write_cmds(data)
+    return line
+
+
+def ensure_hazz_cards(db) -> None:
+    serial = str(_seen().get("serial") or "").strip()
+    if not serial:
+        return
+    try:
+        seeded = HAZZ_SEED_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        seeded = ""
+    if seeded == serial:
+        return
+    from models import Member
+
+    cmds = []
+    seq = 0
+    for member in db.query(Member).all():
+        pin = enroll_pin(member)
+        card = device_card_number(getattr(member, "rfid", ""))
+        if not pin or card <= 0:
+            continue
+        seq += 1
+        cmds.append(
+            {
+                "id": seq,
+                "line": access_user_command(seq, pin, getattr(member, "name", ""), card),
+            }
+        )
+    with _lock:
+        _write_cmds({"seq": seq, "cmds": cmds})
+        HAZZ_SEED_PATH.parent.mkdir(parents=True, exist_ok=True)
+        HAZZ_SEED_PATH.write_text(serial, encoding="utf-8")
+
+
+def pop_hazz_command() -> str:
+    with _lock:
+        data = _read_cmds()
+        if not data["cmds"]:
+            return ""
+        item = data["cmds"].pop(0)
+        _write_cmds(data)
+    return str(item.get("line") or "")
+
+
+def drop_hazz_acked(body: str) -> None:
+    import re
+
+    if "Return=0" not in body.replace(" ", ""):
+        return
+    ids = {int(item) for item in re.findall(r"ID=(\d+)", body)}
+    if not ids:
+        return
+    with _lock:
+        data = _read_cmds()
+        data["cmds"] = [row for row in data["cmds"] if int(row.get("id") or 0) not in ids]
+        _write_cmds(data)
 
 
 def start_hazz_watch(session_factory=None) -> None:
-    if not _enabled():
-        return
-    if session_factory is None:
-        from database import SessionLocal
-
-        session_factory = SessionLocal
-    with _lock:
-        if _state.get("watching"):
-            return
-        _state["watching"] = True
-        _state["host"] = settings.zk_hazz_host
-        _state["port"] = settings.zk_hazz_port
-    threading.Thread(
-        target=_loop,
-        args=(session_factory,),
-        name="zk-hazz-watch",
-        daemon=True,
-    ).start()
+    """Hazz Camp dials in over ADMS. Do not open a TCP session to port 4370."""
+    return None
