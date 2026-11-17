@@ -1,6 +1,7 @@
 from datetime import date
 
 from daily import auto_default_clear_range
+from zk_gate import device_card_number, same_rfid
 from permissions import filter_snapshot_body
 from security import hash_token, validate_password, verify_login_mfa
 from storage import StorageError, sniff_image_mime, sniff_mime
@@ -14,6 +15,13 @@ class DummyStaff:
         self.mfa_enabled = mfa_enabled
         self.mfa_secret = mfa_secret
         self.mfa_recovery = mfa_recovery
+
+
+def test_device_verifies_the_stored_rfid_without_replacing_it():
+    assert device_card_number("0007502842") == 4918042
+    assert device_card_number("7502842") == 4918042
+    assert same_rfid("7502842", 4918042)
+    assert same_rfid("7502842", 7502842)
 
 
 def test_inactive_clears_only_the_rest_of_this_month():

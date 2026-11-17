@@ -92,6 +92,33 @@ def rfid_card(raw: str | None) -> int:
     return value
 
 
+def device_card_number(raw: str | None) -> int:
+    """Card number the ZK reader compares, from the real RFID stored in the database.
+
+    A checker value such as 0007502842 is site 75 and card 2842. The reader
+    reports (75 << 16) | 2842. The stored RFID is not changed.
+    """
+    real = rfid_card(raw)
+    if real <= 0:
+        return 0
+    text = f"{real:010d}"
+    if len(text) > 10:
+        return real
+    facility = int(text[:5])
+    number = int(text[5:])
+    if facility == 0 or facility > 255 or number > 65535:
+        return real
+    return (facility << 16) | number
+
+
+def same_rfid(stored: str | None, seen: int) -> bool:
+    """True when a device reading is the stored real RFID, in either form."""
+    real = rfid_card(stored)
+    if real <= 0 or seen <= 0:
+        return False
+    return seen == real or seen == device_card_number(stored)
+
+
 def lookup_keys(member: Member) -> list[str]:
     keys: list[str] = []
     for raw in (member.rab_id, getattr(member, "personal_id", "")):
@@ -104,6 +131,9 @@ def lookup_keys(member: Member) -> list[str]:
         stripped = str(int(digits))
         if stripped not in keys:
             keys.append(stripped)
+        device_card = str(device_card_number(member.rfid))
+        if device_card != "0" and device_card not in keys:
+            keys.append(device_card)
     return keys
 
 
@@ -292,7 +322,7 @@ def enroll_pin(member: Member) -> str:
 def queue_adms_userinfo(member: Member, pin: str | None = None) -> str:
     """Queue a Security PUSH user write. The device picks it up on GET /iclock/getrequest."""
     pin = device_pin(pin or enroll_pin(member))
-    card = rfid_card(member.rfid)
+    card = device_card_number(member.rfid)
     if not pin or card <= 0:
         raise ValueError("Member needs an SRB ID and RFID")
     name = device_name(member.name)
@@ -496,7 +526,7 @@ def _apply_rfid(conn, rfid_by_pin: dict[str, Member]) -> None:
     enrolled = 0
     for pin, member in rfid_by_pin.items():
         wanted_name = device_name(member.name)
-        wanted_card = rfid_card(member.rfid)
+        wanted_card = device_card_number(member.rfid)
         current = by_pin.get(pin)
         current_name = str(getattr(current, "name", "") or "").strip() if current else ""
         current_card = int(getattr(current, "card", 0) or 0) if current is not None else -1

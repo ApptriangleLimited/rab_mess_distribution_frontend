@@ -219,7 +219,7 @@ def _rtlog_rows(body: str) -> list[dict]:
 
 def _bind_rtlog_cards(rows: list[dict]) -> None:
     from models import Member
-    from zk_gate import rfid_card, sync_member_to_device
+    from zk_gate import rfid_card, same_rfid, sync_member_to_device
 
     db = SessionLocal()
     try:
@@ -233,7 +233,7 @@ def _bind_rtlog_cards(rows: list[dict]) -> None:
                 .filter((Member.personal_id == pin) | (Member.rab_id == pin))
                 .first()
             )
-            if member is None or rfid_card(member.rfid) == value:
+            if member is None or same_rfid(member.rfid, value):
                 continue
             member.rfid = str(value).zfill(10)
             db.commit()
