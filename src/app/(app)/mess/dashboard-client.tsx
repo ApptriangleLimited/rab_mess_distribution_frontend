@@ -10,11 +10,14 @@ import {
   IconCake,
   IconCheck,
   IconClockHour4,
+  IconDownload,
+  IconPrinter,
   IconSearch,
   IconSettings,
   IconSoup,
   IconTags,
   IconUser,
+  IconX,
 } from "@tabler/icons-react";
 import {
   Bar,
@@ -56,6 +59,7 @@ import {
 } from "@/lib/api/mess-checkins";
 import { listPritibhojEventsApi } from "@/lib/api/pritibhoj";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
+import { fetchZkDisplay, type ZkGateRow, type ZkGateStatus } from "@/lib/api/zk-gate";
 import { eachISODate, todayISO } from "@/lib/date";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import { listGuestMeals } from "@/lib/store/guest-meals";
@@ -88,6 +92,85 @@ const BRANCH_COLORS = [
 ];
 const DONUT_CONSUMED = "#f97316";
 const DONUT_REST = "#e2e8f0";
+
+type PersonLine = {
+  name: string;
+  rabId: string;
+  personalId: string;
+  when: string;
+};
+
+type ListKind = "planned" | "accepted" | "duplicate";
+
+function punchStatus(row: ZkGateRow): ZkGateStatus {
+  if (
+    row.status === "accepted" ||
+    row.status === "already_accepted" ||
+    row.status === "not_allowed" ||
+    row.status === "rfid_not_found"
+  ) {
+    return row.status;
+  }
+  return row.allowed ? "accepted" : "not_allowed";
+}
+
+function csvCell(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function downloadPeople(filename: string, rows: PersonLine[], headers: string[]) {
+  const lines = [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) =>
+      [row.name, row.rabId, row.personalId, row.when].slice(0, headers.length).map(csvCell).join(","),
+    ),
+  ];
+  const blob = new Blob([`\uFEFF${lines.join("\n")}`], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function printPeople(title: string, rows: PersonLine[], headers: string[]) {
+  const popup = window.open("", "_blank", "noopener,noreferrer");
+  if (!popup) return;
+  const body = rows
+    .map(
+      (row) =>
+        `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.rabId)}</td><td>${escapeHtml(row.personalId)}</td>${
+          headers.length > 3 ? `<td>${escapeHtml(row.when)}</td>` : ""
+        }</tr>`,
+    )
+    .join("");
+  popup.document.write(`<!DOCTYPE html><html><head><title>${escapeHtml(title)}</title>
+    <style>
+      body { font-family: sans-serif; padding: 24px; color: #111; }
+      h1 { font-size: 18px; margin: 0 0 12px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 13px; }
+      th { background: #f3f4f6; }
+    </style></head><body>
+    <h1>${escapeHtml(title)} (${rows.length})</h1>
+    <table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+    <tbody>${body || `<tr><td colspan="${headers.length}">—</td></tr>`}</tbody></table>
+    </body></html>`);
+  popup.document.close();
+  popup.focus();
+  popup.print();
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
 
 type ActivityRow = {
   id: string;
@@ -155,6 +238,9 @@ export default function MessDashboardClient() {
   const [apiData, setApiData] = useState<MessCheckinsData | null>(null);
   const [ledgerRows, setLedgerRows] = useState<LedgerRow[]>([]);
   const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
+  const [devicePunches, setDevicePunches] = useState<ZkGateRow[]>([]);
+  const [todayLedger, setTodayLedger] = useState<LedgerRow[]>([]);
+  const [openList, setOpenList] = useState<ListKind | null>(null);
 
   const range = useMemo(() => {
     return dateFrom <= dateTo
@@ -197,6 +283,47 @@ export default function MessDashboardClient() {
       cancelled = true;
     };
   }, [apiOn, range.from, range.to]);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setTodayLedger([]);
+      return;
+    }
+    let cancelled = false;
+    void listMessLedger(today, today)
+      .then((ledger) => {
+        if (!cancelled) setTodayLedger(ledger.rows.map(ledgerRowApiToLedgerRow));
+      })
+      .catch(() => {
+        if (!cancelled) setTodayLedger([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiOn, today]);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setDevicePunches([]);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      void fetchZkDisplay()
+        .then((snapshot) => {
+          if (!cancelled) setDevicePunches(snapshot.rows ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setDevicePunches([]);
+        });
+    };
+    load();
+    const timer = window.setInterval(load, 10000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [apiOn]);
 
   const shifts = useMemo(
     () => listMealShifts(),
@@ -260,19 +387,79 @@ export default function MessDashboardClient() {
     [liveLedgerRows, wing, state.wing_parent],
   );
 
-  /** Same MS person-day count as mess ledger / Daily RR. */
-  const planned = useMemo(() => {
-    let ms = 0;
-    for (const row of filteredLedgerRows) {
-      for (const tag of row.days) {
-        if (tag === "MS") ms += 1;
+  const userByKey = useMemo(() => {
+    const map = new Map<string, User>();
+    const add = (user: User | undefined) => {
+      if (!user) return;
+      if (user.rab_id) map.set(user.rab_id, user);
+      if (user.personal_id) map.set(user.personal_id, user);
+    };
+    for (const user of state.users) add(user);
+    for (const user of members) add(user);
+    for (const row of todayLedger) add(row.user);
+    return map;
+  }, [members, state.users, todayLedger]);
+
+  const plannedLines = useMemo(() => {
+    const todayRange = liveLedgerRows.filter(
+      () => range.from === today && range.to === today,
+    );
+    const source = todayLedger.length ? todayLedger : todayRange;
+    const lines: PersonLine[] = [];
+    for (const row of source) {
+      if (!memberMatchesWingFilter(row.user.wing, wing)) continue;
+      if (!row.days.some((tag) => tag === "MS")) continue;
+      lines.push({
+        name: row.user.name,
+        rabId: row.user.rab_id,
+        personalId: row.user.personal_id,
+        when: "",
+      });
+    }
+    if (!apiOn && !(range.from === today && range.to === today)) {
+      for (const row of state.assignments) {
+        if (row.date !== today || row.tag !== "MS") continue;
+        const user = state.users.find((item) => item.id === row.user_id);
+        if (!user || !memberMatchesWingFilter(user.wing, wing)) continue;
+        lines.push({
+          name: user.name,
+          rabId: user.rab_id,
+          personalId: user.personal_id,
+          when: "",
+        });
       }
     }
-    return ms;
-  }, [filteredLedgerRows]);
+    lines.sort((a, b) => a.name.localeCompare(b.name));
+    return lines;
+  }, [apiOn, liveLedgerRows, range.from, range.to, state.assignments, state.users, state.wing_parent, today, todayLedger, wing]);
 
-  const uniqueConsume = assigns.filter((row) => row.status === 1).length;
-  const duplicates = assigns.filter((row) => row.status === 2).length;
+  const deviceLines = useMemo(() => {
+    const accepted: PersonLine[] = [];
+    const duplicate: PersonLine[] = [];
+    for (const row of devicePunches) {
+      const day = (row.punched_at || "").slice(0, 10);
+      if (day !== today) continue;
+      const status = punchStatus(row);
+      if (status !== "accepted" && status !== "already_accepted") continue;
+      if (shift !== "all" && row.shift_id !== shift) continue;
+      const user = userByKey.get(row.rab_id);
+      if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
+      const line: PersonLine = {
+        name: user?.name || row.name,
+        rabId: user?.rab_id || row.rab_id,
+        personalId: user?.personal_id || "",
+        when: (row.punched_at || "").slice(11, 19),
+      };
+      if (status === "accepted") accepted.push(line);
+      else duplicate.push(line);
+    }
+    return { accepted, duplicate };
+  }, [devicePunches, shift, today, userByKey, wing]);
+
+  const todayPlanned = plannedLines.length;
+  const todayAccepted = deviceLines.accepted.length;
+  const todayDuplicate = deviceLines.duplicate.length;
+  const uniqueConsume = todayAccepted;
   const guestCount = guests.length;
   const pritibhojEvents = apiEvents ?? listPritibhojEvents();
   const groupCount = useMemo(() => {
@@ -343,10 +530,10 @@ export default function MessDashboardClient() {
     t,
   ]);
 
-  const remaining = Math.max(0, planned - uniqueConsume);
+  const remaining = Math.max(0, todayPlanned - uniqueConsume);
   const donut = [
     { name: t("mess.dashboard.consumed"), value: uniqueConsume, fill: DONUT_CONSUMED },
-    { name: t("mess.dashboard.remaining"), value: remaining || (planned ? 0 : 1), fill: DONUT_REST },
+    { name: t("mess.dashboard.remaining"), value: remaining || (todayPlanned ? 0 : 1), fill: DONUT_REST },
   ];
 
   const activities = useMemo(() => {
@@ -522,22 +709,27 @@ export default function MessDashboardClient() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label={t("mess.dashboard.plannedMeals")}
-            value={planned}
+            value={todayPlanned}
             icon={<IconSoup className="h-4 w-4" />}
             tone="emerald"
             hint={t("mess.totalMs")}
+            onClick={() => setOpenList("planned")}
           />
           <StatCard
             label={t("mess.dashboard.totalConsumption")}
-            value={uniqueConsume}
+            value={todayAccepted}
             icon={<IconActivity className="h-4 w-4" />}
             tone="sky"
+            hint={t("mess.dashboard.todayHint")}
+            onClick={() => setOpenList("accepted")}
           />
           <StatCard
             label={t("mess.dashboard.duplicateAttempts")}
-            value={duplicates}
+            value={todayDuplicate}
             icon={<IconAlertTriangle className="h-4 w-4" />}
             tone="amber"
+            hint={t("mess.dashboard.todayHint")}
+            onClick={() => setOpenList("duplicate")}
           />
           <StatCard
             label={t("mess.dashboard.otherMeals")}
@@ -626,7 +818,7 @@ export default function MessDashboardClient() {
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <p className="text-sm font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
-                  {uniqueConsume}/{planned}
+                  {uniqueConsume}/{todayPlanned}
                 </p>
               </div>
             </div>
@@ -635,12 +827,12 @@ export default function MessDashboardClient() {
               {shift === "all"
                 ? t("mess.dashboard.lunchesOf", {
                     consumed: uniqueConsume,
-                    planned,
+                    planned: todayPlanned,
                   })
                 : t("mess.dashboard.shiftOf", {
                     shift: shiftName(shift),
                     consumed: uniqueConsume,
-                    planned,
+                    planned: todayPlanned,
                   })}
             </p>
           </section>
@@ -754,6 +946,36 @@ export default function MessDashboardClient() {
             </ul>
           </section>
         </div>
+        {openList ? (
+          <PersonList
+            title={
+              openList === "planned"
+                ? t("mess.dashboard.plannedMeals")
+                : openList === "accepted"
+                  ? t("mess.dashboard.totalConsumption")
+                  : t("mess.dashboard.duplicateAttempts")
+            }
+            rows={
+              openList === "planned"
+                ? plannedLines
+                : openList === "accepted"
+                  ? deviceLines.accepted
+                  : deviceLines.duplicate
+            }
+            showTime={openList !== "planned"}
+            labels={{
+              name: t("mess.dashboard.colName"),
+              srb: t("mess.dashboard.colSrb"),
+              personal: t("mess.dashboard.colPersonal"),
+              time: t("mess.dashboard.colTime"),
+              print: t("mess.dashboard.printList"),
+              download: t("mess.dashboard.downloadList"),
+              empty: t("mess.dashboard.listEmpty"),
+              close: t("mess.dashboard.closeList"),
+            }}
+            onClose={() => setOpenList(null)}
+          />
+        ) : null}
       </motion.div>
     </PagePane>
   );
@@ -780,12 +1002,14 @@ function StatCard({
   icon,
   tone,
   hint,
+  onClick,
 }: {
   label: string;
   value: number;
   icon: ReactNode;
   tone: "emerald" | "sky" | "amber" | "violet";
   hint?: string;
+  onClick?: () => void;
 }) {
   const cardClass = {
     emerald:
@@ -802,8 +1026,13 @@ function StatCard({
     amber: "bg-white/80 text-amber-600 dark:bg-amber-900/70 dark:text-amber-200",
     violet: "bg-white/80 text-violet-600 dark:bg-violet-900/70 dark:text-violet-200",
   }[tone];
-  return (
-    <div className={cn("flex items-start justify-between rounded-2xl border p-4 shadow-sm", cardClass)}>
+  const className = cn(
+    "flex w-full items-start justify-between rounded-2xl border p-4 text-left shadow-sm",
+    onClick && "cursor-pointer transition hover:brightness-[0.98]",
+    cardClass,
+  );
+  const body = (
+    <>
       <div>
         <p className="text-xs font-medium opacity-70">{label}</p>
         <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
@@ -812,6 +1041,112 @@ function StatCard({
       <span className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg", toneClass)}>
         {icon}
       </span>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className}>
+        {body}
+      </button>
+    );
+  }
+  return (
+    <div className={className}>
+      {body}
+    </div>
+  );
+}
+
+function PersonList({
+  title,
+  rows,
+  showTime,
+  labels,
+  onClose,
+}: {
+  title: string;
+  rows: PersonLine[];
+  showTime: boolean;
+  labels: {
+    name: string;
+    srb: string;
+    personal: string;
+    time: string;
+    print: string;
+    download: string;
+    empty: string;
+    close: string;
+  };
+  onClose: () => void;
+}) {
+  const headers = showTime
+    ? [labels.name, labels.srb, labels.personal, labels.time]
+    : [labels.name, labels.srb, labels.personal];
+  const file = `${title.replace(/\s+/g, "-").toLowerCase()}.csv`;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-950">
+        <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+          <div>
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-white">{title}</h2>
+            <p className="text-xs text-neutral-500">{rows.length}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" className="h-8 rounded-lg" onClick={() => printPeople(title, rows, headers)}>
+              <IconPrinter className="mr-1.5 h-4 w-4" />
+              {labels.print}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 rounded-lg"
+              onClick={() => downloadPeople(file, rows, headers)}
+            >
+              <IconDownload className="mr-1.5 h-4 w-4" />
+              {labels.download}
+            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              aria-label={labels.close}
+            >
+              <IconX className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-neutral-50 text-left text-xs text-neutral-500 dark:bg-neutral-900">
+              <tr>
+                {headers.map((header) => (
+                  <th key={header} className="px-4 py-2 font-medium">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length ? (
+                rows.map((row, index) => (
+                  <tr key={`${row.rabId}-${row.when}-${index}`} className="border-t border-neutral-100 dark:border-neutral-800">
+                    <td className="px-4 py-2 text-neutral-900 dark:text-neutral-100">{row.name}</td>
+                    <td className="px-4 py-2 tabular-nums">{row.rabId || "—"}</td>
+                    <td className="px-4 py-2 tabular-nums">{row.personalId || "—"}</td>
+                    {showTime ? <td className="px-4 py-2 tabular-nums">{row.when || "—"}</td> : null}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={headers.length} className="px-4 py-8 text-center text-neutral-500">
+                    {labels.empty}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
