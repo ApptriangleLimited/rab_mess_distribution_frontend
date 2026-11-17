@@ -11,15 +11,13 @@ export function monthStartISO(today = todayISO()): string {
   return `${today.slice(0, 7)}-01`;
 }
 
-/** Daily RR: past, today, and future days can all be painted. */
+/** Daily RR: today and future days can be painted. Earlier days stay locked. */
 export function isDailyDateEditable(date: string, today = todayISO()): boolean {
-  void today;
-  return /^\d{4}-\d{2}-\d{2}$/.test(date);
+  return date >= today;
 }
 
 export function dailyEditMinDate(today = todayISO()): string {
-  void today;
-  return "";
+  return today;
 }
 
 export function nowISO() {

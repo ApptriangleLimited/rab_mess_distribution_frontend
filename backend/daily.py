@@ -18,8 +18,8 @@ router = APIRouter()
 
 
 def daily_day_writable(day: date) -> bool:
-    """Any calendar day can be painted. Joining date and inactive spans still apply."""
-    return isinstance(day, date)
+    """Today and future days can be painted. Earlier days stay as they are."""
+    return day >= date.today()
 
 
 def utcnow() -> datetime:
