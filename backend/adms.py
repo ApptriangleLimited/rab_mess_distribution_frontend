@@ -33,9 +33,6 @@ router = APIRouter(
 
 
 def handshake_options(serial_number: str) -> str:
-    command = _peek_commands()
-    if command:
-        return command
     return chr(10).join(
         [
             "GET OPTION FROM: " + serial_number,
@@ -102,37 +99,6 @@ def _take_command() -> str:
     if command and not command.endswith("\n"):
         return f"{command}\n"
     return command
-
-
-def _peek_commands() -> str:
-    rows: list = []
-    try:
-        import json
-
-        raw = json.loads(ADMS_CMD_PATH.read_text(encoding="utf-8"))
-        rows = list(raw.get("cmds") or [])
-    except Exception:
-        try:
-            from adms_store import pending
-            rows = list(pending() or [])
-        except Exception:
-            try:
-                from zk_gate import pending_adms_commands
-                rows = list(pending_adms_commands() or [])
-            except Exception:
-                rows = []
-    lines: list[str] = []
-    for row in rows:
-        if isinstance(row, dict):
-            text = str(row.get("line") or row.get("cmd") or row.get("command") or "")
-        else:
-            text = str(row)
-        text = text.strip()
-        if text:
-            lines.append(text)
-    if not lines:
-        return ""
-    return chr(10).join(lines) + chr(10)
 
 
 def _punches(body: str) -> list[tuple[str, datetime]]:
@@ -281,10 +247,6 @@ async def device_handshake(request: Request) -> Response:
     options_all = str(query.get("options") or "").lower() == "all"
 
     if options_all:
-        command = _peek_commands()
-        if command:
-            _audit("cdata_get_cmd", request, f"serial={serial_number} cmd={command!r}")
-            return plain_text(command)
         response = handshake_options(serial_number)
     else:
         response = chr(10).join(
@@ -404,9 +366,7 @@ async def device_registry(request: Request) -> Response:
     if serial_number:
         note_adms(serial_number)
         _mark_registered(serial_number)
-    extra = _peek_commands()
-    _audit("registry_cmds", request, f"serial={serial_number} cmds={extra!r}")
-    return plain_text("OK" + chr(10) + extra)
+    return plain_text("OK")
 
 
 @router.api_route("/ping", methods=["GET", "POST"])
