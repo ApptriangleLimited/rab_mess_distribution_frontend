@@ -31,11 +31,10 @@ function newId() {
 }
 
 /**
- * Data-entry phase: Daily RR tag paints apply now (no Ration/Consume queue).
- * Set true to restore the same approval routes:
  * MS + MFR apply now. FR/CD → Ration. Red TRG → Ration. Black TRG applies now.
+ * Every other tag goes to Consume for approval.
  */
-export const TAG_CHANGE_APPROVAL_ENABLED = false;
+export const TAG_CHANGE_APPROVAL_ENABLED = true;
 
 /** MS + MFR apply now. FR/CD → Ration. Red TRG → Ration. Black TRG applies now. */
 export function dutyTagQueue(

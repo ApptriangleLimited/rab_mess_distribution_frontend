@@ -18,11 +18,8 @@ router = APIRouter()
 
 
 def daily_day_writable(day: date) -> bool:
-    """Today/future always writable. Past days only in the current month."""
-    today = date.today()
-    if day >= today:
-        return True
-    return day.year == today.year and day.month == today.month
+    """Any calendar day can be painted. Joining date and inactive spans still apply."""
+    return isinstance(day, date)
 
 
 def utcnow() -> datetime:

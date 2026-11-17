@@ -11,17 +11,15 @@ export function monthStartISO(today = todayISO()): string {
   return `${today.slice(0, 7)}-01`;
 }
 
-/**
- * Daily RR: today and future stay open. Past days stay open only in the
- * current calendar month (so October 1–today can still be painted).
- */
+/** Daily RR: past, today, and future days can all be painted. */
 export function isDailyDateEditable(date: string, today = todayISO()): boolean {
-  if (date >= today) return true;
-  return date.slice(0, 7) === today.slice(0, 7);
+  void today;
+  return /^\d{4}-\d{2}-\d{2}$/.test(date);
 }
 
 export function dailyEditMinDate(today = todayISO()): string {
-  return monthStartISO(today);
+  void today;
+  return "";
 }
 
 export function nowISO() {
