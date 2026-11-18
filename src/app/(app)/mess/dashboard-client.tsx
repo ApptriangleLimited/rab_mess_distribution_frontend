@@ -100,8 +100,12 @@ const BRANCH_COLORS = [
   "#6366f1",
   "#fb7185",
 ];
-const DONUT_CONSUMED = "#f97316";
 const DONUT_REST = "#e2e8f0";
+const SHIFT_RING_COLOR = {
+  breakfast: "#f97316",
+  lunch: "#22c55e",
+  dinner: "#a855f7",
+} as const;
 
 type PersonLine = {
   name: string;
@@ -354,6 +358,57 @@ function formatStamp(iso: string, locale: string) {
     second: "2-digit",
   });
   return `${date}, ${time}`;
+}
+
+function ShiftRing({
+  consumed,
+  planned,
+  color,
+  label,
+  large,
+}: {
+  consumed: number;
+  planned: number;
+  color: string;
+  label: string;
+  large: boolean;
+}) {
+  const remaining = Math.max(0, planned - consumed);
+  const data = [
+    { name: "consumed", value: consumed, fill: color },
+    { name: "rest", value: remaining || (planned ? 0 : 1), fill: DONUT_REST },
+  ];
+  return (
+    <div className="flex min-w-0 flex-1 flex-col items-center">
+      <div className={cn("relative w-full", large ? "h-56" : "h-40")}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              innerRadius={large ? 68 : 46}
+              outerRadius={large ? 86 : 60}
+              startAngle={90}
+              endAngle={-270}
+              stroke="none"
+            >
+              {data.map((row) => (
+                <Cell key={row.name} fill={row.fill} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <p className="text-sm font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
+            {consumed}/{planned}
+          </p>
+        </div>
+      </div>
+      <p className="mt-1 text-center text-xs font-medium" style={{ color }}>
+        {label}
+      </p>
+    </div>
+  );
 }
 
 export default function MessDashboardClient() {
@@ -612,7 +667,22 @@ export default function MessDashboardClient() {
   const todayPlanned = plannedLines.length;
   const todayAccepted = deviceLines.accepted.length;
   const todayDuplicate = deviceLines.duplicate.length;
-  const uniqueConsume = todayAccepted;
+  const shiftConsumed = useMemo(() => {
+    const counts = { breakfast: 0, lunch: 0, dinner: 0 };
+    for (const row of devicePunches) {
+      const day = (row.punched_at || "").slice(0, 10);
+      if (day !== today) continue;
+      if (punchStatus(row) !== "accepted") continue;
+      const user = userByKey.get(row.rab_id);
+      if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
+      const id = row.shift_id;
+      if (id === "breakfast" || id === "lunch" || id === "dinner") counts[id] += 1;
+    }
+    return counts;
+  }, [devicePunches, today, userByKey, wing]);
+  const ringShifts = (
+    shift === "all" ? (["breakfast", "lunch", "dinner"] as const) : ([shift] as const)
+  ).filter((id): id is "breakfast" | "lunch" | "dinner" => id in SHIFT_RING_COLOR);
   const guestCount = guests.length;
   const pritibhojEvents = apiEvents ?? listPritibhojEvents();
   const groupCount = useMemo(() => {
@@ -682,12 +752,6 @@ export default function MessDashboardClient() {
     wing,
     t,
   ]);
-
-  const remaining = Math.max(0, todayPlanned - uniqueConsume);
-  const donut = [
-    { name: t("mess.dashboard.consumed"), value: uniqueConsume, fill: DONUT_CONSUMED },
-    { name: t("mess.dashboard.remaining"), value: remaining || (todayPlanned ? 0 : 1), fill: DONUT_REST },
-  ];
 
   const activities = useMemo(() => {
     const rows: ActivityRow[] = [];
@@ -955,45 +1019,22 @@ export default function MessDashboardClient() {
             <h2 className="text-sm font-semibold text-orange-800 dark:text-orange-200">
               {t("mess.dashboard.mealDistribution")}
             </h2>
-            <div className="relative mt-3 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={donut}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={68}
-                    outerRadius={86}
-                    startAngle={90}
-                    endAngle={-270}
-                    stroke="none"
-                  >
-                    {donut.map((row) => (
-                      <Cell key={row.name} fill={row.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <p className="text-sm font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
-                  {uniqueConsume}/{todayPlanned}
-                </p>
-              </div>
-            </div>
-            <p className="mt-1 text-center text-xs text-neutral-500">
-              <span className="mr-1 inline-block h-2 w-2 rounded-full bg-orange-400" />
-              {shift === "all"
-                ? t("mess.dashboard.lunchesOf", {
-                    consumed: uniqueConsume,
-                    planned: todayPlanned,
-                  })
-                : t("mess.dashboard.shiftOf", {
-                    shift: shiftName(shift),
-                    consumed: uniqueConsume,
+            <div className="mt-3 flex items-end justify-center gap-2">
+              {ringShifts.map((id) => (
+                <ShiftRing
+                  key={id}
+                  consumed={shiftConsumed[id]}
+                  planned={todayPlanned}
+                  color={SHIFT_RING_COLOR[id]}
+                  label={t("mess.dashboard.shiftOf", {
+                    shift: shiftName(id),
+                    consumed: shiftConsumed[id],
                     planned: todayPlanned,
                   })}
-            </p>
+                  large={ringShifts.length === 1}
+                />
+              ))}
+            </div>
           </section>
         </div>
 
