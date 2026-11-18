@@ -62,6 +62,7 @@ import { MESS_LEDGER_TAGS } from "@/lib/constants";
 import {
   fetchHazzDisplay,
   fetchZkDisplay,
+  fetchZkPunches,
   type ZkGateRow,
   type ZkGateStatus,
 } from "@/lib/api/zk-gate";
@@ -431,6 +432,7 @@ export default function MessDashboardClient() {
   const [ledgerRows, setLedgerRows] = useState<LedgerRow[]>([]);
   const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
   const [devicePunches, setDevicePunches] = useState<BoardPunch[]>([]);
+  const [rangePunches, setRangePunches] = useState<BoardPunch[]>([]);
   const [todayLedger, setTodayLedger] = useState<LedgerRow[]>([]);
   const [openList, setOpenList] = useState<ListKind | null>(null);
 
@@ -493,6 +495,35 @@ export default function MessDashboardClient() {
       cancelled = true;
     };
   }, [apiOn, today]);
+
+  useEffect(() => {
+    if (!apiOn) {
+      setRangePunches([]);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      void fetchZkPunches(range.from, range.to)
+        .then((data) => {
+          if (cancelled) return;
+          setRangePunches(
+            (data.rows ?? []).map((row) => ({
+              ...row,
+              mess: row.mess || "SRB HQ",
+            })),
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setRangePunches([]);
+        });
+    };
+    load();
+    const timer = window.setInterval(load, 10000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [apiOn, range.from, range.to]);
 
   useEffect(() => {
     if (!apiOn) {
@@ -669,9 +700,9 @@ export default function MessDashboardClient() {
   const todayDuplicate = deviceLines.duplicate.length;
   const shiftConsumed = useMemo(() => {
     const counts = { breakfast: 0, lunch: 0, dinner: 0 };
-    for (const row of devicePunches) {
+    for (const row of rangePunches) {
       const day = (row.punched_at || "").slice(0, 10);
-      if (day !== today) continue;
+      if (day < range.from || day > range.to) continue;
       if (punchStatus(row) !== "accepted") continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
@@ -679,7 +710,16 @@ export default function MessDashboardClient() {
       if (id === "breakfast" || id === "lunch" || id === "dinner") counts[id] += 1;
     }
     return counts;
-  }, [devicePunches, today, userByKey, wing]);
+  }, [range.from, range.to, rangePunches, userByKey, wing]);
+  const ringPlanned = useMemo(() => {
+    let count = 0;
+    for (const row of filteredLedgerRows) {
+      for (const tag of row.days) {
+        if (tag === "MS") count += 1;
+      }
+    }
+    return count;
+  }, [filteredLedgerRows]);
   const ringShifts = (shift === "all"
     ? (["breakfast", "lunch", "dinner"] as const)
     : shift === "breakfast" || shift === "lunch" || shift === "dinner"
@@ -1026,12 +1066,12 @@ export default function MessDashboardClient() {
                 <ShiftRing
                   key={id}
                   consumed={shiftConsumed[id]}
-                  planned={todayPlanned}
+                  planned={ringPlanned}
                   color={SHIFT_RING_COLOR[id]}
                   label={t("mess.dashboard.shiftOf", {
                     shift: shiftName(id),
                     consumed: shiftConsumed[id],
-                    planned: todayPlanned,
+                    planned: ringPlanned,
                   })}
                   large={ringShifts.length === 1}
                 />

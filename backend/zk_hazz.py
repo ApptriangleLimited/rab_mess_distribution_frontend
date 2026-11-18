@@ -82,6 +82,12 @@ def _save_board(day: str, rows: list[dict]) -> None:
         json.dumps({"date": day, "rows": rows}),
         encoding="utf-8",
     )
+    from zk_gate import _archive_punch_day
+
+    _archive_punch_day(HAZZ_PUNCH_HISTORY, day, rows)
+
+
+HAZZ_PUNCH_HISTORY = HAZZ_PUNCH_PATH.with_name("hazz_punch_history.json")
 
 
 def hazz_snapshot() -> dict:

@@ -303,6 +303,77 @@ def _save_punch_board(day: str, rows: list[dict]) -> None:
         json.dumps({"date": day, "rows": rows}),
         encoding="utf-8",
     )
+    _archive_punch_day(ADMS_PUNCH_HISTORY, day, rows)
+
+
+ADMS_PUNCH_HISTORY = ADMS_PUNCH_PATH.with_name("adms_punch_history.json")
+
+
+def _archive_punch_day(path: Path, day: str, rows: list[dict]) -> None:
+    """Keep each day's punch board. The live file only holds today."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    data[day] = rows
+    if len(data) > 400:
+        for key in sorted(str(item) for item in data)[:-400]:
+            data.pop(key, None)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def _history_days(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def punches_for_range(start: date, end: date) -> list[dict]:
+    """Classified punches for the dashboard date filter. Both messes."""
+    if end < start:
+        start, end = end, start
+    from zk_hazz import HAZZ_PUNCH_HISTORY, HAZZ_PUNCH_PATH
+
+    found: list[dict] = []
+
+    def add(day: str, rows: list, mess: str) -> None:
+        if day < start.isoformat() or day > end.isoformat():
+            return
+        if not isinstance(rows, list):
+            return
+        for row in rows:
+            if isinstance(row, dict):
+                item = dict(row)
+                item["mess"] = mess
+                found.append(item)
+
+    for day, rows in _history_days(ADMS_PUNCH_HISTORY).items():
+        add(str(day), rows, "SRB HQ")
+    for day, rows in _history_days(HAZZ_PUNCH_HISTORY).items():
+        add(str(day), rows, "Haji camp")
+    hq = _load_punch_board()
+    add(str(hq.get("date") or ""), hq.get("rows") or [], "SRB HQ")
+    try:
+        hazz = json.loads(HAZZ_PUNCH_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        hazz = {}
+    if isinstance(hazz, dict):
+        add(str(hazz.get("date") or ""), hazz.get("rows") or [], "Haji camp")
+    unique: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for row in found:
+        key = (str(row.get("mess") or ""), str(row.get("rab_id") or ""), str(row.get("punched_at") or ""))
+        if not key[2] or key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+    unique.sort(key=lambda row: str(row.get("punched_at") or ""), reverse=True)
+    return unique
 
 
 def pending_adms_commands() -> list[dict]:

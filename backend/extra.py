@@ -1068,6 +1068,21 @@ def zk_attendance(_staff: Staff = Depends(current_staff)):
     )
 
 
+@router.get("/api/v1/zk/punches")
+def zk_punches(date_from: str = "", date_to: str = ""):
+    """Punch rows for a date range. Used by the mess dashboard filter."""
+    from datetime import date as date_cls
+
+    from zk_gate import punches_for_range
+
+    try:
+        start = date_cls.fromisoformat(date_from) if date_from else date_cls.today()
+        end = date_cls.fromisoformat(date_to) if date_to else start
+    except ValueError:
+        start = end = date_cls.today()
+    return envelope({"rows": punches_for_range(start, end)})
+
+
 @router.get("/api/v1/zk/display")
 def zk_gate_display():
     """Punch board for the public /device tab. No login."""

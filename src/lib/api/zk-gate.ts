@@ -44,6 +44,13 @@ export function fetchHazzDisplay() {
   return apiJson<ZkGateSnapshot>("/api/v1/zk/hazz-camp/display");
 }
 
+export function fetchZkPunches(dateFrom: string, dateTo: string) {
+  const search = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+  return apiJson<{ rows: (ZkGateRow & { mess?: string })[] }>(
+    `/api/v1/zk/punches?${search}`,
+  );
+}
+
 export function syncZkGate() {
   return apiJson<ZkGateSnapshot>("/api/v1/zk/sync", { method: "POST" });
 }
