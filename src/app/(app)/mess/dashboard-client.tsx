@@ -680,9 +680,11 @@ export default function MessDashboardClient() {
     }
     return counts;
   }, [devicePunches, today, userByKey, wing]);
-  const ringShifts = (
-    shift === "all" ? (["breakfast", "lunch", "dinner"] as const) : ([shift] as const)
-  ).filter((id): id is "breakfast" | "lunch" | "dinner" => id in SHIFT_RING_COLOR);
+  const ringShifts = (shift === "all"
+    ? (["breakfast", "lunch", "dinner"] as const)
+    : shift === "breakfast" || shift === "lunch" || shift === "dinner"
+      ? ([shift] as const)
+      : ([] as const));
   const guestCount = guests.length;
   const pritibhojEvents = apiEvents ?? listPritibhojEvents();
   const groupCount = useMemo(() => {
