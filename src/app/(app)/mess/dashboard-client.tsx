@@ -60,8 +60,6 @@ import {
 import { listPritibhojEventsApi } from "@/lib/api/pritibhoj";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
 import {
-  fetchHazzDisplay,
-  fetchZkDisplay,
   fetchZkPunches,
   type ZkGateRow,
   type ZkGateStatus,
@@ -431,9 +429,7 @@ export default function MessDashboardClient() {
   const [apiData, setApiData] = useState<MessCheckinsData | null>(null);
   const [ledgerRows, setLedgerRows] = useState<LedgerRow[]>([]);
   const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
-  const [devicePunches, setDevicePunches] = useState<BoardPunch[]>([]);
   const [rangePunches, setRangePunches] = useState<BoardPunch[]>([]);
-  const [todayLedger, setTodayLedger] = useState<LedgerRow[]>([]);
   const [openList, setOpenList] = useState<ListKind | null>(null);
 
   const range = useMemo(() => {
@@ -480,24 +476,6 @@ export default function MessDashboardClient() {
 
   useEffect(() => {
     if (!apiOn) {
-      setTodayLedger([]);
-      return;
-    }
-    let cancelled = false;
-    void listMessLedger(today, today)
-      .then((ledger) => {
-        if (!cancelled) setTodayLedger(ledger.rows.map(ledgerRowApiToLedgerRow));
-      })
-      .catch(() => {
-        if (!cancelled) setTodayLedger([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiOn, today]);
-
-  useEffect(() => {
-    if (!apiOn) {
       setRangePunches([]);
       return;
     }
@@ -524,32 +502,6 @@ export default function MessDashboardClient() {
       window.clearInterval(timer);
     };
   }, [apiOn, range.from, range.to]);
-
-  useEffect(() => {
-    if (!apiOn) {
-      setDevicePunches([]);
-      return;
-    }
-    let cancelled = false;
-    const load = () => {
-      void Promise.all([
-        fetchZkDisplay().catch(() => null),
-        fetchHazzDisplay().catch(() => null),
-      ]).then(([hq, hazz]) => {
-        if (cancelled) return;
-        setDevicePunches([
-          ...(hq?.rows ?? []).map((row) => ({ ...row, mess: "SRB HQ" })),
-          ...(hazz?.rows ?? []).map((row) => ({ ...row, mess: "Haji camp" })),
-        ]);
-      });
-    };
-    load();
-    const timer = window.setInterval(load, 10000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [apiOn]);
 
   const shifts = useMemo(
     () => listMealShifts(),
@@ -622,57 +574,39 @@ export default function MessDashboardClient() {
     };
     for (const user of state.users) add(user);
     for (const user of members) add(user);
-    for (const row of todayLedger) add(row.user);
+    for (const row of liveLedgerRows) add(row.user);
     return map;
-  }, [members, state.users, todayLedger]);
+  }, [liveLedgerRows, members, state.users]);
 
   const plannedLines = useMemo(() => {
-    const todayRange = liveLedgerRows.filter(
-      () => range.from === today && range.to === today,
-    );
-    const source = todayLedger.length ? todayLedger : todayRange;
+    const dates = eachISODate(range.from, range.to);
     const lines: PersonLine[] = [];
-    for (const row of source) {
-      if (!memberMatchesWingFilter(row.user.wing, wing)) continue;
-      if (!row.days.some((tag) => tag === "MS")) continue;
-      lines.push(
-        personLine(row.user, {
-          name: row.user.name,
-          rabId: row.user.rab_id,
-          status: "Planned",
-          sift: "—",
-          checkIn: "—",
-          sortKey: row.user.name,
-        }),
-      );
-    }
-    if (!apiOn && !(range.from === today && range.to === today)) {
-      for (const row of state.assignments) {
-        if (row.date !== today || row.tag !== "MS") continue;
-        const user = state.users.find((item) => item.id === row.user_id);
-        if (!user || !memberMatchesWingFilter(user.wing, wing)) continue;
+    for (const row of filteredLedgerRows) {
+      row.days.forEach((tag, index) => {
+        if (tag !== "MS") return;
+        const day = dates[index] ?? "";
         lines.push(
-          personLine(user, {
-            name: user.name,
-            rabId: user.rab_id,
+          personLine(row.user, {
+            name: row.user.name,
+            rabId: row.user.rab_id,
             status: "Planned",
             sift: "—",
-            checkIn: "—",
-            sortKey: user.name,
+            checkIn: day || "—",
+            sortKey: `${day}-${row.user.name}`,
           }),
         );
-      }
+      });
     }
-    lines.sort((a, b) => a.name.localeCompare(b.name));
+    lines.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
     return lines;
-  }, [apiOn, liveLedgerRows, range.from, range.to, state.assignments, state.users, state.wing_parent, today, todayLedger, wing]);
+  }, [filteredLedgerRows, range.from, range.to]);
 
   const deviceLines = useMemo(() => {
     const accepted: PersonLine[] = [];
     const duplicate: PersonLine[] = [];
-    for (const row of devicePunches) {
+    for (const row of rangePunches) {
       const day = (row.punched_at || "").slice(0, 10);
-      if (day !== today) continue;
+      if (day < range.from || day > range.to) continue;
       const status = punchStatus(row);
       if (status !== "accepted" && status !== "already_accepted") continue;
       if (shift !== "all" && row.shift_id !== shift) continue;
@@ -693,7 +627,7 @@ export default function MessDashboardClient() {
       else duplicate.push(line);
     }
     return { accepted, duplicate };
-  }, [devicePunches, shift, shifts, t, today, userByKey, wing]);
+  }, [range.from, range.to, rangePunches, shift, shifts, t, userByKey, wing]);
 
   const todayPlanned = plannedLines.length;
   const todayAccepted = deviceLines.accepted.length;
@@ -797,7 +731,7 @@ export default function MessDashboardClient() {
 
   const activities = useMemo(() => {
     const rows: ActivityRow[] = [];
-    for (const row of devicePunches) {
+    for (const row of rangePunches) {
       const day = (row.punched_at || "").slice(0, 10);
       if (day < range.from || day > range.to) continue;
       const status = punchStatus(row);
@@ -852,7 +786,9 @@ export default function MessDashboardClient() {
         )
       : rows
     ).slice(0, 8);
-  }, [devicePunches, guests, pritibhojEvents, range, search, shift, shifts, state.wing_parent, t, userByKey, wing]);
+  }, [guests, pritibhojEvents, range, rangePunches, search, shift, shifts, state.wing_parent, t, userByKey, wing]);
+
+  const rangeHint = range.from === range.to ? range.from : `${range.from} – ${range.to}`;
 
   const filtersDirty =
     wing !== "all" || shift !== "all" || dateFrom !== today || dateTo !== today;
@@ -977,7 +913,7 @@ export default function MessDashboardClient() {
             value={todayPlanned}
             icon={<IconSoup className="h-4 w-4" />}
             tone="emerald"
-            hint={t("mess.totalMs")}
+            hint={rangeHint}
             onClick={() => setOpenList("planned")}
           />
           <StatCard
@@ -985,7 +921,7 @@ export default function MessDashboardClient() {
             value={todayAccepted}
             icon={<IconActivity className="h-4 w-4" />}
             tone="sky"
-            hint={t("mess.dashboard.todayHint")}
+            hint={rangeHint}
             onClick={() => setOpenList("accepted")}
           />
           <StatCard
@@ -993,7 +929,7 @@ export default function MessDashboardClient() {
             value={todayDuplicate}
             icon={<IconAlertTriangle className="h-4 w-4" />}
             tone="amber"
-            hint={t("mess.dashboard.todayHint")}
+            hint={rangeHint}
             onClick={() => setOpenList("duplicate")}
           />
           <StatCard
