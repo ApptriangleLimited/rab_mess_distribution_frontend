@@ -71,7 +71,7 @@ export function DeviceBoard({
 
   const statusLabel = (status: ZkGateStatus) => {
     if (status === "accepted") return t("zkGate.accepted");
-    if (status === "already_accepted") return t("zkGate.alreadyAccepted");
+    if (status === "already_accepted") return "Duplicate punch";
     if (status === "rfid_not_found") return t("zkGate.rfidNotFound");
     return t("zkGate.notAllowed");
   };
