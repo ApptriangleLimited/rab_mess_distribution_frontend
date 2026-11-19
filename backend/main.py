@@ -52,7 +52,6 @@ from daily import (
     dhaka_today,
     each_date,
     grant_default_tag_from_today,
-    repair_inactive_tags,
     router as daily_router,
     sync_due_jl,
     sync_member_jl,
@@ -630,9 +629,7 @@ def list_members(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    changed = sync_due_jl(db)
-    changed = repair_inactive_tags(db) or changed
-    if changed:
+    if sync_due_jl(db):
         db.commit()
         bust_members()
         bust_daily()

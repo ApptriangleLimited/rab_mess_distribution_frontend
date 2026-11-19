@@ -629,7 +629,7 @@ def clear_tags_after_inactive(db: Session, member: Member) -> int:
 
 
 def repair_inactive_tags(db: Session) -> bool:
-    """Drop tags that are still stored after an inactive date."""
+    """One-time cleanup. Do not call this while Daily RR is loading."""
     changed = False
     members = db.query(Member).filter(Member.status == "0").all()
     for member in members:
@@ -758,9 +758,7 @@ def list_assignments(
         wing_family=wing_family,
         q=q,
     )
-    changed = sync_due_jl(db)
-    changed = repair_inactive_tags(db) or changed
-    if changed:
+    if sync_due_jl(db):
         db.commit()
         bust_daily()
         bust_members()
