@@ -47,9 +47,12 @@ from cache import (
 )
 from daily import (
     can_assign,
-    clear_auto_defaults_after_today,
+    clear_tags_after_inactive,
     daily_day_writable,
+    dhaka_today,
     each_date,
+    grant_default_tag_from_today,
+    repair_inactive_tags,
     router as daily_router,
     sync_due_jl,
     sync_member_jl,
@@ -627,9 +630,12 @@ def list_members(
     _staff: Staff = Depends(current_staff),
     db: Session = Depends(get_db),
 ):
-    if sync_due_jl(db):
+    changed = sync_due_jl(db)
+    changed = repair_inactive_tags(db) or changed
+    if changed:
         db.commit()
         bust_members()
+        bust_daily()
     query = db.query(Member)
     if q and q.strip():
         like = f"%{q.strip()}%"
@@ -765,7 +771,17 @@ def update_member(
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists")
     apply_member_fields(row, body)
     became_inactive = False
+    activated = False
     if body.status in ("0", "1"):
+        if body.status == "1" and row.status != "1":
+            if row.member_type not in ("guest", "civilian") and not (
+                row.default_tag or ""
+            ).strip():
+                raise HTTPException(
+                    status_code=409,
+                    detail="Set a default tag before activating this member",
+                )
+            activated = True
         if body.status != row.status or (
             body.status == "1"
             and any(
@@ -778,7 +794,9 @@ def update_member(
             apply_status_spans(row, body.status)
         row.status = body.status
     if became_inactive:
-        clear_auto_defaults_after_today(db, row)
+        clear_tags_after_inactive(db, row)
+    if activated:
+        grant_default_tag_from_today(db, row)
     if body.approval_status:
         row.approval_status = normalize_approval(body.approval_status, row.approval_status)
     row.updated_at = utcnow()
@@ -789,7 +807,7 @@ def update_member(
         raise HTTPException(status_code=409, detail="A member with this SRB ID already exists") from exc
     db.refresh(row)
     bust_members()
-    if became_inactive:
+    if became_inactive or activated:
         bust_daily()
     push_member_card(row)
     return envelope(member_out(row), "Member updated")
@@ -878,7 +896,7 @@ def change_member_tag(
 
 
 def apply_status_spans(row: Member, status: str) -> None:
-    today = date.today()
+    today = dhaka_today()
     spans = [s for s in (row.inactive_spans or []) if isinstance(s, dict)]
     if status == "0":
         if not any(not s.get("to") for s in spans):
@@ -911,11 +929,21 @@ def set_member_status(
         raise HTTPException(status_code=404, detail="User not found")
     if row.approval_status != "approved":
         raise HTTPException(status_code=409, detail="Only accepted members can change status")
+    if body.status == "1" and row.status != "1":
+        if row.member_type not in ("guest", "civilian") and not (
+            row.default_tag or ""
+        ).strip():
+            raise HTTPException(
+                status_code=409,
+                detail="Set a default tag before activating this member",
+            )
     if row.status != body.status:
         apply_status_spans(row, body.status)
-        if body.status == "0":
-            clear_auto_defaults_after_today(db, row)
         row.status = body.status
+        if body.status == "0":
+            clear_tags_after_inactive(db, row)
+        else:
+            grant_default_tag_from_today(db, row)
         row.updated_at = utcnow()
         db.commit()
         db.refresh(row)

@@ -1,4 +1,11 @@
-import { nextISODate, nowISO, previousISODate, todayISO } from "@/lib/date";
+import {
+  eachISODate,
+  isDailyDateEditable,
+  nextISODate,
+  nowISO,
+  previousISODate,
+  todayISO,
+} from "@/lib/date";
 import { getState, setState } from "@/lib/store";
 import type {
   ApprovalStatus,
@@ -198,14 +205,34 @@ function patchUser(
     inactive_spans,
     updated_at: nowISO(),
   };
+  const keptDays = new Set(
+    (updated.inactive_spans ?? []).map((span) => span.from).filter(Boolean),
+  );
   setState((prev) => ({
     ...prev,
     users: prev.users.map((u) => (u.id === id ? updated : u)),
-    assignments: prev.assignments.filter(
-      (a) => !(a.user_id === id && isUserInactiveOnDate(updated, a.date)),
-    ),
+    assignments: prev.assignments.filter((row) => {
+      if (row.user_id !== id || !isUserInactiveOnDate(updated, row.date)) return true;
+      return keptDays.has(row.date);
+    }),
+    suppressed_carries: (prev.suppressed_carries ?? []).filter((key) => {
+      const split = key.indexOf("|");
+      if (split < 0) return true;
+      const userId = key.slice(0, split);
+      const date = key.slice(split + 1);
+      if (userId !== id || !isUserInactiveOnDate(updated, date)) return true;
+      return keptDays.has(date);
+    }),
   }));
   return updated;
+}
+
+function monthEndISO(iso: string) {
+  const [year, month] = iso.split("-").map(Number);
+  const end = new Date(year, month, 0);
+  const mm = String(end.getMonth() + 1).padStart(2, "0");
+  const dd = String(end.getDate()).padStart(2, "0");
+  return `${end.getFullYear()}-${mm}-${dd}`;
 }
 
 export function listPendingUsers() {
@@ -257,7 +284,56 @@ export function endEntry(id: string) {
 }
 
 export function setUserStatus(id: string, status: UserStatus) {
-  return patchUser(id, { status });
+  const existing = getState().users.find((user) => user.id === id);
+  if (!existing) return null;
+  if (
+    status === "1" &&
+    existing.status !== "1" &&
+    existing.member_type !== "civilian" &&
+    existing.member_type !== "guest" &&
+    !(existing.default_tag || "").trim()
+  ) {
+    return null;
+  }
+  const updated = patchUser(id, { status });
+  if (
+    updated &&
+    status === "1" &&
+    existing.status !== "1" &&
+    (existing.default_tag || "").trim()
+  ) {
+    const today = todayISO();
+    const tag = existing.default_tag;
+    const taken = new Set(
+      getState()
+        .assignments.filter((row) => row.user_id === id)
+        .map((row) => row.date),
+    );
+    const empty = eachISODate(today, monthEndISO(today)).filter(
+      (day) =>
+        !taken.has(day) &&
+        isDailyDateEditable(day, today) &&
+        canAssignOnDate(updated, day),
+    );
+    if (empty.length) {
+      const stamp = nowISO();
+      setState((prev) => ({
+        ...prev,
+        assignments: [
+          ...prev.assignments,
+          ...empty.map((day) => ({
+            id: `a_${Math.random().toString(16).slice(2, 14)}`,
+            user_id: id,
+            date: day,
+            tag,
+            updated_by: "default",
+            updated_at: stamp,
+          })),
+        ],
+      }));
+    }
+  }
+  return updated;
 }
 
 export function setApprovalStatus(id: string, approval_status: ApprovalStatus) {

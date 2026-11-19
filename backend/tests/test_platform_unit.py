@@ -1,6 +1,6 @@
 from datetime import date
 
-from daily import auto_default_clear_range
+from daily import inactive_open_start, month_end
 from zk_gate import access_user_command, device_card_number, same_rfid
 from permissions import filter_snapshot_body
 from security import hash_token, validate_password, verify_login_mfa
@@ -59,13 +59,17 @@ def test_access_command_sends_the_device_card_number():
     )
 
 
-def test_inactive_clears_only_the_rest_of_this_month():
-    assert auto_default_clear_range(date(2026, 11, 12)) == (
-        date(2026, 11, 13),
-        date(2026, 11, 30),
-    )
-    assert auto_default_clear_range(date(2026, 11, 30)) is None
-    assert auto_default_clear_range(date(2026, 12, 31)) is None
+def test_inactive_keeps_that_day_and_clears_every_later_day():
+    class Member:
+        def __init__(self, status, spans):
+            self.status = status
+            self.inactive_spans = spans
+
+    inactive = Member("0", [{"from": "2026-11-04", "to": None}])
+    assert inactive_open_start(inactive) == date(2026, 11, 4)
+    assert inactive_open_start(Member("1", [{"from": "2026-11-04", "to": None}])) is None
+    assert month_end(date(2026, 11, 19)) == date(2026, 11, 30)
+    assert month_end(date(2026, 12, 2)) == date(2026, 12, 31)
 
 
 def test_password_policy_rejects_short_and_common():

@@ -87,6 +87,16 @@ function DailyUserDetail() {
 
   async function confirmStatus() {
     if (!user || !statusNext || busy) return;
+    if (
+      statusNext === "1" &&
+      user.member_type !== "civilian" &&
+      user.member_type !== "guest" &&
+      !(user.default_tag || "").trim()
+    ) {
+      toast(t("daily.activateNeedsTag"), "error");
+      setStatusNext(null);
+      return;
+    }
     if (apiOn) {
       setBusy(true);
       try {
@@ -109,7 +119,12 @@ function DailyUserDetail() {
       }
       return;
     }
-    setUserStatus(user.id, statusNext);
+    const saved = setUserStatus(user.id, statusNext);
+    if (!saved) {
+      toast(t("daily.activateNeedsTag"), "error");
+      setStatusNext(null);
+      return;
+    }
     toast(
       statusNext === "1"
         ? t("daily.activatedToast")

@@ -389,7 +389,21 @@ export function UserForm({
     variant !== "public" ? (
       <StatusSwitch
         active={values.status === "1"}
-        onChange={(active) => patch("status", active ? "1" : "0")}
+        onChange={(active) => {
+          const next = active ? "1" : "0";
+          if (
+            next === "1" &&
+            mode === "edit" &&
+            initial?.status === "0" &&
+            values.member_type !== "civilian" &&
+            values.member_type !== "guest" &&
+            !(values.default_tag || "").trim()
+          ) {
+            toast(t("daily.activateNeedsTag"), "error");
+            return;
+          }
+          patch("status", next);
+        }}
         activeLabel={t("cc.statusActive")}
         inactiveLabel={t("cc.statusInactive")}
       />
@@ -625,6 +639,17 @@ export function UserForm({
       )
     ) {
       toast(t("cc.phoneInvalid"), "error");
+      return;
+    }
+    if (
+      mode === "edit" &&
+      initial?.status === "0" &&
+      values.status === "1" &&
+      values.member_type !== "civilian" &&
+      values.member_type !== "guest" &&
+      !(values.default_tag || "").trim()
+    ) {
+      toast(t("daily.activateNeedsTag"), "error");
       return;
     }
     const payload = prepareUserFormSubmit(values);

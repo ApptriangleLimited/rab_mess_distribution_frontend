@@ -969,6 +969,12 @@ def mess_ledger(
     end = parse_day(date_to, "to")
     if end < start:
         start, end = end, start
+    from daily import repair_inactive_tags
+    from cache import bust_daily
+
+    if repair_inactive_tags(db):
+        db.commit()
+        bust_daily()
     days = list(each_date(start, end))
     members = [
         row

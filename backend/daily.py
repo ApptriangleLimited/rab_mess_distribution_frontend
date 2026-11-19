@@ -580,42 +580,92 @@ def fill_missing_default_tags(
     return len(values)
 
 
-def auto_default_clear_range(today: date) -> tuple[date, date] | None:
-    """Days after the inactive day, through the end of the current month."""
-    start = today + timedelta(days=1)
-    month_end = (
-        date(today.year, 12, 31)
-        if today.month == 12
-        else date(today.year, today.month + 1, 1) - timedelta(days=1)
-    )
-    if start > month_end:
+def dhaka_today() -> date:
+    return datetime.now(DHAKA).date()
+
+
+def month_end(day: date) -> date:
+    if day.month == 12:
+        return date(day.year, 12, 31)
+    return date(day.year, day.month + 1, 1) - timedelta(days=1)
+
+
+def inactive_open_start(member: Member) -> date | None:
+    """The day this member was made inactive, while they are still inactive."""
+    if str(member.status) == "1":
         return None
-    return start, month_end
+    start: date | None = None
+    for span in member.inactive_spans or []:
+        if not isinstance(span, dict) or span.get("to") or not span.get("from"):
+            continue
+        try:
+            day = date.fromisoformat(str(span["from"])[:10])
+        except ValueError:
+            continue
+        if start is None or day > start:
+            start = day
+    return start
 
 
-def clear_auto_defaults_after_today(db: Session, member: Member) -> int:
-    """Drop automatic default tags after today through the end of this month.
-
-    The day the member goes inactive stays. Hand-painted tags stay.
-    Earlier months and later months stay.
-    """
-    window = auto_default_clear_range(date.today())
-    default = (member.default_tag or "").upper()
-    if window is None or not default:
-        return 0
-    start, month_end = window
+def clear_tags_after(db: Session, member_id: str, last: date) -> int:
+    """Remove every tag after `last`. The inactive day itself stays."""
     removed = (
         db.query(Assignment)
-        .filter(
-            Assignment.user_id == member.id,
-            Assignment.date >= start,
-            Assignment.date <= month_end,
-            Assignment.updated_by == "default",
-            func.upper(Assignment.tag) == default,
-        )
+        .filter(Assignment.user_id == member_id, Assignment.date > last)
+        .delete(synchronize_session=False)
+    )
+    removed += (
+        db.query(SuppressedCarry)
+        .filter(SuppressedCarry.user_id == member_id, SuppressedCarry.date > last)
         .delete(synchronize_session=False)
     )
     return int(removed or 0)
+
+
+def clear_tags_after_inactive(db: Session, member: Member) -> int:
+    """No Tag on every day after the inactive date. Earlier days stay."""
+    start = inactive_open_start(member) or dhaka_today()
+    return clear_tags_after(db, member.id, start)
+
+
+def repair_inactive_tags(db: Session) -> bool:
+    """Drop tags that are still stored after an inactive date."""
+    changed = False
+    members = db.query(Member).filter(Member.status == "0").all()
+    for member in members:
+        start = inactive_open_start(member)
+        if start is None:
+            continue
+        if clear_tags_after(db, member.id, start):
+            changed = True
+    return changed
+
+
+def grant_default_tag_from_today(db: Session, member: Member) -> int:
+    """Write the default tag on empty days from today through this month."""
+    today = dhaka_today()
+    end = month_end(today)
+    stored = {
+        (row.user_id, row.date): row
+        for row in db.query(Assignment)
+        .filter(
+            Assignment.user_id == member.id,
+            Assignment.date >= today,
+            Assignment.date <= end,
+        )
+        .all()
+    }
+    suppressed = {
+        (row.user_id, row.date)
+        for row in db.query(SuppressedCarry)
+        .filter(
+            SuppressedCarry.user_id == member.id,
+            SuppressedCarry.date >= today,
+            SuppressedCarry.date <= end,
+        )
+        .all()
+    }
+    return fill_missing_default_tags(db, [member], today, end, stored, suppressed)
 
 
 def infer_trg_tone(force: str | None, trg_tone: str | None = None) -> str:
@@ -708,7 +758,9 @@ def list_assignments(
         wing_family=wing_family,
         q=q,
     )
-    if sync_due_jl(db):
+    changed = sync_due_jl(db)
+    changed = repair_inactive_tags(db) or changed
+    if changed:
         db.commit()
         bust_daily()
         bust_members()

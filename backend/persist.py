@@ -843,8 +843,11 @@ def month_bounds(month: str) -> tuple[date, date]:
 
 def consume_month_data(db: Session, month: str) -> dict:
     start, end = month_bounds(month)
-    from daily import fill_missing_default_tags, load_window
+    from daily import fill_missing_default_tags, load_window, repair_inactive_tags
 
+    if repair_inactive_tags(db):
+        db.commit()
+        bust_daily()
     members, stored_map, suppressed = load_window(db, start, end, None, None, None)
     if fill_missing_default_tags(db, members, start, end, stored_map, suppressed):
         db.commit()
