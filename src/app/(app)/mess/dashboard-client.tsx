@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -64,6 +64,7 @@ import {
   type ZkGateRow,
   type ZkGateStatus,
 } from "@/lib/api/zk-gate";
+import { playPunchStatus } from "@/lib/zk/punch-sound";
 import { eachISODate, todayISO } from "@/lib/date";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -430,6 +431,7 @@ export default function MessDashboardClient() {
   const [ledgerRows, setLedgerRows] = useState<LedgerRow[]>([]);
   const [apiEvents, setApiEvents] = useState<PritibhojEvent[] | null>(null);
   const [rangePunches, setRangePunches] = useState<BoardPunch[]>([]);
+  const heardPunch = useRef("");
   const [openList, setOpenList] = useState<ListKind | null>(null);
 
   const range = useMemo(() => {
@@ -502,6 +504,21 @@ export default function MessDashboardClient() {
       window.clearInterval(timer);
     };
   }, [apiOn, range.from, range.to]);
+
+  useEffect(() => {
+    if (rangePunches.length === 0) return;
+    const newest = rangePunches.reduce((best, row) =>
+      (row.punched_at || "") > (best.punched_at || "") ? row : best,
+    );
+    const key = `${newest.mess}|${newest.rab_id}|${newest.punched_at}|${newest.status}`;
+    if (!heardPunch.current) {
+      heardPunch.current = key;
+      return;
+    }
+    if (heardPunch.current === key) return;
+    heardPunch.current = key;
+    playPunchStatus(punchStatus(newest));
+  }, [rangePunches]);
 
   const shifts = useMemo(
     () => listMealShifts(),
@@ -615,7 +632,7 @@ export default function MessDashboardClient() {
       const line = personLine(user, {
         name: user?.name || row.name,
         rabId: row.rab_id,
-        status: status === "accepted" ? "Consumption" : "Duplicate",
+        status: status === "accepted" ? "Consumption" : "Duplicate punch",
         sift: row.shift_id
           ? mealShiftLabel(row.shift_id, shifts.find((item) => item.id === row.shift_id)?.name ?? row.shift_name ?? row.shift_id, t)
           : "—",

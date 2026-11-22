@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useT } from "@/i18n/provider";
 import { ApiClientError } from "@/lib/api/client";
 import {
@@ -10,6 +10,7 @@ import {
   type ZkGateStatus,
 } from "@/lib/api/zk-gate";
 import { mealShiftLabel } from "@/lib/store/meal-shifts";
+import { armPunchSound, playPunchStatus, punchSoundIsArmed } from "@/lib/zk/punch-sound";
 import { cn } from "@/lib/utils";
 
 function rowStatus(row: ZkGateRow): ZkGateStatus {
@@ -46,6 +47,8 @@ export function DeviceBoard({
   const t = useT();
   const [data, setData] = useState<ZkGateSnapshot | null>(null);
   const [error, setError] = useState("");
+  const [soundOn, setSoundOn] = useState(false);
+  const heardPunch = useRef("");
 
   const load = useCallback(async () => {
     try {
@@ -65,13 +68,39 @@ export function DeviceBoard({
     return () => window.clearInterval(poll);
   }, [load]);
 
+  useEffect(() => {
+    const arm = () => {
+      armPunchSound();
+      window.setTimeout(() => setSoundOn(punchSoundIsArmed()), 50);
+    };
+    window.addEventListener("pointerdown", arm);
+    window.addEventListener("keydown", arm);
+    return () => {
+      window.removeEventListener("pointerdown", arm);
+      window.removeEventListener("keydown", arm);
+    };
+  }, []);
+
   const rows = data?.rows ?? [];
   const latest = rows[0] ?? null;
   const latestStatus = latest ? rowStatus(latest) : null;
 
+  useEffect(() => {
+    if (!latest || !latestStatus) return;
+    const key = `${latest.punched_at}|${latest.rab_id}|${latest.rfid}|${latestStatus}`;
+    if (!heardPunch.current) {
+      heardPunch.current = key;
+      return;
+    }
+    if (heardPunch.current === key) return;
+    heardPunch.current = key;
+    playPunchStatus(latestStatus);
+    setSoundOn(punchSoundIsArmed());
+  }, [latest, latestStatus]);
+
   const statusLabel = (status: ZkGateStatus) => {
     if (status === "accepted") return t("zkGate.accepted");
-    if (status === "already_accepted") return "Duplicate punch";
+    if (status === "already_accepted") return t("zkGate.alreadyAccepted");
     if (status === "rfid_not_found") return t("zkGate.rfidNotFound");
     return t("zkGate.notAllowed");
   };
@@ -85,6 +114,18 @@ export function DeviceBoard({
 
   return (
     <div className="flex h-dvh flex-col bg-neutral-950 text-white">
+      {soundOn ? null : (
+        <button
+          type="button"
+          className="mx-4 mt-4 shrink-0 rounded-lg bg-white px-4 py-3 text-center text-base font-semibold text-neutral-950"
+          onClick={() => {
+            armPunchSound();
+            window.setTimeout(() => setSoundOn(punchSoundIsArmed()), 50);
+          }}
+        >
+          Tap once for loud punch sound
+        </button>
+      )}
       {title ? (
         <p className="shrink-0 px-4 pt-4 text-center text-sm font-semibold uppercase tracking-[0.28em] text-white/70">
           {title}

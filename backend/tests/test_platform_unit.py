@@ -52,11 +52,15 @@ def test_hazz_camp_keeps_its_own_punch_board():
 
 
 def test_access_command_sends_the_device_card_number():
+    from zk_gate import card_on_device
+
     line = access_user_command(1393, "1006837", "Md Bellal Hossain", 4918042)
     assert line == (
-        "C:1393:DATA UPDATE user CardNo=4918042 Name=MdBellalHossain "
-        "Pin=1006837 Password= Group=1 StartTime=0 EndTime=0 Privilege=0"
+        "C:1393:DATA UPDATE user Pin=1006837\tName=Md Bellal Hossain\t"
+        "Privilege=0\tPassword=\tCardNo=4918042\tGroup=1\tStartTime=0\tEndTime=0"
     )
+    assert card_on_device("0007502842") == 4918042
+    assert card_on_device("0004918050") == 4918050
 
 
 def test_inactive_keeps_that_day_and_clears_every_later_day():

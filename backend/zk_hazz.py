@@ -13,9 +13,11 @@ from config import settings
 from zk_gate import (
     _build_rows,
     _today_maps,
+    access_authorize_command,
+    access_delete_command,
     access_user_command,
-    device_card_number,
-    enroll_pin,
+    card_on_device,
+    machine_pin,
     mess_today,
 )
 
@@ -77,14 +79,28 @@ def _load_board() -> dict:
 
 
 def _save_board(day: str, rows: list[dict]) -> None:
+    from zk_gate import _archive_punch_day, _merge_archived_punches, _punch_stamp_day
+
+    today_rows = [
+        row
+        for row in rows
+        if isinstance(row, dict) and _punch_stamp_day(row) == day
+    ]
     HAZZ_PUNCH_PATH.parent.mkdir(parents=True, exist_ok=True)
     HAZZ_PUNCH_PATH.write_text(
-        json.dumps({"date": day, "rows": rows}),
+        json.dumps({"date": day, "rows": today_rows}),
         encoding="utf-8",
     )
-    from zk_gate import _archive_punch_day
-
-    _archive_punch_day(HAZZ_PUNCH_HISTORY, day, rows)
+    _archive_punch_day(HAZZ_PUNCH_HISTORY, day, today_rows)
+    stray: dict[str, list[dict]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        punch_day = _punch_stamp_day(row)
+        if punch_day and punch_day != day:
+            stray.setdefault(punch_day, []).append(row)
+    for punch_day, extra in stray.items():
+        _merge_archived_punches(HAZZ_PUNCH_HISTORY, punch_day, extra)
 
 
 HAZZ_PUNCH_HISTORY = HAZZ_PUNCH_PATH.with_name("hazz_punch_history.json")
@@ -103,6 +119,13 @@ def hazz_snapshot() -> dict:
         mem_latest = max((str(row.get("punched_at") or "") for row in rows), default="")
         if mem_date != day or disk_latest >= mem_latest:
             rows = list(board["rows"])
+    from zk_gate import _punch_stamp_day
+
+    rows = [
+        row
+        for row in rows
+        if isinstance(row, dict) and _punch_stamp_day(row) == day
+    ]
     return {
         "reachable": fresh,
         "host": str(seen.get("serial") or ""),
@@ -141,6 +164,8 @@ def _append_punch(pin: str, punched: datetime, known_by_key, ms_ids, shifts) -> 
             try:
                 when = datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
             except ValueError:
+                continue
+            if when.date() != day:
                 continue
             events.append((str(row.get("rab_id") or ""), when))
         events.append((pin, punched.replace(tzinfo=None)))
@@ -185,15 +210,19 @@ def queue_hazz_userinfo(member) -> str:
     """One card update for a later edit. The first full list is sent when the device asks."""
     if not HAZZ_SEED_PATH.exists():
         return ""
-    pin = enroll_pin(member)
-    card = device_card_number(member.rfid)
+    pin = machine_pin(member)
+    card = card_on_device(member.rfid)
     if not pin or card <= 0:
         return ""
     with _lock:
         data = _read_cmds()
         data["seq"] += 1
+        data["cmds"].append({"id": data["seq"], "line": access_delete_command(data["seq"], pin)})
+        data["seq"] += 1
         line = access_user_command(data["seq"], pin, member.name, card)
         data["cmds"].append({"id": data["seq"], "line": line})
+        data["seq"] += 1
+        data["cmds"].append({"id": data["seq"], "line": access_authorize_command(data["seq"], pin)})
         _write_cmds(data)
     return line
 
@@ -213,10 +242,12 @@ def ensure_hazz_cards(db) -> None:
     cmds = []
     seq = 0
     for member in db.query(Member).all():
-        pin = enroll_pin(member)
-        card = device_card_number(getattr(member, "rfid", ""))
+        pin = machine_pin(member)
+        card = card_on_device(getattr(member, "rfid", ""))
         if not pin or card <= 0:
             continue
+        seq += 1
+        cmds.append({"id": seq, "line": access_delete_command(seq, pin)})
         seq += 1
         cmds.append(
             {
@@ -224,6 +255,8 @@ def ensure_hazz_cards(db) -> None:
                 "line": access_user_command(seq, pin, getattr(member, "name", ""), card),
             }
         )
+        seq += 1
+        cmds.append({"id": seq, "line": access_authorize_command(seq, pin)})
     with _lock:
         _write_cmds({"seq": seq, "cmds": cmds})
         HAZZ_SEED_PATH.parent.mkdir(parents=True, exist_ok=True)

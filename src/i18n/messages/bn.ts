@@ -1815,7 +1815,7 @@ export const bn = {
   zkGate: {
     title: "ডিভাইস চেক-ইন",
     subtitle:
-      "নাস্তা, দুপুর বা রাতে একবার গৃহীত। একই শিফটে দ্বিতীয় পাঞ্চ Already accepted।",
+      "নাস্তা, দুপুর বা রাতে একবার গৃহীত। একই শিফটে দ্বিতীয় পাঞ্চ Duplicate punch।",
     name: "নাম",
     srbId: "এসআরবি আইডি",
     time: "সময়",
@@ -1823,7 +1823,7 @@ export const bn = {
     positive: "পজিটিভ",
     allowed: "অনুমোদিত",
     accepted: "গৃহীত",
-    alreadyAccepted: "ইতিমধ্যে গৃহীত",
+    alreadyAccepted: "Duplicate punch",
     notAllowed: "অনুমতি নেই",
     rfidNotFound: "আরএফআইডি পাওয়া যায়নি",
     empty: "চেক-ইনের অপেক্ষায়।",

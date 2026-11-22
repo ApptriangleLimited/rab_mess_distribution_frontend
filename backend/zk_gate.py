@@ -92,6 +92,28 @@ def rfid_card(raw: str | None) -> int:
     return value
 
 
+# These saved values are already the number the reader prints. Converting them
+# again stores a different card, so the machine keeps saying Failed to verify.
+READER_CARD = {4918050, 4961639, 4931286}
+
+
+def card_on_device(raw: str | None) -> int:
+    """Number to store on the machine. The database RFID is not changed."""
+    real = rfid_card(raw)
+    if real in READER_CARD:
+        return real
+    return device_card_number(raw)
+
+
+def machine_pin(member: Member, pin: str | None = None) -> str:
+    """Numeric pin the reader stores. A lettered personal id falls back to the SRB id."""
+    chosen = device_pin(pin or enroll_pin(member))
+    if chosen.isdigit():
+        return chosen
+    backup = device_pin(getattr(member, "rab_id", ""))
+    return backup if backup.isdigit() else ""
+
+
 def device_card_number(raw: str | None) -> int:
     """Card number the ZK reader compares, from the real RFID stored in the database.
 
@@ -216,6 +238,7 @@ def _snapshot() -> dict:
         mem_latest = max((str(row.get("punched_at") or "") for row in state["rows"]), default="")
         if disk_latest >= mem_latest:
             state["rows"] = list(board["rows"])
+    state["rows"] = _rows_on_day(state["rows"], state["date"])
     return state
 
 
@@ -297,13 +320,63 @@ def _load_punch_board() -> dict:
     }
 
 
+def _punch_stamp_day(row: dict) -> str:
+    return str(row.get("punched_at") or "")[:10]
+
+
+def _rows_on_day(rows: list, day: str) -> list[dict]:
+    return [
+        row
+        for row in rows
+        if isinstance(row, dict) and _punch_stamp_day(row) == day
+    ]
+
+
+def _merge_archived_punches(path: Path, day: str, rows: list[dict]) -> None:
+    """Add punches into that day's history. Never replace the day with a shorter list."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    existing = data.get(day)
+    merged = list(existing) if isinstance(existing, list) else []
+    seen = {
+        (str(row.get("rab_id") or ""), str(row.get("punched_at") or ""))
+        for row in merged
+        if isinstance(row, dict)
+    }
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        key = (str(row.get("rab_id") or ""), str(row.get("punched_at") or ""))
+        if not key[1] or key in seen:
+            continue
+        seen.add(key)
+        merged.append(row)
+    data[day] = merged
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
 def _save_punch_board(day: str, rows: list[dict]) -> None:
+    today_rows = _rows_on_day(rows, day)
     ADMS_PUNCH_PATH.parent.mkdir(parents=True, exist_ok=True)
     ADMS_PUNCH_PATH.write_text(
-        json.dumps({"date": day, "rows": rows}),
+        json.dumps({"date": day, "rows": today_rows}),
         encoding="utf-8",
     )
-    _archive_punch_day(ADMS_PUNCH_HISTORY, day, rows)
+    _archive_punch_day(ADMS_PUNCH_HISTORY, day, today_rows)
+    stray: dict[str, list[dict]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        punch_day = _punch_stamp_day(row)
+        if punch_day and punch_day != day:
+            stray.setdefault(punch_day, []).append(row)
+    for punch_day, extra in stray.items():
+        _merge_archived_punches(ADMS_PUNCH_HISTORY, punch_day, extra)
 
 
 ADMS_PUNCH_HISTORY = ADMS_PUNCH_PATH.with_name("adms_punch_history.json")
@@ -342,15 +415,17 @@ def punches_for_range(start: date, end: date) -> list[dict]:
     found: list[dict] = []
 
     def add(day: str, rows: list, mess: str) -> None:
-        if day < start.isoformat() or day > end.isoformat():
-            return
         if not isinstance(rows, list):
             return
         for row in rows:
-            if isinstance(row, dict):
-                item = dict(row)
-                item["mess"] = mess
-                found.append(item)
+            if not isinstance(row, dict):
+                continue
+            punch_day = _punch_stamp_day(row) or day
+            if punch_day < start.isoformat() or punch_day > end.isoformat():
+                continue
+            item = dict(row)
+            item["mess"] = mess
+            found.append(item)
 
     for day, rows in _history_days(ADMS_PUNCH_HISTORY).items():
         add(str(day), rows, "SRB HQ")
@@ -390,29 +465,55 @@ def enroll_pin(member: Member) -> str:
     return device_pin(getattr(member, "personal_id", "") or "") or device_pin(member.rab_id)
 
 
+def access_delete_command(cmd_id: int, pin: str) -> str:
+    return f"C:{cmd_id}:DATA DELETE user Pin={pin}"
+
+
+def access_authorize_command(cmd_id: int, pin: str) -> str:
+    """Door time zone. Without this the reader says Invalid time period."""
+    fields = "\t".join([
+        f"Pin={pin}",
+        "AuthorizeTimezoneId=1",
+        "AuthorizeDoorId=1",
+    ])
+    return f"C:{cmd_id}:DATA UPDATE userauthorize {fields}"
+
+
 def access_user_command(cmd_id: int, pin: str, name: str, card: int) -> str:
-    """Security PUSH 3.1.2 user write. Fields are space-separated, card is CardNo."""
-    safe_name = "".join(device_name(name).split()) or "Member"
-    return (
-        f"C:{cmd_id}:DATA UPDATE user CardNo={card} Name={safe_name} "
-        f"Pin={pin} Password= Group=1 StartTime=0 EndTime=0 Privilege=0"
-    )
+    """Security PUSH 3.1.2 user write. Tab-separated fields are what this reader stores."""
+    safe_name = device_name(name).replace("\t", " ").replace("\r", " ").replace("\n", " ")
+    fields = "\t".join([
+        f"Pin={pin}",
+        f"Name={safe_name}",
+        "Privilege=0",
+        "Password=",
+        f"CardNo={card}",
+        "Group=1",
+        "StartTime=0",
+        "EndTime=0",
+    ])
+    return f"C:{cmd_id}:DATA UPDATE user {fields}"
 
 
 def queue_adms_userinfo(member: Member, pin: str | None = None) -> str:
-    """Queue a Security PUSH user write. The device picks it up on GET /iclock/getrequest."""
-    pin = device_pin(pin or enroll_pin(member))
-    card = device_card_number(member.rfid)
+    """Queue a delete and a card write. The device picks them up on GET /iclock/getrequest."""
+    pin = machine_pin(member, pin)
+    card = card_on_device(member.rfid)
     if not pin or card <= 0:
         raise ValueError("Member needs an SRB ID and RFID")
     with _adms_cmd_lock:
         with _open_adms_store() as handle:
             _lock_adms_file(handle)
             data = _read_adms_store(handle)
-            data["seq"] = int(data.get("seq") or 0) + 1
-            cmd_id = data["seq"]
-            line = access_user_command(cmd_id, pin, member.name, card)
-            data["cmds"].append({"id": cmd_id, "line": line})
+            seq = int(data.get("seq") or 0)
+            seq += 1
+            data["cmds"].append({"id": seq, "line": access_delete_command(seq, pin)})
+            seq += 1
+            line = access_user_command(seq, pin, member.name, card)
+            data["cmds"].append({"id": seq, "line": line})
+            seq += 1
+            data["cmds"].append({"id": seq, "line": access_authorize_command(seq, pin)})
+            data["seq"] = seq
             _write_adms_store(handle, data)
     _adms_log.info("ADMS queued cmd=%r", line)
     return line
@@ -456,12 +557,13 @@ def pop_adms_command() -> str:
 
 def note_adms(serial: str, info: dict | None = None) -> None:
     """The terminal dialed this API over ADMS. That is the live session."""
+    today = mess_today().isoformat()
     values: dict = {
         "reachable": True,
         "host": settings.zk_host,
         "port": settings.zk_port,
         "error": "",
-        "date": mess_today().isoformat(),
+        "date": today,
         "adms_at": time.monotonic(),
     }
     if serial:
@@ -470,7 +572,12 @@ def note_adms(serial: str, info: dict | None = None) -> None:
         name = str(info.get("DeviceName") or info.get("~DeviceName") or "").strip()
         if name:
             values["adms_name"] = name
-    _set(**values)
+    with _state_lock:
+        stored = str(_state.get("date") or "")
+        if stored and stored != today:
+            _state["rows"] = []
+            _state["rows_date"] = ""
+        _state.update(values)
 
 
 def ingest_adms_attendance(db: Session, records: list[tuple[str, datetime]]) -> int:
@@ -652,14 +759,14 @@ def _classify(
     punched: datetime,
     ms_ids: set[str],
     shifts: list[dict],
-    accepted_keys: set[tuple[str, str]],
+    accepted_keys: set[tuple[str, str, str]],
 ) -> tuple[str, dict | None]:
     shift = _match_shift(punched, shifts)
     if member is None:
         return STATUS_RFID_NOT_FOUND, shift
     if member.id not in ms_ids or shift is None:
         return STATUS_NOT_ALLOWED, shift
-    key = (member.id, shift["id"])
+    key = (member.id, str(shift["id"]), punched.date().isoformat())
     if key in accepted_keys:
         return STATUS_ALREADY_ACCEPTED, shift
     accepted_keys.add(key)
@@ -672,7 +779,7 @@ def _punch_row(
     known_by_key: dict[str, Member],
     ms_ids: set[str],
     shifts: list[dict],
-    accepted_keys: set[tuple[str, str]],
+    accepted_keys: set[tuple[str, str, str]],
     device_names: dict[str, str],
     device_cards: dict[str, str],
 ) -> dict:
@@ -722,7 +829,7 @@ def _build_rows(
     device_names: dict[str, str],
     device_cards: dict[str, str],
 ) -> list[dict]:
-    accepted_keys: set[tuple[str, str]] = set()
+    accepted_keys: set[tuple[str, str, str]] = set()
     rows = [
         _punch_row(
             pin,
@@ -767,14 +874,19 @@ def _reclassify_cached(
 ) -> None:
     names = device_names or {}
     cards = device_cards or {}
-    with _state_lock:
-        existing = list(_state["rows"])
+    existing = _combined_rows(day)
+    if not existing:
+        return
     events: list[tuple[str, datetime]] = []
     for row in reversed(existing):
         when = _parse_punched_at(str(row.get("punched_at") or ""))
         if when is None or when.date() != day:
             continue
-        pin = device_pin(row.get("rab_id")) or str(row.get("rab_id") or "").strip()
+        pin = (
+            str(row.get("pin") or "").strip()
+            or device_pin(row.get("rab_id"))
+            or str(row.get("rab_id") or "").strip()
+        )
         if pin:
             events.append((pin, when))
             if row.get("name") and pin not in names:
@@ -784,6 +896,7 @@ def _reclassify_cached(
     events.sort(key=lambda item: item[1])
     rows = _build_rows(events, known_by_key, ms_ids, shifts, names, cards)
     _set(rows=rows, date=day.isoformat(), rows_date=day.isoformat(), shift_stamp=_shift_stamp(shifts))
+    _save_punch_board(day.isoformat(), rows)
 
 
 def _apply_current_shifts(
@@ -871,6 +984,8 @@ def _combined_rows(day: date) -> list[dict]:
     merged: list[dict] = []
     seen: set[tuple[str, str]] = set()
     for row in disk + memory:
+        if not isinstance(row, dict) or _punch_stamp_day(row) != day.isoformat():
+            continue
         key = (str(row.get("rab_id") or ""), str(row.get("punched_at") or ""))
         if not key[1] or key in seen:
             continue
@@ -903,7 +1018,7 @@ def _append_live_punch(
         events: list[tuple[str, datetime]] = []
         for row in reversed(existing):
             when = _parse_punched_at(str(row.get("punched_at") or ""))
-            if when is None:
+            if when is None or when.date() != day:
                 continue
             saved_pin = str(row.get("pin") or "").strip()
             events.append((saved_pin or device_pin(row.get("rab_id")) or str(row.get("rab_id") or ""), when))

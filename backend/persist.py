@@ -787,9 +787,14 @@ def put_snapshot(
 ):
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Invalid snapshot")
-    apply_snapshot(db, filter_snapshot_body(body, staff.role), replace_lists=True)
+    saved = filter_snapshot_body(body, staff.role)
+    apply_snapshot(db, saved, replace_lists=True)
     db.commit()
     _bust_app_caches()
+    if "meal_shifts" in saved:
+        from zk_gate import apply_saved_shifts
+
+        apply_saved_shifts(SessionLocal)
     return envelope(build_snapshot(db), "Saved")
 
 

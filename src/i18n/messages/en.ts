@@ -1812,7 +1812,7 @@ export const en = {
   zkGate: {
     title: "Device check-in",
     subtitle:
-      "One accepted punch per Breakfast, Lunch, or Dinner. A second punch in the same shift is Already accepted.",
+      "One accepted punch per Breakfast, Lunch, or Dinner. A second punch in the same shift is a duplicate punch.",
     name: "Name",
     srbId: "SRB ID",
     time: "Time",
@@ -1820,7 +1820,7 @@ export const en = {
     positive: "Positive",
     allowed: "Allowed",
     accepted: "Accepted",
-    alreadyAccepted: "Already accepted",
+    alreadyAccepted: "Duplicate punch",
     notAllowed: "Not allowed",
     rfidNotFound: "RFID not found",
     empty: "Waiting for a check-in.",
