@@ -120,10 +120,11 @@ export function DeviceBoard({
           className="mx-4 mt-4 shrink-0 rounded-lg bg-white px-4 py-3 text-center text-base font-semibold text-neutral-950"
           onClick={() => {
             armPunchSound();
+            playPunchStatus("accepted");
             window.setTimeout(() => setSoundOn(punchSoundIsArmed()), 50);
           }}
         >
-          Tap once for loud punch sound
+          {t("zkGate.enableVoice")}
         </button>
       )}
       {title ? (

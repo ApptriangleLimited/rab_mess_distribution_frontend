@@ -1824,6 +1824,7 @@ export const en = {
     notAllowed: "Not allowed",
     rfidNotFound: "RFID not found",
     empty: "Waiting for a check-in.",
+    enableVoice: "Tap once for punch voice",
     deviceUp: "Device connected",
     deviceDown: "Device not reachable",
     syncing: "Sending RFID members to the device…",
