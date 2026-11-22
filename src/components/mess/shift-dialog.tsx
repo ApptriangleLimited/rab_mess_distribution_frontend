@@ -11,6 +11,7 @@ import {
   isCanonicalMealShift,
   mealShiftLabel,
   MealShiftFail,
+  pushMealShifts,
   updateMealShift,
 } from "@/lib/store/meal-shifts";
 import type { MealShift } from "@/lib/types";
@@ -36,6 +37,7 @@ export function ShiftDialog({
   const [start, setStart] = useState("06:00");
   const [end, setEnd] = useState("09:00");
   const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -56,10 +58,10 @@ export function ShiftDialog({
       if (err.code === "OVERLAP") return t("mess.shifts.overlap");
       if (err.code === "NAME_TAKEN") return t("mess.shifts.nameTaken");
     }
-    return t("mess.shifts.missing");
+    return t("mess.shifts.saveFailed");
   }
 
-  function onConfirm() {
+  async function onConfirm() {
     const input = {
       name:
         shift && isCanonicalMealShift(shift.id)
@@ -69,13 +71,17 @@ export function ShiftDialog({
       end_time: end,
       description,
     };
+    setSaving(true);
     try {
       if (editing && shift) updateMealShift(shift.id, input);
       else createMealShift(input);
+      await pushMealShifts();
       onSaved();
       onClose();
     } catch (err) {
       onError(failMessage(err));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -88,6 +94,7 @@ export function ShiftDialog({
       body={t("mess.shifts.formHint")}
       confirmLabel={t("common.save")}
       panelClassName="max-w-md"
+      busy={saving}
       onCancel={onClose}
       onConfirm={onConfirm}
     >

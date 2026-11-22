@@ -1492,6 +1492,7 @@ export const en = {
       nameTaken: "That shift name already exists.",
       inUse: "Shift is used in a plan or check-in. Remove those first.",
       missing: "Shift not found.",
+      saveFailed: "Shift did not save to the punch screen. Try again.",
     },
     pritibhoj: {
       new: "New Pritibhoj",

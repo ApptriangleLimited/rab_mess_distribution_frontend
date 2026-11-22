@@ -788,14 +788,42 @@ def put_snapshot(
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Invalid snapshot")
     saved = filter_snapshot_body(body, staff.role)
+    # Mess Shifts page owns this table. A stale browser snapshot must not
+    # put old lunch/dinner hours back over a live Save.
+    saved.pop("meal_shifts", None)
     apply_snapshot(db, saved, replace_lists=True)
     db.commit()
     _bust_app_caches()
-    if "meal_shifts" in saved:
-        from zk_gate import apply_saved_shifts
-
-        apply_saved_shifts(SessionLocal)
     return envelope(build_snapshot(db), "Saved")
+
+
+@router.get("/api/v1/meal-shifts")
+def get_meal_shifts(
+    _staff: Staff = Depends(require_permission("meal.view")),
+    db: Session = Depends(get_db),
+):
+    return envelope([meal_shift_out(row) for row in db.query(MealShift).all()])
+
+
+@router.put("/api/v1/meal-shifts")
+def put_meal_shifts(
+    body: dict,
+    _staff: Staff = Depends(require_permission("meal.manage")),
+    db: Session = Depends(get_db),
+):
+    """Mess Shifts page. Write windows now so /device uses them on the next punch."""
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Invalid shifts")
+    items = body.get("shifts") or body.get("meal_shifts") or []
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="No shifts")
+    apply_snapshot(db, {"meal_shifts": items}, replace_lists=True)
+    db.commit()
+    _bust_app_caches()
+    from zk_gate import apply_saved_shifts
+
+    apply_saved_shifts(SessionLocal)
+    return envelope([meal_shift_out(row) for row in db.query(MealShift).all()], "Shifts saved")
 
 
 @router.post("/api/v1/app/import")

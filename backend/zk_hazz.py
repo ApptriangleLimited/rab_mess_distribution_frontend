@@ -263,14 +263,66 @@ def ensure_hazz_cards(db) -> None:
         HAZZ_SEED_PATH.write_text(serial, encoding="utf-8")
 
 
-def pop_hazz_command() -> str:
+def queue_hazz_always_open(db) -> int:
+    """Same Group=0 + authorize grant as HQ, on the Haji camp command file."""
+    from models import Member
+
+    from zk_gate import (
+        access_set_timezone_command,
+        access_timezone_command,
+        access_user_group_command,
+        enroll_pin,
+    )
+
+    rows: list[tuple[str, str, int]] = []
+    seen: set[str] = set()
+    for member in db.query(Member).all():
+        if str(getattr(member, "status", "")) != "1":
+            continue
+        if (getattr(member, "approval_status", "") or "") != "approved":
+            continue
+        pin = enroll_pin(member)
+        card = card_on_device(getattr(member, "rfid", ""))
+        if not pin or card <= 0 or pin in seen:
+            continue
+        seen.add(pin)
+        rows.append((pin, getattr(member, "name", "") or "", card))
     with _lock:
         data = _read_cmds()
-        if not data["cmds"]:
-            return ""
-        item = data["cmds"].pop(0)
+        seq = int(data.get("seq") or 0) + 1
+        data["cmds"].append({"id": seq, "line": access_timezone_command(seq)})
+        seq += 1
+        data["cmds"].append({"id": seq, "line": access_set_timezone_command(seq)})
+        seq += 1
+        data["cmds"].append({"id": seq, "line": access_user_group_command(seq)})
+        for pin, name, card in rows:
+            seq += 1
+            data["cmds"].append({"id": seq, "line": access_user_command(seq, pin, name, card)})
+            seq += 1
+            data["cmds"].append({"id": seq, "line": access_authorize_command(seq, pin)})
+        data["seq"] = seq
         _write_cmds(data)
-    return str(item.get("line") or "")
+    return len(rows)
+
+
+HAZZ_CMD_BATCH = 10
+
+
+def peek_hazz_commands(limit: int = HAZZ_CMD_BATCH) -> str:
+    with _lock:
+        data = _read_cmds()
+        lines = []
+        for item in (data.get("cmds") or [])[: max(1, limit)]:
+            line = str(item.get("line") or "").strip()
+            if line:
+                lines.append(line)
+    if not lines:
+        return ""
+    return "\r\n".join(lines) + "\r\n"
+
+
+def pop_hazz_command() -> str:
+    return peek_hazz_commands(1)
 
 
 def drop_hazz_acked(body: str) -> None:

@@ -10,10 +10,16 @@ from database import SessionLocal
 from zk_gate import ingest_adms_attendance, note_adms
 
 try:
-    from zk_gate import pop_adms_command
+    from zk_gate import drop_adms_acked, peek_adms_commands, pop_adms_command
 except Exception:
     def pop_adms_command() -> str:
         return ""
+
+    def peek_adms_commands(limit: int = 1) -> str:
+        return pop_adms_command()
+
+    def drop_adms_acked(ids: set[int]) -> None:
+        return None
 
 try:
     from adms_store import pop_adms_command as pop_file_command
@@ -141,9 +147,14 @@ def _take_command(serial_number: str = "") -> str:
                 ensure_hazz_cards(db)
             finally:
                 db.close()
-            command = pop_hazz_command()
+            try:
+                from zk_hazz import peek_hazz_commands
+
+                command = peek_hazz_commands()
+            except Exception:
+                command = pop_hazz_command()
         else:
-            command = pop_adms_command() or pop_file_command()
+            command = peek_adms_commands() or pop_file_command()
     except Exception as exc:
         logger.warning("ADMS pop failed: %s", exc)
         return ""
@@ -191,20 +202,25 @@ def _is_registered(serial: str, window: float = 900) -> bool:
 
 
 def _drop_acked(body: str) -> None:
-    if "Return=0" not in body.replace(" ", ""):
-        return
-    ids = {int(item) for item in re.findall(r"ID=(\d+)", body)}
+    ids = {
+        int(cmd_id)
+        for cmd_id, code in re.findall(r"ID=(\d+)&Return=([-\d]+)", body.replace(" ", ""))
+        if code == "0"
+    }
     if not ids:
         return
     try:
-        import json
+        drop_adms_acked(ids)
+    except Exception:
+        try:
+            import json
 
-        raw = json.loads(ADMS_CMD_PATH.read_text(encoding="utf-8"))
-        cmds = [row for row in raw.get("cmds", []) if int(row.get("id") or 0) not in ids]
-        raw["cmds"] = cmds
-        ADMS_CMD_PATH.write_text(json.dumps(raw), encoding="utf-8")
-    except (OSError, ValueError, TypeError):
-        pass
+            raw = json.loads(ADMS_CMD_PATH.read_text(encoding="utf-8"))
+            cmds = [row for row in raw.get("cmds", []) if int(row.get("id") or 0) not in ids]
+            raw["cmds"] = cmds
+            ADMS_CMD_PATH.write_text(json.dumps(raw), encoding="utf-8")
+        except (OSError, ValueError, TypeError):
+            pass
 
 
 def _rtlog_rows(body: str) -> list[dict]:

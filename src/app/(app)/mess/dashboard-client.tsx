@@ -321,7 +321,7 @@ type ActivityRow = {
   wing: string;
   shiftId: MealShiftId;
   time: string;
-  kind: "consumption" | "duplicate" | "guest" | "group";
+  kind: "consumption" | "duplicate" | "guest" | "group" | "not_allowed";
 };
 
 function initials(name: string) {
@@ -621,18 +621,30 @@ export default function MessDashboardClient() {
   const deviceLines = useMemo(() => {
     const accepted: PersonLine[] = [];
     const duplicate: PersonLine[] = [];
+    const rejected: PersonLine[] = [];
     for (const row of rangePunches) {
       const day = (row.punched_at || "").slice(0, 10);
       if (day < range.from || day > range.to) continue;
       const status = punchStatus(row);
-      if (status !== "accepted" && status !== "already_accepted") continue;
+      if (
+        status !== "accepted" &&
+        status !== "already_accepted" &&
+        status !== "not_allowed"
+      ) {
+        continue;
+      }
       if (shift !== "all" && row.shift_id !== shift) continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
       const line = personLine(user, {
         name: user?.name || row.name,
         rabId: row.rab_id,
-        status: status === "accepted" ? "Consumption" : "Duplicate punch",
+        status:
+          status === "accepted"
+            ? "Consumption"
+            : status === "already_accepted"
+              ? "Duplicate punch"
+              : "Not allowed",
         sift: row.shift_id
           ? mealShiftLabel(row.shift_id, shifts.find((item) => item.id === row.shift_id)?.name ?? row.shift_name ?? row.shift_id, t)
           : "—",
@@ -641,9 +653,10 @@ export default function MessDashboardClient() {
         mess: row.mess,
       });
       if (status === "accepted") accepted.push(line);
-      else duplicate.push(line);
+      else if (status === "already_accepted") duplicate.push(line);
+      else rejected.push(line);
     }
-    return { accepted, duplicate };
+    return { accepted, duplicate, rejected };
   }, [range.from, range.to, rangePunches, shift, shifts, t, userByKey, wing]);
 
   const todayPlanned = plannedLines.length;
@@ -752,7 +765,13 @@ export default function MessDashboardClient() {
       const day = (row.punched_at || "").slice(0, 10);
       if (day < range.from || day > range.to) continue;
       const status = punchStatus(row);
-      if (status !== "accepted" && status !== "already_accepted") continue;
+      if (
+        status !== "accepted" &&
+        status !== "already_accepted" &&
+        status !== "not_allowed"
+      ) {
+        continue;
+      }
       if (shift !== "all" && row.shift_id !== shift) continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
@@ -764,7 +783,12 @@ export default function MessDashboardClient() {
         wing: memberFormWing(user?.wing ?? "") || "—",
         shiftId: row.shift_id || "lunch",
         time: (row.punched_at || "").replace(" ", "T"),
-        kind: status === "accepted" ? "consumption" : "duplicate",
+        kind:
+          status === "accepted"
+            ? "consumption"
+            : status === "already_accepted"
+              ? "duplicate"
+              : "not_allowed",
       });
     }
     for (const row of guests) {
@@ -1124,7 +1148,9 @@ export default function MessDashboardClient() {
                                 ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-200"
                                 : row.kind === "duplicate"
                                   ? "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200"
-                                  : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200",
+                                  : row.kind === "not_allowed"
+                                    ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-200"
+                                    : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200",
                           )}
                         >
                           {row.kind === "guest"
@@ -1133,7 +1159,9 @@ export default function MessDashboardClient() {
                               ? t("nav.pritibhoj")
                               : row.kind === "duplicate"
                                 ? t("zkGate.alreadyAccepted")
-                                : t("zkGate.accepted")}
+                                : row.kind === "not_allowed"
+                                  ? t("zkGate.notAllowed")
+                                  : t("zkGate.accepted")}
                         </span>
                       </p>
                     </div>
@@ -1164,9 +1192,11 @@ export default function MessDashboardClient() {
                   ? deviceLines.accepted
                   : openList === "duplicate"
                     ? deviceLines.duplicate
-                    : [...deviceLines.accepted, ...deviceLines.duplicate].sort((a, b) =>
-                        b.sortKey.localeCompare(a.sortKey),
-                      )
+                    : [
+                        ...deviceLines.accepted,
+                        ...deviceLines.duplicate,
+                        ...deviceLines.rejected,
+                      ].sort((a, b) => b.sortKey.localeCompare(a.sortKey))
             }
             labels={{
               print: t("mess.dashboard.printList"),

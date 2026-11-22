@@ -71,7 +71,7 @@ export function ConfirmDialog({
   panelClassName?: string;
   /** Applied to fixed overlay root (e.g. no-print). */
   rootClassName?: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }) {
   const t = useT();
@@ -197,7 +197,9 @@ export function ConfirmDialog({
                   variant={resolvedTone === "danger" ? "danger" : "cta"}
                   className="rounded-xl"
                   disabled={busy || confirmDisabled}
-                  onClick={onConfirm}
+                  onClick={() => {
+                    void Promise.resolve(onConfirm());
+                  }}
                 >
                   {confirmLabel ?? t("common.confirm")}
                 </Button>

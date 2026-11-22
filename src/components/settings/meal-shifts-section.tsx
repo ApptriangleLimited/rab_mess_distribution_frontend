@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { IconClockHour4, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { CollapsibleSection } from "@/components/shared/collapsible-section";
@@ -16,6 +16,8 @@ import {
   listMealShifts,
   mealShiftLabel,
   MealShiftFail,
+  pullMealShifts,
+  pushMealShifts,
   shiftDurationMin,
 } from "@/lib/store/meal-shifts";
 import type { MealShift } from "@/lib/types";
@@ -40,6 +42,10 @@ export function MealShiftsSection({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<MealShift | null>(null);
   const [deleting, setDeleting] = useState<MealShift | null>(null);
+
+  useEffect(() => {
+    void pullMealShifts().catch(() => {});
+  }, []);
 
   const shifts = useMemo(() => listMealShifts(), [state.meal_shifts]);
 
@@ -195,10 +201,11 @@ export function MealShiftsSection({
         body={t("confirm.deleteShiftBody", { name: deleting?.name ?? "" })}
         confirmLabel={t("mess.shifts.deleteShift")}
         onCancel={() => setDeleting(null)}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!deleting) return;
           try {
             deleteMealShift(deleting.id);
+            await pushMealShifts();
             toast(t("mess.shifts.deleted"), "success");
           } catch (err) {
             toast(failMessage(err), "error");

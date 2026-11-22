@@ -227,10 +227,13 @@ async function writeCurrent() {
   if (catalogSaved) {
     // Catalog is already committed. Keep it out of the member snapshot so a
     // slow snapshot cannot put the old rank list back.
-    void saveAppSnapshot(getState(), false).catch((err) => {
+    try {
+      await saveAppSnapshot(getState(), false);
+    } catch (err) {
       if (rememberMissingRoute("snapshot", err)) return;
       console.error("Failed to persist app state to Docker API", err);
-    });
+      throw err;
+    }
     return;
   }
   try {

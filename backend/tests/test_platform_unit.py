@@ -1,7 +1,15 @@
 from datetime import date
 
 from daily import inactive_open_start, month_end
-from zk_gate import access_user_command, device_card_number, same_rfid
+from zk_gate import (
+    access_authorize_command,
+    access_set_timezone_command,
+    access_timezone_command,
+    access_user_command,
+    access_user_group_command,
+    device_card_number,
+    same_rfid,
+)
 from permissions import filter_snapshot_body
 from security import hash_token, validate_password, verify_login_mfa
 from storage import StorageError, sniff_image_mime, sniff_mime
@@ -51,13 +59,30 @@ def test_hazz_camp_keeps_its_own_punch_board():
     assert is_hazz_serial("") is False
 
 
+def test_access_timezone_is_always_open():
+    line = access_timezone_command(9)
+    assert line.startswith("C:9:DATA UPDATE timezone TimezoneId=1\t")
+    assert "SunTime1=00002359" in line
+    assert "SatTime1=00002359" in line
+    assert "Hol1Time1=00002359" in line
+    assert access_set_timezone_command(8) == (
+        "C:8:SET TIMEZONE TZid=1,Sun=00002359,Mon=00002359,Tue=00002359,"
+        "Wed=00002359,Thu=00002359,Fri=00002359,Sat=00002359"
+    )
+    assert access_user_group_command(7) == "C:7:SET USER_GROUP GroupId=1,TZid=1"
+    assert access_authorize_command(10, "9019223274") == (
+        "C:10:DATA UPDATE userauthorize Pin=9019223274\t"
+        "AuthorizeTimezoneId=1\tAuthorizeDoorId=1"
+    )
+
+
 def test_access_command_sends_the_device_card_number():
     from zk_gate import card_on_device
 
     line = access_user_command(1393, "1006837", "Md Bellal Hossain", 4918042)
     assert line == (
         "C:1393:DATA UPDATE user Pin=1006837\tName=Md Bellal Hossain\t"
-        "Privilege=0\tPassword=\tCardNo=4918042\tGroup=1\tStartTime=0\tEndTime=0"
+        "Privilege=0\tPassword=\tCardNo=4918042\tGroup=1\tTZ=0001000000000000"
     )
     assert card_on_device("0007502842") == 4918042
     assert card_on_device("0004918050") == 4918050

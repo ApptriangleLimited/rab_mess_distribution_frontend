@@ -469,6 +469,42 @@ def access_delete_command(cmd_id: int, pin: str) -> str:
     return f"C:{cmd_id}:DATA DELETE user Pin={pin}"
 
 
+def access_timezone_command(cmd_id: int) -> str:
+    """Timezone 1 = 00:00-23:59. SenseFace Acc uses Time1/Time2/Time3 slots, not SunTime."""
+    parts = ["TimezoneId=1"]
+    for name in (
+        "Sun",
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat",
+        "Hol1",
+        "Hol2",
+        "Hol3",
+    ):
+        parts.append(f"{name}Time=00002359")
+        parts.append(f"{name}Time1=00002359")
+        parts.append(f"{name}Time2=0")
+        parts.append(f"{name}Time3=0")
+    return f"C:{cmd_id}:DATA UPDATE timezone " + "\t".join(parts)
+
+
+def access_set_timezone_command(cmd_id: int) -> str:
+    """ZAM70 PUSH SET TIMEZONE. Same 24/7 window as Time Zone 1 on the keypad."""
+    days = ",".join(
+        f"{name}=00002359"
+        for name in ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+    )
+    return f"C:{cmd_id}:SET TIMEZONE TZid=1,{days}"
+
+
+def access_user_group_command(cmd_id: int, group_id: int = 1) -> str:
+    """Bind access group to timezone 1. Empty group timetable is Invalid time period."""
+    return f"C:{cmd_id}:SET USER_GROUP GroupId={group_id},TZid=1"
+
+
 def access_authorize_command(cmd_id: int, pin: str) -> str:
     """Door time zone. Without this the reader says Invalid time period."""
     fields = "\t".join([
@@ -480,7 +516,7 @@ def access_authorize_command(cmd_id: int, pin: str) -> str:
 
 
 def access_user_command(cmd_id: int, pin: str, name: str, card: int) -> str:
-    """Security PUSH 3.1.2 user write. Tab-separated fields are what this reader stores."""
+    """Security PUSH 3.1.2 user write. TZ digits 1-4 select group time period 1."""
     safe_name = device_name(name).replace("\t", " ").replace("\r", " ").replace("\n", " ")
     fields = "\t".join([
         f"Pin={pin}",
@@ -489,8 +525,7 @@ def access_user_command(cmd_id: int, pin: str, name: str, card: int) -> str:
         "Password=",
         f"CardNo={card}",
         "Group=1",
-        "StartTime=0",
-        "EndTime=0",
+        "TZ=0001000000000000",
     ])
     return f"C:{cmd_id}:DATA UPDATE user {fields}"
 
@@ -519,6 +554,48 @@ def queue_adms_userinfo(member: Member, pin: str | None = None) -> str:
     return line
 
 
+def queue_always_open_access(db: Session) -> int:
+    """24/7 timezone 1, rewrite each user as Group=0, then userauthorize.
+
+    Group=1 uses the group timetable. An empty group table is Invalid time period
+    even after userauthorize Return=0. Showkat's working LCD write was Group=0.
+    """
+    rows: list[tuple[str, str, int]] = []
+    seen: set[str] = set()
+    for member in db.query(Member).all():
+        if str(member.status) != "1" or (member.approval_status or "") != "approved":
+            continue
+        pin = enroll_pin(member)
+        card = card_on_device(member.rfid)
+        if not pin or card <= 0 or pin in seen:
+            continue
+        seen.add(pin)
+        rows.append((pin, member.name or "", card))
+    first = {"2418338", "2603040"}
+    rows.sort(key=lambda item: (0 if item[0] in first else 1, item[0]))
+    with _adms_cmd_lock:
+        with _open_adms_store() as handle:
+            _lock_adms_file(handle)
+            data = _read_adms_store(handle)
+            seq = int(data.get("seq") or 0) + 1
+            data["cmds"].append({"id": seq, "line": access_timezone_command(seq)})
+            seq += 1
+            data["cmds"].append({"id": seq, "line": access_set_timezone_command(seq)})
+            seq += 1
+            data["cmds"].append({"id": seq, "line": access_user_group_command(seq)})
+            for pin, name, card in rows:
+                seq += 1
+                data["cmds"].append(
+                    {"id": seq, "line": access_user_command(seq, pin, name, card)}
+                )
+                seq += 1
+                data["cmds"].append({"id": seq, "line": access_authorize_command(seq, pin)})
+            data["seq"] = seq
+            _write_adms_store(handle, data)
+    _adms_log.info("ADMS queued timezone + group0 + authorize for %s", len(rows))
+    return len(rows)
+
+
 def sync_member_to_device(member: Member) -> str:
     """Queue an RFID write after Daily saves a card. Safe to call from API handlers."""
     if str(member.status) != "1" or (member.approval_status or "") != "approved":
@@ -537,22 +614,49 @@ def sync_member_to_device(member: Member) -> str:
     return line
 
 
-def pop_adms_command() -> str:
+ADMS_CMD_BATCH = 10
+
+
+def peek_adms_commands(limit: int = ADMS_CMD_BATCH) -> str:
+    """Leave commands in the file until the reader posts Return=0."""
     with _adms_cmd_lock:
         try:
             with _open_adms_store() as handle:
                 _lock_adms_file(handle)
                 data = _read_adms_store(handle)
-                if not data["cmds"]:
-                    return ""
-                item = data["cmds"].pop(0)
-                _write_adms_store(handle, data)
+                lines = []
+                for item in (data.get("cmds") or [])[: max(1, limit)]:
+                    line = str(item.get("line") or "").strip()
+                    if line:
+                        lines.append(line)
         except OSError:
             return ""
-    line = str(item.get("line") or "")
-    if line:
-        _adms_log.info("ADMS popped cmd=%r", line)
-    return line
+    if not lines:
+        return ""
+    _adms_log.info("ADMS peek %s cmds", len(lines))
+    return "\r\n".join(lines) + "\r\n"
+
+
+def drop_adms_acked(ids: set[int]) -> None:
+    if not ids:
+        return
+    with _adms_cmd_lock:
+        try:
+            with _open_adms_store() as handle:
+                _lock_adms_file(handle)
+                data = _read_adms_store(handle)
+                data["cmds"] = [
+                    row
+                    for row in (data.get("cmds") or [])
+                    if int(row.get("id") or 0) not in ids
+                ]
+                _write_adms_store(handle, data)
+        except OSError:
+            return
+
+
+def pop_adms_command() -> str:
+    return peek_adms_commands(1)
 
 
 def note_adms(serial: str, info: dict | None = None) -> None:
@@ -1204,14 +1308,8 @@ def apply_saved_shifts(session_factory=None) -> dict:
     db = session_factory()
     try:
         day = mess_today()
-        shifts = _load_shifts(db)
-        stamp = _shift_stamp(shifts)
-        with _state_lock:
-            unchanged = stamp == str(_state.get("shift_stamp") or "")
-        if unchanged:
-            return _snapshot()
         known_by_key, ms_ids, _, shifts = _today_maps(db, day)
-        _apply_current_shifts(known_by_key, ms_ids, shifts, day)
+        _reclassify_cached(known_by_key, ms_ids, shifts, day)
     finally:
         db.close()
     return _snapshot()

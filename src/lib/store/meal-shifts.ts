@@ -1,6 +1,9 @@
 import type { MessageKey } from "@/i18n";
 import { persistAppStateNow } from "@/lib/api/app-sync";
+import { apiJson } from "@/lib/api/client";
+import { isCcApiEnabled } from "@/lib/api/mode";
 import { nowISO } from "@/lib/date";
+import { getAccessToken } from "@/lib/session";
 import { getState, setState } from "@/lib/store";
 import type { MealShift, MealShiftId } from "@/lib/types";
 
@@ -92,6 +95,28 @@ function overlaps(
     }
   }
   return false;
+}
+
+function applyMealShifts(rows: MealShift[]) {
+  if (!Array.isArray(rows) || rows.length === 0) return;
+  setState((prev) => ({ ...prev, meal_shifts: rows }));
+}
+
+/** Mess Shifts and /device both use Postgres. Load that table into the browser. */
+export async function pullMealShifts() {
+  if (!isCcApiEnabled() || !getAccessToken()) return;
+  const data = await apiJson<MealShift[]>("/api/v1/meal-shifts");
+  applyMealShifts(data);
+}
+
+/** Write shift windows to Postgres now. Punch /device reads this table, not the browser. */
+export async function pushMealShifts() {
+  if (!isCcApiEnabled() || !getAccessToken()) return;
+  const data = await apiJson<MealShift[]>("/api/v1/meal-shifts", {
+    method: "PUT",
+    body: JSON.stringify({ shifts: getState().meal_shifts ?? [] }),
+  });
+  applyMealShifts(data);
 }
 
 export function listMealShifts() {
