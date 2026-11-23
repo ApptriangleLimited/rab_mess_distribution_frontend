@@ -34,6 +34,7 @@ import {
   presentConsumeLedger,
   withReportSource,
 } from "@/lib/reports";
+import type { UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -94,6 +95,8 @@ export default function ConsumeLedgerPrintClient() {
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
   const memberType = parseConsumeMemberType(searchParams.get("member_type"));
+  const memberStatus: UserStatus =
+    searchParams.get("status") === "0" ? "0" : "1";
   const dateFrom = searchParams.get("from") ?? "";
   const dateTo = searchParams.get("to") ?? "";
 
@@ -159,13 +162,14 @@ export default function ConsumeLedgerPrintClient() {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
+      if (row.user.status !== memberStatus) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing, memberType]);
+  }, [ledger.rows, q, rank, wing, memberType, memberStatus]);
 
   const backHref = useMemo(() => {
     const back = searchParams.get("back")?.trim();
@@ -174,11 +178,12 @@ export default function ConsumeLedgerPrintClient() {
     if (dateFrom) params.set("from", dateFrom);
     if (dateTo) params.set("to", dateTo);
     if (memberType !== "all") params.set("member_type", memberType);
+    params.set("status", memberStatus);
     if (back?.startsWith("/ration/monthly")) {
       return `${back}${back.includes("?") ? "&" : "?"}${params.toString()}`;
     }
     return `/consume/monthly/ledger?${params.toString()}`;
-  }, [month, dateFrom, dateTo, memberType, searchParams]);
+  }, [month, dateFrom, dateTo, memberType, memberStatus, searchParams]);
 
   const wingLedgers = useMemo(
     () =>

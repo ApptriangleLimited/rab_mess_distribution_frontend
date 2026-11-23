@@ -19,6 +19,7 @@ import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
 import { Button } from "@/components/ui/button";
 import { ConsumeMemberTypeSelect } from "@/components/consume/consume-member-type-select";
+import { ActiveInactiveToggle } from "@/components/shared/active-inactive-toggle";
 import {
   SettingsRankFilter,
   SettingsWingFilter,
@@ -44,6 +45,7 @@ import {
   presentConsumeLedger,
   withReportSource,
 } from "@/lib/reports";
+import type { UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +66,7 @@ export default function ConsumeLedgerClient() {
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
   const [memberType, setMemberType] = useState<ConsumeMemberTypeFilter>("all");
+  const [memberStatus, setMemberStatus] = useState<UserStatus>("1");
   const [reportOpen, setReportOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
@@ -126,13 +129,14 @@ export default function ConsumeLedgerClient() {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
+      if (row.user.status !== memberStatus) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing, memberType, state.wing_parent]);
+  }, [ledger.rows, q, rank, wing, memberType, memberStatus, state.wing_parent]);
 
   const printHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -143,8 +147,9 @@ export default function ConsumeLedgerClient() {
     if (rank !== "all") params.set("rank", rank);
     if (wing !== "all") params.set("wing", wing);
     if (memberType !== "all") params.set("member_type", memberType);
+    params.set("status", memberStatus);
     return `/consume/monthly/ledger/print?${params.toString()}`;
-  }, [month, q, rank, wing, memberType, dateFrom, dateTo]);
+  }, [month, q, rank, wing, memberType, memberStatus, dateFrom, dateTo]);
 
   const fieldClass = searchFilterFieldClass;
   function onDownload() {
@@ -220,7 +225,11 @@ export default function ConsumeLedgerClient() {
           searchPlaceholder={t("cc.searchPlaceholder")}
           tiles={
             <MiniStat
-              label={t("daily.rosterStatAll")}
+              label={
+                memberStatus === "1"
+                  ? t("cc.statusActive")
+                  : t("cc.statusInactive")
+              }
               value={String(rows.length)}
               accent
             />
@@ -278,6 +287,10 @@ export default function ConsumeLedgerClient() {
             value={memberType}
             onChange={setMemberType}
             className={cn(fieldClass, "w-[11rem] shrink-0")}
+          />
+          <ActiveInactiveToggle
+            value={memberStatus}
+            onChange={setMemberStatus}
           />
           <WingSummaryButton
             month={month}
