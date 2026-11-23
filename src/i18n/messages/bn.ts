@@ -1171,6 +1171,7 @@ export const bn = {
     signMessPresident: "সভাপতি, মেস কমিটি",
     signCommandant: "কমান্ড্যান্ট",
     exportPdf: "পিডিএফ ডাউনলোড",
+    exportExcel: "এক্সেল ডাউনলোড",
     colSerial: "ক্রঃ",
     colId: "নম্বর",
     untagged: "আনট্যাগড",

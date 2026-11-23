@@ -1169,6 +1169,7 @@ export const en = {
     signMessPresident: "President, Mess Committee",
     signCommandant: "Commandant",
     exportPdf: "Download PDF",
+    exportExcel: "Download Excel",
     colSerial: "#",
     colId: "ID",
     untagged: "Untagged",

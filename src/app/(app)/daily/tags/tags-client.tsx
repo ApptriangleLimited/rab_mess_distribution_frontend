@@ -150,7 +150,7 @@ export default function TagsPageClient() {
     autoApplyCarryForward(ids, today);
   }, [apiOn, today, state.users]);
 
-  /** Active members, plus inactive members who already have a tag in this range. */
+  /** Active switch lists status=1 only. Inactive switch lists tagged status=0. */
   const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
     const dates = eachISODate(dateFrom, dateTo);
@@ -262,8 +262,9 @@ export default function TagsPageClient() {
     if (wing !== "all") params.set("wing", wing);
     if (memberType !== "all") params.set("member_type", memberType);
     params.set("status", memberStatus);
+    if (tagFilter !== "all") params.set("tag", tagFilter);
     return `/daily/tags/print?${params.toString()}`;
-  }, [month, dateFrom, dateTo, q, rank, wing, memberType, memberStatus]);
+  }, [month, dateFrom, dateTo, q, rank, wing, memberType, memberStatus, tagFilter]);
 
   function onTagChange(
     userId: string,

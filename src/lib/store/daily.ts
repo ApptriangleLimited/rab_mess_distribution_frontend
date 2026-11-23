@@ -123,10 +123,8 @@ export function isRangeFullyBlocked(
 
 /**
  * Daily RR roster for a month.
- * Active (assignable on any day) members always stay.
- * A member who is inactive for the whole range stays only when that range
- * already has a tag for them.
- * `statusFilter` "0" is the Inactive switch: only those tagged inactive rows.
+ * Active switch: currently active members only.
+ * Inactive switch: currently inactive members who already have a tag in range.
  */
 export function dailyRosterVisible(
   user: Parameters<typeof canAssignOnDate>[0],
@@ -134,10 +132,11 @@ export function dailyRosterVisible(
   hasTag: boolean,
   statusFilter: "0" | "1" = "1",
 ): boolean {
-  const blocked = isRangeFullyBlocked(user, dates);
   if (statusFilter === "0") {
-    return (user.status === "0" || blocked) && hasTag;
+    return user.status === "0" && hasTag;
   }
+  if (user.status !== "1") return false;
+  const blocked = isRangeFullyBlocked(user, dates);
   if (!blocked) return true;
   return hasTag;
 }

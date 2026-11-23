@@ -7,6 +7,7 @@ import {
   IconArrowLeft,
   IconDownload,
   IconPrinter,
+  IconTableExport,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
@@ -26,6 +27,7 @@ import {
 } from "@/lib/date";
 import { wingPrintOrder } from "@/lib/daily-register-wings";
 import { downloadDailyRegisterPdf } from "@/lib/download-daily-register-pdf";
+import { downloadDailyTagExcel } from "@/lib/download-daily-tag-excel";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildDailyRegisterFromCells } from "@/lib/reports";
 import { projectRangeCarry } from "@/lib/store/assignments";
@@ -46,6 +48,7 @@ export default function DailyRegisterPrintClient() {
   const month = parseMonthInput(searchParams.get("month") ?? "");
   const dateFrom = searchParams.get("from") ?? "";
   const dateTo = searchParams.get("to") ?? "";
+  const excelTag = (searchParams.get("tag") ?? "").trim().toUpperCase();
   const q = searchParams.get("q") ?? "";
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
@@ -74,7 +77,7 @@ export default function DailyRegisterPrintClient() {
     status: memberStatus,
   });
 
-  /** Active members, plus inactive members who already have a tag in this range. */
+  /** Active switch lists status=1 only. Inactive switch lists tagged status=0. */
   const demoUsers = useMemo(() => {
     const query = q.trim().toLowerCase();
     const dates = eachISODate(loadFrom, loadTo);
@@ -192,6 +195,15 @@ export default function DailyRegisterPrintClient() {
     downloadDailyRegisterPdf(pdfArgs);
   }
 
+  function onDownloadExcel() {
+    if (!canAct) return;
+    downloadDailyTagExcel({
+      dates: columnDates,
+      rows: printRows,
+      tag: excelTag,
+    });
+  }
+
   async function onPrint() {
     const el = printRef.current;
     if (!el || !canAct) return;
@@ -227,6 +239,17 @@ export default function DailyRegisterPrintClient() {
           }
           actions={
             <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-lg"
+                disabled={!canAct}
+                onClick={onDownloadExcel}
+              >
+                <IconTableExport className="h-3.5 w-3.5" />
+                {t("daily.exportExcel")}
+              </Button>
               <Button
                 type="button"
                 size="sm"
