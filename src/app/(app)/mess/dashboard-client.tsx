@@ -191,6 +191,13 @@ function reportCells(row: PersonLine, index: number) {
 }
 
 type BoardPunch = ZkGateRow & { mess: string };
+type MessSite = "hq" | "haji";
+
+function punchMessSite(mess: string | undefined): MessSite {
+  const label = (mess || "SRB HQ").toLowerCase();
+  if (label.includes("haji") || label.includes("hazz")) return "haji";
+  return "hq";
+}
 
 function personLine(
   user: User | undefined,
@@ -423,6 +430,7 @@ export default function MessDashboardClient() {
 
   const [wing, setWing] = useState("all");
   const [shift, setShift] = useState<MealShiftId | "all">("all");
+  const [messSite, setMessSite] = useState<MessSite>("hq");
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
   const [search, setSearch] = useState("");
@@ -667,6 +675,7 @@ export default function MessDashboardClient() {
     for (const row of rangePunches) {
       const day = (row.punched_at || "").slice(0, 10);
       if (day < range.from || day > range.to) continue;
+      if (punchMessSite(row.mess) !== messSite) continue;
       if (punchStatus(row) !== "accepted") continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
@@ -674,7 +683,7 @@ export default function MessDashboardClient() {
       if (id === "breakfast" || id === "lunch" || id === "dinner") counts[id] += 1;
     }
     return counts;
-  }, [range.from, range.to, rangePunches, userByKey, wing]);
+  }, [messSite, range.from, range.to, rangePunches, userByKey, wing]);
   const ringPlanned = useMemo(() => {
     let count = 0;
     for (const row of filteredLedgerRows) {
@@ -1035,9 +1044,36 @@ export default function MessDashboardClient() {
           </section>
 
           <section className="rounded-2xl border border-orange-200/80 bg-gradient-to-br from-white to-orange-50/70 p-4 dark:border-orange-900/50 dark:from-neutral-950 dark:to-orange-950/30">
-            <h2 className="text-sm font-semibold text-orange-800 dark:text-orange-200">
-              {t("mess.dashboard.mealDistribution")}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-orange-800 dark:text-orange-200">
+                {t("mess.dashboard.mealDistribution")}
+              </h2>
+              <div
+                role="radiogroup"
+                aria-label={t("mess.dashboard.messSite")}
+                className="inline-flex shrink-0 rounded-lg border border-orange-200 bg-white p-0.5 dark:border-orange-800 dark:bg-neutral-900"
+              >
+                {(["hq", "haji"] as const).map((site) => (
+                  <button
+                    key={site}
+                    type="button"
+                    role="radio"
+                    aria-checked={messSite === site}
+                    onClick={() => setMessSite(site)}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                      messSite === site
+                        ? "bg-orange-600 text-white"
+                        : "text-orange-800 hover:bg-orange-50 dark:text-orange-200 dark:hover:bg-orange-950/40",
+                    )}
+                  >
+                    {site === "hq"
+                      ? t("mess.dashboard.messHq")
+                      : t("mess.dashboard.messHaji")}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mt-3 flex items-end justify-center gap-2">
               {ringShifts.map((id) => (
                 <ShiftRing
