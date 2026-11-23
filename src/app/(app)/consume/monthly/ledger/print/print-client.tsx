@@ -20,6 +20,10 @@ import {
   CONSUME_REPORT_LEDGER_TAGS,
 } from "@/lib/constants";
 import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
+import {
+  memberMatchesTypeFilter,
+  parseConsumeMemberType,
+} from "@/lib/consume-filters";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { formatMonthLong, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
@@ -89,7 +93,7 @@ export default function ConsumeLedgerPrintClient() {
   const q = searchParams.get("q") ?? "";
   const rank = searchParams.get("rank") ?? "all";
   const wing = searchParams.get("wing") ?? "all";
-  const memberType = searchParams.get("member_type") ?? "all";
+  const memberType = parseConsumeMemberType(searchParams.get("member_type"));
   const dateFrom = searchParams.get("from") ?? "";
   const dateTo = searchParams.get("to") ?? "";
 
@@ -154,7 +158,7 @@ export default function ConsumeLedgerPrintClient() {
     return ledger.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
-      if (memberType !== "all" && row.user.member_type !== memberType) return false;
+      if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")

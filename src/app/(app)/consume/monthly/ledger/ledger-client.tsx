@@ -18,13 +18,7 @@ import { WingSummaryButton } from "@/components/consume/wing-summary-button";
 import { ConsumePanelTabs } from "@/components/layout/consume-panel-tabs";
 import { GenerateReportDialog } from "@/components/ration/generate-report-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ConsumeMemberTypeSelect } from "@/components/consume/consume-member-type-select";
 import {
   SettingsRankFilter,
   SettingsWingFilter,
@@ -38,6 +32,10 @@ import {
   CONSUME_REPORT_LEDGER_TAGS,
 } from "@/lib/constants";
 import { groupRowsByOfficialWing } from "@/lib/consume-official-reports";
+import {
+  memberMatchesTypeFilter,
+  type ConsumeMemberTypeFilter,
+} from "@/lib/consume-filters";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { monthDateBounds } from "@/lib/date";
@@ -65,7 +63,7 @@ export default function ConsumeLedgerClient() {
   const [q, setQ] = useState("");
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
-  const [memberType, setMemberType] = useState("all");
+  const [memberType, setMemberType] = useState<ConsumeMemberTypeFilter>("all");
   const [reportOpen, setReportOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
@@ -127,7 +125,7 @@ export default function ConsumeLedgerClient() {
     return ledger.rows.filter((row) => {
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
-      if (memberType !== "all" && row.user.member_type !== memberType) return false;
+      if (!memberMatchesTypeFilter(row.user.member_type, memberType)) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
@@ -276,19 +274,11 @@ export default function ConsumeLedgerClient() {
             className="w-[9rem] shrink-0"
             triggerClassName={cn(fieldClass, "w-full")}
           />
-          <Select value={memberType} onValueChange={setMemberType}>
-            <SelectTrigger
-              className={cn(fieldClass, "w-[11rem] shrink-0")}
-              aria-label={t("cc.fields.memberType")}
-            >
-              <SelectValue placeholder={t("common.allMemberType")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("common.allMemberType")}</SelectItem>
-              <SelectItem value="attached">{t("cc.memberTypes.attached")}</SelectItem>
-              <SelectItem value="new">{t("cc.memberTypes.new")}</SelectItem>
-            </SelectContent>
-          </Select>
+          <ConsumeMemberTypeSelect
+            value={memberType}
+            onChange={setMemberType}
+            className={cn(fieldClass, "w-[11rem] shrink-0")}
+          />
           <WingSummaryButton
             month={month}
             wing={wing}

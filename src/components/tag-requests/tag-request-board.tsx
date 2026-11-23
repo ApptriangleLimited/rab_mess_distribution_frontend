@@ -57,7 +57,7 @@ import {
 } from "@/lib/store/tag-requests";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { listAllTags } from "@/lib/store/rates";
-import { formatDateDisplay, todayISO } from "@/lib/date";
+import { eachISODate, formatDateDisplay, todayISO } from "@/lib/date";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -86,6 +86,13 @@ function queueLabel(queue: TagRequestQueue, t: ReturnType<typeof useT>) {
 
 function requestDay(iso: string) {
   return iso.slice(0, 10);
+}
+
+function requestSpanDays(req: TagRequest): number {
+  const from = (req.from_date || req.date || "").slice(0, 10);
+  const to = (req.to_date || from).slice(0, 10);
+  if (!from) return 0;
+  return eachISODate(from, to).length;
 }
 
 export function TagRequestBoard({
@@ -595,6 +602,7 @@ export function TagRequestBoard({
                     <th className="px-4 py-3.5">{t("tagRequest.requestedTag")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.status")}</th>
                     <th className="px-4 py-3.5">{t("common.dateRange")}</th>
+                    <th className="px-4 py-3.5">{t("tagRequest.days")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.requestedAt")}</th>
                     {canAct ? <th className="px-4 py-3.5" /> : null}
                   </tr>
@@ -802,6 +810,9 @@ function RequestRow({
         {req.from_date && req.to_date && req.from_date !== req.to_date
           ? `${formatDateDisplay(req.from_date)} – ${formatDateDisplay(req.to_date)}`
           : formatDateDisplay(req.from_date || req.date) || req.from_date || req.date}
+      </td>
+      <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+        {requestSpanDays(req) || "—"}
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
         {requestDay(req.requested_at)}

@@ -1810,6 +1810,7 @@ export const bn = {
     sameTag: "বর্তমান ট্যাগ থেকে আলাদা ট্যাগ বেছে নিন",
     cannotRequest: "এই সদস্যকে আজ ট্যাগ করা যাবে না",
     requestedAt: "রিকোয়েস্ট",
+    days: "দিন",
     updatedAt: "আপডেট",
     statAll: "সব",
     dutyToday: "আজকের ডিউটি",

@@ -41,8 +41,9 @@ export function ConsumeMemberTypeSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">{t("common.allMemberType")}</SelectItem>
-        <SelectItem value="attached">{t("cc.memberTypes.attached")}</SelectItem>
+        <SelectItem value="permanent">{t("cc.memberTypes.permanent")}</SelectItem>
         <SelectItem value="new">{t("cc.memberTypes.new")}</SelectItem>
+        <SelectItem value="attached">{t("cc.memberTypes.attached")}</SelectItem>
       </SelectContent>
     </Select>
   );

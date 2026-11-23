@@ -40,7 +40,12 @@ export function consumeFilterLabel(filter: ConsumeFilter) {
   return CONSUME_FILTER_TAGS[filter].join("+");
 }
 
-export const CONSUME_MEMBER_TYPE_FILTERS = ["all", "attached", "new"] as const;
+export const CONSUME_MEMBER_TYPE_FILTERS = [
+  "all",
+  "permanent",
+  "new",
+  "attached",
+] as const;
 
 export type ConsumeMemberTypeFilter =
   (typeof CONSUME_MEMBER_TYPE_FILTERS)[number];
@@ -48,7 +53,7 @@ export type ConsumeMemberTypeFilter =
 export function parseConsumeMemberType(
   raw: string | null | undefined,
 ): ConsumeMemberTypeFilter {
-  if (raw === "attached" || raw === "new") return raw;
+  if (raw === "permanent" || raw === "new" || raw === "attached") return raw;
   return "all";
 }
 

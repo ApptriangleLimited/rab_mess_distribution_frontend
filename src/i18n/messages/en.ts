@@ -1807,6 +1807,7 @@ export const en = {
     sameTag: "Pick a different tag than the current one",
     cannotRequest: "This member cannot be tagged today",
     requestedAt: "Requested",
+    days: "Days",
     updatedAt: "Updated",
     statAll: "All",
     dutyToday: "Duty today",
