@@ -44,7 +44,7 @@ import {
   formatDateLong,
   isDailyDateEditable,
 } from "@/lib/date";
-import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
+import type { DailyAssignment, DailyTag, TrgTone, User, WrCode } from "@/lib/types";
 import type { Locale } from "@/i18n";
 import { tagLabel } from "@/i18n";
 import { dailyUserHref, DAILY_RR_HREF } from "@/lib/daily-back";
@@ -75,6 +75,8 @@ import {
 } from "@/lib/trg-tone";
 import { ColoredTagGrid } from "@/components/daily/colored-tag-grid";
 import { TrgSardaDialog } from "@/components/daily/trg-sarda-dialog";
+import { WrCodeDialog } from "@/components/daily/wr-code-dialog";
+import { isWrTag, normalizeWrCode } from "@/lib/wr-code";
 import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
@@ -162,12 +164,14 @@ export function RegisterBoard({
     date: string,
     tag: DailyTag | "",
     trgTone?: TrgTone,
+    wrCode?: WrCode,
   ) => void;
   onPaintRange: (
     userId: string,
     dates: string[],
     tag: DailyTag | "",
     trgTone?: TrgTone,
+    wrCode?: WrCode,
   ) => void;
   priorByUser: Map<string, DailyTag>;
   suppressedCarries: string[];
@@ -259,11 +263,15 @@ export function RegisterBoard({
   );
 
   const byUserDate = useMemo(() => {
-    const map = new Map<string, { tag: DailyTag; trg_tone?: TrgTone }>();
+    const map = new Map<
+      string,
+      { tag: DailyTag; trg_tone?: TrgTone; wr_code?: WrCode }
+    >();
     for (const a of assignments) {
       map.set(`${a.user_id}|${a.date}`, {
         tag: a.tag,
         trg_tone: a.trg_tone,
+        wr_code: a.wr_code,
       });
     }
     return map;
@@ -287,6 +295,12 @@ export function RegisterBoard({
     toDate: string;
   } | null>(null);
   const [sardaChecked, setSardaChecked] = useState(false);
+  const [wrPrompt, setWrPrompt] = useState<{
+    userId: string;
+    userName: string;
+    fromDate: string;
+    toDate: string;
+  } | null>(null);
   const [trainingChecked, setTrainingChecked] = useState(false);
 
   const closeRangeMenu = useCallback(() => {
@@ -456,13 +470,14 @@ export function RegisterBoard({
     tag: DailyTag,
     fromDate: string,
     toDate: string,
-    opts?: { sarda?: boolean; training?: boolean },
+    opts?: { sarda?: boolean; training?: boolean; wr_code?: WrCode },
   ) {
     const user = users.find((u) => u.id === userId);
     const force = user?.force ?? "";
     const trg_tone = isTrgTag(tag)
       ? resolveTrgTone(force, Boolean(opts?.training), Boolean(opts?.sarda))
       : undefined;
+    const wr_code = normalizeWrCode(tag, opts?.wr_code);
     const queue = dutyTagQueue(tag, trg_tone);
     if (queue === "immediate") return false;
     const trg_sarda =
@@ -479,12 +494,15 @@ export function RegisterBoard({
           queue,
           trg_tone,
           trg_sarda,
+          wr_code,
         });
         upsertLocalTagRequest(requestToTagRequest(created));
         notifyCcDataChange();
         toast(
           queue === "ration"
             ? t("daily.queuedRation", { tag })
+            : queue === "mess"
+              ? t("daily.queuedMess", { tag })
             : t("daily.queuedConsume", { tag }),
           "success",
         );
@@ -504,12 +522,15 @@ export function RegisterBoard({
       queue,
       trg_tone,
       trg_sarda,
+      wr_code,
       skipMfrLock: true,
     });
     if (row) {
       toast(
         queue === "ration"
           ? t("daily.queuedRation", { tag })
+          : queue === "mess"
+            ? t("daily.queuedMess", { tag })
           : t("daily.queuedConsume", { tag }),
         "success",
       );
@@ -530,6 +551,16 @@ export function RegisterBoard({
     if (dates.length === 0) return;
     const fromDate = dates[0]!;
     const toDate = dates[dates.length - 1]!;
+    if (isWrTag(tag) && user) {
+      setWrPrompt({
+        userId: user.id,
+        userName: user.name,
+        fromDate,
+        toDate,
+      });
+      closeRangeMenu();
+      return;
+    }
     if (isTrgTag(tag) && user && needsTrgPrompt(user.force)) {
       setSardaPrompt({
         userId: user.id,
@@ -575,6 +606,25 @@ export function RegisterBoard({
       onTagChange(userId, dates[0]!, "TRG", trgTone);
     } else {
       onPaintRange(userId, dates, "TRG", trgTone);
+    }
+  }
+
+  function applyWr(userId: string, fromDate: string, toDate: string, wrCode: WrCode) {
+    const user = users.find((u) => u.id === userId);
+    const dates = eachISODate(fromDate, toDate).filter(
+      (date) =>
+        isDailyDateEditable(date, todayISO) &&
+        (!user || canAssignOnDate(user, date)),
+    );
+    if (dates.length === 0) return;
+    if (dutyTagQueue("WR") !== "immediate") {
+      void queuePaint(userId, "WR", fromDate, toDate, { wr_code: wrCode });
+      return;
+    }
+    if (dates.length === 1) {
+      onTagChange(userId, dates[0]!, "WR", undefined, wrCode);
+    } else {
+      onPaintRange(userId, dates, "WR", undefined, wrCode);
     }
   }
 
@@ -804,6 +854,7 @@ export function RegisterBoard({
                   stored?: DailyTag;
                   ghost?: DailyTag;
                   trgTone?: TrgTone;
+                  wrCode?: WrCode;
                   pendingTag?: DailyTag;
                   afterOut: boolean;
                   beforeJoin: boolean;
@@ -856,6 +907,9 @@ export function RegisterBoard({
                       trgTone: isTrgTag(afterEntry?.tag)
                         ? (afterEntry?.trg_tone ?? resolveTrgTone(user.force))
                         : undefined,
+                      wrCode: isWrTag(afterEntry?.tag)
+                        ? afterEntry?.wr_code
+                        : undefined,
                       afterOut: true,
                       beforeJoin: false,
                       joiningDay,
@@ -878,6 +932,14 @@ export function RegisterBoard({
                       : isTrgTag(ghost)
                         ? resolveTrgTone(user.force)
                         : undefined;
+                  const storedCode = isWrTag(stored) ? entry?.wr_code : undefined;
+                  const pendingCode = isWrTag(pendingTag)
+                    ? pendingReq?.wr_code
+                    : undefined;
+                  const wrCode =
+                    isWrTag(stored) || (!stored && isWrTag(pendingTag))
+                      ? pendingCode || storedCode
+                      : undefined;
                   rowMeta.push({
                     date,
                     stored,
@@ -885,6 +947,7 @@ export function RegisterBoard({
                     ghost,
                     pendingTag,
                     trgTone,
+                    wrCode,
                     afterOut: false,
                     beforeJoin: false,
                     joiningDay,
@@ -1008,6 +1071,7 @@ export function RegisterBoard({
                         stored,
                         ghost,
                         trgTone,
+                        wrCode,
                         pendingTag,
                         afterOut,
                         beforeJoin,
@@ -1069,6 +1133,7 @@ export function RegisterBoard({
                           userId={user.id}
                           tag={tag}
                           trgTone={trgTone}
+                          wrCode={wrCode}
                           ghost={isGhost}
                           pending={pending}
                           date={date}
@@ -1261,6 +1326,17 @@ export function RegisterBoard({
           setSardaPrompt(null);
           setSardaChecked(false);
           setTrainingChecked(false);
+        }}
+      />
+
+      <WrCodeDialog
+        open={!!wrPrompt}
+        name={wrPrompt?.userName ?? ""}
+        onCancel={() => setWrPrompt(null)}
+        onPick={(code) => {
+          if (!wrPrompt) return;
+          applyWr(wrPrompt.userId, wrPrompt.fromDate, wrPrompt.toDate, code);
+          setWrPrompt(null);
         }}
       />
     </div>
@@ -1851,10 +1927,16 @@ function TagPickerPanel({
   );
 }
 
+function hoverTagText(tag: DailyTag, locale: Locale, wrCode?: WrCode) {
+  if (isWrTag(tag) && wrCode) return `WR ${wrCode}`;
+  return `${tag} ${tagLabel(tag, locale)}`;
+}
+
 function RegisterCell({
   userId,
   tag,
   trgTone,
+  wrCode,
   ghost,
   pending,
   date,
@@ -1876,6 +1958,7 @@ function RegisterCell({
   userId: string;
   tag?: DailyTag;
   trgTone?: TrgTone;
+  wrCode?: WrCode;
   ghost?: boolean;
   pending?: boolean;
   date: string;
@@ -1934,15 +2017,15 @@ function RegisterCell({
           : t("daily.pastLocked");
   // Prior stored tags: normal title (not "disabled"). Empty locked: lock reason.
   const title = pending && tag
-    ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)} · ${t("daily.pendingRequest")}`
+    ? `${userName} · ${date} · ${hoverTagText(tag, locale, wrCode)} · ${t("daily.pendingRequest")}`
     : tag && !ghost
-      ? `${userName} · ${date} · ${tag} ${tagLabel(tag, locale)}${locked ? ` · ${lockReason}` : ""}`
+      ? `${userName} · ${date} · ${hoverTagText(tag, locale, wrCode)}${locked ? ` · ${lockReason}` : ""}`
       : joiningDay && !tag
         ? `${userName} · ${date} · ${t("daily.joiningDay")}`
         : locked
         ? `${userName} · ${date} · ${lockReason}`
         : tag
-          ? `${userName} · ${date} · ${tag}${ghost ? ` (${t("daily.carried")})` : ""} ${tagLabel(tag, locale)}`
+          ? `${userName} · ${date} · ${hoverTagText(tag, locale, wrCode)}${ghost ? ` (${t("daily.carried")})` : ""}`
           : `${userName} · ${date}`;
 
   return (

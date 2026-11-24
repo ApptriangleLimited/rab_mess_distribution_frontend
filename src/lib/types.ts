@@ -1,3 +1,7 @@
+import type { WrCode } from "@/lib/wr-code";
+
+export type { WrCode };
+
 export type Role = "cc" | "daily" | "mess" | "consume" | "ration" | "admin";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "ended";
@@ -119,6 +123,8 @@ export interface DailyAssignment {
   tag: DailyTag;
   /** Set when `tag` is TRG. Black = white label; red = other forces. */
   trg_tone?: TrgTone;
+  /** Set when `tag` is WR. `1`–`15` or `S`. Cell still shows WR. */
+  wr_code?: WrCode;
   updated_by: string;
   updated_at: string;
 }
@@ -126,7 +132,10 @@ export interface DailyAssignment {
 export type TagRequestStatus = "requested" | "updated" | "rejected";
 
 /** Who must approve the cockpit tag change. */
-export type TagRequestQueue = "daily" | "ration" | "consume";
+export type TagRequestQueue = "daily" | "ration" | "consume" | "mess";
+
+/** Admin setting: where a Daily tag change is sent. `none` = apply now. */
+export type TagRequestRoute = "consume" | "ration" | "mess" | "none";
 
 /** CC→Daily, or Daily→Ration (FR/CD), or Daily→Consume (other tags). */
 export interface TagRequest {
@@ -142,6 +151,7 @@ export interface TagRequest {
   /** Snapshot when Daily requests TRG. Applied to cockpit days on approve. */
   trg_tone?: TrgTone;
   trg_sarda?: boolean;
+  wr_code?: WrCode;
   queue: TagRequestQueue;
   status: TagRequestStatus;
   requested_by: string;
@@ -376,6 +386,8 @@ export interface AppState {
   assignments: DailyAssignment[];
   /** CC → Daily cockpit tag change requests. */
   tag_requests: TagRequest[];
+  /** Admin Settings: tag → Consume / Ration / Mess / apply now. */
+  tag_request_routes: Record<string, TagRequestRoute>;
   senders: SenderAccount[];
   rates: AllowanceRate[];
   /** Editable rank ladder (order = seniority for sort). */

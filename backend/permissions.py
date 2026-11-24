@@ -67,6 +67,8 @@ ROLE_PERMISSIONS = {
     "mess": [
         "member.view",
         "assignment.view",
+        "tag_request.view",
+        "tag_request.approve",
         "report.view",
         "snapshot.read",
         "snapshot.write",

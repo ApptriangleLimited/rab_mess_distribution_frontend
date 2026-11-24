@@ -18,6 +18,8 @@ import {
   needsTrgSardaPrompt,
   resolveTrgTone,
 } from "@/lib/trg-tone";
+import { resolveTagRequestRoute } from "@/lib/tag-request-routes";
+import { isWrTag, normalizeWrCode, type WrCode } from "@/lib/wr-code";
 import type {
   DailyTag,
   TagRequest,
@@ -31,26 +33,26 @@ function newId() {
 }
 
 /**
- * MS + MFR apply now. FR/CD → Ration. Red TRG → Ration. Black TRG applies now.
- * Every other tag goes to Consume for approval.
+ * Admin Settings choose Consume / Ration / Mess. `none` applies now.
  */
 export const TAG_CHANGE_APPROVAL_ENABLED = true;
 
-/** MS + MFR apply now. FR/CD → Ration. Red TRG → Ration. Black TRG applies now. */
+/** Admin Settings choose Consume / Ration / Mess. `none` applies now. */
 export function dutyTagQueue(
   tag: DailyTag | "",
-  trgTone?: TrgTone,
-): "immediate" | "ration" | "consume" {
+  _trgTone?: TrgTone,
+): "immediate" | "ration" | "consume" | "mess" {
   if (!TAG_CHANGE_APPROVAL_ENABLED) return "immediate";
-  if (!tag || tag === "MS" || tag === MFR_TAG) return "immediate";
-  if (tag === "FR" || tag === "CD") return "ration";
-  if (tag === "TRG") return trgTone === "red" ? "ration" : "immediate";
-  return "consume";
+  const route = resolveTagRequestRoute(tag, getState().tag_request_routes);
+  if (route === "none" || !tag) return "immediate";
+  return route;
 }
 
 export function normalizeTagRequest(raw: TagRequest): TagRequest {
   const queue: TagRequestQueue =
-    raw.queue === "ration" || raw.queue === "consume" ? raw.queue : "daily";
+    raw.queue === "ration" || raw.queue === "consume" || raw.queue === "mess"
+      ? raw.queue
+      : "daily";
   const from_date = raw.from_date || raw.date;
   const to_date = raw.to_date || raw.date || from_date;
   return { ...raw, queue, from_date, to_date };
@@ -90,7 +92,8 @@ export function requestQueueForTag(
   trgTone?: TrgTone,
 ): TagRequestQueue {
   const routed = dutyTagQueue(tag, trgTone);
-  return routed === "immediate" ? "daily" : routed;
+  if (routed === "immediate") return "daily";
+  return routed;
 }
 
 export function getPendingTagRequest(
@@ -137,11 +140,18 @@ export type PendingRequestCounts = Record<TagRequestQueue, number>;
 export function pendingRequestCounts(
   requests: TagRequest[] = getState().tag_requests,
 ): PendingRequestCounts {
-  const counts: PendingRequestCounts = { daily: 0, ration: 0, consume: 0 };
+  const counts: PendingRequestCounts = {
+    daily: 0,
+    ration: 0,
+    consume: 0,
+    mess: 0,
+  };
   for (const row of requests) {
     if (row.status !== "requested") continue;
     const queue: TagRequestQueue =
-      row.queue === "ration" || row.queue === "consume" ? row.queue : "daily";
+      row.queue === "ration" || row.queue === "consume" || row.queue === "mess"
+        ? row.queue
+        : "daily";
     counts[queue] += 1;
   }
   return counts;
@@ -152,14 +162,18 @@ export function pendingRequestCountForHref(
   href: string,
   counts: PendingRequestCounts,
 ): number {
-  if (href.startsWith("/daily/requests") || href.startsWith("/cc/requested")) {
+  if (href.startsWith("/daily/requests")) {
+    return counts.daily + counts.ration + counts.consume + counts.mess;
+  }
+  if (href.startsWith("/cc/requested")) {
     return counts.daily;
   }
   if (href.startsWith("/admin/requests")) {
-    return counts.daily + counts.ration + counts.consume;
+    return counts.daily + counts.ration + counts.consume + counts.mess;
   }
   if (href.startsWith("/ration/requests")) return counts.ration;
   if (href.startsWith("/consume/requests")) return counts.consume;
+  if (href.startsWith("/mess/requests")) return counts.mess;
   return 0;
 }
 
@@ -189,7 +203,13 @@ export function pendingDutyByUserDate(
   for (const r of requests) {
     if (r.status !== "requested") continue;
     const queue = r.queue ?? "daily";
-    if (queue !== "daily" && queue !== "ration" && queue !== "consume") continue;
+    if (
+      queue !== "daily" &&
+      queue !== "ration" &&
+      queue !== "consume" &&
+      queue !== "mess"
+    )
+      continue;
     const from = r.from_date || r.date;
     const to = r.to_date || r.date || from;
     for (const d of eachISODate(from, to)) {
@@ -303,10 +323,11 @@ export function createDutyTagRequest(input: {
   toTag: DailyTag;
   fromDate: string;
   toDate: string;
-  queue: "ration" | "consume";
+  queue: "ration" | "consume" | "mess";
   requestedBy?: string;
   trg_tone?: TrgTone;
   trg_sarda?: boolean;
+  wr_code?: WrCode;
   /** Daily RR paint only. Other menus keep the MFR lock. */
   skipMfrLock?: boolean;
 }): TagRequest | null {
@@ -324,6 +345,7 @@ export function createDutyTagRequest(input: {
   const trg_sarda = isTrgTag(input.toTag) && needsTrgSardaPrompt(user.force)
     ? Boolean(input.trg_sarda)
     : undefined;
+  const wr_code = normalizeWrCode(input.toTag, input.wr_code);
   const row: TagRequest = {
     id:
       existing?.id && !existing.id.startsWith("tr_demo_")
@@ -337,6 +359,7 @@ export function createDutyTagRequest(input: {
     to_tag: input.toTag,
     trg_tone,
     trg_sarda,
+    wr_code,
     queue: input.queue,
     status: "requested",
     requested_by: input.requestedBy ?? "daily",
@@ -345,6 +368,7 @@ export function createDutyTagRequest(input: {
   };
   if (!trg_tone) delete row.trg_tone;
   if (trg_sarda === undefined) delete row.trg_sarda;
+  if (!wr_code) delete row.wr_code;
 
   setState((prev) => ({
     ...prev,
@@ -388,7 +412,9 @@ export function applyTagRequest(
   const meta =
     isTrgTag(req.to_tag)
       ? { trg_tone: req.trg_tone ?? resolveTrgTone(user.force, false) }
-      : undefined;
+      : isWrTag(req.to_tag)
+        ? { wr_code: normalizeWrCode(req.to_tag, req.wr_code) }
+        : undefined;
 
   if (dates.length === 1) {
     const assigned = setTag(req.user_id, dates[0], req.to_tag, actor, meta);

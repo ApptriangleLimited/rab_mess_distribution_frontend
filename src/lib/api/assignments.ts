@@ -1,5 +1,6 @@
 import { apiJson } from "@/lib/api/client";
-import type { DailyAssignment, DailyTag, InactiveSpan, UserStatus } from "@/lib/types";
+import type { DailyAssignment, DailyTag, InactiveSpan, UserStatus, WrCode } from "@/lib/types";
+import { normalizeWrCode } from "@/lib/wr-code";
 
 export type JlMemberState = {
   id: string;
@@ -16,6 +17,7 @@ export type AssignmentCell = {
   tag: string | null;
   source: AssignmentSource;
   trg_tone?: "black" | "red" | null;
+  wr_code?: WrCode | string | null;
   updated_at?: string;
   updated_by?: string;
 };
@@ -71,6 +73,7 @@ export function putAssignment(body: {
   date: string;
   tag: string;
   trg_tone?: "black" | "red";
+  wr_code?: WrCode;
 }) {
   return apiJson<{ items: AssignmentCell[]; member?: JlMemberState }>("/api/v1/assignments", {
     method: "PUT",
@@ -90,6 +93,7 @@ export function putAssignmentRange(body: {
   dates: string[];
   tag: string;
   trg_tone?: "black" | "red";
+  wr_code?: WrCode;
 }) {
   return apiJson<{ updated: number; items: AssignmentCell[]; member?: JlMemberState }>(
     "/api/v1/assignments/range",
@@ -110,6 +114,7 @@ function cellToAssignment(cell: AssignmentCell): DailyAssignment {
       cell.trg_tone === "black" || cell.trg_tone === "red"
         ? cell.trg_tone
         : undefined,
+    wr_code: normalizeWrCode(cell.tag, cell.wr_code),
     updated_by: cell.updated_by ?? "daily",
     updated_at: cell.updated_at ?? new Date().toISOString(),
   };

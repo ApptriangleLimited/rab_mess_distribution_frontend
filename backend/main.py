@@ -52,6 +52,7 @@ from daily import (
     dhaka_today,
     each_date,
     grant_default_tag_from_today,
+    normalize_wr_code,
     router as daily_router,
     sync_due_jl,
     sync_member_jl,
@@ -94,19 +95,52 @@ QUEUE_ROLES = {
     "daily": ("daily", "admin"),
     "ration": ("ration", "admin"),
     "consume": ("consume", "admin"),
+    "mess": ("mess", "admin"),
+}
+# Daily must see outgoing FR/CD/etc. CC/admin see every desk. Destination still accepts.
+LIST_ALL_QUEUE_ROLES = ("admin", "cc", "daily")
+VIEW_QUEUE_ROLES = {
+    "daily": ("daily", "cc", "admin"),
+    "ration": ("ration", "daily", "cc", "admin"),
+    "consume": ("consume", "daily", "cc", "admin"),
+    "mess": ("mess", "daily", "cc", "admin"),
+}
+
+DEFAULT_TAG_REQUEST_ROUTES = {
+    "FR": "ration",
+    "CD": "ration",
+    "MS": "none",
+    "MFR": "none",
+    "TRG": "none",
 }
 
 
-def duty_tag_queue(tag: str, trg_tone: str | None = None) -> str:
-    """MS/MFR/black TRG stay on Daily. FR/CD/red TRG → Ration. Every other tag → Consume."""
+def tag_request_routes(db: Session) -> dict[str, str]:
+    row = db.get(CatalogState, "default")
+    raw = (row.payload or {}).get("tag_request_routes") if row else None
+    routes = dict(DEFAULT_TAG_REQUEST_ROUTES)
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            tag = str(key or "").strip().upper()
+            dest = str(value or "").strip().lower()
+            if tag and dest in ("consume", "ration", "mess", "none"):
+                routes[tag] = dest
+    return routes
+
+
+def duty_tag_queue(
+    tag: str,
+    trg_tone: str | None = None,
+    db: Session | None = None,
+) -> str:
+    """Admin settings choose Consume / Ration / Mess. `none` stays on Daily."""
+    del trg_tone
     name = (tag or "").upper()
-    if name in ("", "MS", "MFR"):
-        return "daily"
-    if name in ("FR", "CD"):
-        return "ration"
-    if name == "TRG":
-        return "ration" if trg_tone == "red" else "daily"
-    return "consume"
+    routes = tag_request_routes(db) if db is not None else dict(DEFAULT_TAG_REQUEST_ROUTES)
+    dest = routes.get(name) or ("consume" if name else "none")
+    if dest in ("consume", "ration", "mess"):
+        return dest
+    return "daily"
 
 configure_logging()
 settings.assert_secure()
@@ -303,6 +337,7 @@ def request_out(row: TagRequest) -> dict:
         "to_tag": row.to_tag,
         "trg_tone": row.trg_tone,
         "trg_sarda": row.trg_sarda,
+        "wr_code": row.wr_code,
         "queue": row.queue,
         "status": row.status,
         "requested_by": row.requested_by,
@@ -402,7 +437,7 @@ def queue_counts(db: Session) -> dict[str, int]:
         .group_by(TagRequest.queue)
         .all()
     )
-    counts = {"daily": 0, "ration": 0, "consume": 0}
+    counts = {"daily": 0, "ration": 0, "consume": 0, "mess": 0}
     for queue, total in rows:
         if queue in counts:
             counts[queue] = int(total)
@@ -993,10 +1028,15 @@ def list_tag_requests(
     db: Session = Depends(get_db),
 ):
     if queue == "all":
-        if staff.role not in ("admin", "cc"):
+        if staff.role not in LIST_ALL_QUEUE_ROLES:
             raise HTTPException(status_code=403, detail="Admin only")
-    elif queue not in QUEUE_ROLES:
+    elif queue not in VIEW_QUEUE_ROLES:
         raise HTTPException(status_code=400, detail="Invalid queue")
+    elif staff.role not in VIEW_QUEUE_ROLES[queue]:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to perform this action.",
+        )
     query = db.query(TagRequest).options(joinedload(TagRequest.member))
     if queue != "all":
         query = query.filter(TagRequest.queue == queue)
@@ -1007,9 +1047,9 @@ def list_tag_requests(
     if tag and tag != "all":
         query = query.filter(TagRequest.to_tag == tag.upper())
     if date_from:
-        query = query.filter(func.date(TagRequest.requested_at) >= date_from)
+        query = query.filter(TagRequest.to_date >= date_from)
     if date_to:
-        query = query.filter(func.date(TagRequest.requested_at) <= date_to)
+        query = query.filter(TagRequest.from_date <= date_to)
     query = query.join(Member, Member.id == TagRequest.user_id)
     if q and q.strip():
         like = f"%{q.strip()}%"
@@ -1106,14 +1146,17 @@ def create_tag_request(
     end = body.to_date or start
     if end < start:
         start, end = end, start
-    queue = duty_tag_queue(to_tag, body.trg_tone)
+    queue = duty_tag_queue(to_tag, body.trg_tone, db)
     stored = (
         db.query(Assignment)
         .filter(Assignment.user_id == member.id, Assignment.date == start)
         .first()
     )
     current = ((stored.tag if stored else member.default_tag) or "").upper()
-    if current == to_tag:
+    new_code = normalize_wr_code(to_tag, body.wr_code)
+    old_code = normalize_wr_code(current, stored.wr_code if stored is not None else None)
+    # Same tag is a no-op, except WR 1–15 / WR S on a day that already shows WR.
+    if current == to_tag and new_code == old_code:
         raise HTTPException(status_code=400, detail="Requested tag is the same as the current tag")
     pending = (
         db.query(TagRequest)
@@ -1125,6 +1168,11 @@ def create_tag_request(
         .first()
     )
     if pending and pending.to_tag == to_tag and pending.from_date == start and pending.to_date == end:
+        if (pending.wr_code or None) != new_code:
+            pending.wr_code = new_code
+            pending.updated_at = utcnow()
+            db.commit()
+            db.refresh(pending)
         pending.member = member
         bust_tag_requests()
         return envelope(request_out(pending), "Tag request already pending")
@@ -1138,6 +1186,7 @@ def create_tag_request(
         pending.to_date = end
         pending.trg_tone = body.trg_tone
         pending.trg_sarda = body.trg_sarda
+        pending.wr_code = normalize_wr_code(to_tag, body.wr_code)
         pending.requested_by = staff.id
         pending.requested_at = now
         pending.updated_at = now
@@ -1155,6 +1204,7 @@ def create_tag_request(
             to_tag=to_tag,
             trg_tone=body.trg_tone,
             trg_sarda=body.trg_sarda,
+            wr_code=normalize_wr_code(to_tag, body.wr_code),
             queue=queue,
             status="requested",
             requested_by=staff.id,
@@ -1231,7 +1281,7 @@ def accept_tag_request(
         if not can_assign(row.member, day):
             continue
         assigned = upsert_assignment(
-            db, row.member, day, row.to_tag, staff, row.trg_tone
+            db, row.member, day, row.to_tag, staff, row.trg_tone, row.wr_code
         )
         wrote += 1
     if wrote == 0:

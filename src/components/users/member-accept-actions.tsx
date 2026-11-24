@@ -141,6 +141,8 @@ export function MemberAcceptActions({
               toast(
                 queue === "ration"
                   ? t("daily.queuedRation", { tag: actionTag })
+                  : queue === "mess"
+                    ? t("daily.queuedMess", { tag: actionTag })
                   : t("daily.queuedConsume", { tag: actionTag }),
                 "success",
               );
@@ -205,6 +207,8 @@ export function MemberAcceptActions({
           toast(
             queue === "ration"
               ? t("daily.queuedRation", { tag: actionTag })
+              : queue === "mess"
+                ? t("daily.queuedMess", { tag: actionTag })
               : t("daily.queuedConsume", { tag: actionTag }),
             "success",
           );

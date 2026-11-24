@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS tag_requests (
     to_tag VARCHAR(32) NOT NULL,
     trg_tone VARCHAR(16),
     trg_sarda BOOLEAN,
+    wr_code VARCHAR(8),
     queue VARCHAR(16) NOT NULL DEFAULT 'daily',
     status VARCHAR(16) NOT NULL DEFAULT 'requested',
     requested_by VARCHAR(40) NOT NULL,
@@ -97,6 +98,7 @@ CREATE TABLE IF NOT EXISTS assignments (
     date DATE NOT NULL,
     tag VARCHAR(32) NOT NULL,
     trg_tone VARCHAR(16),
+    wr_code VARCHAR(8),
     updated_by VARCHAR(40) NOT NULL DEFAULT 'daily',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

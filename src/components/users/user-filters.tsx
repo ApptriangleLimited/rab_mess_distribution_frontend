@@ -46,6 +46,7 @@ export function MemberDateFilter({
   onTo,
   className,
   triggerClassName,
+  label,
 }: {
   from: string;
   to: string;
@@ -53,6 +54,7 @@ export function MemberDateFilter({
   onTo: (v: string) => void;
   className?: string;
   triggerClassName?: string;
+  label?: string;
 }) {
   const t = useT();
   return (
@@ -63,7 +65,7 @@ export function MemberDateFilter({
         onFrom(nextFrom);
         onTo(nextTo);
       }}
-      label={t("cc.fields.memberDate")}
+      label={label ?? t("cc.fields.memberDate")}
       className={className}
       triggerClassName={triggerClassName}
     />

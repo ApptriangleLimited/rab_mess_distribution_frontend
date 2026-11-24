@@ -7,10 +7,12 @@ import {
 } from "@/lib/store/daily";
 import { isCockpitMember } from "@/lib/store/users";
 import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
+import { normalizeWrCode, type WrCode } from "@/lib/wr-code";
 import type { DailyAssignment, DailyTag, TrgTone, User } from "@/lib/types";
 
 export type TagWriteMeta = {
   trg_tone?: TrgTone;
+  wr_code?: WrCode;
 };
 
 function trgToneForWrite(
@@ -23,6 +25,10 @@ function trgToneForWrite(
     return meta.trg_tone;
   }
   return resolveTrgTone(findUser(userId)?.force ?? "");
+}
+
+function wrCodeForWrite(tag: DailyTag | "", meta?: TagWriteMeta): WrCode | undefined {
+  return normalizeWrCode(tag, meta?.wr_code);
 }
 
 function newId() {
@@ -95,16 +101,19 @@ export function setTag(
   const existing = getAssignment(userId, date);
   const ts = nowISO();
   const trg_tone = trgToneForWrite(userId, tag, meta);
+  const wr_code = wrCodeForWrite(tag, meta);
 
   if (existing) {
     const updated: DailyAssignment = {
       ...existing,
       tag,
       trg_tone,
+      wr_code,
       updated_by: updatedBy,
       updated_at: ts,
     };
     if (!trg_tone) delete updated.trg_tone;
+    if (!wr_code) delete updated.wr_code;
     setState((prev) => {
       const assignments = prev.assignments.map((a) =>
         a.id === existing.id ? updated : a,
@@ -126,10 +135,12 @@ export function setTag(
     date,
     tag,
     trg_tone,
+    wr_code,
     updated_by: updatedBy,
     updated_at: ts,
   };
   if (!trg_tone) delete created.trg_tone;
+  if (!wr_code) delete created.wr_code;
   setState((prev) => {
     const assignments = [...prev.assignments, created];
     const synced = withJlSync(prev.users, assignments, [userId]);
@@ -157,16 +168,19 @@ export function setTagBulk(
     const next = [...prev.assignments];
     for (const userId of eligible) {
       const trg_tone = trgToneForWrite(userId, tag, meta);
+      const wr_code = wrCodeForWrite(tag, meta);
       const idx = next.findIndex((a) => a.user_id === userId && a.date === date);
       if (idx >= 0) {
         const row: DailyAssignment = {
           ...next[idx],
           tag,
           trg_tone,
+          wr_code,
           updated_by: updatedBy,
           updated_at: ts,
         };
         if (!trg_tone) delete row.trg_tone;
+        if (!wr_code) delete row.wr_code;
         next[idx] = row;
       } else {
         const row: DailyAssignment = {
@@ -175,10 +189,12 @@ export function setTagBulk(
           date,
           tag,
           trg_tone,
+          wr_code,
           updated_by: updatedBy,
           updated_at: ts,
         };
         if (!trg_tone) delete row.trg_tone;
+        if (!wr_code) delete row.wr_code;
         next.push(row);
       }
     }
@@ -216,7 +232,9 @@ export function setTagRange(
   const dateSet = new Set(allowed);
   const writeTag = tag || findUser(userId)?.default_tag || "";
   if (!writeTag) return 0;
-  const trg_tone = trgToneForWrite(userId, writeTag, tag ? meta : undefined);
+  const writeMeta = tag ? meta : undefined;
+  const trg_tone = trgToneForWrite(userId, writeTag, writeMeta);
+  const wr_code = wrCodeForWrite(writeTag, writeMeta);
   setState((prev) => {
     const next = prev.assignments.filter(
       (a) => !(a.user_id === userId && dateSet.has(a.date)),
@@ -228,10 +246,12 @@ export function setTagRange(
         date,
         tag: writeTag,
         trg_tone,
+        wr_code,
         updated_by: updatedBy,
         updated_at: ts,
       };
       if (!trg_tone) delete row.trg_tone;
+      if (!wr_code) delete row.wr_code;
       next.push(row);
     }
     let approved = prev.approved_dates ?? [];
@@ -377,15 +397,18 @@ export function approveCarryForward(
       }
 
       const trg_tone = trgToneForWrite(userId, fillTag);
+      const wr_code = wrCodeForWrite(fillTag);
       if (idx >= 0) {
         const row: DailyAssignment = {
           ...next[idx],
           tag: fillTag,
           trg_tone,
+          wr_code,
           updated_by: updatedBy,
           updated_at: ts,
         };
         if (!trg_tone) delete row.trg_tone;
+        if (!wr_code) delete row.wr_code;
         next[idx] = row;
       } else {
         const row: DailyAssignment = {
@@ -394,10 +417,12 @@ export function approveCarryForward(
           date,
           tag: fillTag,
           trg_tone,
+          wr_code,
           updated_by: updatedBy,
           updated_at: ts,
         };
         if (!trg_tone) delete row.trg_tone;
+        if (!wr_code) delete row.wr_code;
         next.push(row);
       }
       suppressed = withoutCarry(suppressed, userId, date);
@@ -444,16 +469,19 @@ export function autoApplyCarryForward(
     if (!fillTag) continue;
 
     const trg_tone = trgToneForWrite(userId, fillTag);
+    const wr_code = wrCodeForWrite(fillTag);
     const row: DailyAssignment = {
       id: newId(),
       user_id: userId,
       date,
       tag: fillTag,
       trg_tone,
+      wr_code,
       updated_by: updatedBy,
       updated_at: ts,
     };
     if (!trg_tone) delete row.trg_tone;
+    if (!wr_code) delete row.wr_code;
     next.push(row);
     filled += 1;
   }

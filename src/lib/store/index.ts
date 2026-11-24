@@ -74,6 +74,7 @@ import {
   extraTrustFirewoodMembers,
   SEED_VERSION,
 } from "@/lib/store/seed";
+import { ensureTagRequestRoutes } from "@/lib/tag-request-routes";
 import type {
   AllowanceRate,
   AppState,
@@ -2242,6 +2243,9 @@ function normalizeState(state: AppState): AppState {
       (state as AppState & { paper_report_requests?: unknown })
         .paper_report_requests,
     ),
+    tag_request_routes: ensureTagRequestRoutes(
+      (state as AppState).tag_request_routes,
+    ),
     tag_requests: apiBacked
       ? storedTagRequests(state.tag_requests)
       : ensureTagRequests(state.tag_requests, state.users ?? []),
@@ -2279,6 +2283,7 @@ const EMPTY_SERVER_SNAPSHOT: AppState = {
   ranks: [],
   wings: [],
   wing_parent: {},
+  tag_request_routes: ensureTagRequestRoutes({}),
   wing_labels: {},
   wing_labels_bn: {},
   wing_serials: {},

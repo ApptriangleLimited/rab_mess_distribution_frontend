@@ -12,7 +12,12 @@ import {
   type PendingRequestCounts,
 } from "@/lib/store/tag-requests";
 
-const emptyCounts: PendingRequestCounts = { daily: 0, ration: 0, consume: 0 };
+const emptyCounts: PendingRequestCounts = {
+  daily: 0,
+  ration: 0,
+  consume: 0,
+  mess: 0,
+};
 
 export function usePendingRequestCounts() {
   const { tag_requests } = useStore();

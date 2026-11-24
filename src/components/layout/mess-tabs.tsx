@@ -5,11 +5,13 @@ import {
   IconCake,
   IconClockHour4,
   IconLayoutDashboard,
+  IconSend,
   IconSettings,
   IconTags,
 } from "@tabler/icons-react";
 import { RoleNavTabs } from "@/components/layout/role-nav-tabs";
 import { AdminTabs } from "@/components/layout/ration-tabs";
+import { useRequestMenuBadge } from "@/hooks/use-pending-request-counts";
 import { useSession } from "@/hooks/use-session";
 import { useT } from "@/i18n/provider";
 
@@ -26,6 +28,13 @@ const TABS = [
     icon: IconTags,
     match: (path: string) =>
       path === "/mess/ledger" || path.startsWith("/mess/ledger/"),
+  },
+  {
+    href: "/mess/requests",
+    labelKey: "nav.requests" as const,
+    icon: IconSend,
+    match: (path: string) =>
+      path === "/mess/requests" || path.startsWith("/mess/requests/"),
   },
   {
     href: "/mess/pritibhoj",
@@ -53,6 +62,7 @@ const TABS = [
 export function MessTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();
+  const requestBadge = useRequestMenuBadge("/mess/requests");
 
   return (
     <RoleNavTabs
@@ -64,6 +74,7 @@ export function MessTabs({ className }: { className?: string }) {
         label: t(tab.labelKey),
         icon: tab.icon,
         active: tab.match(pathname),
+        badge: tab.href === "/mess/requests" ? requestBadge : undefined,
       }))}
     />
   );

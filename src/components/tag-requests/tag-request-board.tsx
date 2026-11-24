@@ -46,6 +46,7 @@ import { syncStoreFromApi } from "@/lib/api/app-sync";
 import {
   acceptTagRequest,
   listTagRequests,
+  listTagRequestsAllQueues,
   rejectTagRequestApi,
   requestMember,
   requestToTagRequest,
@@ -66,8 +67,7 @@ import {
 import { formatMemberWing, memberMatchesWingFilter } from "@/lib/store/org-options";
 import { listAllTags } from "@/lib/store/rates";
 import { eachISODate, formatDateDisplay, todayISO } from "@/lib/date";
-import { tagLabel } from "@/i18n";
-import { useI18n, useT } from "@/i18n/provider";
+import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import type {
   TagRequest,
@@ -76,7 +76,7 @@ import type {
   User,
 } from "@/lib/types";
 
-type Mode = "daily" | "cc" | "ration" | "consume" | "admin";
+type Mode = "daily" | "cc" | "ration" | "consume" | "mess" | "admin";
 type BoardTab = "inbox" | "history";
 type HistoryView = "all" | "updated" | "rejected";
 type QueueFilter = TagRequestQueue | "all";
@@ -102,12 +102,14 @@ function matchesBoardTab(
 function queueForMode(mode: Mode): TagRequestQueue {
   if (mode === "ration") return "ration";
   if (mode === "consume") return "consume";
+  if (mode === "mess") return "mess";
   return "daily";
 }
 
 function queueLabel(queue: TagRequestQueue, t: ReturnType<typeof useT>) {
   if (queue === "ration") return t("tagRequest.queueRation");
   if (queue === "consume") return t("tagRequest.queueConsume");
+  if (queue === "mess") return t("tagRequest.queueMess");
   return t("tagRequest.queueDaily");
 }
 
@@ -134,7 +136,6 @@ export function TagRequestBoard({
   tabs: ReactNode;
 }) {
   const t = useT();
-  const { locale } = useI18n();
   const { toast } = useToast();
   const state = useStore();
   const apiOn = isCcApiEnabled();
@@ -170,8 +171,12 @@ export function TagRequestBoard({
   const [pendingUpdate, setPendingUpdate] = useState<TagRequest | null>(null);
   const [pendingReject, setPendingReject] = useState<TagRequest | null>(null);
   const queue: QueueFilter =
-    mode === "admin" ? queueFilter : mode === "cc" ? "all" : queueForMode(mode);
-  const showQueue = mode === "admin" || mode === "cc";
+    mode === "daily"
+      ? queueFilter
+      : mode === "admin" || mode === "cc"
+        ? "all"
+        : queueForMode(mode);
+  const showQueueFilter = mode === "daily";
 
   useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
 
@@ -187,7 +192,6 @@ export function TagRequestBoard({
     let cancelled = false;
     setLoading(true);
     const filters = {
-      queue,
       q: q || undefined,
       rank,
       wing,
@@ -236,41 +240,21 @@ export function TagRequestBoard({
       if (queue !== "all") {
         return listTagRequests({
           ...filters,
+          queue,
           status: statusParam,
           page: apiPage,
           page_size: apiPageSize,
         });
       }
-      return Promise.all(
-        (["daily", "ration", "consume"] as const).map((nextQueue) =>
-          listTagRequests({
-            ...filters,
-            queue: nextQueue,
-            status: statusParam,
-            page: 1,
-            page_size: 500,
-          }),
-        ),
-      ).then((pages) => {
-        const items = sortItems(pages.flatMap((page) => page.items));
-        const status_counts = pages.reduce(
-          (acc, page) => ({
-            requested: acc.requested + page.status_counts.requested,
-            updated: acc.updated + page.status_counts.updated,
-            rejected: acc.rejected + page.status_counts.rejected,
-            all: acc.all + page.status_counts.all,
-          }),
-          { requested: 0, updated: 0, rejected: 0, all: 0 },
-        );
-        return {
-          items,
-          total: items.length,
-          page: 1,
-          page_size: 500,
-          counts: pages[0]?.counts ?? { daily: 0, ration: 0, consume: 0 },
-          status_counts,
-        } satisfies TagRequestListData;
-      });
+      return listTagRequestsAllQueues({
+        ...filters,
+        status: statusParam,
+        page: 1,
+        page_size: 500,
+      }).then((data) => ({
+        ...data,
+        items: sortItems(data.items),
+      }));
     }
 
     const load =
@@ -350,9 +334,10 @@ export function TagRequestBoard({
           return false;
         if (status !== "all" && user.status !== status) return false;
         if (tag !== "all" && req.to_tag !== tag) return false;
-        const day = requestDay(req.requested_at);
-        if (dateFrom && day < dateFrom) return false;
-        if (dateTo && day > dateTo) return false;
+        const reqFrom = requestDay(req.from_date || req.date);
+        const reqTo = requestDay(req.to_date || reqFrom);
+        if (dateFrom && reqTo < dateFrom) return false;
+        if (dateTo && reqFrom > dateTo) return false;
         if (!query) return true;
         return [user.name, user.personal_id, user.rab_id, user.rank, user.wing, req.to_tag]
           .join(" ")
@@ -409,7 +394,9 @@ export function TagRequestBoard({
   const resetKey = rows.map((r) => r.id).join("|");
   const clientPage = usePagination(rows, resetKey);
   const useClientPage =
-    !apiOn || (boardTab === "history" && historyView === "all");
+    !apiOn ||
+    queue === "all" ||
+    (boardTab === "history" && historyView === "all");
   const page = useClientPage
     ? clientPage
     : {
@@ -443,12 +430,13 @@ export function TagRequestBoard({
       t("cc.fields.name"),
       t("cc.fields.wing"),
     ];
-    if (showQueue) headers.push(t("tagRequest.queue"));
+    headers.push(t("tagRequest.goesTo"));
     headers.push(
       t("tagRequest.currentTag"),
       t("tagRequest.requestedTag"),
       t("tagRequest.status"),
-      t("common.dateRange"),
+      t("common.dateFrom"),
+      t("common.dateTo"),
       t("tagRequest.days"),
       t("tagRequest.requestedAt"),
     );
@@ -460,12 +448,6 @@ export function TagRequestBoard({
     user: User,
     index: number,
   ): string[] {
-    const range =
-      req.from_date && req.to_date && req.from_date !== req.to_date
-        ? `${formatDateDisplay(req.from_date)} – ${formatDateDisplay(req.to_date)}`
-        : formatDateDisplay(req.from_date || req.date) ||
-          req.from_date ||
-          req.date;
     const cells = [
       String(index + 1),
       user.rab_id || "—",
@@ -473,12 +455,17 @@ export function TagRequestBoard({
       user.name || "—",
       formatMemberWing(user.wing) || user.wing || "—",
     ];
-    if (showQueue) cells.push(queueLabel(req.queue ?? "daily", t));
+    cells.push(queueLabel(req.queue ?? "daily", t));
     cells.push(
       getCockpitTagOnDate(user, today) || "—",
       req.to_tag || "—",
       statusLabel(req.status),
-      range || "—",
+      formatDateDisplay(req.from_date || req.date) || req.from_date || req.date || "—",
+      formatDateDisplay(req.to_date || req.from_date || req.date) ||
+        req.to_date ||
+        req.from_date ||
+        req.date ||
+        "—",
       String(requestSpanDays(req) || "—"),
       requestDay(req.requested_at) || "—",
     );
@@ -486,8 +473,8 @@ export function TagRequestBoard({
   }
 
   async function loadExportRows() {
-    if (!apiOn) {
-      return demoRows
+    if (!apiOn || queue === "all" || (boardTab === "history" && historyView === "all")) {
+      return (apiOn ? apiRows : demoRows)
         .map((req) => {
           const user = usersById.get(req.user_id);
           return user ? { req, user } : null;
@@ -670,39 +657,6 @@ export function TagRequestBoard({
           </div>
         </div>
 
-        {mode === "admin" ? (
-          <div
-            role="tablist"
-            aria-label={t("tagRequest.queue")}
-            className="grid grid-cols-2 gap-2 rounded-2xl border border-neutral-200/80 bg-gradient-to-br from-white via-neutral-50 to-emerald-50/40 p-1.5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.35)] sm:grid-cols-4 dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900"
-          >
-            {(
-              [
-                ["all", t("tagRequest.queueAll")],
-                ["daily", t("tagRequest.queueDaily")],
-                ["ration", t("tagRequest.queueRation")],
-                ["consume", t("tagRequest.queueConsume")],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={queueFilter === id}
-                onClick={() => setQueueFilter(id)}
-                className={cn(
-                  "rounded-xl px-3 py-3 text-sm font-semibold tracking-wide transition",
-                  queueFilter === id
-                    ? "bg-primary text-white shadow-lg shadow-primary/25"
-                    : "text-neutral-600 hover:bg-white hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-white",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         <div
           role="tablist"
           aria-label={t("tagRequest.boardTabs")}
@@ -814,6 +768,30 @@ export function TagRequestBoard({
             </div>
           }
         >
+          {showQueueFilter ? (
+            <div className="w-[9.5rem] shrink-0">
+              <Select
+                value={queueFilter}
+                onValueChange={(value) => setQueueFilter(value as QueueFilter)}
+              >
+                <SelectTrigger
+                  className={cn(fieldClass, "w-full")}
+                  aria-label={t("tagRequest.goesTo")}
+                >
+                  <SelectValue placeholder={t("tagRequest.goesTo")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("tagRequest.queueAll")}</SelectItem>
+                  <SelectItem value="daily">{t("tagRequest.queueDaily")}</SelectItem>
+                  <SelectItem value="ration">{t("tagRequest.queueRation")}</SelectItem>
+                  <SelectItem value="consume">
+                    {t("tagRequest.queueConsume")}
+                  </SelectItem>
+                  <SelectItem value="mess">{t("tagRequest.queueMess")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <SettingsRankFilter
             value={rank}
             onChange={setRank}
@@ -836,7 +814,7 @@ export function TagRequestBoard({
                 <SelectItem value="all">{t("common.allTag")}</SelectItem>
                 {tags.map((code) => (
                   <SelectItem key={code} value={code}>
-                    {code} — {tagLabel(code, locale)}
+                    {code}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -861,6 +839,7 @@ export function TagRequestBoard({
             onTo={setDateTo}
             className="w-[14.25rem] shrink-0"
             triggerClassName="h-8 rounded-lg px-2 text-xs"
+            label={`${t("common.dateFrom")} / ${t("common.dateTo")}`}
           />
         </SearchFilterBar>
 
@@ -879,6 +858,8 @@ export function TagRequestBoard({
                     ? t("tagRequest.emptyRation")
                     : mode === "consume"
                       ? t("tagRequest.emptyConsume")
+                      : mode === "mess"
+                        ? t("tagRequest.emptyMess")
                       : mode === "daily"
                         ? t("tagRequest.emptyDaily")
                         : t("tagRequest.emptyCc")
@@ -894,13 +875,12 @@ export function TagRequestBoard({
                     <th className="px-4 py-3.5">{t("cc.fields.rank")}</th>
                     <th className="px-4 py-3.5">{t("cc.fields.name")}</th>
                     <th className="px-4 py-3.5">{t("cc.fields.wing")}</th>
-                    {showQueue ? (
-                      <th className="px-4 py-3.5">{t("tagRequest.queue")}</th>
-                    ) : null}
+                    <th className="px-4 py-3.5">{t("tagRequest.goesTo")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.currentTag")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.requestedTag")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.status")}</th>
-                    <th className="px-4 py-3.5">{t("common.dateRange")}</th>
+                    <th className="px-4 py-3.5">{t("common.dateFrom")}</th>
+                    <th className="px-4 py-3.5">{t("common.dateTo")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.days")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.requestedAt")}</th>
                     {showActions ? <th className="px-4 py-3.5" /> : null}
@@ -917,11 +897,17 @@ export function TagRequestBoard({
                         user={user}
                         today={today}
                         mode={mode}
-                        canAct={showActions}
+                        showActionCol={showActions}
+                        canAct={
+                          showActions &&
+                          (mode === "admin" ||
+                            (req.queue ?? "daily") === queueForMode(mode))
+                        }
                         onUpdate={() => setPendingUpdate(req)}
                         onReject={
                           mode === "ration" ||
                           mode === "consume" ||
+                          mode === "mess" ||
                           mode === "admin"
                             ? () => setPendingReject(req)
                             : undefined
@@ -1041,6 +1027,7 @@ function RequestRow({
   today,
   mode,
   canAct,
+  showActionCol,
   onUpdate,
   onReject,
 }: {
@@ -1049,6 +1036,7 @@ function RequestRow({
   today: string;
   mode: Mode;
   canAct: boolean;
+  showActionCol: boolean;
   onUpdate: () => void;
   onReject?: () => void;
 }) {
@@ -1074,13 +1062,11 @@ function RequestRow({
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
         {user.wing || "—"}
       </td>
-      {mode === "admin" || mode === "cc" ? (
-        <td className="px-4 py-3">
-          <Badge className="rounded-md border border-neutral-200 bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
-            {queueLabel(req.queue ?? "daily", t)}
-          </Badge>
-        </td>
-      ) : null}
+      <td className="px-4 py-3">
+        <Badge className="rounded-md border border-neutral-200 bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+          {queueLabel(req.queue ?? "daily", t)}
+        </Badge>
+      </td>
       <td className="px-4 py-3">
         <TagChip tag={current} tone={getCockpitToneOnDate(user, today)} />
       </td>
@@ -1106,9 +1092,17 @@ function RequestRow({
         </Badge>
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
-        {req.from_date && req.to_date && req.from_date !== req.to_date
-          ? `${formatDateDisplay(req.from_date)} – ${formatDateDisplay(req.to_date)}`
-          : formatDateDisplay(req.from_date || req.date) || req.from_date || req.date}
+        {formatDateDisplay(req.from_date || req.date) ||
+          req.from_date ||
+          req.date ||
+          "—"}
+      </td>
+      <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+        {formatDateDisplay(req.to_date || req.from_date || req.date) ||
+          req.to_date ||
+          req.from_date ||
+          req.date ||
+          "—"}
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
         {requestSpanDays(req) || "—"}
@@ -1116,33 +1110,39 @@ function RequestRow({
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
         {requestDay(req.requested_at)}
       </td>
-      {canAct && req.status === "requested" ? (
+      {showActionCol ? (
         <td className="px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="cta"
-              size="sm"
-              className="rounded-lg"
-              onClick={onUpdate}
-            >
-              {mode === "daily" ? t("tagRequest.update") : t("tagRequest.approve")}
-            </Button>
-            {onReject ? (
+          {canAct && req.status === "requested" ? (
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="cta"
                 size="sm"
                 className="rounded-lg"
-                onClick={onReject}
+                onClick={onUpdate}
               >
-                {t("tagRequest.reject")}
+                {mode === "daily" ? t("tagRequest.update") : t("tagRequest.approve")}
               </Button>
-            ) : null}
-          </div>
+              {onReject ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={onReject}
+                >
+                  {t("tagRequest.reject")}
+                </Button>
+              ) : null}
+            </div>
+          ) : mode === "daily" && req.status === "requested" ? (
+            <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+              {t("tagRequest.waitingOn", {
+                queue: queueLabel(req.queue ?? "daily", t),
+              })}
+            </span>
+          ) : null}
         </td>
-      ) : canAct ? (
-        <td className="px-4 py-3" />
       ) : null}
     </tr>
   );

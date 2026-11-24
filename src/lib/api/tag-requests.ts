@@ -12,7 +12,9 @@ import type {
   TagRequestStatus,
   TrgTone,
   User,
+  WrCode,
 } from "@/lib/types";
+import { normalizeWrCode } from "@/lib/wr-code";
 
 export type TagRequestApiRow = {
   id: string;
@@ -24,6 +26,7 @@ export type TagRequestApiRow = {
   to_tag: string;
   trg_tone?: TrgTone | null;
   trg_sarda?: boolean | null;
+  wr_code?: WrCode | string | null;
   queue: TagRequestQueue;
   status: TagRequestStatus;
   requested_by: string;
@@ -38,7 +41,7 @@ export type TagRequestListData = {
   total: number;
   page: number;
   page_size: number;
-  counts: { daily: number; ration: number; consume: number };
+  counts: { daily: number; ration: number; consume: number; mess: number };
   status_counts: {
     all: number;
     requested: number;
@@ -74,6 +77,7 @@ export function requestToTagRequest(row: TagRequestApiRow): TagRequest {
     to_tag: row.to_tag as DailyTag,
     trg_tone: row.trg_tone ?? undefined,
     trg_sarda: row.trg_sarda ?? undefined,
+    wr_code: normalizeWrCode(row.to_tag, row.wr_code),
     queue: row.queue,
     status: row.status,
     requested_by: row.requested_by,
@@ -87,14 +91,51 @@ export function requestMember(row: TagRequestApiRow): User | null {
   return row.member ? memberToUser(row.member) : null;
 }
 
+export const TAG_REQUEST_QUEUES: TagRequestQueue[] = [
+  "daily",
+  "ration",
+  "consume",
+  "mess",
+];
+
 function emptyTagRequestList(params: TagRequestListParams = {}): TagRequestListData {
   return {
     items: [],
     total: 0,
     page: params.page ?? 1,
     page_size: params.page_size ?? 25,
-    counts: { daily: 0, ration: 0, consume: 0 },
+    counts: { daily: 0, ration: 0, consume: 0, mess: 0 },
     status_counts: { all: 0, requested: 0, updated: 0, rejected: 0 },
+  };
+}
+
+function mergeTagRequestLists(pages: TagRequestListData[]): TagRequestListData {
+  const items = [...pages.flatMap((page) => page.items)].sort((a, b) => {
+    const timeA = a.updated_at || a.requested_at || "";
+    const timeB = b.updated_at || b.requested_at || "";
+    return timeB.localeCompare(timeA);
+  });
+  const status_counts = pages.reduce(
+    (acc, page) => ({
+      requested: acc.requested + page.status_counts.requested,
+      updated: acc.updated + page.status_counts.updated,
+      rejected: acc.rejected + page.status_counts.rejected,
+      all: acc.all + page.status_counts.all,
+    }),
+    { requested: 0, updated: 0, rejected: 0, all: 0 },
+  );
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    page_size: Math.max(items.length, 1),
+    counts: pages[0]?.counts ?? {
+      daily: 0,
+      ration: 0,
+      consume: 0,
+      mess: 0,
+    },
+    status_counts,
   };
 }
 
@@ -119,17 +160,48 @@ export async function listTagRequests(params: TagRequestListParams = {}) {
   }
 }
 
+/** Daily / CC / Admin inbox: every desk, even if `queue=all` is still denied. */
+export async function listTagRequestsAllQueues(
+  params: Omit<TagRequestListParams, "queue"> = {},
+) {
+  try {
+    return await listTagRequests({
+      ...params,
+      queue: "all",
+      page: params.page ?? 1,
+      page_size: params.page_size ?? 500,
+    });
+  } catch {
+    const pages = await Promise.all(
+      TAG_REQUEST_QUEUES.map((queue) =>
+        listTagRequests({
+          ...params,
+          queue,
+          page: 1,
+          page_size: 500,
+        }).catch(() => emptyTagRequestList({ ...params, queue })),
+      ),
+    );
+    return mergeTagRequestLists(pages);
+  }
+}
+
 export async function tagRequestCounts() {
   if (isLegacyLiveApi() || isApiFeatureMissing("tag-requests")) {
-    return { daily: 0, ration: 0, consume: 0 };
+    return { daily: 0, ration: 0, consume: 0, mess: 0 };
   }
   try {
-    return await apiJson<{ daily: number; ration: number; consume: number }>(
+    return await apiJson<{
+      daily: number;
+      ration: number;
+      consume: number;
+      mess: number;
+    }>(
       "/api/v1/tag-requests/counts",
     );
   } catch (err) {
     if (rememberMissingRoute("tag-requests", err)) {
-      return { daily: 0, ration: 0, consume: 0 };
+      return { daily: 0, ration: 0, consume: 0, mess: 0 };
     }
     throw err;
   }
@@ -143,6 +215,7 @@ export function createTagRequestApi(input: {
   queue?: TagRequestQueue;
   trg_tone?: TrgTone;
   trg_sarda?: boolean;
+  wr_code?: WrCode;
 }) {
   return apiJson<TagRequestApiRow>("/api/v1/tag-requests", {
     method: "POST",
@@ -154,6 +227,7 @@ export function createTagRequestApi(input: {
       queue: input.queue ?? "daily",
       trg_tone: input.trg_tone ?? null,
       trg_sarda: input.trg_sarda ?? null,
+      wr_code: input.wr_code ?? null,
     }),
   });
 }

@@ -455,10 +455,13 @@ def get_catalog(
 @router.put("/api/v1/catalog")
 def put_catalog(
     body: CatalogPutIn,
-    _staff: Staff = Depends(require_permission("settings.manage")),
+    staff: Staff = Depends(require_permission("settings.manage")),
     db: Session = Depends(get_db),
 ):
-    apply_catalog(db, body.payload or {})
+    payload = dict(body.payload or {})
+    if staff.role != "admin":
+        payload.pop("tag_request_routes", None)
+    apply_catalog(db, payload)
     db.commit()
     bust_settings()
     return envelope(catalog_payload(db), "Saved")

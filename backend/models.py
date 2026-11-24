@@ -137,6 +137,7 @@ class TagRequest(AuditUserMixin, Base):
     to_tag: Mapped[str] = mapped_column(String(32), nullable=False)
     trg_tone: Mapped[str | None] = mapped_column(String(16), nullable=True)
     trg_sarda: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    wr_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
     queue: Mapped[str] = mapped_column(String(16), nullable=False, default="daily")
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="requested")
     requested_by: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -164,6 +165,7 @@ class Assignment(AuditUserMixin, Base):
     date: Mapped[date] = mapped_column(Date, nullable=False)
     tag: Mapped[str] = mapped_column(String(32), nullable=False)
     trg_tone: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    wr_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
     updated_by: Mapped[str] = mapped_column(String(40), nullable=False, default="daily")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

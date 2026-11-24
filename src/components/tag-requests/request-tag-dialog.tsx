@@ -99,6 +99,10 @@ export function RequestTagButton({
         toast(t("daily.queuedConsume", { tag }), "success");
         return;
       }
+      if (queue === "mess") {
+        toast(t("daily.queuedMess", { tag }), "success");
+        return;
+      }
       toast(t("tagRequest.requestToast"), "success");
     }
     if (apiOn) {

@@ -36,6 +36,7 @@ import { isCcApiEnabled } from "@/lib/api/mode";
 import { officialSenderAccounts } from "@/lib/official-senders";
 import { demoPritibhojEvents } from "@/lib/pritibhoj-demo";
 import { demoTagRequests } from "@/lib/tag-request-demo";
+import { DEFAULT_TAG_REQUEST_ROUTES } from "@/lib/tag-request-routes";
 import type {
   AllowanceRate,
   AppState,
@@ -698,6 +699,7 @@ export function createSeedState(): AppState {
     assignments,
     senders,
     rates,
+    tag_request_routes: { ...DEFAULT_TAG_REQUEST_ROUTES },
     ranks: [...RANKS, "Attached"],
     wings: [...new Set([...WINGS, ...ADMIN_SUB_WINGS, ...HQ_SUB_WINGS])],
     wing_parent: { ...DEFAULT_WING_PARENT },

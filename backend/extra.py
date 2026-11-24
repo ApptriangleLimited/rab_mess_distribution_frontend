@@ -785,7 +785,7 @@ PUBLIC_FORM_CATALOG_KEYS = tuple(
     key
     for key in CATALOG_KEYS
     if key
-    not in ("manpower_held", "manpower_absent", "manpower_present", "manpower_absence_detail", "force_rank_officer", "force_rank_cells", "paper_report_requests")
+    not in ("manpower_held", "manpower_absent", "manpower_present", "manpower_absence_detail", "force_rank_officer", "force_rank_cells", "paper_report_requests", "tag_request_routes")
 )
 
 

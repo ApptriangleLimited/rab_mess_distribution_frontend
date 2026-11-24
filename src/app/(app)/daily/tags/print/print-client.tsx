@@ -153,6 +153,7 @@ export default function DailyRegisterPrintClient() {
         tag: row.tag,
         source: row.id.startsWith("carry|") ? "carry" : "stored",
         trg_tone: row.trg_tone,
+        wr_code: row.wr_code,
       })),
     ).rows;
   }, [

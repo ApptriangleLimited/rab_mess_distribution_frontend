@@ -51,6 +51,7 @@ import { RegisterQrSection } from "@/components/settings/register-qr-section";
 import { StaffAccountsSection } from "@/components/settings/staff-accounts-section";
 import { MealShiftsSection } from "@/components/settings/meal-shifts-section";
 import { OrgListSection } from "@/components/settings/org-list-section";
+import { TagRequestRoutesSection } from "@/components/settings/tag-request-routes-section";
 import {
   parseSettingsTab,
   settingsTabAccess,
@@ -496,6 +497,9 @@ function SettingsPageInner() {
         ) : null}
         {tab === "authorized" ? <AuthorizedSection static /> : null}
         {tab === "qr" ? <RegisterQrSection static /> : null}
+        {tab === "tag-routes" && access.isAdmin ? (
+          <TagRequestRoutesSection />
+        ) : null}
 
         {/* Languages — kept for later; hidden for now */}
         <SectionCard className="hidden">

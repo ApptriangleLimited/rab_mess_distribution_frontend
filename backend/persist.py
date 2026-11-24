@@ -90,6 +90,7 @@ CATALOG_KEYS = (
     "force_rank_officer",
     "force_rank_cells",
     "paper_report_requests",
+    "tag_request_routes",
 )
 
 
@@ -270,6 +271,7 @@ def assignment_out(row: Assignment) -> dict:
         "date": row.date.isoformat(),
         "tag": row.tag,
         "trg_tone": row.trg_tone,
+        "wr_code": row.wr_code,
         "updated_by": row.updated_by,
         "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
     }
@@ -529,6 +531,7 @@ def upsert_assignment(db: Session, raw: dict) -> None:
         db.add(existing)
     existing.tag = str(raw.get("tag") or "MS").upper()
     existing.trg_tone = raw.get("trg_tone")
+    existing.wr_code = raw.get("wr_code")
     existing.updated_by = str(raw.get("updated_by") or "daily")
     existing.updated_at = parse_dt(raw.get("updated_at")) or utcnow()
 
@@ -553,6 +556,7 @@ def upsert_tag_request(db: Session, raw: dict) -> None:
     row.to_tag = str(raw.get("to_tag") or "MS")
     row.trg_tone = raw.get("trg_tone")
     row.trg_sarda = raw.get("trg_sarda")
+    row.wr_code = raw.get("wr_code")
     row.queue = str(raw.get("queue") or "daily")
     row.status = str(raw.get("status") or "requested")
     row.requested_by = str(raw.get("requested_by") or "cc")

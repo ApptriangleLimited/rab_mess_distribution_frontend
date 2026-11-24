@@ -58,6 +58,7 @@ const CATALOG_KEYS = [
   "force_rank_officer",
   "force_rank_cells",
   "paper_report_requests",
+  "tag_request_routes",
 ] as const;
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;

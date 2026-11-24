@@ -10,6 +10,7 @@ import {
   IconShield,
   IconTopologyStar3,
   IconClipboardList,
+  IconSend,
   IconUsers,
   type Icon,
 } from "@tabler/icons-react";
@@ -29,7 +30,8 @@ export type SettingsTabId =
   | "bank"
   | "member-bank"
   | "authorized"
-  | "qr";
+  | "qr"
+  | "tag-routes";
 
 type TabDef = {
   id: SettingsTabId;
@@ -38,12 +40,14 @@ type TabDef = {
   rationOnly?: boolean;
   staffOnly?: boolean;
   hideForMess?: boolean;
+  adminOnly?: boolean;
 };
 
 export type SettingsTabAccess = {
   isRation: boolean;
   canManageStaff: boolean;
   hideRates: boolean;
+  isAdmin: boolean;
 };
 
 export function settingsTabAccess(role?: Role | null): SettingsTabAccess {
@@ -53,6 +57,7 @@ export function settingsTabAccess(role?: Role | null): SettingsTabAccess {
     isRation: role === "ration" || isAdmin,
     canManageStaff: isAdmin || isMess,
     hideRates: isMess,
+    isAdmin,
   };
 }
 
@@ -81,6 +86,12 @@ const TABS: TabDef[] = [
     icon: IconClipboardList,
   },
   { id: "qr", labelKey: "settings.tabQr", icon: IconQrcode },
+  {
+    id: "tag-routes",
+    labelKey: "settings.tabTagRoutes",
+    icon: IconSend,
+    adminOnly: true,
+  },
 ];
 
 export function settingsTabsForRole(access: SettingsTabAccess): TabDef[] {
@@ -88,6 +99,7 @@ export function settingsTabsForRole(access: SettingsTabAccess): TabDef[] {
     if (tab.rationOnly && !access.isRation) return false;
     if (tab.staffOnly && !access.canManageStaff) return false;
     if (tab.hideForMess && access.hideRates) return false;
+    if (tab.adminOnly && !access.isAdmin) return false;
     return true;
   });
 }

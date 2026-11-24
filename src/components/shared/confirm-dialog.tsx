@@ -49,6 +49,7 @@ export function ConfirmDialog({
   tone,
   busy,
   confirmDisabled,
+  hideConfirm,
   compact,
   children,
   panelClassName,
@@ -65,6 +66,7 @@ export function ConfirmDialog({
   tone?: Tone;
   busy?: boolean;
   confirmDisabled?: boolean;
+  hideConfirm?: boolean;
   /** Tighter chrome so a full preview still fits one viewport. */
   compact?: boolean;
   children?: React.ReactNode;
@@ -192,17 +194,19 @@ export function ConfirmDialog({
                 >
                   {cancelLabel ?? t("common.cancel")}
                 </Button>
-                <Button
-                  type="button"
-                  variant={resolvedTone === "danger" ? "danger" : "cta"}
-                  className="rounded-xl"
-                  disabled={busy || confirmDisabled}
-                  onClick={() => {
-                    void Promise.resolve(onConfirm());
-                  }}
-                >
-                  {confirmLabel ?? t("common.confirm")}
-                </Button>
+                {hideConfirm ? null : (
+                  <Button
+                    type="button"
+                    variant={resolvedTone === "danger" ? "danger" : "cta"}
+                    className="rounded-xl"
+                    disabled={busy || confirmDisabled}
+                    onClick={() => {
+                      void Promise.resolve(onConfirm());
+                    }}
+                  >
+                    {confirmLabel ?? t("common.confirm")}
+                  </Button>
+                )}
               </div>
             </div>
           </motion.div>

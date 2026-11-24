@@ -66,7 +66,7 @@ import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
-import type { DailyTag, MemberType, TrgTone, UserStatus } from "@/lib/types";
+import type { DailyTag, MemberType, TrgTone, UserStatus, WrCode } from "@/lib/types";
 import { tagLabel } from "@/i18n";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
@@ -271,12 +271,19 @@ export default function TagsPageClient() {
     date: string,
     tag: DailyTag | "",
     trgTone?: TrgTone,
+    wrCode?: WrCode,
   ) {
     const user = users.find((u) => u.id === userId);
     if (user && !canAssignOnDate(user, date)) return;
-    if (apiOn) void cockpit.onTagChange(userId, date, tag, trgTone);
+    if (apiOn) void cockpit.onTagChange(userId, date, tag, trgTone, wrCode);
     else if (!tag) clearTag(userId, date);
-    else setTag(userId, date, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
+    else {
+      const meta =
+        trgTone || wrCode
+          ? { trg_tone: trgTone, wr_code: wrCode }
+          : undefined;
+      setTag(userId, date, tag, "daily", meta);
+    }
   }
 
   function onPaintRange(
@@ -284,11 +291,18 @@ export default function TagsPageClient() {
     dates: string[],
     tag: DailyTag | "",
     trgTone?: TrgTone,
+    wrCode?: WrCode,
   ) {
     const user = users.find((u) => u.id === userId);
     if (user && dates.every((d) => !canAssignOnDate(user, d))) return;
-    if (apiOn) void cockpit.onPaintRange(userId, dates, tag, trgTone);
-    else setTagRange(userId, dates, tag, "daily", trgTone ? { trg_tone: trgTone } : undefined);
+    if (apiOn) void cockpit.onPaintRange(userId, dates, tag, trgTone, wrCode);
+    else {
+      const meta =
+        trgTone || wrCode
+          ? { trg_tone: trgTone, wr_code: wrCode }
+          : undefined;
+      setTagRange(userId, dates, tag, "daily", meta);
+    }
   }
 
   const loading = apiOn && cockpit.loading;

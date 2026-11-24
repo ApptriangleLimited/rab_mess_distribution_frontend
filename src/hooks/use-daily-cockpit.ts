@@ -29,14 +29,18 @@ import { isDailyApiEnabled } from "@/lib/api/mode";
 import { eachISODate } from "@/lib/date";
 import { dailyRosterVisible } from "@/lib/store/daily";
 import { onCcDataChange } from "@/lib/api/cc-events";
-import { listTagRequests, requestToTagRequest } from "@/lib/api/tag-requests";
+import {
+  listTagRequestsAllQueues,
+  requestToTagRequest,
+  TAG_REQUEST_QUEUES,
+} from "@/lib/api/tag-requests";
 import { useToast } from "@/components/shared/toast-provider";
 import {
   TAG_CHANGE_APPROVAL_ENABLED,
   replaceQueueRequests,
 } from "@/lib/store/tag-requests";
 import { compareUsers, isCockpitMember } from "@/lib/store/users";
-import type { DailyAssignment, DailyTag, User } from "@/lib/types";
+import type { DailyAssignment, DailyTag, User, WrCode } from "@/lib/types";
 
 /**
  * Merge updated cells from an API response into the existing cell array.
@@ -124,8 +128,7 @@ export function useDailyCockpit({
         listBoroKhanaDates(dateFrom, dateTo),
         listLockedDates(dateFrom, dateTo),
         TAG_CHANGE_APPROVAL_ENABLED
-          ? listTagRequests({
-              queue: "daily",
+          ? listTagRequestsAllQueues({
               status: "requested",
               page: 1,
               page_size: 500,
@@ -142,10 +145,13 @@ export function useDailyCockpit({
       setBoroKhanaDates(bkRes.dates);
       setApprovedDates(locksRes.dates);
       if (requestRes) {
-        replaceQueueRequests(
-          "daily",
-          requestRes.items.map(requestToTagRequest),
-        );
+        const rows = requestRes.items.map(requestToTagRequest);
+        for (const queue of TAG_REQUEST_QUEUES) {
+          replaceQueueRequests(
+            queue,
+            rows.filter((row) => (row.queue ?? "daily") === queue),
+          );
+        }
       }
     } catch (err) {
       setUsers([]);
@@ -245,6 +251,7 @@ export function useDailyCockpit({
       date: string,
       tag: DailyTag | "",
       trgTone?: "black" | "red",
+      wrCode?: WrCode,
     ) => {
       try {
         if (!tag) {
@@ -263,6 +270,7 @@ export function useDailyCockpit({
             date,
             tag,
             trg_tone: trgTone,
+            wr_code: wrCode,
           });
           // Apply the server's canonical cell(s) right away — no loading flash.
           setCells((prev) => mergeUpdatedCells(prev, res.items));
@@ -285,6 +293,7 @@ export function useDailyCockpit({
       dates: string[],
       tag: DailyTag | "",
       trgTone?: "black" | "red",
+      wrCode?: WrCode,
     ) => {
       try {
         const res = await putAssignmentRange({
@@ -292,6 +301,7 @@ export function useDailyCockpit({
           dates,
           tag: tag || "",
           trg_tone: trgTone,
+          wr_code: wrCode,
         });
         // Merge all returned cells immediately so every day in the range
         // shows the new tag without waiting for the background reload.

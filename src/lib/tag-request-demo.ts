@@ -72,7 +72,9 @@ function stamp(isoDate: string, hour: number): string {
 
 function normalizeRequest(raw: TagRequest): TagRequest {
   const queue: TagRequestQueue =
-    raw.queue === "ration" || raw.queue === "consume" ? raw.queue : "daily";
+    raw.queue === "ration" || raw.queue === "consume" || raw.queue === "mess"
+      ? raw.queue
+      : "daily";
   const from_date = raw.from_date || raw.date;
   const to_date = raw.to_date || raw.date || from_date;
   const status: TagRequestStatus =

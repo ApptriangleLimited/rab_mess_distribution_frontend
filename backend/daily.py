@@ -374,6 +374,7 @@ def project_cell(
             "tag": stored.tag,
             "source": "stored",
             "trg_tone": stored.trg_tone,
+            "wr_code": stored.wr_code,
             "updated_at": stored.updated_at.isoformat() if stored.updated_at else None,
             "updated_by": stored.updated_by,
         }
@@ -677,6 +678,33 @@ def infer_trg_tone(force: str | None, trg_tone: str | None = None) -> str:
     return "red"
 
 
+WR_CODES = {str(i) for i in range(1, 16)} | {"S"}
+
+
+def normalize_wr_code(tag: str | None, wr_code: str | None = None) -> str | None:
+    if (tag or "").upper() != "WR":
+        return None
+    raw = (wr_code or "").strip().upper()
+    if raw in WR_CODES:
+        return raw
+    if raw.isdigit() and str(int(raw)) in WR_CODES:
+        return str(int(raw))
+    return None
+
+
+def stored_cell(row: Assignment) -> dict:
+    return {
+        "member_id": row.user_id,
+        "date": row.date.isoformat(),
+        "tag": row.tag,
+        "source": "stored",
+        "trg_tone": row.trg_tone,
+        "wr_code": row.wr_code,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
+        "updated_by": row.updated_by,
+    }
+
+
 def upsert_assignment(
     db: Session,
     member: Member,
@@ -684,6 +712,7 @@ def upsert_assignment(
     tag: str,
     staff: Staff,
     trg_tone: str | None = None,
+    wr_code: str | None = None,
 ) -> Assignment:
     row = (
         db.query(Assignment)
@@ -692,9 +721,11 @@ def upsert_assignment(
     )
     now = utcnow()
     tone = infer_trg_tone(member.force, trg_tone) if tag == "TRG" else None
+    code = normalize_wr_code(tag, wr_code)
     if row:
         row.tag = tag
         row.trg_tone = tone
+        row.wr_code = code
         row.updated_by = staff.id
         row.updated_at = now
     else:
@@ -704,6 +735,7 @@ def upsert_assignment(
             date=day,
             tag=tag,
             trg_tone=tone,
+            wr_code=code,
             updated_by=staff.id,
             updated_at=now,
         )
@@ -719,6 +751,7 @@ class AssignmentIn(BaseModel):
     date: str
     tag: str
     trg_tone: str | None = None
+    wr_code: str | None = None
 
 
 class AssignmentRangeIn(BaseModel):
@@ -726,6 +759,7 @@ class AssignmentRangeIn(BaseModel):
     dates: list[str]
     tag: str = ""
     trg_tone: str | None = None
+    wr_code: str | None = None
 
 
 class BoroKhanaIn(BaseModel):
@@ -906,22 +940,14 @@ def put_assignment(
         raise HTTPException(status_code=409, detail="Previous tags cannot be changed")
     if not can_write_tag(member, day, tag):
         raise HTTPException(status_code=409, detail="Cannot assign tag on this date")
-    row = upsert_assignment(db, member, day, tag, staff, body.trg_tone)
+    row = upsert_assignment(db, member, day, tag, staff, body.trg_tone, body.wr_code)
     sync_member_jl(db, member)
     last_jl = (
         db.query(func.max(Assignment.date))
         .filter(Assignment.user_id == member.id, func.upper(Assignment.tag) == "JL")
         .scalar()
     )
-    painted = {
-        "member_id": row.user_id,
-        "date": row.date.isoformat(),
-        "tag": row.tag,
-        "source": "stored",
-        "trg_tone": row.trg_tone,
-        "updated_at": row.updated_at.isoformat(),
-        "updated_by": row.updated_by,
-    }
+    painted = stored_cell(row)
     kept = [] if last_jl is not None and row.date > last_jl else [painted]
     try:
         db.commit()
@@ -989,15 +1015,7 @@ def delete_assignment(
     return envelope(
         {
             "items": [
-                {
-                    "member_id": row.user_id,
-                    "date": row.date.isoformat(),
-                    "tag": row.tag,
-                    "source": "stored",
-                    "trg_tone": row.trg_tone,
-                    "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
-                    "updated_by": row.updated_by,
-                },
+                stored_cell(row),
                 *empty_cells_after(member.id, last_jl),
             ],
             "member": member_jl_state(member),
@@ -1033,18 +1051,10 @@ def put_assignment_range(
         if tag:
             if not can_write_tag(member, day, tag):
                 continue
-            row = upsert_assignment(db, member, day, tag, staff, body.trg_tone)
-            items.append(
-                {
-                    "member_id": row.user_id,
-                    "date": row.date.isoformat(),
-                    "tag": row.tag,
-                    "source": "stored",
-                    "trg_tone": row.trg_tone,
-                    "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
-                    "updated_by": row.updated_by,
-                }
+            row = upsert_assignment(
+                db, member, day, tag, staff, body.trg_tone, body.wr_code
             )
+            items.append(stored_cell(row))
             updated += 1
         else:
             if not can_assign(member, day):
@@ -1053,17 +1063,7 @@ def put_assignment_range(
             if not default:
                 continue
             row = upsert_assignment(db, member, day, default, staff)
-            items.append(
-                {
-                    "member_id": row.user_id,
-                    "date": row.date.isoformat(),
-                    "tag": row.tag,
-                    "source": "stored",
-                    "trg_tone": row.trg_tone,
-                    "updated_at": row.updated_at.isoformat() if row.updated_at else utcnow().isoformat(),
-                    "updated_by": row.updated_by,
-                }
-            )
+            items.append(stored_cell(row))
             updated += 1
     member.updated_at = utcnow()
     sync_member_jl(db, member)

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 Role = Literal["cc", "daily", "mess", "consume", "ration", "admin"]
 ApprovalStatus = Literal["pending", "approved", "rejected", "ended"]
 MemberType = Literal["new", "attached", "permanent", "guest", "civilian"]
-TagQueue = Literal["daily", "ration", "consume"]
+TagQueue = Literal["daily", "ration", "consume", "mess"]
 TagRequestStatus = Literal["requested", "updated", "rejected"]
 
 DUTY_TAGS = {
@@ -136,6 +136,7 @@ class TagRequestIn(BaseModel):
     queue: TagQueue = "daily"
     trg_tone: Literal["black", "red"] | None = None
     trg_sarda: bool | None = None
+    wr_code: str | None = None
 
 
 class TagRequestPatchIn(BaseModel):
@@ -193,6 +194,7 @@ class TagRequestOut(BaseModel):
     to_tag: str
     trg_tone: str | None = None
     trg_sarda: bool | None = None
+    wr_code: str | None = None
     queue: str
     status: str
     requested_by: str
