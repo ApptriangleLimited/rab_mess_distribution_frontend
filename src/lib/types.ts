@@ -2,7 +2,7 @@ import type { WrCode } from "@/lib/wr-code";
 
 export type { WrCode };
 
-export type Role = "cc" | "daily" | "mess" | "consume" | "ration" | "admin";
+export type Role = "cc" | "daily" | "mess" | "mess_checker" | "consume" | "ration" | "admin";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "ended";
 export type UserStatus = "0" | "1";

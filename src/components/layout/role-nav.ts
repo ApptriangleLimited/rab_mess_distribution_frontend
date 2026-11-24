@@ -12,6 +12,8 @@ import {
   IconCake,
   IconLayoutDashboard,
   IconSettings,
+  IconListDetails,
+  IconScan,
   type Icon,
 } from "@tabler/icons-react";
 
@@ -77,6 +79,12 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       chip: "teal",
     },
     {
+      href: "/mess/guest-list",
+      labelKey: "nav.guestList",
+      icon: IconListDetails,
+      chip: "sky",
+    },
+    {
       href: "/mess/requests",
       labelKey: "nav.requests",
       icon: IconSend,
@@ -99,6 +107,20 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       labelKey: "nav.settings",
       icon: IconSettings,
       chip: "neutral",
+    },
+  ],
+  mess_checker: [
+    {
+      href: "/mess/check",
+      labelKey: "nav.mealCheckIn",
+      icon: IconScan,
+      chip: "emerald",
+    },
+    {
+      href: "/mess/guest-list",
+      labelKey: "nav.guestList",
+      icon: IconListDetails,
+      chip: "sky",
     },
   ],
   consume: [

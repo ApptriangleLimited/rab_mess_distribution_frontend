@@ -52,6 +52,7 @@ const EMPTY_FORM = {
   password: "",
   confirmPassword: "",
   role: "cc" as Role,
+  desk: "hq",
 };
 
 function looksLikeSrbId(value: string) {
@@ -160,6 +161,7 @@ export function StaffAccountsSection({
       password: "",
       confirmPassword: "",
       role: row.role,
+      desk: row.desk === "haji" ? "haji" : "hq",
     });
     setShowFormPassword(false);
     setMemberMatch(null);
@@ -268,6 +270,7 @@ export function StaffAccountsSection({
           display_name: name,
           srb_id: srbId,
           role: form.role,
+          desk: form.role === "mess_checker" ? form.desk : "",
           password: form.password || undefined,
         });
         if (form.password) rememberStaffPassword(updated.id, form.password);
@@ -279,6 +282,7 @@ export function StaffAccountsSection({
           srb_id: srbId,
           password: form.password,
           role: form.role,
+          desk: form.role === "mess_checker" ? form.desk : "",
         });
         rememberStaffPassword(created.id, form.password);
         setRows((prev) => [...prev, created]);
@@ -299,7 +303,10 @@ export function StaffAccountsSection({
     if (row.role === role) return;
     setRoleBusyId(row.id);
     try {
-      const updated = await updateStaffAccount(row.id, { role });
+      const updated = await updateStaffAccount(row.id, {
+        role,
+        desk: role === "mess_checker" ? row.desk || "hq" : "",
+      });
       setRows((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       toast(t("settings.staffUpdated"), "success");
     } catch (err) {
@@ -460,7 +467,7 @@ export function StaffAccountsSection({
                       onValueChange={(value) => void changeRole(row, value as Role)}
                     >
                       <SelectTrigger
-                        className="h-8 w-[8.5rem] rounded-xl text-xs"
+                        className="h-8 w-[10.5rem] rounded-xl text-xs"
                         aria-label={t("profile.role")}
                       >
                         <SelectValue />
@@ -575,6 +582,23 @@ export function StaffAccountsSection({
             </Select>
             <p className="text-xs text-neutral-500">{t("settings.staffRoleAccess")}</p>
           </div>
+          {form.role === "mess_checker" ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="staff-desk">{t("settings.checkerBranch")}</Label>
+              <Select
+                value={form.desk}
+                onValueChange={(value) => setForm((prev) => ({ ...prev, desk: value }))}
+              >
+                <SelectTrigger id="staff-desk">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hq">SRB HQ</SelectItem>
+                  <SelectItem value="haji">Haji Camp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="staff-name">{t("profile.name")}</Label>
             <Input

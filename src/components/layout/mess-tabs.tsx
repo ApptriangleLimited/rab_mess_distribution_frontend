@@ -6,6 +6,8 @@ import {
   IconClockHour4,
   IconLayoutDashboard,
   IconSend,
+  IconListDetails,
+  IconScan,
   IconSettings,
   IconTags,
 } from "@tabler/icons-react";
@@ -14,6 +16,22 @@ import { AdminTabs } from "@/components/layout/ration-tabs";
 import { useRequestMenuBadge } from "@/hooks/use-pending-request-counts";
 import { useSession } from "@/hooks/use-session";
 import { useT } from "@/i18n/provider";
+
+const CHECKER_TABS = [
+  {
+    href: "/mess/check",
+    labelKey: "nav.mealCheckIn" as const,
+    icon: IconScan,
+    match: (path: string) => path === "/mess/check" || path.startsWith("/mess/check/"),
+  },
+  {
+    href: "/mess/guest-list",
+    labelKey: "nav.guestList" as const,
+    icon: IconListDetails,
+    match: (path: string) =>
+      path === "/mess/guest-list" || path.startsWith("/mess/guest-list/"),
+  },
+] as const;
 
 const TABS = [
   {
@@ -28,6 +46,13 @@ const TABS = [
     icon: IconTags,
     match: (path: string) =>
       path === "/mess/ledger" || path.startsWith("/mess/ledger/"),
+  },
+  {
+    href: "/mess/guest-list",
+    labelKey: "nav.guestList" as const,
+    icon: IconListDetails,
+    match: (path: string) =>
+      path === "/mess/guest-list" || path.startsWith("/mess/guest-list/"),
   },
   {
     href: "/mess/requests",
@@ -62,14 +87,16 @@ const TABS = [
 export function MessTabs({ className }: { className?: string }) {
   const pathname = usePathname();
   const t = useT();
+  const { session } = useSession();
   const requestBadge = useRequestMenuBadge("/mess/requests");
+  const tabs = session?.role === "mess_checker" ? CHECKER_TABS : TABS;
 
   return (
     <RoleNavTabs
       className={className}
       ariaLabel={t("nav.messTabs")}
       layoutId="mess-role-tabs-pill"
-      tabs={TABS.map((tab) => ({
+      tabs={tabs.map((tab) => ({
         href: tab.href,
         label: t(tab.labelKey),
         icon: tab.icon,

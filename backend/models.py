@@ -27,6 +27,7 @@ class Staff(AuditUserMixin, Base):
     mfa_recovery: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     avatar: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    desk: Mapped[str] = mapped_column(String(16), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -329,6 +330,7 @@ class GuestMeal(AuditUserMixin, Base):
     guest_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     guest_info: Mapped[str] = mapped_column(Text, nullable=False, default="")
     ref_info: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    branch: Mapped[str] = mapped_column(String(16), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

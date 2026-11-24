@@ -80,6 +80,13 @@ ROLE_PERMISSIONS = {
         "auth.manage",
         "file.download",
     ],
+    "mess_checker": [
+        "member.view",
+        "assignment.view",
+        "meal.view",
+        "notification.view",
+        "auth.manage",
+    ],
     "consume": [
         "member.view",
         "assignment.view",

@@ -355,6 +355,7 @@ def guest_meal_out(row: GuestMeal) -> dict:
         "guest_name": row.guest_name,
         "guest_info": row.guest_info,
         "ref_info": row.ref_info,
+        "branch": getattr(row, "branch", "") or "",
         "created_at": row.created_at.isoformat() if row.created_at else "",
         "updated_at": row.updated_at.isoformat() if row.updated_at else "",
     }
@@ -729,6 +730,7 @@ def apply_snapshot(db: Session, body: dict, *, replace_lists: bool) -> None:
                     guest_name=str(raw.get("guest_name") or ""),
                     guest_info=str(raw.get("guest_info") or ""),
                     ref_info=str(raw.get("ref_info") or ""),
+                    branch=str(raw.get("branch") or ""),
                 )
                 if parse_day(raw.get("date"))
                 else None

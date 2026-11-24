@@ -63,6 +63,7 @@ from extra import router as extra_router, seed_catalog
 from persist import router as persist_router, seed_persist
 from account import router as account_router
 from adms import router as adms_router
+from checker import router as checker_router
 from headers import SecurityHeadersMiddleware
 from permissions import seed_permissions
 from security import encrypt_secret, verify_login_mfa
@@ -88,7 +89,7 @@ from schemas import (
     normalize_tag,
 )
 
-ROLES = ("cc", "daily", "mess", "consume", "ration", "admin")
+ROLES = ("cc", "daily", "mess", "mess_checker", "consume", "ration", "admin")
 MEMBER_ROLES = ("cc", "daily", "admin")
 MEMBER_CREATE_ROLES = ("cc", "admin")
 QUEUE_ROLES = {
@@ -159,6 +160,7 @@ app.include_router(extra_router)
 app.include_router(persist_router)
 app.include_router(account_router)
 app.include_router(adms_router)
+app.include_router(checker_router)
 
 _origins = settings.cors_origins
 app.add_middleware(
@@ -444,6 +446,44 @@ def queue_counts(db: Session) -> dict[str, int]:
     return counts
 
 
+def ensure_mess_checker_login() -> None:
+    """SRB-Cheacker always exists so the checker desk can sign in on the server."""
+    login_id = "SRB-CHEACKER"
+    password = settings.seed_staff_password or "ChangeMe!"
+    db = SessionLocal()
+    try:
+        row = find_staff_by_login(db, login_id)
+        if row is None:
+            db.add(
+                Staff(
+                    id=new_id("st"),
+                    email=login_id,
+                    display_name="MESS CHECKER",
+                    role="mess_checker",
+                    password_hash=hash_password(password),
+                    password_vault=encrypt_secret(password),
+                    active=True,
+                    desk="hq",
+                )
+            )
+            db.commit()
+            return
+        changed = False
+        if row.role != "mess_checker":
+            row.role = "mess_checker"
+            changed = True
+        if (getattr(row, "desk", "") or "") not in ("hq", "haji"):
+            row.desk = "hq"
+            changed = True
+        if not row.active:
+            row.active = True
+            changed = True
+        if changed:
+            db.commit()
+    finally:
+        db.close()
+
+
 def seed_staff() -> None:
     if not settings.seed_staff:
         return
@@ -467,6 +507,7 @@ def seed_staff() -> None:
                         password_hash=hash_password(password),
                         password_vault=encrypt_secret(password),
                         active=True,
+                        desk="hq" if role == "mess_checker" else "",
                     )
                 )
                 changed = True
@@ -478,6 +519,9 @@ def seed_staff() -> None:
                 password, current.password_hash
             ):
                 current.password_vault = encrypt_secret(password)
+                changed = True
+            if role == "mess_checker" and (getattr(current, "desk", "") or "") not in ("hq", "haji"):
+                current.desk = "hq"
                 changed = True
         super_id = "SRB-SUPERADMIN"
         super_password = "SuperAdmin@123"
@@ -511,6 +555,7 @@ def run_migrations() -> None:
 @app.on_event("startup")
 def on_startup() -> None:
     run_migrations()
+    ensure_mess_checker_login()
     if settings.allow_create_all:
         Base.metadata.create_all(bind=engine)
     seed_staff()

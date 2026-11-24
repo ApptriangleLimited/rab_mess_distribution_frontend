@@ -126,6 +126,9 @@ def hazz_snapshot() -> dict:
         for row in rows
         if isinstance(row, dict) and _punch_stamp_day(row) == day
     ]
+    from zk_gate import merge_checker_punches
+
+    rows = merge_checker_punches(day, "haji", rows)
     return {
         "reachable": fresh,
         "host": str(seen.get("serial") or ""),

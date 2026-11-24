@@ -324,7 +324,7 @@ def update_me(
     )
 
 
-STAFF_ROLES = ("cc", "daily", "mess", "consume", "ration", "admin")
+STAFF_ROLES = ("cc", "daily", "mess", "mess_checker", "consume", "ration", "admin")
 STAFF_MANAGE = ("admin", "mess")
 
 
@@ -346,6 +346,7 @@ def staff_out(row: Staff, *, include_password: bool = False) -> dict:
         "rab_id": row.email,
         "display_name": row.display_name,
         "role": row.role,
+        "desk": getattr(row, "desk", "") or "",
         "avatar": getattr(row, "avatar", "") or "",
         "active": bool(row.active),
         "has_password": bool(getattr(row, "password_vault", None)),
@@ -359,6 +360,14 @@ def _set_staff_password(row: Staff, password: str) -> None:
     set_staff_password(row, password)
 
 
+def checker_desk(role: str, raw: str, current: str = "") -> str:
+    """HQ or Haji Camp. Only a Mess checker account keeps a branch."""
+    if (role or "").strip().lower() != "mess_checker":
+        return ""
+    chosen = (raw or current or "hq").strip().lower()
+    return chosen if chosen in ("hq", "haji") else "hq"
+
+
 class StaffCreateIn(BaseModel):
     display_name: str = Field(min_length=2, max_length=255)
     username: str = ""
@@ -367,6 +376,7 @@ class StaffCreateIn(BaseModel):
     rab_id: str = ""
     password: str = Field(min_length=1, max_length=255)
     role: str
+    desk: str = ""
 
 
 class StaffUpdateIn(BaseModel):
@@ -377,6 +387,7 @@ class StaffUpdateIn(BaseModel):
     rab_id: str = ""
     password: str = ""
     role: str = ""
+    desk: str = ""
     active: bool | None = None
 
 
@@ -397,6 +408,8 @@ SYSTEM_STAFF_LOGINS = {
     "SRB-CC",
     "SRB-DAILY",
     "SRB-MESS",
+    "SRB-MESS_CHECKER",
+    "SRB-CHEACKER",
     "SRB-CONSUME",
     "SRB-RATION",
     "SRB-SUPERADMIN",
@@ -512,6 +525,7 @@ def create_staff(
         password_hash=hash_password(body.password),
         password_vault=encrypt_secret(body.password),
         active=True,
+        desk=checker_desk(role, body.desk),
     )
     db.add(row)
     try:
@@ -558,6 +572,7 @@ def update_staff(
         if row.id == actor.id and role != actor.role:
             raise HTTPException(status_code=400, detail="You cannot change your own role")
         row.role = role
+    row.desk = checker_desk(row.role, body.desk, getattr(row, "desk", "") or "")
     password = (body.password or "").strip()
     if password:
         error = validate_password(password, username or row.email)

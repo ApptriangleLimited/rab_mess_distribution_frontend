@@ -8,6 +8,7 @@ export type StaffAccount = {
   rab_id?: string;
   display_name: string;
   role: Role;
+  desk?: string;
   active: boolean;
   has_password?: boolean;
   password?: string;
@@ -30,6 +31,7 @@ export function createStaffAccount(body: {
   username?: string;
   password: string;
   role: Role;
+  desk?: string;
 }) {
   const srbId = (body.srb_id || body.rab_id || "").trim();
   return apiJson<StaffAccount>("/api/v1/staff", {
@@ -42,6 +44,7 @@ export function createStaffAccount(body: {
       username: body.username ?? srbId,
       password: body.password,
       role: body.role,
+      desk: body.desk ?? "",
     }),
   });
 }
@@ -56,6 +59,7 @@ export function updateStaffAccount(
     username?: string;
     password?: string;
     role?: Role;
+    desk?: string;
     active?: boolean;
   },
 ) {

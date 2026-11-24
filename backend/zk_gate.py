@@ -208,8 +208,79 @@ def _in_window(mins: int, start: str, end: str) -> bool:
     return any(start_min <= mins < end_min for start_min, end_min in _intervals(start, end))
 
 
+def _seconds_until_shift_end(now: datetime, shift: dict) -> int:
+    mins = now.hour * 60 + now.minute
+    ends = [
+        end
+        for start, end in _intervals(shift["start_time"], shift["end_time"])
+        if start <= mins < end
+    ]
+    if not ends:
+        return 0
+    return max(0, (ends[0] - mins) * 60 - now.second)
+
+
 def _aware(stamped: datetime) -> datetime:
     return stamped.astimezone(DHAKA) if stamped.tzinfo else stamped.replace(tzinfo=DHAKA)
+
+
+CHECKER_PUNCH_PATH = ADMS_PUNCH_PATH.with_name("checker_punches.json")
+_checker_lock = threading.Lock()
+
+
+def _read_checker_file() -> dict:
+    try:
+        data = json.loads(CHECKER_PUNCH_PATH.read_text(encoding="utf-8")) if CHECKER_PUNCH_PATH.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def checker_rows(day: str, branch: str) -> list[dict]:
+    """Manual Mess-checker punches. Kept apart so a device rebuild cannot drop them."""
+    with _checker_lock:
+        day_rows = _read_checker_file().get(day) or {}
+    rows = day_rows.get(branch) if isinstance(day_rows, dict) else []
+    return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+
+
+def append_checker_punch(day: str, branch: str, row: dict) -> None:
+    with _checker_lock:
+        data = _read_checker_file()
+        day_rows = data.get(day)
+        if not isinstance(day_rows, dict):
+            day_rows = {}
+        rows = day_rows.get(branch)
+        if not isinstance(rows, list):
+            rows = []
+        rows.append(row)
+        day_rows[branch] = rows
+        data[day] = day_rows
+        if len(data) > 400:
+            for key in sorted(str(item) for item in data)[:-400]:
+                data.pop(key, None)
+        CHECKER_PUNCH_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CHECKER_PUNCH_PATH.write_text(json.dumps(data), encoding="utf-8")
+
+
+def merge_checker_punches(day: str, branch: str, rows: list[dict]) -> list[dict]:
+    extra = checker_rows(day, branch)
+    if not extra:
+        return rows
+    seen = {
+        (str(row.get("rab_id") or ""), str(row.get("punched_at") or ""))
+        for row in rows
+        if isinstance(row, dict)
+    }
+    merged = list(rows)
+    for row in extra:
+        key = (str(row.get("rab_id") or ""), str(row.get("punched_at") or ""))
+        if not key[1] or key in seen:
+            continue
+        seen.add(key)
+        merged.append(row)
+    merged.sort(key=lambda item: str(item.get("punched_at") or ""), reverse=True)
+    return merged
 
 
 def _snapshot() -> dict:
@@ -239,6 +310,7 @@ def _snapshot() -> dict:
         if disk_latest >= mem_latest:
             state["rows"] = list(board["rows"])
     state["rows"] = _rows_on_day(state["rows"], state["date"])
+    state["rows"] = merge_checker_punches(str(state["date"] or ""), "hq", state["rows"])
     return state
 
 
@@ -433,6 +505,11 @@ def punches_for_range(start: date, end: date) -> list[dict]:
         add(str(day), rows, "Haji camp")
     hq = _load_punch_board()
     add(str(hq.get("date") or ""), hq.get("rows") or [], "SRB HQ")
+    for day, branches in _read_checker_file().items():
+        if not isinstance(branches, dict):
+            continue
+        add(str(day), branches.get("hq") or [], "SRB HQ")
+        add(str(day), branches.get("haji") or [], "Haji camp")
     try:
         hazz = json.loads(HAZZ_PUNCH_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):

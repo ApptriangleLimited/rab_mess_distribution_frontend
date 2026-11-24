@@ -201,6 +201,7 @@ export function isRoleAllowed(role: Role, pathname: string) {
     cc: "/cc",
     daily: "/daily",
     mess: ["/mess", "/cc/users/new"],
+    mess_checker: ["/mess/check", "/mess/guest-list"],
     consume: "/consume",
     /** Ration also uses Consume panels (ledger / bills / summary). */
     ration: ["/ration", "/consume"],

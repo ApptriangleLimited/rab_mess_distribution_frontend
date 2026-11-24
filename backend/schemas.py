@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-Role = Literal["cc", "daily", "mess", "consume", "ration", "admin"]
+Role = Literal["cc", "daily", "mess", "mess_checker", "consume", "ration", "admin"]
 ApprovalStatus = Literal["pending", "approved", "rejected", "ended"]
 MemberType = Literal["new", "attached", "permanent", "guest", "civilian"]
 TagQueue = Literal["daily", "ration", "consume", "mess"]
