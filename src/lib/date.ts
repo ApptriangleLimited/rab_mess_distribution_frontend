@@ -11,13 +11,18 @@ export function monthStartISO(today = todayISO()): string {
   return `${today.slice(0, 7)}-01`;
 }
 
-/** Daily RR: today and future days can be painted. Earlier days stay locked. */
+/** Daily RR may paint every day of November 2026, including days already past. */
+const DAILY_OPEN_FROM = "2026-11-01";
+const DAILY_OPEN_TO = "2026-11-30";
+
+/** Daily RR: today, future days, and all of November 2026 can be painted. */
 export function isDailyDateEditable(date: string, today = todayISO()): boolean {
+  if (date >= DAILY_OPEN_FROM && date <= DAILY_OPEN_TO) return true;
   return date >= today;
 }
 
 export function dailyEditMinDate(today = todayISO()): string {
-  return today;
+  return DAILY_OPEN_FROM < today ? DAILY_OPEN_FROM : today;
 }
 
 export function nowISO() {

@@ -20,7 +20,9 @@ router = APIRouter()
 
 
 def daily_day_writable(day: date) -> bool:
-    """After 12:00 AM in Dhaka, that day can no longer be painted, even in this month."""
+    """November 2026 stays paintable. Other days lock after midnight in Dhaka."""
+    if date(2026, 11, 1) <= day <= date(2026, 11, 30):
+        return True
     return day >= datetime.now(DHAKA).date()
 
 
