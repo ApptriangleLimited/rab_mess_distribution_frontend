@@ -405,6 +405,12 @@ type Bucket = {
   absence: Omit<StrengthAbsenceRow, "wing" | "total">;
 };
 
+/** Form 2 hides HQ Br (সদর দপ্তর শাখা) on screen and paper. The row stays in the data. */
+export function isForm2HqBranchHidden(wing: string): boolean {
+  const key = wing.trim().toLowerCase();
+  return key === "hq br" || key === "headquarters branch";
+}
+
 /** Official Form 2 এ্যাডমিন উইং rows — Record Branch is crossed off the paper. */
 const FORM2_ADMIN_BRANCHES = [
   "HQ Br",
