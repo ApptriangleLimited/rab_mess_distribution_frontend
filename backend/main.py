@@ -96,6 +96,18 @@ QUEUE_ROLES = {
     "consume": ("consume", "admin"),
 }
 
+
+def duty_tag_queue(tag: str, trg_tone: str | None = None) -> str:
+    """MS/MFR/black TRG stay on Daily. FR/CD/red TRG → Ration. Every other tag → Consume."""
+    name = (tag or "").upper()
+    if name in ("", "MS", "MFR"):
+        return "daily"
+    if name in ("FR", "CD"):
+        return "ration"
+    if name == "TRG":
+        return "ration" if trg_tone == "red" else "daily"
+    return "consume"
+
 configure_logging()
 settings.assert_secure()
 
@@ -981,14 +993,16 @@ def list_tag_requests(
     db: Session = Depends(get_db),
 ):
     if queue == "all":
-        if staff.role != "admin":
+        if staff.role not in ("admin", "cc"):
             raise HTTPException(status_code=403, detail="Admin only")
     elif queue not in QUEUE_ROLES:
         raise HTTPException(status_code=400, detail="Invalid queue")
     query = db.query(TagRequest).options(joinedload(TagRequest.member))
     if queue != "all":
         query = query.filter(TagRequest.queue == queue)
-    if status and status != "all":
+    if status == "history":
+        query = query.filter(TagRequest.status.in_(("updated", "rejected")))
+    elif status and status != "all":
         query = query.filter(TagRequest.status == status)
     if tag and tag != "all":
         query = query.filter(TagRequest.to_tag == tag.upper())
@@ -1092,6 +1106,7 @@ def create_tag_request(
     end = body.to_date or start
     if end < start:
         start, end = end, start
+    queue = duty_tag_queue(to_tag, body.trg_tone)
     stored = (
         db.query(Assignment)
         .filter(Assignment.user_id == member.id, Assignment.date == start)
@@ -1104,7 +1119,7 @@ def create_tag_request(
         db.query(TagRequest)
         .filter(
             TagRequest.user_id == member.id,
-            TagRequest.queue == body.queue,
+            TagRequest.queue == queue,
             TagRequest.status == "requested",
         )
         .first()
@@ -1140,7 +1155,7 @@ def create_tag_request(
             to_tag=to_tag,
             trg_tone=body.trg_tone,
             trg_sarda=body.trg_sarda,
-            queue=body.queue,
+            queue=queue,
             status="requested",
             requested_by=staff.id,
             requested_at=now,

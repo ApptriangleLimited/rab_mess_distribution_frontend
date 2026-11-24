@@ -221,6 +221,14 @@ export function nextISODate(date: string) {
   return todayISOFrom(d);
 }
 
+/** Shift an ISO date by a signed day count. */
+export function shiftISODate(date: string, days: number) {
+  const d = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return date;
+  d.setDate(d.getDate() + days);
+  return todayISOFrom(d);
+}
+
 /** All ISO dates from day 1 of current month through today. */
 export function monthDatesThroughToday() {
   const today = todayISO();

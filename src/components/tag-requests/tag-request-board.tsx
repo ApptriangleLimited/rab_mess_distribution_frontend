@@ -5,6 +5,9 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   IconCircleCheck,
   IconClockHour4,
+  IconDownload,
+  IconHistory,
+  IconPrinter,
   IconSend,
   IconX,
 } from "@tabler/icons-react";
@@ -46,7 +49,12 @@ import {
   rejectTagRequestApi,
   requestMember,
   requestToTagRequest,
+  type TagRequestListData,
 } from "@/lib/api/tag-requests";
+import {
+  downloadTagRequestPdf,
+  printTagRequestList,
+} from "@/lib/download-tag-request-pdf";
 import { PAGE_SIZE } from "@/lib/pagination";
 import {
   applyTagRequest,
@@ -55,7 +63,7 @@ import {
   rejectTagRequest,
   upsertLocalTagRequest,
 } from "@/lib/store/tag-requests";
-import { memberMatchesWingFilter } from "@/lib/store/org-options";
+import { formatMemberWing, memberMatchesWingFilter } from "@/lib/store/org-options";
 import { listAllTags } from "@/lib/store/rates";
 import { eachISODate, formatDateDisplay, todayISO } from "@/lib/date";
 import { tagLabel } from "@/i18n";
@@ -69,8 +77,27 @@ import type {
 } from "@/lib/types";
 
 type Mode = "daily" | "cc" | "ration" | "consume" | "admin";
-type StatusView = "all" | TagRequestStatus;
+type BoardTab = "inbox" | "history";
+type HistoryView = "all" | "updated" | "rejected";
 type QueueFilter = TagRequestQueue | "all";
+
+function requestStatusParam(tab: BoardTab, historyView: HistoryView) {
+  if (tab === "inbox") return "requested";
+  if (historyView === "updated") return "updated";
+  if (historyView === "rejected") return "rejected";
+  return "history";
+}
+
+function matchesBoardTab(
+  status: TagRequestStatus,
+  tab: BoardTab,
+  historyView: HistoryView,
+) {
+  if (tab === "inbox") return status === "requested";
+  if (historyView === "updated") return status === "updated";
+  if (historyView === "rejected") return status === "rejected";
+  return status === "updated" || status === "rejected";
+}
 
 function queueForMode(mode: Mode): TagRequestQueue {
   if (mode === "ration") return "ration";
@@ -135,22 +162,22 @@ export function TagRequestBoard({
   const [tag, setTagFilter] = useState("all");
   const [status, setStatus] = useState("all");
   const canAct = mode !== "cc";
-  const showStatusChips = mode !== "daily";
-  const [view, setView] = useState<StatusView>(
-    mode === "daily" ? "requested" : "all",
-  );
+  const [boardTab, setBoardTab] = useState<BoardTab>("inbox");
+  const [historyView, setHistoryView] = useState<HistoryView>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
   const [pendingUpdate, setPendingUpdate] = useState<TagRequest | null>(null);
   const [pendingReject, setPendingReject] = useState<TagRequest | null>(null);
-  const queue: QueueFilter = mode === "admin" ? queueFilter : queueForMode(mode);
+  const queue: QueueFilter =
+    mode === "admin" ? queueFilter : mode === "cc" ? "all" : queueForMode(mode);
+  const showQueue = mode === "admin" || mode === "cc";
 
   useEffect(() => onCcDataChange(() => setReloadTick((n) => n + 1)), []);
 
   useEffect(() => {
     setApiPage(1);
-  }, [q, rank, wing, tag, status, view, dateFrom, dateTo, queue]);
+  }, [q, rank, wing, tag, status, boardTab, historyView, dateFrom, dateTo, queue]);
 
   useEffect(() => {
     if (!apiOn) {
@@ -159,9 +186,8 @@ export function TagRequestBoard({
     }
     let cancelled = false;
     setLoading(true);
-    listTagRequests({
+    const filters = {
       queue,
-      status: mode === "daily" ? "requested" : view,
       q: q || undefined,
       rank,
       wing,
@@ -170,31 +196,101 @@ export function TagRequestBoard({
       member_status: status,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
-      page: apiPage,
-      page_size: apiPageSize,
-    })
-      .then((data) => {
-        if (cancelled) return;
-        const users: User[] = [];
-        const seen = new Set<string>();
-        const rows = data.items.map((row) => {
-          const member = requestMember(row);
-          if (member && !seen.has(member.id)) {
-            seen.add(member.id);
-            users.push(member);
-          }
-          return requestToTagRequest(row);
+    };
+
+    function ingest(
+      items: Parameters<typeof requestToTagRequest>[0][],
+      total: number,
+      counts: TagRequestListData["status_counts"],
+    ) {
+      const users: User[] = [];
+      const seen = new Set<string>();
+      const nextRows = items.map((row) => {
+        const member = requestMember(row);
+        if (member && !seen.has(member.id)) {
+          seen.add(member.id);
+          users.push(member);
+        }
+        return requestToTagRequest(row);
+      });
+      setApiRows(nextRows);
+      setApiUsers(users);
+      setApiTotal(total);
+      setApiCounts({
+        requested: counts.requested,
+        updated: counts.updated,
+        rejected: counts.rejected,
+        all: counts.all,
+      });
+    }
+
+    function sortItems(items: TagRequestListData["items"]) {
+      return [...items].sort((a, b) => {
+        const timeA = a.updated_at || a.requested_at || "";
+        const timeB = b.updated_at || b.requested_at || "";
+        return timeB.localeCompare(timeA);
+      });
+    }
+
+    function fetchStatus(statusParam: string) {
+      if (queue !== "all") {
+        return listTagRequests({
+          ...filters,
+          status: statusParam,
+          page: apiPage,
+          page_size: apiPageSize,
         });
-        setApiRows(rows);
-        setApiUsers(users);
-        setApiTotal(data.total);
-        setApiCounts({
-          requested: data.status_counts.requested,
-          updated: data.status_counts.updated,
-          rejected: data.status_counts.rejected,
-          all: data.status_counts.all,
-        });
-      })
+      }
+      return Promise.all(
+        (["daily", "ration", "consume"] as const).map((nextQueue) =>
+          listTagRequests({
+            ...filters,
+            queue: nextQueue,
+            status: statusParam,
+            page: 1,
+            page_size: 500,
+          }),
+        ),
+      ).then((pages) => {
+        const items = sortItems(pages.flatMap((page) => page.items));
+        const status_counts = pages.reduce(
+          (acc, page) => ({
+            requested: acc.requested + page.status_counts.requested,
+            updated: acc.updated + page.status_counts.updated,
+            rejected: acc.rejected + page.status_counts.rejected,
+            all: acc.all + page.status_counts.all,
+          }),
+          { requested: 0, updated: 0, rejected: 0, all: 0 },
+        );
+        return {
+          items,
+          total: items.length,
+          page: 1,
+          page_size: 500,
+          counts: pages[0]?.counts ?? { daily: 0, ration: 0, consume: 0 },
+          status_counts,
+        } satisfies TagRequestListData;
+      });
+    }
+
+    const load =
+      boardTab === "history" && historyView === "all"
+        ? Promise.all([fetchStatus("updated"), fetchStatus("rejected")]).then(
+            ([updated, rejected]) => {
+              if (cancelled) return;
+              ingest(
+                sortItems([...updated.items, ...rejected.items]),
+                updated.items.length + rejected.items.length,
+                updated.status_counts,
+              );
+            },
+          )
+        : fetchStatus(requestStatusParam(boardTab, historyView)).then((data) => {
+            if (cancelled) return;
+            ingest(data.items, data.total, data.status_counts);
+          });
+
+    load
       .catch((err) => {
         if (cancelled) return;
         setApiRows([]);
@@ -226,7 +322,8 @@ export function TagRequestBoard({
     t,
     tag,
     toast,
-    view,
+    boardTab,
+    historyView,
     wing,
   ]);
 
@@ -240,8 +337,7 @@ export function TagRequestBoard({
     return state.tag_requests
       .filter((req) => {
         if (queue !== "all" && (req.queue ?? "daily") !== queue) return false;
-        if (mode === "daily" && req.status !== "requested") return false;
-        if (view !== "all" && req.status !== view) return false;
+        if (!matchesBoardTab(req.status, boardTab, historyView)) return false;
         const user = usersById.get(req.user_id);
         if (!user) return false;
         if (rank !== "all" && user.rank !== rank) return false;
@@ -282,7 +378,8 @@ export function TagRequestBoard({
     state.tag_requests,
     usersById,
     mode,
-    view,
+    boardTab,
+    historyView,
     rank,
     wing,
     status,
@@ -307,12 +404,15 @@ export function TagRequestBoard({
   const rejectedCount = apiOn
     ? apiCounts.rejected
     : queued.filter((r) => r.status === "rejected").length;
-  const allCount = apiOn ? apiCounts.all : queued.length;
+  const historyCount = updatedCount + rejectedCount;
 
   const resetKey = rows.map((r) => r.id).join("|");
   const clientPage = usePagination(rows, resetKey);
-  const page = apiOn
-    ? {
+  const useClientPage =
+    !apiOn || (boardTab === "history" && historyView === "all");
+  const page = useClientPage
+    ? clientPage
+    : {
         page: apiPage,
         pageSize: apiPageSize,
         total: apiTotal,
@@ -325,9 +425,151 @@ export function TagRequestBoard({
           setApiPageSize(size);
           setApiPage(1);
         },
-      }
-    : clientPage;
+      };
   const fieldClass = searchFilterCompactFieldClass;
+  const showActions = canAct && boardTab === "inbox";
+
+  function statusLabel(value: TagRequestStatus) {
+    if (value === "requested") return t("tagRequest.requested");
+    if (value === "rejected") return t("tagRequest.rejected");
+    return t("tagRequest.accepted");
+  }
+
+  function exportHeaders() {
+    const headers = [
+      "SL",
+      t("cc.fields.rabId"),
+      t("cc.fields.rank"),
+      t("cc.fields.name"),
+      t("cc.fields.wing"),
+    ];
+    if (showQueue) headers.push(t("tagRequest.queue"));
+    headers.push(
+      t("tagRequest.currentTag"),
+      t("tagRequest.requestedTag"),
+      t("tagRequest.status"),
+      t("common.dateRange"),
+      t("tagRequest.days"),
+      t("tagRequest.requestedAt"),
+    );
+    return headers;
+  }
+
+  function exportCells(
+    req: TagRequest,
+    user: User,
+    index: number,
+  ): string[] {
+    const range =
+      req.from_date && req.to_date && req.from_date !== req.to_date
+        ? `${formatDateDisplay(req.from_date)} – ${formatDateDisplay(req.to_date)}`
+        : formatDateDisplay(req.from_date || req.date) ||
+          req.from_date ||
+          req.date;
+    const cells = [
+      String(index + 1),
+      user.rab_id || "—",
+      user.rank || "—",
+      user.name || "—",
+      formatMemberWing(user.wing) || user.wing || "—",
+    ];
+    if (showQueue) cells.push(queueLabel(req.queue ?? "daily", t));
+    cells.push(
+      getCockpitTagOnDate(user, today) || "—",
+      req.to_tag || "—",
+      statusLabel(req.status),
+      range || "—",
+      String(requestSpanDays(req) || "—"),
+      requestDay(req.requested_at) || "—",
+    );
+    return cells;
+  }
+
+  async function loadExportRows() {
+    if (!apiOn) {
+      return demoRows
+        .map((req) => {
+          const user = usersById.get(req.user_id);
+          return user ? { req, user } : null;
+        })
+        .filter((row): row is { req: TagRequest; user: User } => Boolean(row));
+    }
+    const collected: { req: TagRequest; user: User }[] = [];
+    const seenUsers = new Map<string, User>();
+    let pageNo = 1;
+    let total = Number.POSITIVE_INFINITY;
+    while (collected.length < total) {
+      const data = await listTagRequests({
+        queue,
+        status: requestStatusParam(boardTab, historyView),
+        q: q || undefined,
+        rank,
+        wing,
+        wing_family: mode === "consume" && wing !== "all" ? "1" : undefined,
+        tag,
+        member_status: status,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        page: pageNo,
+        page_size: 500,
+      });
+      total = data.total;
+      if (!data.items.length) break;
+      for (const row of data.items) {
+        const req = requestToTagRequest(row);
+        const member = requestMember(row) ?? seenUsers.get(req.user_id);
+        if (member) {
+          seenUsers.set(member.id, member);
+          collected.push({ req, user: member });
+        }
+      }
+      pageNo += 1;
+      if (pageNo > 20) break;
+    }
+    return collected;
+  }
+
+  async function onPrintList() {
+    try {
+      const list = await loadExportRows();
+      printTagRequestList({
+        title:
+          boardTab === "history"
+            ? t("tagRequest.historyTitle")
+            : t("tagRequest.inboxTitle"),
+        headers: exportHeaders(),
+        rows: list.map((row, i) => exportCells(row.req, row.user, i)),
+      });
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
+        "error",
+      );
+    }
+  }
+
+  async function onDownloadPdf() {
+    try {
+      const list = await loadExportRows();
+      downloadTagRequestPdf({
+        title:
+          boardTab === "history"
+            ? t("tagRequest.historyTitle")
+            : t("tagRequest.inboxTitle"),
+        headers: exportHeaders(),
+        rows: list.map((row, i) => exportCells(row.req, row.user, i)),
+        filename:
+          boardTab === "history"
+            ? "tag-request-history.pdf"
+            : "tag-requests.pdf",
+      });
+    } catch (err) {
+      toast(
+        err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
+        "error",
+      );
+    }
+  }
 
   async function confirmUpdate() {
     if (!pendingUpdate || busy) return;
@@ -461,6 +703,43 @@ export function TagRequestBoard({
           </div>
         ) : null}
 
+        <div
+          role="tablist"
+          aria-label={t("tagRequest.boardTabs")}
+          className="grid grid-cols-2 gap-2 rounded-2xl border border-neutral-200/80 bg-gradient-to-br from-white via-neutral-50 to-emerald-50/40 p-1.5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.35)] dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900"
+        >
+          {(
+            [
+              ["inbox", t("tagRequest.inbox"), requestedCount],
+              ["history", t("tagRequest.history"), historyCount],
+            ] as const
+          ).map(([id, label, count]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={boardTab === id}
+              onClick={() => setBoardTab(id)}
+              className={cn(
+                "inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold tracking-wide transition",
+                boardTab === id
+                  ? "bg-primary text-white shadow-lg shadow-primary/25"
+                  : "text-neutral-600 hover:bg-white hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-white",
+              )}
+            >
+              {id === "inbox" ? (
+                <IconSend className="h-4 w-4" />
+              ) : (
+                <IconHistory className="h-4 w-4" />
+              )}
+              {label}
+              <span className="rounded-md bg-black/10 px-1.5 py-px text-[11px] font-extrabold tabular-nums dark:bg-white/15">
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+
         <SearchFilterBar
           flat
           singleLine
@@ -471,39 +750,31 @@ export function TagRequestBoard({
           wrapTiles={false}
           className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
           tiles={
-            showStatusChips ? (
+            boardTab === "history" ? (
               <>
                 <StatChip
-                  icon={<IconSend className="h-3 w-3" />}
+                  icon={<IconHistory className="h-3 w-3" />}
                   label={t("tagRequest.statAll")}
-                  value={String(allCount)}
+                  value={String(historyCount)}
                   tone="teal"
-                  selected={view === "all"}
-                  onClick={() => setView("all")}
-                />
-                <StatChip
-                  icon={<IconClockHour4 className="h-3 w-3" />}
-                  label={t("tagRequest.requested")}
-                  value={String(requestedCount)}
-                  tone="amber"
-                  selected={view === "requested"}
-                  onClick={() => setView("requested")}
+                  selected={historyView === "all"}
+                  onClick={() => setHistoryView("all")}
                 />
                 <StatChip
                   icon={<IconCircleCheck className="h-3 w-3" />}
-                  label={t("tagRequest.updated")}
+                  label={t("tagRequest.accepted")}
                   value={String(updatedCount)}
                   tone="emerald"
-                  selected={view === "updated"}
-                  onClick={() => setView("updated")}
+                  selected={historyView === "updated"}
+                  onClick={() => setHistoryView("updated")}
                 />
                 <StatChip
                   icon={<IconX className="h-3 w-3" />}
                   label={t("tagRequest.rejected")}
                   value={String(rejectedCount)}
                   tone="rose"
-                  selected={view === "rejected"}
-                  onClick={() => setView("rejected")}
+                  selected={historyView === "rejected"}
+                  onClick={() => setHistoryView("rejected")}
                 />
               </>
             ) : (
@@ -515,6 +786,32 @@ export function TagRequestBoard({
                 selected
               />
             )
+          }
+          trailing={
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 rounded-lg px-2.5"
+                disabled={page.total === 0 || loading}
+                onClick={() => void onPrintList()}
+              >
+                <IconPrinter className="h-3.5 w-3.5" />
+                {t("tagRequest.printList")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 rounded-lg px-2.5"
+                disabled={page.total === 0 || loading}
+                onClick={() => void onDownloadPdf()}
+              >
+                <IconDownload className="h-3.5 w-3.5" />
+                {t("tagRequest.downloadPdf")}
+              </Button>
+            </div>
           }
         >
           <SettingsRankFilter
@@ -574,15 +871,17 @@ export function TagRequestBoard({
         ) : page.total === 0 ? (
           <EmptyState
             title={
-              mode === "admin"
-                ? t("tagRequest.emptyAdmin")
-                : mode === "ration"
-                  ? t("tagRequest.emptyRation")
-                  : mode === "consume"
-                    ? t("tagRequest.emptyConsume")
-                    : mode === "daily"
-                      ? t("tagRequest.emptyDaily")
-                      : t("tagRequest.emptyCc")
+              boardTab === "history"
+                ? t("tagRequest.emptyHistory")
+                : mode === "admin"
+                  ? t("tagRequest.emptyAdmin")
+                  : mode === "ration"
+                    ? t("tagRequest.emptyRation")
+                    : mode === "consume"
+                      ? t("tagRequest.emptyConsume")
+                      : mode === "daily"
+                        ? t("tagRequest.emptyDaily")
+                        : t("tagRequest.emptyCc")
             }
           />
         ) : (
@@ -595,7 +894,7 @@ export function TagRequestBoard({
                     <th className="px-4 py-3.5">{t("cc.fields.rank")}</th>
                     <th className="px-4 py-3.5">{t("cc.fields.name")}</th>
                     <th className="px-4 py-3.5">{t("cc.fields.wing")}</th>
-                    {mode === "admin" ? (
+                    {showQueue ? (
                       <th className="px-4 py-3.5">{t("tagRequest.queue")}</th>
                     ) : null}
                     <th className="px-4 py-3.5">{t("tagRequest.currentTag")}</th>
@@ -604,7 +903,7 @@ export function TagRequestBoard({
                     <th className="px-4 py-3.5">{t("common.dateRange")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.days")}</th>
                     <th className="px-4 py-3.5">{t("tagRequest.requestedAt")}</th>
-                    {canAct ? <th className="px-4 py-3.5" /> : null}
+                    {showActions ? <th className="px-4 py-3.5" /> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -618,7 +917,7 @@ export function TagRequestBoard({
                         user={user}
                         today={today}
                         mode={mode}
-                        canAct={canAct}
+                        canAct={showActions}
                         onUpdate={() => setPendingUpdate(req)}
                         onReject={
                           mode === "ration" ||
@@ -775,7 +1074,7 @@ function RequestRow({
       <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
         {user.wing || "—"}
       </td>
-      {mode === "admin" ? (
+      {mode === "admin" || mode === "cc" ? (
         <td className="px-4 py-3">
           <Badge className="rounded-md border border-neutral-200 bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
             {queueLabel(req.queue ?? "daily", t)}
@@ -803,7 +1102,7 @@ function RequestRow({
             ? t("tagRequest.requested")
             : req.status === "rejected"
               ? t("tagRequest.rejected")
-              : t("tagRequest.updated")}
+              : t("tagRequest.accepted")}
         </Badge>
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-neutral-600 dark:text-neutral-400">

@@ -1806,6 +1806,7 @@ export const bn = {
     requestBody:
       "{name} এর জন্য ট্যাগ ও তারিখের সীমা বেছে নিন। ডেইলি ককপিট আপডেট করবে।",
     dateRangeRequired: "শুরু ও শেষ তারিখ বেছে নিন",
+    oneYearRange: "১ বছর",
     requestToast: "ট্যাগ রিকোয়েস্ট পাঠানো হয়েছে",
     updateTitle: "ট্যাগ আপডেট",
     updateBody: "ডেইলি ককপিটে {name} কে {tag} এ পরিবর্তন করুন।",
@@ -1817,6 +1818,15 @@ export const bn = {
     updatedAt: "আপডেট",
     statAll: "সব",
     dutyToday: "আজকের ডিউটি",
+    inbox: "রিকোয়েস্ট",
+    history: "ইতিহাস",
+    accepted: "গৃহীত",
+    boardTabs: "রিকোয়েস্ট তালিকা",
+    emptyHistory: "এখনো কোনো গৃহীত বা প্রত্যাখ্যাত রিকোয়েস্ট নেই।",
+    printList: "প্রিন্ট",
+    downloadPdf: "পিডিএফ ডাউনলোড",
+    historyTitle: "ট্যাগ রিকোয়েস্ট ইতিহাস",
+    inboxTitle: "ট্যাগ রিকোয়েস্ট",
   },
   zkGate: {
     title: "ডিভাইস চেক-ইন",

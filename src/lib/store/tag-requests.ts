@@ -85,16 +85,24 @@ export function canRequestTag(user: User, date = todayISO()): boolean {
   return user.approval_status === "approved" && canAssignOnDate(user, date);
 }
 
+export function requestQueueForTag(
+  tag: DailyTag | "",
+  trgTone?: TrgTone,
+): TagRequestQueue {
+  const routed = dutyTagQueue(tag, trgTone);
+  return routed === "immediate" ? "daily" : routed;
+}
+
 export function getPendingTagRequest(
   userId: string,
-  queue: TagRequestQueue = "daily",
+  queue?: TagRequestQueue,
 ): TagRequest | null {
   return (
     getState().tag_requests.find(
       (r) =>
         r.user_id === userId &&
         r.status === "requested" &&
-        (r.queue ?? "daily") === queue,
+        (queue == null || (r.queue ?? "daily") === queue),
     ) ?? null
   );
 }
@@ -249,7 +257,9 @@ export function createTagRequest(
   const fromTag = getCockpitTagOnDate(user, fromDate);
   if (fromTag === toTag) return null;
 
-  const existing = getPendingTagRequest(userId, "daily");
+  const trg_tone = isTrgTag(toTag) ? resolveTrgTone(user.force) : undefined;
+  const queue = requestQueueForTag(toTag, trg_tone);
+  const existing = getPendingTagRequest(userId, queue);
   const ts = nowISO();
   const row: TagRequest = {
     id:
@@ -262,12 +272,14 @@ export function createTagRequest(
     to_date: toDate,
     from_tag: fromTag,
     to_tag: toTag,
-    queue: "daily",
+    trg_tone,
+    queue,
     status: "requested",
     requested_by: requestedBy,
     requested_at: ts,
     updated_at: ts,
   };
+  if (!trg_tone) delete row.trg_tone;
 
   setState((prev) => ({
     ...prev,
@@ -278,7 +290,7 @@ export function createTagRequest(
           !(
             r.user_id === userId &&
             r.status === "requested" &&
-            (r.queue ?? "daily") === "daily"
+            (r.queue ?? "daily") === queue
           ),
       ),
     ],

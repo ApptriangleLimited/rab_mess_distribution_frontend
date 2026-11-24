@@ -20,11 +20,13 @@ import {
   createTagRequest,
   getCockpitTagOnDate,
   getPendingTagRequest,
+  requestQueueForTag,
   upsertLocalTagRequest,
 } from "@/lib/store/tag-requests";
 import { dailyRrAllowedTags, isMfrLocked } from "@/lib/store/daily";
 import { listAllTags } from "@/lib/store/rates";
-import { todayISO } from "@/lib/date";
+import { shiftISODate, todayISO } from "@/lib/date";
+import { isTrgTag, resolveTrgTone } from "@/lib/trg-tone";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import type { DailyTag, User } from "@/lib/types";
@@ -50,6 +52,10 @@ export function RequestTagButton({
   const [busy, setBusy] = useState(false);
   const pending = getPendingTagRequest(user.id);
   const today = todayISO();
+  const rangeMin =
+    user.joining_date && user.joining_date > today
+      ? user.joining_date
+      : today;
   const [tag, setTag] = useState<DailyTag | "">(pending?.to_tag ?? "");
   const [from, setFrom] = useState(pending?.from_date || today);
   const [to, setTo] = useState(pending?.to_date || pending?.from_date || today);
@@ -82,6 +88,19 @@ export function RequestTagButton({
       toast(t("tagRequest.sameTag"), "error");
       return;
     }
+    const trgTone = isTrgTag(tag) ? resolveTrgTone(user.force) : undefined;
+    const queue = requestQueueForTag(tag, trgTone);
+    function queuedToast() {
+      if (queue === "ration") {
+        toast(t("daily.queuedRation", { tag }), "success");
+        return;
+      }
+      if (queue === "consume") {
+        toast(t("daily.queuedConsume", { tag }), "success");
+        return;
+      }
+      toast(t("tagRequest.requestToast"), "success");
+    }
     if (apiOn) {
       setBusy(true);
       try {
@@ -90,10 +109,12 @@ export function RequestTagButton({
           toTag: tag,
           from,
           to,
+          queue,
+          trg_tone: trgTone,
         });
         upsertLocalTagRequest(requestToTagRequest(created));
         notifyCcDataChange();
-        toast(t("tagRequest.requestToast"), "success");
+        queuedToast();
         setOpen(false);
       } catch (err) {
         toast(
@@ -110,8 +131,16 @@ export function RequestTagButton({
       toast(t("tagRequest.cannotRequest"), "error");
       return;
     }
-    toast(t("tagRequest.requestToast"), "success");
+    queuedToast();
     setOpen(false);
+  }
+
+  function setOneYearRange() {
+    const start = from && from >= rangeMin ? from : rangeMin;
+    let end = shiftISODate(start, 365);
+    if (user.out_date && end > user.out_date) end = user.out_date;
+    setFrom(start);
+    setTo(end);
   }
 
   if (!allowed && !iconOnly) return null;
@@ -165,15 +194,24 @@ export function RequestTagButton({
             <TagChip tag={current} />
           </div>
           <div>
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              {t("common.dateRange")}
-            </p>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                {t("common.dateRange")}
+              </p>
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-primary hover:underline"
+                onClick={setOneYearRange}
+              >
+                {t("tagRequest.oneYearRange")}
+              </button>
+            </div>
             <DateRangePicker
               from={from}
               to={to}
-              min={user.joining_date || undefined}
+              min={rangeMin}
               max={user.out_date || undefined}
-              maxSpanDays={31}
+              maxSpanDays={366}
               onChange={({ from: nextFrom, to: nextTo }) => {
                 setFrom(nextFrom);
                 setTo(nextTo);
