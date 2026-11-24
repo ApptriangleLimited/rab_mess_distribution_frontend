@@ -66,15 +66,22 @@ import {
 } from "@/lib/store/tag-requests";
 import { formatMemberWing, memberMatchesWingFilter } from "@/lib/store/org-options";
 import { listAllTags } from "@/lib/store/rates";
-import { eachISODate, formatDateDisplay, todayISO } from "@/lib/date";
+import { eachISODate, formatDateDisplay } from "@/lib/date";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import type {
+  DailyTag,
   TagRequest,
   TagRequestQueue,
   TagRequestStatus,
   User,
 } from "@/lib/types";
+
+function shownFromTag(req: TagRequest, user: User): DailyTag | "" {
+  if (req.from_tag) return req.from_tag;
+  const day = req.from_date || req.date;
+  return day ? getCockpitTagOnDate(user, day) : "";
+}
 
 type Mode = "daily" | "cc" | "ration" | "consume" | "mess" | "admin";
 type BoardTab = "inbox" | "history";
@@ -141,7 +148,6 @@ export function TagRequestBoard({
   const apiOn = isCcApiEnabled();
   const tags = listAllTags();
   const reduceMotion = useReducedMotion();
-  const today = todayISO();
   const [apiRows, setApiRows] = useState<TagRequest[]>([]);
   const [apiUsers, setApiUsers] = useState<User[]>([]);
   const [apiTotal, setApiTotal] = useState(0);
@@ -457,7 +463,7 @@ export function TagRequestBoard({
     ];
     cells.push(queueLabel(req.queue ?? "daily", t));
     cells.push(
-      getCockpitTagOnDate(user, today) || "—",
+      shownFromTag(req, user) || "—",
       req.to_tag || "—",
       statusLabel(req.status),
       formatDateDisplay(req.from_date || req.date) || req.from_date || req.date || "—",
@@ -895,7 +901,6 @@ export function TagRequestBoard({
                         key={req.id}
                         req={req}
                         user={user}
-                        today={today}
                         mode={mode}
                         showActionCol={showActions}
                         canAct={
@@ -972,8 +977,11 @@ export function TagRequestBoard({
             <div className="flex flex-col items-end gap-1">
               <div className="flex items-center gap-2">
                 <TagChip
-                  tag={getCockpitTagOnDate(updateUser, today)}
-                  tone={getCockpitToneOnDate(updateUser, today)}
+                  tag={shownFromTag(pendingUpdate, updateUser)}
+                  tone={getCockpitToneOnDate(
+                    updateUser,
+                    pendingUpdate.from_date || pendingUpdate.date,
+                  )}
                 />
                 <span className="text-neutral-400">→</span>
                 <TagChip tag={pendingUpdate.to_tag} tone={pendingUpdate.trg_tone} />
@@ -1024,7 +1032,6 @@ export function TagRequestBoard({
 function RequestRow({
   req,
   user,
-  today,
   mode,
   canAct,
   showActionCol,
@@ -1033,7 +1040,6 @@ function RequestRow({
 }: {
   req: TagRequest;
   user: User;
-  today: string;
   mode: Mode;
   canAct: boolean;
   showActionCol: boolean;
@@ -1041,7 +1047,8 @@ function RequestRow({
   onReject?: () => void;
 }) {
   const t = useT();
-  const current = getCockpitTagOnDate(user, today);
+  const current = shownFromTag(req, user);
+  const fromDay = req.from_date || req.date;
 
   return (
     <tr className="border-t border-neutral-100 dark:border-neutral-800">
@@ -1068,7 +1075,7 @@ function RequestRow({
         </Badge>
       </td>
       <td className="px-4 py-3">
-        <TagChip tag={current} tone={getCockpitToneOnDate(user, today)} />
+        <TagChip tag={current} tone={getCockpitToneOnDate(user, fromDay)} />
       </td>
       <td className="px-4 py-3">
         <TagChip tag={req.to_tag} tone={req.trg_tone} />
