@@ -424,9 +424,11 @@ const FORM2_ADMIN_BRANCHES = [
 
 /**
  * Daily → Admin wings (Form 3) — paper order from দৈনিক জনবলের প্রতিবেদন.
- * সদর is the subtotal of the offices above; নতুন অস্থায়ী সংযুক্ত stays after it.
+ * সদর (shown as সদর দপ্তর শাখা) is the subtotal and stays the first row.
+ * নতুন অস্থায়ী সংযুক্ত stays last.
  */
 const FORM3_ADMIN_WINGS = [
+  "সদর",
   "DG Office",
   "ADG (Ops) Office",
   "ADG (Admin) Office",
@@ -441,7 +443,6 @@ const FORM3_ADMIN_WINGS = [
   "Proj Br",
   "Dev Br",
   "Wksp Br",
-  "সদর",
   "New Temp Att",
 ] as const;
 
@@ -550,6 +551,7 @@ function listForm3Branches(snapshot?: ManpowerSnapshot): string[] {
     seen.add(key);
     out.push(canon);
   }
+  push("সদর");
   const offices = FORM3_ADMIN_WINGS.filter(
     (w) => w !== "সদর" && w !== "New Temp Att",
   );
@@ -576,7 +578,6 @@ function listForm3Branches(snapshot?: ManpowerSnapshot): string[] {
       );
     });
   for (const w of extra) push(w);
-  push("সদর");
   const attached = [
     ...kids,
     ...HQ_SUB_WINGS,
