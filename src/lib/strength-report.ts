@@ -371,20 +371,19 @@ function isSadarWing(name: string): boolean {
 }
 
 /**
- * Form 3 top প্রাপ্ত / উপস্থিত / অনুপস্থিত, one column at a time.
- * সদর দপ্তর শাখা is the office subtotal, so it is not added again.
- * Every other displayed row is added once. Officer, DAD, and each
- * lower rank roll up the same way.
+ * Top প্রাপ্ত / উপস্থিত / অনুপস্থিত.
+ * Form 3 adds every displayed Admin Wing row, including সদর দপ্তর শাখা,
+ * and each rank column (officer, DAD, and the rest) adds the same rows.
  */
 export function sumDisplayedStrength(
   blocks: StrengthBranchBlock[],
   formNo: 2 | 3,
 ): { held: StrengthCounts; present: StrengthCounts; absent: StrengthCounts } {
+  void formNo;
   let held = emptyCounts();
   let present = emptyCounts();
   let absent = emptyCounts();
   for (const block of blocks) {
-    if (formNo === 3 && isSadarWing(block.wing)) continue;
     held = addCounts(held, block.held);
     present = addCounts(present, block.present);
     absent = addCounts(absent, block.absent);
