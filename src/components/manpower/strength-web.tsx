@@ -8,7 +8,6 @@ import { fromBnDigits, toBnDigits } from "@/lib/consume-official-reports";
 import { ABSENCE_DETAIL_FIELDS, isManualAttachedWing } from "@/lib/manpower-report";
 import {
   STRENGTH_CATEGORIES,
-  isForm2HqBranchHidden,
   strengthCategoryLabelBn,
   strengthMetricTotal,
   sumAbsenceRows,
@@ -505,7 +504,7 @@ function HqAbsenceSection({
             </tr>
           </thead>
           <tbody>
-            {report.absence.filter((row) => !(form2 && isForm2HqBranchHidden(row.wing))).map((row) => {
+            {report.absence.map((row) => {
               const manual = Boolean(
                 !readOnly && isManualAttachedWing(row.wing),
               );
@@ -622,9 +621,7 @@ export function StrengthWeb({ report, readOnly = false }: Props) {
                 />
               </thead>
               <tbody>
-                {report.branches
-                  .filter((block) => !(form2 && isForm2HqBranchHidden(block.wing)))
-                  .map((block) => (
+                {report.branches.map((block) => (
                   <BranchRows
                     key={block.wing}
                     block={block}

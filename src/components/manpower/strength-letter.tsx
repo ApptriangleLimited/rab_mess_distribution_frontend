@@ -11,7 +11,6 @@ import { WingName } from "@/components/manpower/wing-name";
 import { toBnDigits } from "@/lib/consume-official-reports";
 import {
   STRENGTH_CATEGORIES,
-  isForm2HqBranchHidden,
   strengthCategoryLabelBn,
   strengthMetricTotal,
   sumAbsenceRows,
@@ -284,7 +283,7 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
           </tr>
         </thead>
         <tbody>
-          {report.absence.filter((row) => !(form2 && isForm2HqBranchHidden(row.wing))).map((row) => (
+          {report.absence.map((row) => (
             <tr key={row.wing}>
               <td className="border border-neutral-800 px-1 py-0.5 text-left font-medium">
                 {form2 ? (
@@ -392,9 +391,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
           <tbody>
             {report.formNo === 2 ? (
               <>
-                {report.branches
-                  .filter((block) => !isForm2HqBranchHidden(block.wing))
-                  .map((block) => (
+                {report.branches.map((block) => (
                   <Form2BranchBlock key={block.wing} block={block} bn={bn} />
                 ))}
                 <Form2BranchBlock block={report.grandTotal} bn={bn} />
