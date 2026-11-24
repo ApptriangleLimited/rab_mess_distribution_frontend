@@ -14,6 +14,7 @@ import {
   strengthCategoryLabelBn,
   strengthMetricTotal,
   sumAbsenceRows,
+  sumDisplayedStrength,
   type StrengthAbsenceRow,
   type StrengthBranchBlock,
   type StrengthCounts,
@@ -145,24 +146,9 @@ function BranchBlock({
           <WingName wing={block.wing} paper />
         </td>
       </tr>
-      <MetricRow
-        label="প্রাপ্ত"
-        counts={block.held}
-        blankOfficer
-        bn={bn}
-      />
-      <MetricRow
-        label="উপস্থিত"
-        counts={block.present}
-        blankOfficer
-        bn={bn}
-      />
-      <MetricRow
-        label="অনুপস্থিত"
-        counts={block.absent}
-        blankOfficer
-        bn={bn}
-      />
+      <MetricRow label="প্রাপ্ত" counts={block.held} bn={bn} />
+      <MetricRow label="উপস্থিত" counts={block.present} bn={bn} />
+      <MetricRow label="অনুপস্থিত" counts={block.absent} bn={bn} />
     </>
   );
 }
@@ -310,6 +296,13 @@ function LetterAbsenceTable({ report }: { report: StrengthReport }) {
 export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
   function StrengthLetter({ report, locale = "bn-BD", verified = false }, ref) {
     const bn = true;
+    const rolled = sumDisplayedStrength(report.branches, report.formNo);
+    const headline = {
+      ...report.grandTotal,
+      held: rolled.held,
+      present: rolled.present,
+      absent: rolled.absent,
+    };
     return (
       <div
         ref={ref}
@@ -351,9 +344,9 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
             </tr>
           </thead>
           <tbody>
-            <MetricRow label="প্রাপ্ত" counts={report.summary.held} bn={bn} />
-            <MetricRow label="উপস্থিত" counts={report.summary.present} bn={bn} />
-            <MetricRow label="অনুপস্থিত" counts={report.summary.absent} bn={bn} />
+            <MetricRow label="প্রাপ্ত" counts={headline.held} bn={bn} />
+            <MetricRow label="উপস্থিত" counts={headline.present} bn={bn} />
+            <MetricRow label="অনুপস্থিত" counts={headline.absent} bn={bn} />
           </tbody>
         </table>
 
@@ -394,7 +387,7 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
                 {report.branches.map((block) => (
                   <Form2BranchBlock key={block.wing} block={block} bn={bn} />
                 ))}
-                <Form2BranchBlock block={report.grandTotal} bn={bn} />
+                <Form2BranchBlock block={headline} bn={bn} />
               </>
             ) : (
               <>
@@ -406,34 +399,16 @@ export const StrengthLetter = forwardRef<HTMLDivElement, Props>(
                     colSpan={STRENGTH_CATEGORIES.length + 2}
                     className="border border-neutral-800 bg-neutral-200/70 px-1 py-0.5 text-left text-[9px] font-bold"
                   >
-                    {report.grandTotal.wing === "সর্বমোট" ? (
+                    {headline.wing === "সর্বমোট" ? (
                       "সর্বমোট"
                     ) : (
-                      <WingName wing={report.grandTotal.wing} paper />
+                      <WingName wing={headline.wing} paper />
                     )}
                   </td>
                 </tr>
-                <MetricRow
-                  label="প্রাপ্ত"
-                  counts={report.grandTotal.held}
-                  blankOfficer
-                  emphasize
-                  bn={bn}
-                />
-                <MetricRow
-                  label="উপস্থিত"
-                  counts={report.grandTotal.present}
-                  blankOfficer
-                  emphasize
-                  bn={bn}
-                />
-                <MetricRow
-                  label="অনুপস্থিত"
-                  counts={report.grandTotal.absent}
-                  blankOfficer
-                  emphasize
-                  bn={bn}
-                />
+                <MetricRow label="প্রাপ্ত" counts={headline.held} emphasize bn={bn} />
+                <MetricRow label="উপস্থিত" counts={headline.present} emphasize bn={bn} />
+                <MetricRow label="অনুপস্থিত" counts={headline.absent} emphasize bn={bn} />
               </>
             )}
           </tbody>

@@ -11,6 +11,7 @@ import {
   strengthCategoryLabelBn,
   strengthMetricTotal,
   sumAbsenceRows,
+  sumDisplayedStrength,
   type StrengthAbsenceRow,
   type StrengthBranchBlock,
   type StrengthCounts,
@@ -569,6 +570,13 @@ export function StrengthWeb({ report, readOnly = false }: Props) {
   const isHq = report.formNo === 3;
   const form2 = report.formNo === 2;
   const bn = true;
+  const rolled = sumDisplayedStrength(report.branches, report.formNo);
+  const headline = {
+    ...report.grandTotal,
+    held: rolled.held,
+    present: rolled.present,
+    absent: rolled.absent,
+  };
   return (
     <div className="flex flex-col gap-6 p-1 sm:p-2">
       <section className="overflow-hidden rounded-xl border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900">
@@ -584,24 +592,9 @@ export function StrengthWeb({ report, readOnly = false }: Props) {
               <RankHead metricLabel={form2 ? "ডিটেইল" : "বিবরণ"} />
             </thead>
             <tbody>
-              <MetricRow
-                label="প্রাপ্ত"
-                counts={report.grandTotal.held}
-                emphasize
-                bn={bn}
-              />
-              <MetricRow
-                label="উপস্থিত"
-                counts={report.grandTotal.present}
-                emphasize
-                bn={bn}
-              />
-              <MetricRow
-                label="অনুপস্থিত"
-                counts={report.grandTotal.absent}
-                emphasize
-                bn={bn}
-              />
+              <MetricRow label="প্রাপ্ত" counts={headline.held} emphasize bn={bn} />
+              <MetricRow label="উপস্থিত" counts={headline.present} emphasize bn={bn} />
+              <MetricRow label="অনুপস্থিত" counts={headline.absent} emphasize bn={bn} />
             </tbody>
           </table>
         </div>
@@ -634,7 +627,7 @@ export function StrengthWeb({ report, readOnly = false }: Props) {
                 ))}
                 {form2 ? (
                   <BranchRows
-                    block={report.grandTotal}
+                    block={headline}
                     date={report.date}
                     officerAuthorizedId={null}
                     bn={bn}

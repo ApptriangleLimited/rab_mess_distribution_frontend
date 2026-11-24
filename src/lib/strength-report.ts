@@ -370,6 +370,28 @@ function isSadarWing(name: string): boolean {
   return key === "সদর" || key === "sadar" || key === "hq";
 }
 
+/**
+ * Form 3 top প্রাপ্ত / উপস্থিত / অনুপস্থিত, one column at a time.
+ * সদর দপ্তর শাখা is the office subtotal, so it is not added again.
+ * Every other displayed row is added once. Officer, DAD, and each
+ * lower rank roll up the same way.
+ */
+export function sumDisplayedStrength(
+  blocks: StrengthBranchBlock[],
+  formNo: 2 | 3,
+): { held: StrengthCounts; present: StrengthCounts; absent: StrengthCounts } {
+  let held = emptyCounts();
+  let present = emptyCounts();
+  let absent = emptyCounts();
+  for (const block of blocks) {
+    if (formNo === 3 && isSadarWing(block.wing)) continue;
+    held = addCounts(held, block.held);
+    present = addCounts(present, block.present);
+    absent = addCounts(absent, block.absent);
+  }
+  return { held, present, absent };
+}
+
 function isCentralWorkshopBranch(name: string): boolean {
   const key = canonicalWingName(name).trim().toLowerCase();
   return (
@@ -389,21 +411,6 @@ function placeForm3SadarAfterWorkshop(rows: string[]): string[] {
     workshopAt >= 0 ? workshopAt + 1 : attachedAt >= 0 ? attachedAt : body.length;
   body.splice(insertAt, 0, FORM3_SADAR);
   return body;
-}
-
-/**
- * Admin wing top প্রাপ্ত / উপস্থিত / অনুপস্থিত.
- * সদর দপ্তর শাখা is the office sum, so it is not added again.
- * Every other শাখা, including নতুন অস্থায়ী সংযুক্ত, is added once.
- */
-function countsTowardWingTop(
-  scope: StrengthScope,
-  wing: string,
-  skipSadarFill: boolean,
-): boolean {
-  if (skipSadarFill && isSadarWing(wing)) return false;
-  if (scope === "hq" && isSadarWing(wing)) return false;
-  return true;
 }
 
 function bumpAbsence(
@@ -867,26 +874,13 @@ export function buildStrengthReport(
     };
   });
 
-  let summaryHeld = emptyCounts();
-  let summaryPresent = emptyCounts();
-  let summaryAbsent = emptyCounts();
-  for (const wing of branches) {
-    if (!countsTowardWingTop(scope, wing, cfg.skipSadarFill)) continue;
-    const b = map.get(wing)!;
-    summaryHeld = addCounts(summaryHeld, b.held);
-    summaryPresent = addCounts(summaryPresent, b.present);
-    summaryAbsent = addCounts(summaryAbsent, b.absent);
-  }
-
-  let grandHeld = emptyCounts();
-  let grandPresent = emptyCounts();
-  let grandAbsent = emptyCounts();
-  for (const block of branchBlocks) {
-    if (!countsTowardWingTop(scope, block.wing, cfg.skipSadarFill)) continue;
-    grandHeld = addCounts(grandHeld, block.held);
-    grandPresent = addCounts(grandPresent, block.present);
-    grandAbsent = addCounts(grandAbsent, block.absent);
-  }
+  const rolled = sumDisplayedStrength(branchBlocks, cfg.formNo);
+  const summaryHeld = rolled.held;
+  const summaryPresent = rolled.present;
+  const summaryAbsent = rolled.absent;
+  const grandHeld = rolled.held;
+  const grandPresent = rolled.present;
+  const grandAbsent = rolled.absent;
 
   const absence: StrengthAbsenceRow[] = branches.map((wing) => {
     const raw =
