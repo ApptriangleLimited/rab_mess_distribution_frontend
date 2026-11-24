@@ -21,7 +21,7 @@ import { formatMonthLong, monthDateBounds, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
-import type { DailyTag } from "@/lib/types";
+import type { DailyTag, UserStatus } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -48,6 +48,8 @@ export default function MessLedgerPrintClient() {
   const wing = searchParams.get("wing") ?? "all";
   const dateFrom = searchParams.get("from") ?? "";
   const dateTo = searchParams.get("to") ?? "";
+  const memberStatus: UserStatus =
+    searchParams.get("status") === "0" ? "0" : "1";
 
   const rangeBounds = useMemo(() => {
     const from = dateFrom.trim();
@@ -129,6 +131,7 @@ export default function MessLedgerPrintClient() {
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
     return ledger.rows.filter((row) => {
+      if (row.user.status !== memberStatus) return false;
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (wing !== "all" && row.user.wing !== wing) return false;
       if (!query) return true;
@@ -137,7 +140,7 @@ export default function MessLedgerPrintClient() {
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing]);
+  }, [ledger.rows, q, rank, wing, memberStatus]);
 
   const backHref = `/mess/ledger?month=${month}`;
   const canAct = rows.length > 0;

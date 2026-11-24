@@ -14,6 +14,7 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PagePane } from "@/components/shared/page-pane";
+import { ActiveInactiveToggle } from "@/components/shared/active-inactive-toggle";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
@@ -43,7 +44,7 @@ import { listBoroKhanaDates } from "@/lib/store/boro-khana";
 import { getMessEaters } from "@/lib/store/mess";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { isCivilianMember } from "@/lib/store/users";
-import type { DailyTag } from "@/lib/types";
+import type { DailyTag, UserStatus } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +75,7 @@ export default function MessLedgerClient() {
   const [rank, setRank] = useState("all");
   const [wing, setWing] = useState("all");
   const [tagFilter, setTagFilter] = useState<MessChipFilter>("all");
+  const [memberStatus, setMemberStatus] = useState<UserStatus>("1");
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
   const [loading, setLoading] = useState(false);
@@ -177,6 +179,7 @@ export default function MessLedgerClient() {
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
     return ledger.rows.filter((row) => {
+      if (row.user.status !== memberStatus) return false;
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (wing !== "all" && row.user.wing !== wing) return false;
       if (!query) return true;
@@ -185,7 +188,7 @@ export default function MessLedgerClient() {
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing]);
+  }, [ledger.rows, q, rank, wing, memberStatus]);
 
   const defaultDates = defaultRange();
   const datesAreDefault =
@@ -201,6 +204,7 @@ export default function MessLedgerClient() {
     const query = q.trim().toLowerCase();
     const civilFromUsers = state.users.filter((user) => {
       if (user.approval_status !== "approved") return false;
+      if (user.status !== memberStatus) return false;
       if (!isCivilianMember(user)) return false;
       if (rank !== "all" && user.rank !== rank) return false;
       if (!memberMatchesWingFilter(user.wing, wing)) return false;
@@ -231,7 +235,7 @@ export default function MessLedgerClient() {
       mfr,
       civil: civilFromUsers || civilFromRows,
     };
-  }, [rows, state.users, q, rank, wing, state.wing_parent]);
+  }, [rows, state.users, q, rank, wing, memberStatus, state.wing_parent]);
 
   const boardRows = useMemo(() => {
     if (tagFilter === "all") return rows;
@@ -287,8 +291,9 @@ export default function MessLedgerClient() {
     if (wing !== "all") params.set("wing", wing);
     params.set("from", dateFrom);
     params.set("to", dateTo);
+    params.set("status", memberStatus);
     return `/mess/ledger/print?${params.toString()}`;
-  }, [month, q, rank, wing, dateFrom, dateTo]);
+  }, [month, q, rank, wing, dateFrom, dateTo, memberStatus]);
 
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
@@ -455,6 +460,11 @@ export default function MessLedgerClient() {
             onChange={setWing}
             className="w-[7rem] shrink-0"
             triggerClassName={cn(fieldClass, "w-full")}
+          />
+          <ActiveInactiveToggle
+            value={memberStatus}
+            onChange={setMemberStatus}
+            className="h-9"
           />
         </SearchFilterBar>
 
