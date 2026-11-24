@@ -366,8 +366,44 @@ function isAbsentTag(tag: DailyTag | ""): boolean {
 
 function isSadarWing(name: string): boolean {
   const key = normalize(name);
-  // Form 2 placeholder only — not HQ Br children (Form 3).
+  // Form 3 subtotal row only — not HQ Br children, and not Form 2's HQ Br.
   return key === "সদর" || key === "sadar" || key === "hq";
+}
+
+function isCentralWorkshopBranch(name: string): boolean {
+  const key = canonicalWingName(name).trim().toLowerCase();
+  return (
+    key === "wksp br" ||
+    key === "workshop branch" ||
+    key === "central workshop branch" ||
+    key === "central workshop"
+  );
+}
+
+/** Admin wing only: সদর দপ্তর শাখা follows কেন্দ্রীয় ওয়ার্কশপ শাখা. */
+function placeForm3SadarAfterWorkshop(rows: string[]): string[] {
+  const body = rows.filter((wing) => !isSadarWing(wing));
+  const workshopAt = body.findIndex(isCentralWorkshopBranch);
+  const attachedAt = body.findIndex((wing) => isManualAttachedWing(wing));
+  const insertAt =
+    workshopAt >= 0 ? workshopAt + 1 : attachedAt >= 0 ? attachedAt : body.length;
+  body.splice(insertAt, 0, FORM3_SADAR);
+  return body;
+}
+
+/**
+ * Admin wing top প্রাপ্ত / উপস্থিত / অনুপস্থিত.
+ * সদর দপ্তর শাখা is the office sum, so it is not added again.
+ * Every other শাখা, including নতুন অস্থায়ী সংযুক্ত, is added once.
+ */
+function countsTowardWingTop(
+  scope: StrengthScope,
+  wing: string,
+  skipSadarFill: boolean,
+): boolean {
+  if (skipSadarFill && isSadarWing(wing)) return false;
+  if (scope === "hq" && isSadarWing(wing)) return false;
+  return true;
 }
 
 function bumpAbsence(
@@ -420,11 +456,10 @@ const FORM2_ADMIN_BRANCHES = [
 
 /**
  * Daily → Admin wings (Form 3) — paper order from দৈনিক জনবলের প্রতিবেদন.
- * সদর (shown as সদর দপ্তর শাখা) is the subtotal and stays the first row.
- * নতুন অস্থায়ী সংযুক্ত stays last.
+ * সদর (shown as সদর দপ্তর শাখা) sits directly under কেন্দ্রীয় ওয়ার্কশপ শাখা.
+ * নতুন অস্থায়ী সংযুক্ত stays last. HQ Sub branch (Form 2) is a different list.
  */
 const FORM3_ADMIN_WINGS = [
-  "সদর",
   "DG Office",
   "ADG (Ops) Office",
   "ADG (Admin) Office",
@@ -439,6 +474,7 @@ const FORM3_ADMIN_WINGS = [
   "Proj Br",
   "Dev Br",
   "Wksp Br",
+  "সদর",
   "New Temp Att",
 ] as const;
 
@@ -547,7 +583,6 @@ function listForm3Branches(snapshot?: ManpowerSnapshot): string[] {
     seen.add(key);
     out.push(canon);
   }
-  push("সদর");
   const offices = FORM3_ADMIN_WINGS.filter(
     (w) => w !== "সদর" && w !== "New Temp Att",
   );
@@ -584,7 +619,8 @@ function listForm3Branches(snapshot?: ManpowerSnapshot): string[] {
   } else {
     push("New Temp Att");
   }
-  return out.length ? out : [...FORM3_ADMIN_WINGS];
+  const placed = placeForm3SadarAfterWorkshop(out);
+  return placed.length ? placed : [...FORM3_ADMIN_WINGS];
 }
 
 function lookupDayWingCat(
@@ -835,8 +871,7 @@ export function buildStrengthReport(
   let summaryPresent = emptyCounts();
   let summaryAbsent = emptyCounts();
   for (const wing of branches) {
-    if (cfg.skipSadarFill && isSadarWing(wing)) continue;
-    if (scope === "hq" && isSadarWing(wing)) continue;
+    if (!countsTowardWingTop(scope, wing, cfg.skipSadarFill)) continue;
     const b = map.get(wing)!;
     summaryHeld = addCounts(summaryHeld, b.held);
     summaryPresent = addCounts(summaryPresent, b.present);
@@ -847,7 +882,7 @@ export function buildStrengthReport(
   let grandPresent = emptyCounts();
   let grandAbsent = emptyCounts();
   for (const block of branchBlocks) {
-    if (scope === "hq" && isSadarWing(block.wing)) continue;
+    if (!countsTowardWingTop(scope, block.wing, cfg.skipSadarFill)) continue;
     grandHeld = addCounts(grandHeld, block.held);
     grandPresent = addCounts(grandPresent, block.present);
     grandAbsent = addCounts(grandAbsent, block.absent);
