@@ -10,6 +10,10 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { CollapsibleSection } from "@/components/shared/collapsible-section";
+import {
+  SearchFilterBar,
+  searchFilterFieldClass,
+} from "@/components/shared/search-filter-bar";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { StaffPasswordPolicy } from "@/components/settings/staff-password-policy";
 import { staffPasswordReady } from "@/lib/staff-password";
@@ -116,13 +120,41 @@ export function StaffAccountsSection({
   const [memberLookupBusy, setMemberLookupBusy] = useState(false);
   const isAdmin = session?.role === "admin";
   const [roleBusyId, setRoleBusyId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const filtersActive =
+    q.trim() !== "" || roleFilter !== "all" || statusFilter !== "all";
+
+  const filteredRows = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (roleFilter !== "all" && row.role !== roleFilter) return false;
+      if (statusFilter === "active" && !row.active) return false;
+      if (statusFilter === "inactive" && row.active) return false;
+      if (!query) return true;
+      return [row.display_name, staffLoginId(row)]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [rows, q, roleFilter, statusFilter]);
 
   const grouped = useMemo(() => {
     return ROLE_KEYS.map((role) => ({
       role,
-      items: rows.filter((row) => row.role === role),
-    })).filter((group) => group.items.length > 0 || group.role === "mess_checker");
-  }, [rows]);
+      items: filteredRows.filter((row) => row.role === role),
+    })).filter(
+      (group) =>
+        group.items.length > 0 || (group.role === "mess_checker" && !filtersActive),
+    );
+  }, [filteredRows, filtersActive]);
+
+  function clearFilters() {
+    setQ("");
+    setRoleFilter("all");
+    setStatusFilter("all");
+  }
 
   async function reload() {
     if (!apiOn) return;
@@ -409,28 +441,75 @@ export function StaffAccountsSection({
     <p className="px-1 py-6 text-sm text-neutral-500">{t("common.loading")}</p>
   ) : (
     <div className="space-y-5">
+      <SearchFilterBar
+        flat
+        singleLine
+        search={q}
+        onSearchChange={setQ}
+        searchPlaceholder={t("settings.staffSearchPlaceholder")}
+        filtersActive={filtersActive}
+        className="border-primary/10 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900"
+      >
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <div className="min-w-[9rem] flex-1">
+            <Select
+              value={roleFilter}
+              onValueChange={(value) => setRoleFilter(value as Role | "all")}
+            >
+              <SelectTrigger className={searchFilterFieldClass} aria-label={t("profile.role")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("settings.staffAllRoles")}</SelectItem>
+                {ROLE_KEYS.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {roleLabel(role, locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-[9rem] flex-1">
+            <Select
+              value={statusFilter}
+              onValueChange={(value) =>
+                setStatusFilter(value as "all" | "active" | "inactive")
+              }
+            >
+              <SelectTrigger className={searchFilterFieldClass} aria-label={t("common.allStatus")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("common.allStatus")}</SelectItem>
+                <SelectItem value="active">{t("settings.staffActive")}</SelectItem>
+                <SelectItem value="inactive">{t("settings.staffInactive")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {filtersActive ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-10 rounded-xl px-3"
+              onClick={clearFilters}
+            >
+              {t("common.clearFilters")}
+            </Button>
+          ) : null}
+        </div>
+      </SearchFilterBar>
+      {grouped.length === 0 ? (
+        <p className="px-1 py-6 text-sm text-neutral-500">{t("common.noResults")}</p>
+      ) : null}
       {grouped.map((group) => (
         <section key={group.role}>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-              {roleLabel(group.role, locale)}
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                {group.items.length}
-              </span>
-            </h3>
-            {group.role === "mess_checker" && apiOn ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="cta"
-                className="h-8 rounded-xl"
-                onClick={() => openCreate("mess_checker")}
-              >
-                <IconPlus className="h-3.5 w-3.5" />
-                {t("settings.staffAdd")}
-              </Button>
-            ) : null}
-          </div>
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+            {roleLabel(group.role, locale)}
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+              {group.items.length}
+            </span>
+          </h3>
           {group.items.length === 0 ? (
             <p className="rounded-xl border border-dashed border-neutral-200 px-3 py-4 text-sm text-neutral-500 dark:border-neutral-800">
               {t("settings.staffAddBody")}
