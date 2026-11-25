@@ -440,7 +440,6 @@ export function filterUsers(users: User[], filters: UserFilters) {
   const dateTo = filters.date_to?.trim() ?? "";
   return users
     .filter((u) => {
-      if (u.member_type === "civilian") return false;
       if (filters.status && filters.status !== "all" && u.status !== filters.status) {
         return false;
       }
@@ -524,7 +523,8 @@ export function userFiltersFromSearchParams(
       memberType === "new" ||
       memberType === "attached" ||
       memberType === "permanent" ||
-      memberType === "guest"
+      memberType === "guest" ||
+      memberType === "civilian"
         ? memberType
         : "all",
     wing: search.get("wing") || "all",

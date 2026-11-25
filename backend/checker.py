@@ -20,6 +20,7 @@ from zk_gate import (
     _load_shifts,
     _match_shift,
     _seconds_until_shift_end,
+    _to_min,
     append_checker_punch,
     device_pin,
     has_rfid,
@@ -149,13 +150,43 @@ def _current_shift(db: Session):
     return now, _match_shift(now, shifts)
 
 
+def _shift_brief(shift: dict | None) -> dict | None:
+    if shift is None:
+        return None
+    return {
+        "id": shift["id"],
+        "name": shift["name"],
+        "start_time": shift["start_time"],
+        "end_time": shift["end_time"],
+    }
+
+
+def _upcoming_shift(now: datetime, shifts: list[dict]) -> dict | None:
+    """Next window that has not started. After the last window, tomorrow's first."""
+    mins = now.hour * 60 + now.minute
+    later: list[tuple[int, dict]] = []
+    for shift in shifts:
+        start = _to_min(shift["start_time"])
+        if start is None or start <= mins:
+            continue
+        later.append((start, shift))
+    if later:
+        later.sort(key=lambda item: item[0])
+        return later[0][1]
+    if not shifts:
+        return None
+    return min(shifts, key=lambda shift: _to_min(shift["start_time"]) or 24 * 60)
+
+
 @router.get("/api/v1/mess/checker/board")
 def checker_board(
     staff: Staff = Depends(require_roles("mess_checker")),
     db: Session = Depends(get_db),
 ):
     branch = _branch(staff)
-    now, shift = _current_shift(db)
+    now = datetime.now(DHAKA)
+    shifts = _load_shifts(db)
+    shift = _match_shift(now, shifts)
     day = now.date()
     rows = _branch_rows(branch)
     guests = (
@@ -180,6 +211,7 @@ def checker_board(
                 "end_time": shift["end_time"],
                 "seconds_left": _seconds_until_shift_end(now, shift),
             },
+            "next_shift": None if shift is not None else _shift_brief(_upcoming_shift(now, shifts)),
             "stats": {
                 "planned": _planned_ms(db, day),
                 "consumptions": sum(1 for row in rows if row.get("status") == STATUS_ACCEPTED),
@@ -198,12 +230,18 @@ def checker_check_in(
 ):
     branch = _branch(staff)
     member = _find_member(db, body.srb_id)
-    if member is None or member.member_type == "civilian":
+    if member is None:
         return envelope({"ok": False, "code": "not_found"})
     if has_rfid(member):
         return envelope({"ok": False, "code": "has_rfid", "name": member.name})
     day = mess_today()
-    if not _is_ms(member, _today_tag(db, member, day)):
+    civilian_ms = (
+        member.member_type == "civilian"
+        and str(member.status) == "1"
+        and (member.approval_status or "") == "approved"
+        and (member.default_tag or "").upper() == "MS"
+    )
+    if not civilian_ms and not _is_ms(member, _today_tag(db, member, day)):
         return envelope({"ok": False, "code": "not_ms", "name": member.name})
     now, shift = _current_shift(db)
     if shift is None:
@@ -216,7 +254,7 @@ def checker_check_in(
     row = {
         "name": member.name,
         "pin": device_pin(member.rab_id) or device_pin(getattr(member, "personal_id", "")),
-        "rab_id": member.rab_id,
+        "rab_id": member.rab_id or getattr(member, "personal_id", "") or "",
         "rfid": "",
         "punched_at": punched.strftime("%Y-%m-%d %H:%M:%S"),
         "allowed": True,

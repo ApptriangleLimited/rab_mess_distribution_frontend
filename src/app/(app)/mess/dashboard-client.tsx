@@ -1,32 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import {
   IconActivity,
   IconAlertTriangle,
   IconArrowRight,
-  IconCake,
-  IconCheck,
-  IconClockHour4,
   IconDownload,
   IconPrinter,
   IconSearch,
-  IconSettings,
   IconSoup,
-  IconTags,
   IconUser,
   IconX,
 } from "@tabler/icons-react";
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
   LabelList,
   Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -65,13 +58,13 @@ import {
   type ZkGateStatus,
 } from "@/lib/api/zk-gate";
 import { playPunchStatus } from "@/lib/zk/punch-sound";
-import { eachISODate, todayISO } from "@/lib/date";
+import { eachISODate, formatDateDisplay, nextISODate, todayISO } from "@/lib/date";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import { listGuestMeals } from "@/lib/store/guest-meals";
 import { listMealAssigns } from "@/lib/store/meal-assigns";
-import { listMealShifts, mealShiftLabel } from "@/lib/store/meal-shifts";
+import { isCurrentShift, listMealShifts, mealShiftLabel } from "@/lib/store/meal-shifts";
 import {
   formatMemberWing,
   isHqBranchName,
@@ -80,13 +73,11 @@ import {
   memberWingCascade,
 } from "@/lib/store/org-options";
 import {
-  eventManpower,
   listPritibhojEvents,
   replaceLocalPritibhojEvents,
 } from "@/lib/store/pritibhoj";
 import { isCivilianMember } from "@/lib/store/users";
-import type { PritibhojEvent } from "@/lib/types";
-import type { MealShiftId, User } from "@/lib/types";
+import type { GuestMeal, MealShiftId, PritibhojEvent, User } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +91,6 @@ const BRANCH_COLORS = [
   "#6366f1",
   "#fb7185",
 ];
-const DONUT_REST = "#e2e8f0";
 const SHIFT_RING_COLOR = {
   breakfast: "#f97316",
   lunch: "#22c55e",
@@ -199,6 +189,12 @@ function punchMessSite(mess: string | undefined): MessSite {
   return "hq";
 }
 
+function guestMessSite(row: GuestMeal): MessSite {
+  const branch = String((row as GuestMeal & { branch?: string }).branch || "");
+  if (!branch.trim()) return "hq";
+  return punchMessSite(branch);
+}
+
 function personLine(
   user: User | undefined,
   fields: {
@@ -227,7 +223,7 @@ function personLine(
   };
 }
 
-type ListKind = "planned" | "accepted" | "duplicate" | "punches";
+type ListKind = "planned" | "accepted" | "duplicate" | "punches" | "guests" | "civilian";
 
 function punchStatus(row: ZkGateRow): ZkGateStatus {
   if (
@@ -367,58 +363,155 @@ function formatStamp(iso: string, locale: string) {
   return `${date}, ${time}`;
 }
 
-function ShiftRing({
-  consumed,
+function ringArc(consumed: number, planned: number, radius: number) {
+  const length = 2 * Math.PI * radius;
+  const ratio = planned > 0 ? Math.min(1, consumed / planned) : 0;
+  const filled = length * ratio;
+  const gap = 1 - ratio;
+  const start = 90 + gap * 180;
+  return { length, filled, start };
+}
+
+function MealRings({
+  shift,
+  breakfast,
+  lunch,
+  dinner,
   planned,
-  color,
-  label,
-  large,
+  labels,
 }: {
-  consumed: number;
+  shift: MealShiftId | "all";
+  breakfast: number;
+  lunch: number;
+  dinner: number;
   planned: number;
-  color: string;
-  label: string;
-  large: boolean;
+  labels: { breakfast: string; lunch: string; dinner: string };
 }) {
-  const remaining = Math.max(0, planned - consumed);
-  const data = [
-    { name: "consumed", value: consumed, fill: color },
-    { name: "rest", value: remaining || (planned ? 0 : 1), fill: DONUT_REST },
-  ];
-  return (
-    <div className="flex min-w-0 flex-1 flex-col items-center">
-      <div className={cn("relative w-full", large ? "h-56" : "h-40")}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              innerRadius={large ? 68 : 46}
-              outerRadius={large ? 86 : 60}
-              startAngle={90}
-              endAngle={-270}
-              stroke="none"
+  const counts = { breakfast, lunch, dinner };
+  const selected =
+    shift === "breakfast" || shift === "lunch" || shift === "dinner" ? shift : null;
+
+  if (selected) {
+    const consumed = counts[selected];
+    const arc = ringArc(consumed, planned, 46);
+    return (
+      <div className="flex h-full w-full flex-col px-1 pb-1 pt-2">
+        <div className="flex flex-1 items-center justify-center">
+          <svg viewBox="0 0 200 200" className="h-60 w-60" role="img" aria-label={`${consumed}/${planned}`}>
+            <circle cx="100" cy="100" r="46" fill="none" stroke="#eceff3" strokeWidth="14" />
+            {arc.filled > 0 ? (
+              <circle
+                cx="100"
+                cy="100"
+                r="46"
+                fill="none"
+                stroke={SHIFT_RING_COLOR[selected]}
+                strokeWidth="14"
+                strokeLinecap="round"
+                strokeDasharray={`${arc.filled} ${arc.length - arc.filled}`}
+                transform={`rotate(${arc.start} 100 100)`}
+              />
+            ) : null}
+            <text
+              x="100"
+              y="106"
+              textAnchor="middle"
+              className="fill-neutral-800 dark:fill-neutral-100"
+              style={{ fontSize: 16, fontWeight: 650 }}
             >
-              {data.map((row) => (
-                <Cell key={row.name} fill={row.fill} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <p className="text-sm font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
-            {consumed}/{planned}
-          </p>
+              {consumed}/{planned}
+            </text>
+          </svg>
+        </div>
+        <div>
+          <span
+            className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
+            style={{ backgroundColor: SHIFT_RING_COLOR[selected] }}
+          >
+            {labels[selected]}
+          </span>
         </div>
       </div>
-      <p className="mt-1 text-center text-xs font-medium" style={{ color }}>
-        {label}
-      </p>
+    );
+  }
+
+  const rings = [
+    { key: "dinner" as const, consumed: dinner, r: 78 },
+    { key: "lunch" as const, consumed: lunch, r: 58 },
+    { key: "breakfast" as const, consumed: breakfast, r: 38 },
+  ];
+  const total = breakfast + lunch + dinner;
+  const capacity = planned * 3;
+  const pills = [
+    { key: "breakfast" as const, label: labels.breakfast, color: SHIFT_RING_COLOR.breakfast },
+    { key: "lunch" as const, label: labels.lunch, color: SHIFT_RING_COLOR.lunch },
+    { key: "dinner" as const, label: labels.dinner, color: SHIFT_RING_COLOR.dinner },
+  ];
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center px-2 py-2">
+      <svg viewBox="0 0 200 200" className="h-60 w-60" role="img" aria-label={`${total}/${capacity}`}>
+        {rings.map((ring) => {
+          const length = 2 * Math.PI * ring.r;
+          const ratio = planned > 0 ? Math.min(1, ring.consumed / planned) : 0;
+          const filled = length * ratio;
+          return (
+            <g key={ring.key}>
+              <circle
+                cx="100"
+                cy="100"
+                r={ring.r}
+                fill="none"
+                stroke="#eceff3"
+                strokeWidth="12"
+              />
+              {filled > 0 ? (
+                <circle
+                  cx="100"
+                  cy="100"
+                  r={ring.r}
+                  fill="none"
+                  stroke={SHIFT_RING_COLOR[ring.key]}
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeDasharray={`${filled} ${length - filled}`}
+                  transform="rotate(180 100 100)"
+                />
+              ) : null}
+            </g>
+          );
+        })}
+        <text
+          x="100"
+          y="106"
+          textAnchor="middle"
+          className="fill-neutral-800 dark:fill-neutral-100"
+          style={{ fontSize: 16, fontWeight: 650 }}
+        >
+          {total}/{capacity}
+        </text>
+      </svg>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        {pills.map((pill) => (
+          <span
+            key={pill.key}
+            className="rounded-full px-3 py-1 text-xs font-semibold text-white"
+            style={{ backgroundColor: pill.color }}
+          >
+            {pill.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
-export default function MessDashboardClient() {
+export default function MessDashboardClient({
+  embedded = false,
+  pulse = false,
+}: {
+  embedded?: boolean;
+  pulse?: boolean;
+}) {
   const t = useT();
   const { locale } = useI18n();
   const { session } = useSession();
@@ -427,10 +520,11 @@ export default function MessDashboardClient() {
   const apiOn = isApiEnabled();
   const dateLocale = locale === "bn" ? "bn-BD" : "en-US";
   const today = todayISO();
+  const tomorrow = nextISODate(today);
 
   const [wing, setWing] = useState("all");
   const [shift, setShift] = useState<MealShiftId | "all">("all");
-  const [messSite, setMessSite] = useState<MessSite>("hq");
+  const [messBranch, setMessBranch] = useState<MessSite | "all">("all");
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
   const [search, setSearch] = useState("");
@@ -441,6 +535,8 @@ export default function MessDashboardClient() {
   const [rangePunches, setRangePunches] = useState<BoardPunch[]>([]);
   const heardPunch = useRef("");
   const [openList, setOpenList] = useState<ListKind | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+  const shiftPinned = useRef(false);
 
   const range = useMemo(() => {
     return dateFrom <= dateTo
@@ -482,7 +578,7 @@ export default function MessDashboardClient() {
     return () => {
       cancelled = true;
     };
-  }, [apiOn, range.from, range.to]);
+  }, [apiOn, range.from, range.to, reloadTick]);
 
   useEffect(() => {
     if (!apiOn) {
@@ -511,7 +607,7 @@ export default function MessDashboardClient() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [apiOn, range.from, range.to]);
+  }, [apiOn, range.from, range.to, reloadTick]);
 
   useEffect(() => {
     if (rangePunches.length === 0) return;
@@ -532,6 +628,18 @@ export default function MessDashboardClient() {
     () => listMealShifts(),
     [state.meal_shifts],
   );
+  const [shiftClock, setShiftClock] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setShiftClock((n) => n + 1), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const runningShift = useMemo(() => {
+    void shiftClock;
+    return shifts.find((row) => isCurrentShift(row))?.id ?? "all";
+  }, [shifts, shiftClock]);
+  useEffect(() => {
+    if (!shiftPinned.current) setShift(runningShift);
+  }, [runningShift]);
 
   const members = useMemo(() => {
     if (apiData?.members?.length) return messCheckinMembers(apiData);
@@ -562,9 +670,10 @@ export default function MessDashboardClient() {
     return rows.filter((row) => {
       if (row.date < range.from || row.date > range.to) return false;
       if (shift !== "all" && row.shift_id !== shift) return false;
+      if (messBranch !== "all" && guestMessSite(row) !== messBranch) return false;
       return true;
     });
-  }, [apiData, range, shift, state.guest_meals]);
+  }, [apiData, messBranch, range, shift, state.guest_meals]);
 
   const liveLedgerRows = useMemo(() => {
     if (apiOn) return ledgerRows;
@@ -642,6 +751,7 @@ export default function MessDashboardClient() {
         continue;
       }
       if (shift !== "all" && row.shift_id !== shift) continue;
+      if (messBranch !== "all" && punchMessSite(row.mess) !== messBranch) continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
       const line = personLine(user, {
@@ -665,7 +775,7 @@ export default function MessDashboardClient() {
       else rejected.push(line);
     }
     return { accepted, duplicate, rejected };
-  }, [range.from, range.to, rangePunches, shift, shifts, t, userByKey, wing]);
+  }, [messBranch, range.from, range.to, rangePunches, shift, shifts, t, userByKey, wing]);
 
   const todayPlanned = plannedLines.length;
   const todayAccepted = deviceLines.accepted.length;
@@ -675,7 +785,7 @@ export default function MessDashboardClient() {
     for (const row of rangePunches) {
       const day = (row.punched_at || "").slice(0, 10);
       if (day < range.from || day > range.to) continue;
-      if (punchMessSite(row.mess) !== messSite) continue;
+      if (messBranch !== "all" && punchMessSite(row.mess) !== messBranch) continue;
       if (punchStatus(row) !== "accepted") continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
@@ -683,7 +793,23 @@ export default function MessDashboardClient() {
       if (id === "breakfast" || id === "lunch" || id === "dinner") counts[id] += 1;
     }
     return counts;
-  }, [messSite, range.from, range.to, rangePunches, userByKey, wing]);
+  }, [messBranch, range.from, range.to, rangePunches, userByKey, wing]);
+  const siteBars = useMemo(() => {
+    const counts = { hq: 0, haji: 0 };
+    for (const row of rangePunches) {
+      const day = (row.punched_at || "").slice(0, 10);
+      if (day < range.from || day > range.to) continue;
+      if (punchStatus(row) !== "accepted") continue;
+      if (shift !== "all" && row.shift_id !== shift) continue;
+      const user = userByKey.get(row.rab_id);
+      if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
+      counts[punchMessSite(row.mess)] += 1;
+    }
+    return [
+      { name: t("mess.dashboard.siteHq"), value: counts.hq },
+      { name: t("mess.dashboard.siteHaji"), value: counts.haji },
+    ];
+  }, [range.from, range.to, rangePunches, shift, t, userByKey, wing]);
   const ringPlanned = useMemo(() => {
     let count = 0;
     for (const row of filteredLedgerRows) {
@@ -693,25 +819,59 @@ export default function MessDashboardClient() {
     }
     return count;
   }, [filteredLedgerRows]);
-  const ringShifts = (shift === "all"
-    ? (["breakfast", "lunch", "dinner"] as const)
-    : shift === "breakfast" || shift === "lunch" || shift === "dinner"
-      ? ([shift] as const)
-      : ([] as const));
   const guestCount = guests.length;
   const pritibhojEvents = apiEvents ?? listPritibhojEvents();
-  const groupCount = useMemo(() => {
-    return pritibhojEvents
-      .filter((event) => event.date >= range.from && event.date <= range.to)
-      .reduce((sum, event) => {
-        const sheetTotal = [...event.main_rows, ...event.admin_rows].reduce(
-          (s, row) => s + (row.total || 0),
-          0,
-        );
-        return sum + (sheetTotal || eventManpower(event));
-      }, 0);
-  }, [pritibhojEvents, range]);
-  const otherMeals = guestCount + groupCount;
+  const guestLines = useMemo(() => {
+    return guests
+      .map((row) =>
+        personLine(undefined, {
+          name: row.guest_name || t("mess.dashboard.guestMeal"),
+          rabId: row.ref_info || "—",
+          status: "Guest",
+          sift: mealShiftLabel(
+            row.shift_id,
+            shifts.find((item) => item.id === row.shift_id)?.name ?? row.shift_id,
+            t,
+          ),
+          checkIn: checkInLabel(row.check_in_time || row.date),
+          sortKey: row.check_in_time || row.date,
+          mess: guestMessSite(row) === "haji" ? "Haji Camp" : "SRB HQ",
+        }),
+      )
+      .sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+  }, [guests, shifts, t]);
+  const civilianLines = useMemo(() => {
+    const lines: PersonLine[] = [];
+    for (const row of rangePunches) {
+      const day = (row.punched_at || "").slice(0, 10);
+      if (day < range.from || day > range.to) continue;
+      if (punchStatus(row) !== "accepted") continue;
+      if (shift !== "all" && row.shift_id !== shift) continue;
+      if (messBranch !== "all" && punchMessSite(row.mess) !== messBranch) continue;
+      const user = userByKey.get(row.rab_id);
+      if (!user || !isCivilianMember(user)) continue;
+      if (wing !== "all" && !memberMatchesWingFilter(user.wing, wing)) continue;
+      lines.push(
+        personLine(user, {
+          name: user.name || row.name,
+          rabId: row.rab_id,
+          status: "Consumption",
+          sift: row.shift_id
+            ? mealShiftLabel(
+                row.shift_id,
+                shifts.find((item) => item.id === row.shift_id)?.name ?? row.shift_name ?? row.shift_id,
+                t,
+              )
+            : "—",
+          checkIn: checkInLabel(row.punched_at || ""),
+          sortKey: row.punched_at || "",
+          mess: row.mess,
+        }),
+      );
+    }
+    lines.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    return lines;
+  }, [messBranch, range.from, range.to, rangePunches, shift, shifts, t, userByKey, wing]);
 
   const branchBars = useMemo(() => {
     const msCounts = new Map<string, number>();
@@ -782,6 +942,7 @@ export default function MessDashboardClient() {
         continue;
       }
       if (shift !== "all" && row.shift_id !== shift) continue;
+      if (messBranch !== "all" && punchMessSite(row.mess) !== messBranch) continue;
       const user = userByKey.get(row.rab_id);
       if (wing !== "all" && (!user || !memberMatchesWingFilter(user.wing, wing))) continue;
       rows.push({
@@ -836,31 +997,215 @@ export default function MessDashboardClient() {
         )
       : rows
     ).slice(0, 8);
-  }, [guests, pritibhojEvents, range, rangePunches, search, shift, shifts, state.wing_parent, t, userByKey, wing]);
+  }, [guests, messBranch, pritibhojEvents, range, rangePunches, search, shift, shifts, state.wing_parent, t, userByKey, wing]);
 
   const rangeHint = range.from === range.to ? range.from : `${range.from} – ${range.to}`;
 
   const filtersDirty =
-    wing !== "all" || shift !== "all" || dateFrom !== today || dateTo !== today;
+    wing !== "all" ||
+    messBranch !== "all" ||
+    shift !== runningShift ||
+    dateFrom !== today ||
+    dateTo !== today;
+
+  function chooseShift(value: MealShiftId | "all") {
+    shiftPinned.current = true;
+    setShift(value);
+  }
 
   function clearFilters() {
+    shiftPinned.current = false;
     setWing("all");
-    setShift("all");
+    setMessBranch("all");
+    setShift(runningShift);
     setDateFrom(today);
     setDateTo(today);
     setSearch("");
   }
 
+  function refreshDashboard() {
+    setReloadTick((n) => n + 1);
+  }
+
   const shiftName = (id: MealShiftId) =>
     mealShiftLabel(id, shifts.find((s) => s.id === id)?.name ?? id, t);
 
-  return (
-    <PagePane className="gap-5">
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-5"
-      >
+  const listTitle =
+    openList === "planned"
+      ? t("mess.dashboard.plannedMeals")
+      : openList === "accepted"
+        ? t("mess.dashboard.totalConsumption")
+        : openList === "duplicate"
+          ? t("mess.dashboard.duplicateAttempts")
+          : openList === "guests"
+            ? t("mess.dashboard.guestMealsCard")
+            : openList === "civilian"
+              ? t("mess.dashboard.civilianConsumption")
+              : t("mess.dashboard.recentActivities");
+  const listRows =
+    openList === "planned"
+      ? plannedLines
+      : openList === "accepted"
+        ? deviceLines.accepted
+        : openList === "duplicate"
+          ? deviceLines.duplicate
+          : openList === "guests"
+            ? guestLines
+            : openList === "civilian"
+              ? civilianLines
+              : [
+                  ...deviceLines.accepted,
+                  ...deviceLines.duplicate,
+                  ...deviceLines.rejected,
+                ].sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
+  if (pulse) {
+    const pulseLabel = "text-[10px] font-medium uppercase tracking-wide text-teal-100/70";
+    const pulseControl =
+      "h-10 w-full rounded-xl border-white/20 bg-white/10 text-white shadow-none placeholder:text-teal-100/60";
+    const pulseCards = [
+      { key: "planned" as const, label: t("mess.dashboard.plannedMeals"), value: todayPlanned },
+      { key: "accepted" as const, label: t("mess.dashboard.totalConsumption"), value: todayAccepted },
+      { key: "duplicate" as const, label: t("mess.dashboard.duplicateAttempts"), value: todayDuplicate },
+      { key: "guests" as const, label: t("mess.dashboard.guestMealsCard"), value: guestCount },
+    ];
+    return (
+      <>
+        <div className="overflow-hidden rounded-2xl border border-teal-800/20 bg-[linear-gradient(135deg,#0f766e_0%,#115e59_42%,#134e4a_100%)] text-white shadow-[0_12px_40px_rgba(15,118,110,0.28)]">
+          <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-4 sm:px-5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-teal-100/80">
+                {t("pages.adminDashboard.pulse.eyebrow")}
+              </p>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">
+                {t("pages.adminDashboard.pulse.title")}
+              </h2>
+              <p className="mt-1 max-w-xl text-xs text-teal-50/75">
+                {t("pages.adminDashboard.pulse.hint", {
+                  today: formatDateDisplay(today),
+                  tomorrow: formatDateDisplay(tomorrow),
+                })}
+              </p>
+            </div>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
+              <IconSoup className="h-5 w-5" />
+            </span>
+          </div>
+        <div className="grid gap-3 border-t border-white/10 px-4 py-3 sm:grid-cols-2 sm:px-5 xl:grid-cols-6">
+          <FilterField label={t("mess.dashboard.messBranch")} labelClassName={pulseLabel}>
+            <Select value={messBranch} onValueChange={(value) => setMessBranch(value as MessSite | "all")}>
+              <SelectTrigger className={pulseControl}>
+                <SelectValue placeholder={t("mess.dashboard.allMessBranches")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("mess.dashboard.allMessBranches")}</SelectItem>
+                <SelectItem value="hq">{t("mess.dashboard.messHq")}</SelectItem>
+                <SelectItem value="haji">{t("mess.dashboard.messHaji")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
+          <FilterField label={t("mess.dashboard.branch")} labelClassName={pulseLabel}>
+            <SettingsWingFilter
+              value={wing}
+              onChange={setWing}
+              rootsOnly
+              namesOnly
+              className="w-full"
+              triggerClassName={pulseControl}
+              placeholder={t("mess.dashboard.allBranches")}
+              clearLabel={t("mess.dashboard.allBranches")}
+            />
+          </FilterField>
+          <FilterField label={t("mess.dashboard.shift")} labelClassName={pulseLabel}>
+            <Select value={shift} onValueChange={(value) => chooseShift(value as MealShiftId | "all")}>
+              <SelectTrigger className={pulseControl}>
+                <SelectValue placeholder={t("mess.dashboard.allShifts")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("mess.dashboard.allShifts")}</SelectItem>
+                {shifts.map((row) => (
+                  <SelectItem key={row.id} value={row.id}>
+                    {mealShiftLabel(row.id, row.name, t)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+          <FilterField label={t("mess.dashboard.fromDate")} labelClassName={pulseLabel}>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value || today)}
+              className={`${pulseControl} [color-scheme:dark]`}
+            />
+          </FilterField>
+          <FilterField label={t("mess.dashboard.toDate")} labelClassName={pulseLabel}>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value || today)}
+              className={`${pulseControl} [color-scheme:dark]`}
+            />
+          </FilterField>
+          <div className="flex items-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 flex-1 rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10"
+              disabled={!filtersDirty}
+              onClick={clearFilters}
+            >
+              {t("mess.dashboard.clearFilters")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 flex-1 rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10"
+              onClick={refreshDashboard}
+            >
+              {t("mess.dashboard.refresh")}
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
+          {pulseCards.map((card) => (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => setOpenList(card.key)}
+              className="bg-teal-950/35 px-4 py-3.5 text-left backdrop-blur-[2px] transition hover:bg-teal-950/55"
+            >
+              <p className="text-[10px] font-medium uppercase tracking-wide text-teal-100/70">
+                {card.label}
+              </p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-white">
+                {card.value}
+              </p>
+            </button>
+          ))}
+        </div>
+        </div>
+        <MessCharts />
+        {openList ? (
+          <PersonList
+            title={listTitle}
+            rows={listRows}
+            labels={{
+              print: t("mess.dashboard.printList"),
+              download: t("mess.dashboard.downloadList"),
+              empty: t("mess.dashboard.listEmpty"),
+              close: t("mess.dashboard.closeList"),
+            }}
+            onClose={() => setOpenList(null)}
+          />
+        ) : null}
+      </>
+    );
+  }
+
+  const body = (
+    <>
+        {embedded ? null : (
         <div className="grid grid-cols-1 gap-3 rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-emerald-50 via-sky-50 to-violet-50 p-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center dark:border-emerald-900/50 dark:from-emerald-950/40 dark:via-sky-950/30 dark:to-violet-950/40">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
@@ -896,8 +1241,24 @@ export default function MessDashboardClient() {
             </button>
           )}
         </div>
+        )}
 
-        <div className="grid gap-3 rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white via-sky-50/70 to-amber-50/60 p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] dark:border-sky-900/50 dark:from-neutral-950 dark:via-sky-950/20 dark:to-amber-950/20">
+        <div className="grid gap-3 rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white via-sky-50/70 to-amber-50/60 p-3 sm:grid-cols-2 xl:grid-cols-6 dark:border-sky-900/50 dark:from-neutral-950 dark:via-sky-950/20 dark:to-amber-950/20">
+          <FilterField label={t("mess.dashboard.messBranch")}>
+            <Select
+              value={messBranch}
+              onValueChange={(value) => setMessBranch(value as MessSite | "all")}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl">
+                <SelectValue placeholder={t("mess.dashboard.allMessBranches")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("mess.dashboard.allMessBranches")}</SelectItem>
+                <SelectItem value="hq">{t("mess.dashboard.messHq")}</SelectItem>
+                <SelectItem value="haji">{t("mess.dashboard.messHaji")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
           <FilterField label={t("mess.dashboard.branch")}>
             <SettingsWingFilter
               value={wing}
@@ -913,7 +1274,7 @@ export default function MessDashboardClient() {
           <FilterField label={t("mess.dashboard.shift")}>
             <Select
               value={shift}
-              onValueChange={(value) => setShift(value as MealShiftId | "all")}
+              onValueChange={(value) => chooseShift(value as MealShiftId | "all")}
             >
               <SelectTrigger className="h-10 w-full rounded-xl">
                 <SelectValue placeholder={t("mess.dashboard.allShifts")} />
@@ -944,15 +1305,23 @@ export default function MessDashboardClient() {
               className="h-10 rounded-xl"
             />
           </FilterField>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <Button
               type="button"
               variant="outline"
-              className="h-10 w-full rounded-xl"
+              className="h-10 flex-1 rounded-xl"
               disabled={!filtersDirty}
               onClick={clearFilters}
             >
               {t("mess.dashboard.clearFilters")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 flex-1 rounded-xl"
+              onClick={refreshDashboard}
+            >
+              {t("mess.dashboard.refresh")}
             </Button>
           </div>
         </div>
@@ -983,23 +1352,118 @@ export default function MessDashboardClient() {
             onClick={() => setOpenList("duplicate")}
           />
           <StatCard
-            label={t("mess.dashboard.otherMeals")}
-            value={otherMeals}
-            icon={<IconCheck className="h-4 w-4" />}
+            label={t("mess.dashboard.guestMealsCard")}
+            value={guestCount}
+            icon={<IconUser className="h-4 w-4" />}
             tone="violet"
-            hint={t("mess.dashboard.otherMealsHint", {
-              guest: guestCount,
-              group: groupCount,
-            })}
+            onClick={() => setOpenList("guests")}
           />
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-2">
-          <section className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/70 p-4 dark:border-emerald-900/50 dark:from-neutral-950 dark:to-emerald-950/30">
-            <h2 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+        <MessCharts />
+
+        {openList ? (
+          <PersonList
+            title={
+              openList === "planned"
+                ? t("mess.dashboard.plannedMeals")
+                : openList === "accepted"
+                  ? t("mess.dashboard.totalConsumption")
+                  : openList === "duplicate"
+                    ? t("mess.dashboard.duplicateAttempts")
+                    : openList === "guests"
+                      ? t("mess.dashboard.guestMealsCard")
+                      : openList === "civilian"
+                        ? t("mess.dashboard.civilianConsumption")
+                        : t("mess.dashboard.recentActivities")
+            }
+            rows={
+              openList === "planned"
+                ? plannedLines
+                : openList === "accepted"
+                  ? deviceLines.accepted
+                  : openList === "duplicate"
+                    ? deviceLines.duplicate
+                    : openList === "guests"
+                      ? guestLines
+                      : openList === "civilian"
+                        ? civilianLines
+                        : [
+                        ...deviceLines.accepted,
+                        ...deviceLines.duplicate,
+                        ...deviceLines.rejected,
+                      ].sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+            }
+            labels={{
+              print: t("mess.dashboard.printList"),
+              download: t("mess.dashboard.downloadList"),
+              empty: t("mess.dashboard.listEmpty"),
+              close: t("mess.dashboard.closeList"),
+            }}
+            onClose={() => setOpenList(null)}
+          />
+        ) : null}
+    </>
+  );
+
+  function MessCharts() {
+    return (
+      <>
+        <div className="flex flex-col gap-4">
+          <div className="grid items-stretch gap-4 lg:grid-cols-2">
+            <section className="flex h-full flex-col rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+              <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
+                {t("mess.dashboard.siteOverview")}
+              </h2>
+              <div className="mt-3 h-64 min-h-64 flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={siteBars} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#525252" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#737373" }} allowDecimals={false} axisLine={false} tickLine={false} width={36} />
+                    <Tooltip cursor={{ fill: "rgba(249,115,22,0.08)" }} />
+                    <Bar dataKey="value" name={t("mess.dashboard.consumed")} fill="#f97316" radius={[4, 4, 0, 0]} maxBarSize={88} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+            <section className="flex h-full flex-col rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+              <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
+                {t("mess.dashboard.mealDistribution")}
+              </h2>
+              <div className="mt-1 flex min-h-64 flex-1 items-center justify-center">
+                <MealRings
+                  shift={shift}
+                  breakfast={shiftConsumed.breakfast}
+                  lunch={shiftConsumed.lunch}
+                  dinner={shiftConsumed.dinner}
+                  planned={ringPlanned}
+                  labels={{
+                    breakfast: t("mess.dashboard.shiftOf", {
+                      shift: shiftName("breakfast"),
+                      consumed: shiftConsumed.breakfast,
+                      planned: ringPlanned,
+                    }),
+                    lunch: t("mess.dashboard.shiftOf", {
+                      shift: shiftName("lunch"),
+                      consumed: shiftConsumed.lunch,
+                      planned: ringPlanned,
+                    }),
+                    dinner: t("mess.dashboard.shiftOf", {
+                      shift: shiftName("dinner"),
+                      consumed: shiftConsumed.dinner,
+                      planned: ringPlanned,
+                    }),
+                  }}
+                />
+              </div>
+            </section>
+          </div>
+          <section className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/70 p-5 dark:border-emerald-900/50 dark:from-neutral-950 dark:to-emerald-950/30">
+            <h2 className="text-base font-semibold text-emerald-800 dark:text-emerald-200">
               {t("mess.dashboard.branchOverview")}
             </h2>
-            <div className="mt-3 h-72">
+            <div className="mt-3 h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={branchBars} margin={{ top: 16, right: 8, left: 0, bottom: 8 }}>
                   <XAxis
@@ -1042,95 +1506,9 @@ export default function MessDashboardClient() {
               </ResponsiveContainer>
             </div>
           </section>
-
-          <section className="rounded-2xl border border-orange-200/80 bg-gradient-to-br from-white to-orange-50/70 p-4 dark:border-orange-900/50 dark:from-neutral-950 dark:to-orange-950/30">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-orange-800 dark:text-orange-200">
-                {t("mess.dashboard.mealDistribution")}
-              </h2>
-              <div
-                role="radiogroup"
-                aria-label={t("mess.dashboard.messSite")}
-                className="inline-flex shrink-0 rounded-lg border border-orange-200 bg-white p-0.5 dark:border-orange-800 dark:bg-neutral-900"
-              >
-                {(["hq", "haji"] as const).map((site) => (
-                  <button
-                    key={site}
-                    type="button"
-                    role="radio"
-                    aria-checked={messSite === site}
-                    onClick={() => setMessSite(site)}
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                      messSite === site
-                        ? "bg-orange-600 text-white"
-                        : "text-orange-800 hover:bg-orange-50 dark:text-orange-200 dark:hover:bg-orange-950/40",
-                    )}
-                  >
-                    {site === "hq"
-                      ? t("mess.dashboard.messHq")
-                      : t("mess.dashboard.messHaji")}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="mt-3 flex items-end justify-center gap-2">
-              {ringShifts.map((id) => (
-                <ShiftRing
-                  key={id}
-                  consumed={shiftConsumed[id]}
-                  planned={ringPlanned}
-                  color={SHIFT_RING_COLOR[id]}
-                  label={t("mess.dashboard.shiftOf", {
-                    shift: shiftName(id),
-                    consumed: shiftConsumed[id],
-                    planned: ringPlanned,
-                  })}
-                  large={ringShifts.length === 1}
-                />
-              ))}
-            </div>
-          </section>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-2">
-          <section className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-white to-violet-50/70 p-4 dark:border-violet-900/50 dark:from-neutral-950 dark:to-violet-950/30">
-            <h2 className="text-sm font-semibold text-violet-800 dark:text-violet-200">
-              {t("mess.dashboard.quickActions")}
-            </h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <QuickAction
-                href="/mess/ledger"
-                icon={<IconTags className="h-5 w-5" />}
-                tone="sky"
-                title={t("nav.messLedger")}
-                hint={t("mess.dashboard.openLedgerHint")}
-              />
-              <QuickAction
-                href="/mess/pritibhoj"
-                icon={<IconCake className="h-5 w-5" />}
-                tone="rose"
-                title={t("nav.pritibhoj")}
-                hint={t("mess.dashboard.newPritibhojHint")}
-              />
-              <QuickAction
-                href="/mess/shifts"
-                icon={<IconClockHour4 className="h-5 w-5" />}
-                tone="emerald"
-                title={t("nav.shifts")}
-                hint={t("mess.dashboard.createShiftHint")}
-              />
-              <QuickAction
-                href="/settings"
-                icon={<IconSettings className="h-5 w-5" />}
-                tone="violet"
-                title={t("nav.settings")}
-                hint={t("mess.dashboard.openSettingsHint")}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white to-sky-50/70 p-4 dark:border-sky-900/50 dark:from-neutral-950 dark:to-sky-950/30">
+        <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white to-sky-50/70 p-4 dark:border-sky-900/50 dark:from-neutral-950 dark:to-sky-950/30">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-sky-800 dark:text-sky-200">
                 {t("mess.dashboard.recentActivities")}
@@ -1209,40 +1587,22 @@ export default function MessDashboardClient() {
               )}
             </ul>
           </section>
-        </div>
-        {openList ? (
-          <PersonList
-            title={
-              openList === "planned"
-                ? t("mess.dashboard.plannedMeals")
-                : openList === "accepted"
-                  ? t("mess.dashboard.totalConsumption")
-                  : openList === "duplicate"
-                    ? t("mess.dashboard.duplicateAttempts")
-                    : t("mess.dashboard.recentActivities")
-            }
-            rows={
-              openList === "planned"
-                ? plannedLines
-                : openList === "accepted"
-                  ? deviceLines.accepted
-                  : openList === "duplicate"
-                    ? deviceLines.duplicate
-                    : [
-                        ...deviceLines.accepted,
-                        ...deviceLines.duplicate,
-                        ...deviceLines.rejected,
-                      ].sort((a, b) => b.sortKey.localeCompare(a.sortKey))
-            }
-            labels={{
-              print: t("mess.dashboard.printList"),
-              download: t("mess.dashboard.downloadList"),
-              empty: t("mess.dashboard.listEmpty"),
-              close: t("mess.dashboard.closeList"),
-            }}
-            onClose={() => setOpenList(null)}
-          />
-        ) : null}
+      </>
+    );
+  }
+
+  if (embedded) {
+    return <div className="flex flex-col gap-5">{body}</div>;
+  }
+
+  return (
+    <PagePane className="gap-5">
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col gap-5"
+      >
+        {body}
       </motion.div>
     </PagePane>
   );
@@ -1251,13 +1611,17 @@ export default function MessDashboardClient() {
 function FilterField({
   label,
   children,
+  labelClassName,
 }: {
   label: string;
   children: ReactNode;
+  labelClassName?: string;
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-1">
-      <span className="text-[11px] font-medium text-neutral-500">{label}</span>
+      <span className={cn("text-[11px] font-medium text-neutral-500", labelClassName)}>
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -1274,7 +1638,7 @@ function StatCard({
   label: string;
   value: number;
   icon: ReactNode;
-  tone: "emerald" | "sky" | "amber" | "violet";
+  tone: "emerald" | "sky" | "amber" | "violet" | "rose";
   hint?: string;
   onClick?: () => void;
 }) {
@@ -1286,12 +1650,14 @@ function StatCard({
       "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 text-amber-950 dark:border-amber-900/60 dark:from-amber-950/50 dark:to-orange-950/30 dark:text-amber-50",
     violet:
       "border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-100 text-violet-950 dark:border-violet-900/60 dark:from-violet-950/50 dark:to-fuchsia-950/30 dark:text-violet-50",
+    rose: "border-rose-200 bg-gradient-to-br from-rose-50 to-pink-100 text-rose-950 dark:border-rose-900/60 dark:from-rose-950/50 dark:to-pink-950/30 dark:text-rose-50",
   }[tone];
   const toneClass = {
     emerald: "bg-white/80 text-emerald-600 dark:bg-emerald-900/70 dark:text-emerald-200",
     sky: "bg-white/80 text-sky-600 dark:bg-sky-900/70 dark:text-sky-200",
     amber: "bg-white/80 text-amber-600 dark:bg-amber-900/70 dark:text-amber-200",
     violet: "bg-white/80 text-violet-600 dark:bg-violet-900/70 dark:text-violet-200",
+    rose: "bg-white/80 text-rose-600 dark:bg-rose-900/70 dark:text-rose-200",
   }[tone];
   const className = cn(
     "flex w-full items-start justify-between rounded-2xl border p-4 text-left shadow-sm",
@@ -1415,52 +1781,3 @@ function PersonList({
   );
 }
 
-function QuickAction({
-  href,
-  icon,
-  tone,
-  title,
-  hint,
-}: {
-  href: string;
-  icon: ReactNode;
-  tone: "violet" | "amber" | "emerald" | "sky" | "rose" | "orange";
-  title: string;
-  hint: string;
-}) {
-  const cardClass = {
-    violet:
-      "border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-100 hover:from-violet-100 dark:border-violet-900/50 dark:from-violet-950/40 dark:to-fuchsia-950/20",
-    amber:
-      "border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-100 hover:from-amber-100 dark:border-amber-900/50 dark:from-amber-950/40 dark:to-yellow-950/20",
-    emerald:
-      "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100 hover:from-emerald-100 dark:border-emerald-900/50 dark:from-emerald-950/40 dark:to-teal-950/20",
-    sky: "border-sky-200 bg-gradient-to-br from-sky-50 to-blue-100 hover:from-sky-100 dark:border-sky-900/50 dark:from-sky-950/40 dark:to-blue-950/20",
-    rose: "border-rose-200 bg-gradient-to-br from-rose-50 to-pink-100 hover:from-rose-100 dark:border-rose-900/50 dark:from-rose-950/40 dark:to-pink-950/20",
-    orange:
-      "border-orange-200 bg-gradient-to-br from-orange-50 to-amber-100 hover:from-orange-100 dark:border-orange-900/50 dark:from-orange-950/40 dark:to-amber-950/20",
-  }[tone];
-  const toneClass = {
-    violet: "bg-white/80 text-violet-600 dark:bg-violet-900/70 dark:text-violet-200",
-    amber: "bg-white/80 text-amber-600 dark:bg-amber-900/70 dark:text-amber-200",
-    emerald: "bg-white/80 text-emerald-600 dark:bg-emerald-900/70 dark:text-emerald-200",
-    sky: "bg-white/80 text-sky-600 dark:bg-sky-900/70 dark:text-sky-200",
-    rose: "bg-white/80 text-rose-600 dark:bg-rose-900/70 dark:text-rose-200",
-    orange: "bg-white/80 text-orange-600 dark:bg-orange-900/70 dark:text-orange-200",
-  }[tone];
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex flex-col items-center gap-2 rounded-2xl border px-3 py-5 text-center transition hover:shadow-sm",
-        cardClass,
-      )}
-    >
-      <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-xl", toneClass)}>
-        {icon}
-      </span>
-      <span className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</span>
-      <span className="text-[11px] text-neutral-600 dark:text-neutral-400">{hint}</span>
-    </Link>
-  );
-}

@@ -16,6 +16,12 @@ export type CheckerBoard = {
     end_time: string;
     seconds_left: number;
   } | null;
+  next_shift: {
+    id: string;
+    name: string;
+    start_time: string;
+    end_time: string;
+  } | null;
   stats: {
     planned: number;
     consumptions: number;
@@ -68,8 +74,9 @@ export function checkInGuest(body: {
   });
 }
 
-export function fetchGuestList(date: string, branch = "") {
+export function fetchGuestList(date: string, branch = "", to = "") {
   const search = new URLSearchParams({ day: date });
+  if (to) search.set("to", to);
   if (branch) search.set("branch", branch);
   return apiJson<{ date: string; branch: string; items: GuestListItem[] }>(
     `/api/v1/mess/guest-list?${search}`,

@@ -71,6 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     session.role === "cc" ||
     session.role === "daily" ||
     session.role === "mess" ||
+    session.role === "mess_checker" ||
     session.role === "consume" ||
     session.role === "ration" ||
     session.role === "admin";

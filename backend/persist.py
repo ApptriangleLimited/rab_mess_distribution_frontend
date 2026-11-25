@@ -1152,11 +1152,7 @@ def mess_checkins_data(db: Session, start: date, end: date) -> dict:
     )
     extra = (
         db.query(Member)
-        .filter(
-            Member.approval_status == "approved",
-            Member.status == "1",
-            Member.member_type != "civilian",
-        )
+        .filter(Member.approval_status == "approved", Member.status == "1")
         .all()
     )
     by_id = {row.id: row for row in extra}
@@ -1191,7 +1187,7 @@ def mess_checkins(
         raise HTTPException(status_code=400, detail="Invalid date range")
     key = cache_key(
         "reports",
-        kind="mess-checkins",
+        kind="mess-checkins-civil",
         start=start.isoformat(),
         end=end.isoformat(),
     )

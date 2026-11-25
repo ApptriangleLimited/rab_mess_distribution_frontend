@@ -377,8 +377,6 @@ def apply_member_fields(row: Member, body: MemberIn) -> None:
     row.force = body.force.strip()
     row.force_rank = body.force_rank.strip()
     row.religion = body.religion.strip()
-    if body.member_type == "civilian":
-        raise HTTPException(status_code=400, detail="Civilian members are not used")
     row.member_type = body.member_type
     row.dropdown_no = body.dropdown_no.strip()
     row.phone = body.phone.strip()
@@ -392,7 +390,10 @@ def apply_member_fields(row: Member, body: MemberIn) -> None:
     row.joining_date = body.joining_date
     row.out_date = body.out_date
     raw_tag = (body.default_tag or "").strip()
-    row.default_tag = normalize_tag(raw_tag) if raw_tag else ""
+    if body.member_type == "civilian" and not raw_tag:
+        row.default_tag = "MS"
+    else:
+        row.default_tag = normalize_tag(raw_tag) if raw_tag else ""
     row.documents = [d.model_dump() for d in body.documents]
     row.documents_verified = bool(body.documents_verified)
     row.emergency_contacts = [
@@ -727,7 +728,7 @@ def list_members(
         db.commit()
         bust_members()
         bust_daily()
-    query = db.query(Member).filter(Member.member_type != "civilian")
+    query = db.query(Member)
     if q and q.strip():
         like = f"%{q.strip()}%"
         query = query.filter(
@@ -754,7 +755,7 @@ def list_members(
             query = query.filter(Member.wing == wing)
     if rank and rank != "all":
         query = query.filter(Member.rank == rank)
-    if member_type and member_type not in ("all", "civilian"):
+    if member_type and member_type != "all":
         query = query.filter(Member.member_type == member_type)
     if date_from or date_to:
         start = date_from or date_to
@@ -774,7 +775,7 @@ def list_members(
         wing_family=wing_family,
         rank=rank,
         member_type=member_type,
-        hide_civilian=1,
+        hide_civilian=0,
         date_from=str(date_from) if date_from else None,
         date_to=str(date_to) if date_to else None,
         page=page,

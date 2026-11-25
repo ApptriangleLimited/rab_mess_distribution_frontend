@@ -1714,6 +1714,7 @@ export const MEMBER_TYPES: {
   { value: "attached", labelKey: "cc.memberTypes.attached" },
   { value: "permanent", labelKey: "cc.memberTypes.permanent" },
   { value: "guest", labelKey: "cc.memberTypes.guest" },
+  { value: "civilian", labelKey: "cc.memberTypes.civilian" },
 ];
 
 export const SESSION_COOKIE = "mess_session";

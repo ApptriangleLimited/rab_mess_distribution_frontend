@@ -42,7 +42,12 @@ import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import { useToast } from "@/components/shared/toast-provider";
 import { listBoroKhanaDates } from "@/lib/store/boro-khana";
 import { getMessEaters } from "@/lib/store/mess";
-import { memberMatchesWingFilter } from "@/lib/store/org-options";
+import {
+  isAdminRootName,
+  listWingChildrenFrom,
+  memberMatchesWingFilter,
+  memberWingCascade,
+} from "@/lib/store/org-options";
 import { isCivilianMember } from "@/lib/store/users";
 import type { DailyTag, UserStatus } from "@/lib/types";
 import { useI18n, useT } from "@/i18n/provider";
@@ -181,14 +186,14 @@ export default function MessLedgerClient() {
     return ledger.rows.filter((row) => {
       if (row.user.status !== memberStatus) return false;
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing, memberStatus]);
+  }, [ledger.rows, q, rank, wing, memberStatus, state.wing_parent]);
 
   const defaultDates = defaultRange();
   const datesAreDefault =
@@ -294,6 +299,18 @@ export default function MessLedgerClient() {
     params.set("status", memberStatus);
     return `/mess/ledger/print?${params.toString()}`;
   }, [month, q, rank, wing, dateFrom, dateTo, memberStatus]);
+
+  const selectedWing = wing !== "all" ? wing : "";
+  const cascade = memberWingCascade(selectedWing);
+  const mainWing = selectedWing ? cascade.main || selectedWing : "all";
+  const adminOpen = isAdminRootName(mainWing);
+  const subWing = adminOpen ? cascade.sub : "";
+  const branchParent =
+    subWing &&
+    listWingChildrenFrom(state.wings, state.wing_parent, subWing).length > 0
+      ? subWing
+      : "";
+  const branch = branchParent ? cascade.leaf : "";
 
   const fieldClass = searchFilterFieldClass;
   const filtersActive =
@@ -456,11 +473,37 @@ export default function MessLedgerClient() {
             triggerClassName={cn(fieldClass, "w-full")}
           />
           <SettingsWingFilter
-            value={wing}
+            value={mainWing}
             onChange={setWing}
-            className="w-[7rem] shrink-0"
+            rootsOnly
+            namesOnly
+            className="w-[7.5rem] shrink-0"
             triggerClassName={cn(fieldClass, "w-full")}
           />
+          {adminOpen ? (
+            <SettingsWingFilter
+              value={subWing || "all"}
+              onChange={(next) => setWing(next === "all" ? "Admin" : next)}
+              parent="Admin"
+              namesOnly
+              placeholder={t("common.allSubWing")}
+              clearLabel={t("common.allSubWing")}
+              className="w-[7.5rem] shrink-0"
+              triggerClassName={cn(fieldClass, "w-full")}
+            />
+          ) : null}
+          {branchParent ? (
+            <SettingsWingFilter
+              value={branch || "all"}
+              onChange={(next) => setWing(next === "all" ? branchParent : next)}
+              parent={branchParent}
+              namesOnly
+              placeholder={t("common.allBranch")}
+              clearLabel={t("common.allBranch")}
+              className="w-[7.5rem] shrink-0"
+              triggerClassName={cn(fieldClass, "w-full")}
+            />
+          ) : null}
           <ActiveInactiveToggle
             value={memberStatus}
             onChange={setMemberStatus}

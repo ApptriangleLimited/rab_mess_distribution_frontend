@@ -19,6 +19,7 @@ import { isApiEnabled } from "@/lib/api/mode";
 import { MESS_LEDGER_TAGS } from "@/lib/constants";
 import { formatMonthLong, monthDateBounds, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
+import { memberMatchesWingFilter } from "@/lib/store/org-options";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import type { DailyTag, UserStatus } from "@/lib/types";
@@ -133,14 +134,14 @@ export default function MessLedgerPrintClient() {
     return ledger.rows.filter((row) => {
       if (row.user.status !== memberStatus) return false;
       if (rank !== "all" && row.user.rank !== rank) return false;
-      if (wing !== "all" && row.user.wing !== wing) return false;
+      if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
       if (!query) return true;
       return [row.user.name, row.user.personal_id, row.user.rab_id, row.user.rank, row.user.wing]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [ledger.rows, q, rank, wing, memberStatus]);
+  }, [ledger.rows, q, rank, wing, memberStatus, state.wing_parent]);
 
   const backHref = `/mess/ledger?month=${month}`;
   const canAct = rows.length > 0;

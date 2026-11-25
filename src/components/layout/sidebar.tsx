@@ -112,7 +112,7 @@ function SidebarNav({ role, collapsed }: { role: Role; collapsed: boolean }) {
   const pathname = usePathname();
   const t = useT();
   const main = NAV_BY_ROLE[role];
-  const shared = SHARED_NAV;
+  const shared = role === "mess_checker" ? [] : SHARED_NAV;
   const mainHrefs = main.map((item) => item.href);
   const sharedHrefs = shared.map((item) => item.href);
 
@@ -139,23 +139,25 @@ function SidebarNav({ role, collapsed }: { role: Role; collapsed: boolean }) {
         ))}
       </nav>
 
-      <div className="mt-4 border-t border-sidebar-edge/80 pt-3 dark:border-white/10">
-        {!collapsed ? (
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
-            {t("common.settings")}
-          </p>
-        ) : null}
-        <nav className="flex flex-col gap-0.5">
-          {shared.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              collapsed={collapsed}
-              active={isNavActive(pathname, item.href, sharedHrefs)}
-            />
-          ))}
-        </nav>
-      </div>
+      {shared.length ? (
+        <div className="mt-4 border-t border-sidebar-edge/80 pt-3 dark:border-white/10">
+          {!collapsed ? (
+            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
+              {t("common.settings")}
+            </p>
+          ) : null}
+          <nav className="flex flex-col gap-0.5">
+            {shared.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                collapsed={collapsed}
+                active={isNavActive(pathname, item.href, sharedHrefs)}
+              />
+            ))}
+          </nav>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -202,7 +204,10 @@ export function MobileDrawer({
   const pathname = usePathname();
   const t = useT();
   const { locale } = useI18n();
-  const items = [...NAV_BY_ROLE[role], ...SHARED_NAV];
+  const items =
+    role === "mess_checker"
+      ? NAV_BY_ROLE[role]
+      : [...NAV_BY_ROLE[role], ...SHARED_NAV];
   const hrefs = items.map((item) => item.href);
 
   if (!open) return null;

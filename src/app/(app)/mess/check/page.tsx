@@ -6,9 +6,11 @@ import {
   IconUserPlus,
   IconUsers,
 } from "@tabler/icons-react";
+import { motion, useReducedMotion } from "motion/react";
 import { MessTabs } from "@/components/layout/mess-tabs";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
+import { PagePane } from "@/components/shared/page-pane";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +34,7 @@ function clock(total: number) {
 
 export default function MessCheckPage() {
   const t = useT();
+  const reduceMotion = useReducedMotion();
   const [board, setBoard] = useState<CheckerBoard | null>(null);
   const [left, setLeft] = useState(0);
   const [srbId, setSrbId] = useState("");
@@ -60,10 +63,23 @@ export default function MessCheckPage() {
   }, [load]);
 
   useEffect(() => {
-    if (!board?.shift) return;
-    const tick = window.setInterval(() => setLeft((value) => Math.max(0, value - 1)), 1000);
-    return () => window.clearInterval(tick);
-  }, [board?.shift?.id, board?.now]);
+    if (!board?.shift) {
+      setLeft(0);
+      return;
+    }
+    const openedAt = Date.parse(board.now);
+    const endsAt = (Number.isNaN(openedAt) ? Date.now() : openedAt) + board.shift.seconds_left * 1000;
+    const tick = () => setLeft(Math.max(0, Math.round((endsAt - Date.now()) / 1000)));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [board?.shift?.id, board?.now, board?.shift?.seconds_left]);
+
+  useEffect(() => {
+    if (!board?.shift || left > 0) return;
+    const refresh = window.setTimeout(() => void load(), 400);
+    return () => window.clearTimeout(refresh);
+  }, [board?.shift, left, load]);
 
   function explain(result: CheckerResult) {
     const name = result.name || result.guest_name || "";
@@ -125,8 +141,14 @@ export default function MessCheckPage() {
   const stats = board?.stats;
 
   return (
-    <div className="page-pane">
-      <PageHeader title={t("mess.checker.title")} center={<MessTabs />} />
+    <PagePane className="gap-5">
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-white via-emerald-50/50 to-sky-50/60 p-4 shadow-[0_10px_40px_-24px_rgba(6,121,87,0.35)] sm:p-5 dark:border-primary/25 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 dark:shadow-none"
+      >
+        <PageHeader title={t("mess.checker.title")} center={<MessTabs />} />
+      </motion.div>
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
           <div className="flex items-start justify-between gap-3">
@@ -141,16 +163,29 @@ export default function MessCheckPage() {
               {t("mess.checker.online")}
             </span>
           </div>
-          <div className="mt-4 rounded-xl bg-neutral-950 px-4 py-5 text-center text-white">
-            <p className="text-sm text-neutral-300">{shiftName}</p>
-            <p className="mt-1 font-mono text-4xl font-semibold tabular-nums">
-              {board?.shift ? clock(left) : "00:00:00"}
-            </p>
-            <p className="mt-1 text-xs text-neutral-400">
-              {board?.shift
-                ? t("mess.checker.until", { time: board.shift.end_time })
-                : t("mess.checker.noShift")}
-            </p>
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-sky-100 px-4 py-3 text-neutral-950 dark:bg-sky-950/40 dark:text-sky-50">
+            <div>
+              <p className="text-sm font-semibold">{t("mess.checker.currentShift")}</p>
+              <p
+                className={
+                  board?.shift
+                    ? "mt-0.5 font-mono text-2xl font-semibold tabular-nums text-red-600 dark:text-red-400"
+                    : "mt-0.5 font-mono text-2xl font-semibold tabular-nums"
+                }
+              >
+                {board?.shift ? clock(left) : board?.next_shift?.start_time || "—"}
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-sky-200/70">
+                {board?.shift
+                  ? t("mess.checker.timeLeft")
+                  : board?.next_shift
+                    ? t("mess.checker.shiftStarts")
+                    : t("mess.checker.noShift")}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-neutral-950 px-3 py-1 text-xs font-semibold text-white">
+              {shiftName}
+            </span>
           </div>
         </section>
 
@@ -218,7 +253,7 @@ export default function MessCheckPage() {
           </div>
         </div>
       </ConfirmDialog>
-    </div>
+    </PagePane>
   );
 }
 
