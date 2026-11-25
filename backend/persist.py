@@ -420,6 +420,7 @@ def build_snapshot(db: Session) -> dict:
         "users": [
             member_payload(row, lite=True)
             for row in db.query(Member)
+            .filter(Member.member_type != "civilian")
             .order_by(Member.created_at.desc(), Member.updated_at.desc(), Member.id.desc())
             .all()
         ],
@@ -1077,7 +1078,7 @@ def report_source_data(db: Session, start: date, end: date) -> dict:
     lookback = start - timedelta(days=90)
     members = (
         db.query(Member)
-        .filter(Member.approval_status == "approved")
+        .filter(Member.approval_status == "approved", Member.member_type != "civilian")
         .all()
     )
     assignments = (
@@ -1120,7 +1121,7 @@ def report_source(
             raise HTTPException(status_code=400, detail="Use month=YYYY-MM or from/to")
     key = cache_key(
         "reports",
-        kind="source",
+        kind="source-nocivil",
         start=start.isoformat(),
         end=end.isoformat(),
     )
@@ -1151,7 +1152,11 @@ def mess_checkins_data(db: Session, start: date, end: date) -> dict:
     )
     extra = (
         db.query(Member)
-        .filter(Member.approval_status == "approved", Member.status == "1")
+        .filter(
+            Member.approval_status == "approved",
+            Member.status == "1",
+            Member.member_type != "civilian",
+        )
         .all()
     )
     by_id = {row.id: row for row in extra}

@@ -932,6 +932,7 @@ def mess_eaters(
         for row in db.query(Member).filter(
             Member.approval_status == "approved",
             Member.status == "1",
+            Member.member_type != "civilian",
         )
     }
     stored = {
@@ -987,7 +988,10 @@ def mess_ledger(
     days = list(each_date(start, end))
     members = [
         row
-        for row in db.query(Member).filter(Member.approval_status == "approved")
+        for row in db.query(Member).filter(
+            Member.approval_status == "approved",
+            Member.member_type != "civilian",
+        )
         if _match_member(row, q, rank, wing)
     ]
     from daily import cells_for_member

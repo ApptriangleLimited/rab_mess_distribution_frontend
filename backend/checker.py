@@ -103,7 +103,7 @@ def _accepted_for_shift(rows: list[dict], member: Member, shift_id: str) -> bool
 
 
 def _planned_ms(db: Session, day: date) -> int:
-    members = db.query(Member).all()
+    members = db.query(Member).filter(Member.member_type != "civilian").all()
     if not members:
         return 0
     ids = [member.id for member in members]
@@ -198,7 +198,7 @@ def checker_check_in(
 ):
     branch = _branch(staff)
     member = _find_member(db, body.srb_id)
-    if member is None:
+    if member is None or member.member_type == "civilian":
         return envelope({"ok": False, "code": "not_found"})
     if has_rfid(member):
         return envelope({"ok": False, "code": "has_rfid", "name": member.name})
@@ -279,15 +279,19 @@ def checker_guest(
 @router.get("/api/v1/mess/guest-list")
 def guest_list(
     day: str = Query(""),
+    to: str = Query(""),
     branch: str = Query(""),
     staff: Staff = Depends(require_roles("mess", "mess_checker", "admin")),
     db: Session = Depends(get_db),
 ):
     try:
-        chosen = date.fromisoformat(day) if day else mess_today()
+        start = date.fromisoformat(day) if day else mess_today()
+        end = date.fromisoformat(to) if to else start
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid date") from exc
-    query = db.query(GuestMeal).filter(GuestMeal.date == chosen)
+    if end < start:
+        start, end = end, start
+    query = db.query(GuestMeal).filter(GuestMeal.date >= start, GuestMeal.date <= end)
     locked = ""
     if staff.role == "mess_checker":
         locked = _branch(staff)
@@ -300,7 +304,9 @@ def guest_list(
             query = query.filter(GuestMeal.branch == "haji")
     names = _shift_names(db)
     items = []
-    for row in query.order_by(GuestMeal.check_in_time.asc(), GuestMeal.guest_name.asc()).all():
+    for row in query.order_by(
+        GuestMeal.date.asc(), GuestMeal.check_in_time.asc(), GuestMeal.guest_name.asc()
+    ).all():
         saved = (getattr(row, "branch", "") or "") or "hq"
         items.append(
             {
@@ -318,7 +324,8 @@ def guest_list(
         )
     return envelope(
         {
-            "date": chosen.isoformat(),
+            "date": start.isoformat(),
+            "date_to": end.isoformat(),
             "branch": locked,
             "items": items,
         }
