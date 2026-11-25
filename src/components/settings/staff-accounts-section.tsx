@@ -121,7 +121,7 @@ export function StaffAccountsSection({
     return ROLE_KEYS.map((role) => ({
       role,
       items: rows.filter((row) => row.role === role),
-    })).filter((group) => group.items.length > 0);
+    })).filter((group) => group.items.length > 0 || group.role === "mess_checker");
   }, [rows]);
 
   async function reload() {
@@ -144,9 +144,9 @@ export function StaffAccountsSection({
     void reload();
   }, [apiOn]);
 
-  function openCreate() {
+  function openCreate(role: Role = "cc") {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, role, desk: "hq" });
     setShowFormPassword(false);
     setMemberMatch(null);
     setMemberLookupError("");
@@ -396,7 +396,7 @@ export function StaffAccountsSection({
       size="sm"
       variant="cta"
       className="h-8 rounded-xl"
-      onClick={openCreate}
+      onClick={() => openCreate()}
     >
       <IconPlus className="h-3.5 w-3.5" />
       {t("settings.staffAdd")}
@@ -407,18 +407,35 @@ export function StaffAccountsSection({
     <p className="px-1 py-6 text-sm text-neutral-500">{t("settings.staffApiOff")}</p>
   ) : loading && rows.length === 0 ? (
     <p className="px-1 py-6 text-sm text-neutral-500">{t("common.loading")}</p>
-  ) : rows.length === 0 ? (
-    <p className="px-1 py-6 text-sm text-neutral-500">{t("settings.staffEmpty")}</p>
   ) : (
     <div className="space-y-5">
       {grouped.map((group) => (
         <section key={group.role}>
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-            {roleLabel(group.role, locale)}
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-              {group.items.length}
-            </span>
-          </h3>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+              {roleLabel(group.role, locale)}
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                {group.items.length}
+              </span>
+            </h3>
+            {group.role === "mess_checker" && apiOn ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="cta"
+                className="h-8 rounded-xl"
+                onClick={() => openCreate("mess_checker")}
+              >
+                <IconPlus className="h-3.5 w-3.5" />
+                {t("settings.staffAdd")}
+              </Button>
+            ) : null}
+          </div>
+          {group.items.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-neutral-200 px-3 py-4 text-sm text-neutral-500 dark:border-neutral-800">
+              {t("settings.staffAddBody")}
+            </p>
+          ) : (
           <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
             {group.items.map((row) => {
               const mine =
@@ -546,6 +563,7 @@ export function StaffAccountsSection({
               );
             })}
           </ul>
+          )}
         </section>
       ))}
     </div>
