@@ -98,7 +98,7 @@ READER_CARD = {4918050, 4961639, 4931286}
 
 
 def card_on_device(raw: str | None) -> int:
-    """Number to store on the machine. The database RFID is not changed."""
+    """Number to store on the machine. Same integer as the database RFID."""
     real = rfid_card(raw)
     if real in READER_CARD:
         return real
@@ -115,22 +115,12 @@ def machine_pin(member: Member, pin: str | None = None) -> str:
 
 
 def device_card_number(raw: str | None) -> int:
-    """Card number the ZK reader compares, from the real RFID stored in the database.
+    """Reader card number already stored on the member. Sent to the device as-is.
 
-    A checker value such as 0007502842 is site 75 and card 2842. The reader
-    reports (75 << 16) | 2842. The stored RFID is not changed.
+    The site/card conversion, (site << 16) | card, was applied once to
+    members.rfid. Do not run it again.
     """
-    real = rfid_card(raw)
-    if real <= 0:
-        return 0
-    text = f"{real:010d}"
-    if len(text) > 10:
-        return real
-    facility = int(text[:5])
-    number = int(text[5:])
-    if facility == 0 or facility > 255 or number > 65535:
-        return real
-    return (facility << 16) | number
+    return rfid_card(raw)
 
 
 def same_rfid(stored: str | None, seen: int) -> bool:
@@ -1002,6 +992,13 @@ def _collect_events(logs, day: date) -> list[tuple[str, datetime]]:
     return events
 
 
+def _clock(punched: datetime) -> datetime:
+    """Local clock with no timezone, so HQ and Haji punches sort together."""
+    if punched.tzinfo is not None:
+        return punched.astimezone(DHAKA).replace(tzinfo=None)
+    return punched
+
+
 def _build_rows(
     events: list[tuple[str, datetime]],
     known_by_key: dict[str, Member],
@@ -1009,10 +1006,43 @@ def _build_rows(
     shifts: list[dict],
     device_names: dict[str, str],
     device_cards: dict[str, str],
+    also: list[tuple[str, datetime]] | None = None,
+    camp: str = "hq",
 ) -> list[dict]:
+    """Classify this camp's punches. `also` is the other camp, same shift rule.
+
+    One accept per member per shift per day. A later punch at either camp is
+    a duplicate. The same timestamp is accepted at HQ first.
+    """
     accepted_keys: set[tuple[str, str, str]] = set()
-    rows = [
-        _punch_row(
+    if not also:
+        rows = [
+            _punch_row(
+                pin,
+                _clock(punched),
+                known_by_key,
+                ms_ids,
+                shifts,
+                accepted_keys,
+                device_names,
+                device_cards,
+            )
+            for pin, punched in events
+        ]
+        rows.reverse()
+        return rows
+    own_rank = 0 if camp == "hq" else 1
+    other_rank = 1 - own_rank
+    timeline: list[tuple[datetime, int, bool, str]] = [
+        (_clock(punched), own_rank, True, pin) for pin, punched in events
+    ]
+    timeline.extend(
+        (_clock(punched), other_rank, False, pin) for pin, punched in also
+    )
+    timeline.sort(key=lambda item: (item[0], item[1]))
+    rows = []
+    for punched, _rank, keep, pin in timeline:
+        row = _punch_row(
             pin,
             punched,
             known_by_key,
@@ -1022,10 +1052,81 @@ def _build_rows(
             device_names,
             device_cards,
         )
-        for pin, punched in events
-    ]
+        if keep:
+            rows.append(row)
     rows.reverse()
     return rows
+
+
+def _events_from_rows(rows: list, day: date) -> list[tuple[str, datetime]]:
+    events: list[tuple[str, datetime]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        when = _parse_punched_at(str(row.get("punched_at") or ""))
+        if when is None or when.date() != day:
+            continue
+        pin = (
+            str(row.get("pin") or "").strip()
+            or device_pin(row.get("rab_id"))
+            or str(row.get("rab_id") or "").strip()
+        )
+        if pin:
+            events.append((pin, when))
+    return events
+
+
+def _haji_events(day: date) -> list[tuple[str, datetime]]:
+    from zk_hazz import current_events
+
+    return current_events(day)
+
+
+def _hq_events(day: date) -> list[tuple[str, datetime]]:
+    return _events_from_rows(_combined_rows(day), day)
+
+
+def rebuild_shared_boards(
+    day: date,
+    hq_events: list[tuple[str, datetime]],
+    haji_events: list[tuple[str, datetime]],
+    known_by_key: dict[str, Member],
+    ms_ids: set[str],
+    shifts: list[dict],
+    device_names: dict[str, str],
+    device_cards: dict[str, str],
+) -> None:
+    """Write both screens from one shared accept per shift."""
+    from zk_hazz import store_rows
+
+    hq_rows = _build_rows(
+        hq_events,
+        known_by_key,
+        ms_ids,
+        shifts,
+        device_names,
+        device_cards,
+        also=haji_events,
+        camp="hq",
+    )
+    haji_rows = _build_rows(
+        haji_events,
+        known_by_key,
+        ms_ids,
+        shifts,
+        device_names,
+        device_cards,
+        also=hq_events,
+        camp="haji",
+    )
+    _set(
+        rows=hq_rows,
+        date=day.isoformat(),
+        rows_date=day.isoformat(),
+        shift_stamp=_shift_stamp(shifts),
+    )
+    _save_punch_board(day.isoformat(), hq_rows)
+    store_rows(day, haji_rows)
 
 
 def _shift_stamp(shifts: list[dict]) -> str:
@@ -1075,9 +1176,16 @@ def _reclassify_cached(
             if row.get("rfid") and pin not in cards:
                 cards[pin] = rfid_digits(str(row.get("rfid") or ""))
     events.sort(key=lambda item: item[1])
-    rows = _build_rows(events, known_by_key, ms_ids, shifts, names, cards)
-    _set(rows=rows, date=day.isoformat(), rows_date=day.isoformat(), shift_stamp=_shift_stamp(shifts))
-    _save_punch_board(day.isoformat(), rows)
+    rebuild_shared_boards(
+        day,
+        events,
+        _haji_events(day),
+        known_by_key,
+        ms_ids,
+        shifts,
+        names,
+        cards,
+    )
 
 
 def _apply_current_shifts(
@@ -1143,12 +1251,18 @@ def _read_rows(
         device_names = {}
         device_cards = {}
     events = _collect_events(logs, day)
-    rows = _build_rows(events, known_by_key, ms_ids, shifts, device_names, device_cards)
+    rebuild_shared_boards(
+        day,
+        events,
+        _haji_events(day),
+        known_by_key,
+        ms_ids,
+        shifts,
+        device_names,
+        device_cards,
+    )
     _set(
-        rows=rows,
         record_count=record_count,
-        rows_date=day.isoformat(),
-        date=day.isoformat(),
         event_stamp=_event_stamp(events),
         shift_stamp=_shift_stamp(shifts),
     )
@@ -1204,19 +1318,22 @@ def _append_live_punch(
             saved_pin = str(row.get("pin") or "").strip()
             events.append((saved_pin or device_pin(row.get("rab_id")) or str(row.get("rab_id") or ""), when))
         events.append((pin, punched))
-        events.sort(key=lambda item: item[1])
-        rows = _build_rows(events, known_by_key, ms_ids, shifts, device_names, device_cards)
+        events.sort(key=lambda item: _clock(item[1]))
         count = _state.get("record_count")
-        _state.update(
-            {
-                "rows": rows,
-                "date": day.isoformat(),
-                "rows_date": day.isoformat(),
-                "event_stamp": _event_stamp(events),
-                "record_count": (int(count) + 1) if isinstance(count, int) else count,
-            }
-        )
-    _save_punch_board(day.isoformat(), rows)
+        next_count = (int(count) + 1) if isinstance(count, int) else count
+    from zk_hazz import current_events
+
+    rebuild_shared_boards(
+        day,
+        events,
+        current_events(day),
+        known_by_key,
+        ms_ids,
+        shifts,
+        device_names,
+        device_cards,
+    )
+    _set(record_count=next_count, event_stamp=_event_stamp(events))
 
 
 def _open_and_run(db: Session, write: bool) -> None:

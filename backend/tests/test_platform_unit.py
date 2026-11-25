@@ -26,9 +26,10 @@ class DummyStaff:
 
 
 def test_device_verifies_the_stored_rfid_without_replacing_it():
-    assert device_card_number("0007502842") == 4918042
-    assert device_card_number("7502842") == 4918042
-    assert same_rfid("7502842", 4918042)
+    assert device_card_number("0007502842") == 7502842
+    assert device_card_number("4953938") == 4953938
+    assert same_rfid("4953938", 4953938)
+    assert same_rfid("7502842", 4918042) is False
     assert same_rfid("7502842", 7502842)
 
 
@@ -47,6 +48,73 @@ def test_restart_keeps_saved_punches_for_the_day(tmp_path, monkeypatch):
         zk_gate._state["date"] = day.isoformat()
     rows = zk_gate._combined_rows(day)
     assert [row["rab_id"] for row in rows] == ["429672"]
+
+
+def test_second_camp_in_the_same_shift_is_duplicate():
+    from datetime import datetime
+
+    from zk_gate import _build_rows
+
+    class Member:
+        id = "m1"
+        name = "Sabbir"
+        rab_id = "440081"
+        rfid = "4953938"
+
+    known = {"440081": Member()}
+    shifts = [{"id": "lunch", "name": "Lunch", "start_time": "12:00", "end_time": "16:59"}]
+    first = datetime(2026, 11, 25, 12, 10, 0)
+    second = datetime(2026, 11, 25, 12, 20, 0)
+    hq_rows = _build_rows(
+        [("440081", first)],
+        known,
+        {"m1"},
+        shifts,
+        {},
+        {},
+        also=[("440081", second)],
+        camp="hq",
+    )
+    haji_rows = _build_rows(
+        [("440081", second)],
+        known,
+        {"m1"},
+        shifts,
+        {},
+        {},
+        also=[("440081", first)],
+        camp="haji",
+    )
+    assert hq_rows[0]["status"] == "accepted"
+    assert haji_rows[0]["status"] == "already_accepted"
+    later = datetime(2026, 11, 25, 12, 40, 0)
+    earlier = datetime(2026, 11, 25, 12, 5, 0)
+    assert (
+        _build_rows(
+            [("440081", later)],
+            known,
+            {"m1"},
+            shifts,
+            {},
+            {},
+            also=[("440081", earlier)],
+            camp="hq",
+        )[0]["status"]
+        == "already_accepted"
+    )
+    assert (
+        _build_rows(
+            [("440081", earlier)],
+            known,
+            {"m1"},
+            shifts,
+            {},
+            {},
+            also=[("440081", later)],
+            camp="haji",
+        )[0]["status"]
+        == "accepted"
+    )
 
 
 def test_hazz_camp_keeps_its_own_punch_board():
@@ -84,8 +152,9 @@ def test_access_command_sends_the_device_card_number():
         "C:1393:DATA UPDATE user Pin=1006837\tName=Md Bellal Hossain\t"
         "Privilege=0\tPassword=\tCardNo=4918042\tGroup=1\tTZ=0001000000000000"
     )
-    assert card_on_device("0007502842") == 4918042
+    assert card_on_device("0007502842") == 7502842
     assert card_on_device("0004918050") == 4918050
+    assert card_on_device("4953938") == 4953938
 
 
 def test_inactive_keeps_that_day_and_clears_every_later_day():

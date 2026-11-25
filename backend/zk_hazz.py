@@ -145,7 +145,6 @@ def hazz_snapshot() -> dict:
 
 
 def _append_punch(pin: str, punched: datetime, known_by_key, ms_ids, shifts) -> None:
-    global _date
     day = punched.date()
     if day != mess_today():
         return
@@ -173,8 +172,48 @@ def _append_punch(pin: str, punched: datetime, known_by_key, ms_ids, shifts) -> 
             events.append((str(row.get("rab_id") or ""), when))
         events.append((pin, punched.replace(tzinfo=None)))
         events.sort(key=lambda item: item[1])
-        rows = _build_rows(events, known_by_key, ms_ids, shifts, {}, {})
-        _rows[:] = rows
+    from zk_gate import _hq_events, rebuild_shared_boards
+
+    rebuild_shared_boards(
+        day,
+        _hq_events(day),
+        events,
+        known_by_key,
+        ms_ids,
+        shifts,
+        {},
+        {},
+    )
+
+
+def current_events(day) -> list[tuple[str, datetime]]:
+    with _lock:
+        if _date == day.isoformat():
+            rows = list(_rows)
+        else:
+            board = _load_board()
+            rows = board["rows"] if board.get("date") == day.isoformat() else []
+    events: list[tuple[str, datetime]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        text = str(row.get("punched_at") or "")
+        try:
+            when = datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        if when.date() != day:
+            continue
+        pin = str(row.get("pin") or "").strip() or str(row.get("rab_id") or "").strip()
+        if pin:
+            events.append((pin, when))
+    return events
+
+
+def store_rows(day, rows: list[dict]) -> None:
+    global _date
+    with _lock:
+        _rows[:] = list(rows)
         _date = day.isoformat()
     _save_board(day.isoformat(), rows)
 
