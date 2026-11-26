@@ -26,6 +26,13 @@ import { MonthLedgerBoard } from "@/components/consume/month-ledger-board";
 import { MessTabs } from "@/components/layout/mess-tabs";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   SettingsRankFilter,
   SettingsWingFilter,
 } from "@/components/shared/settings-catalog-filters";
@@ -184,6 +191,7 @@ export default function MessLedgerClient() {
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
     return ledger.rows.filter((row) => {
+      if (!isCivilianMember(row.user)) return false;
       if (row.user.status !== memberStatus) return false;
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;
@@ -297,6 +305,7 @@ export default function MessLedgerClient() {
     params.set("from", dateFrom);
     params.set("to", dateTo);
     params.set("status", memberStatus);
+    params.set("member_type", "civilian");
     return `/mess/ledger/print?${params.toString()}`;
   }, [month, q, rank, wing, dateFrom, dateTo, memberStatus]);
 
@@ -466,6 +475,17 @@ export default function MessLedgerClient() {
             label={t("common.dateRange")}
             triggerClassName="min-w-[10rem] w-[10rem] px-2 text-xs"
           />
+          <Select value="civilian">
+            <SelectTrigger
+              className={cn(fieldClass, "w-[8.5rem] shrink-0")}
+              aria-label={t("cc.fields.memberType")}
+            >
+              <SelectValue placeholder={t("cc.fields.memberType")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="civilian">{t("cc.memberTypes.civilian")}</SelectItem>
+            </SelectContent>
+          </Select>
           <SettingsRankFilter
             value={rank}
             onChange={setRank}

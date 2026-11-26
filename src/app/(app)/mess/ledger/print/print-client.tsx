@@ -20,6 +20,7 @@ import { MESS_LEDGER_TAGS } from "@/lib/constants";
 import { formatMonthLong, monthDateBounds, monthKey } from "@/lib/date";
 import { downloadConsumeLedgerPdf } from "@/lib/download-consume-ledger-pdf";
 import { memberMatchesWingFilter } from "@/lib/store/org-options";
+import { isCivilianMember } from "@/lib/store/users";
 import { printLetterElement } from "@/lib/print-letter-pdf";
 import { buildRangeLedger, type LedgerRow } from "@/lib/reports";
 import type { DailyTag, UserStatus } from "@/lib/types";
@@ -132,6 +133,7 @@ export default function MessLedgerPrintClient() {
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
     return ledger.rows.filter((row) => {
+      if (!isCivilianMember(row.user)) return false;
       if (row.user.status !== memberStatus) return false;
       if (rank !== "all" && row.user.rank !== rank) return false;
       if (!memberMatchesWingFilter(row.user.wing, wing)) return false;

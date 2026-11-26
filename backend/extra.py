@@ -990,7 +990,7 @@ def mess_ledger(
         row
         for row in db.query(Member).filter(
             Member.approval_status == "approved",
-            Member.member_type != "civilian",
+            Member.member_type == "civilian",
         )
         if _match_member(row, q, rank, wing)
     ]
