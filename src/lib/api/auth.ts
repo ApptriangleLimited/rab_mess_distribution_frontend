@@ -7,6 +7,7 @@ export type StaffPublic = {
   rab_id?: string;
   display_name: string;
   role: string;
+  desk?: string;
   avatar?: string;
 };
 

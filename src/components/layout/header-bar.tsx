@@ -158,6 +158,11 @@ export function HeaderBar({
               </select>
             </label>
           ) : null}
+          {session.role === "mess_checker" && session.desk ? (
+            <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-header-bar">
+              {session.desk === "haji" ? "Haji Camp" : "SRB HQ"}
+            </span>
+          ) : null}
           <div
             className="flex items-center rounded-2xl border border-white/10 bg-white/[0.07] p-0.5 shadow-inner shadow-black/10"
             role="group"

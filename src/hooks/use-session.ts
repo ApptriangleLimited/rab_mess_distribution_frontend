@@ -61,6 +61,7 @@ export function useSession() {
       refreshToken?: string,
       username?: string,
       avatarUrl?: string | null,
+      desk?: string,
     ) => {
       if (avatarUrl) setProfileAvatar(role, avatarUrl, username);
       const next: Session = {
@@ -68,6 +69,7 @@ export function useSession() {
         name,
         username,
         loggedInAt: nowISO(),
+        desk: desk || undefined,
         avatarUrl: avatarUrl || getProfileAvatar(role, username) || undefined,
         roleSwitcher: isSuperAdminLogin(username),
       };

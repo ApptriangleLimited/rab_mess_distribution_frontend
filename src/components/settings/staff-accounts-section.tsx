@@ -533,7 +533,14 @@ export function StaffAccountsSection({
                         </span>
                       ) : null}
                     </p>
-                    <p className="truncate text-xs text-neutral-500">{staffLoginId(row)}</p>
+                    <p className="truncate text-xs text-neutral-500">
+                      {staffLoginId(row)}
+                      {row.role === "mess_checker" ? (
+                        <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-100">
+                          {row.desk === "haji" ? "Haji Camp" : "SRB HQ"}
+                        </span>
+                      ) : null}
+                    </p>
                     {isAdmin && row.password ? (
                       <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-neutral-700 dark:text-neutral-200">
                         <span className="text-neutral-500">{t("profile.password")}:</span>

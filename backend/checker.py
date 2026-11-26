@@ -150,6 +150,17 @@ def _current_shift(db: Session):
     return now, _match_shift(now, shifts)
 
 
+def _seconds_until_shift_start(now: datetime, shift: dict) -> int:
+    start = _to_min(shift["start_time"])
+    if start is None:
+        return 0
+    now_sec = now.hour * 3600 + now.minute * 60 + now.second
+    start_sec = start * 60
+    if start_sec > now_sec:
+        return start_sec - now_sec
+    return (24 * 3600 - now_sec) + start_sec
+
+
 def _shift_brief(shift: dict | None) -> dict | None:
     if shift is None:
         return None
@@ -159,6 +170,19 @@ def _shift_brief(shift: dict | None) -> dict | None:
         "start_time": shift["start_time"],
         "end_time": shift["end_time"],
     }
+
+
+def _next_shift_brief(now: datetime, shifts: list[dict], current: dict | None) -> dict | None:
+    if current is not None:
+        return None
+    upcoming = _upcoming_shift(now, shifts)
+    if upcoming is None:
+        return None
+    brief = _shift_brief(upcoming)
+    if brief is None:
+        return None
+    brief["seconds_until"] = _seconds_until_shift_start(now, upcoming)
+    return brief
 
 
 def _upcoming_shift(now: datetime, shifts: list[dict]) -> dict | None:
@@ -211,7 +235,7 @@ def checker_board(
                 "end_time": shift["end_time"],
                 "seconds_left": _seconds_until_shift_end(now, shift),
             },
-            "next_shift": None if shift is not None else _shift_brief(_upcoming_shift(now, shifts)),
+            "next_shift": _next_shift_brief(now, shifts, shift),
             "stats": {
                 "planned": _planned_ms(db, day),
                 "consumptions": sum(1 for row in rows if row.get("status") == STATUS_ACCEPTED),

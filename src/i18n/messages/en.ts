@@ -1332,7 +1332,7 @@ export const en = {
       noShift: "No Shift",
       until: "Until {time}",
       currentShift: "Current Shift",
-      shiftStarts: "Shift starts",
+      shiftStarts: "Shift Starts",
       timeLeft: "Time left",
       todaysStats: "Today's stats",
       planned: "Planned Meals",

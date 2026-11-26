@@ -144,6 +144,8 @@ export default function LoginPage() {
         rememberMe,
         data.refresh_token,
         data.staff.srb_id || data.staff.rab_id || data.staff.email,
+        undefined,
+        data.staff.desk,
       );
       try {
         if (rememberMe) {

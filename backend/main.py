@@ -677,6 +677,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
                 "rab_id": staff.email,
                 "display_name": staff.display_name,
                 "role": staff.role,
+                "desk": getattr(staff, "desk", "") or "",
                 "avatar": getattr(staff, "avatar", "") or "",
                 "mfa_enabled": bool(staff.mfa_enabled),
             },

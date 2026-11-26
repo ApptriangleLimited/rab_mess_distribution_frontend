@@ -186,6 +186,8 @@ export interface Session {
   name: string;
   username?: string;
   loggedInAt: string;
+  /** Mess checker branch: hq or haji. */
+  desk?: string;
   /** Not stored in the session cookie — see PROFILE_AVATAR_KEY. */
   avatarUrl?: string;
   /** Superadmin title-bar role switcher. Survives jumping to another desk. */

@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
+  IconAlertCircle,
+  IconCheck,
   IconClockHour4,
   IconUserPlus,
   IconUsers,
+  IconX,
 } from "@tabler/icons-react";
 import { motion, useReducedMotion } from "motion/react";
 import { MessTabs } from "@/components/layout/mess-tabs";
@@ -15,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/i18n/provider";
+import { useSession } from "@/hooks/use-session";
 import {
   checkInGuest,
   checkInMeal,
@@ -34,6 +39,7 @@ function clock(total: number) {
 
 export default function MessCheckPage() {
   const t = useT();
+  const { session } = useSession();
   const reduceMotion = useReducedMotion();
   const [board, setBoard] = useState<CheckerBoard | null>(null);
   const [left, setLeft] = useState(0);
@@ -44,6 +50,8 @@ export default function MessCheckPage() {
   const [guestInfo, setGuestInfo] = useState("");
   const [guestRef, setGuestRef] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState<CheckNotice | null>(null);
+  const srbRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -62,40 +70,69 @@ export default function MessCheckPage() {
     return () => window.clearInterval(poll);
   }, [load]);
 
+  const countdownSeconds = board?.shift
+    ? board.shift.seconds_left
+    : board?.next_shift?.seconds_until;
+
   useEffect(() => {
-    if (!board?.shift) {
+    if (countdownSeconds == null) {
       setLeft(0);
       return;
     }
-    const openedAt = Date.parse(board.now);
-    const endsAt = (Number.isNaN(openedAt) ? Date.now() : openedAt) + board.shift.seconds_left * 1000;
+    const openedAt = board ? Date.parse(board.now) : Number.NaN;
+    const endsAt = (Number.isNaN(openedAt) ? Date.now() : openedAt) + countdownSeconds * 1000;
     const tick = () => setLeft(Math.max(0, Math.round((endsAt - Date.now()) / 1000)));
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [board?.shift?.id, board?.now, board?.shift?.seconds_left]);
+  }, [board, countdownSeconds]);
 
   useEffect(() => {
-    if (!board?.shift || left > 0) return;
-    const refresh = window.setTimeout(() => void load(), 400);
-    return () => window.clearTimeout(refresh);
-  }, [board?.shift, left, load]);
+    if (countdownSeconds == null || countdownSeconds <= 0) return;
+    const openedAt = board ? Date.parse(board.now) : Number.NaN;
+    const endsAt = (Number.isNaN(openedAt) ? Date.now() : openedAt) + countdownSeconds * 1000;
+    const refresh = window.setInterval(() => {
+      if (Date.now() >= endsAt) void load();
+    }, 1000);
+    return () => window.clearInterval(refresh);
+  }, [board, countdownSeconds, load]);
 
-  function explain(result: CheckerResult) {
+  function showResult(result: CheckerResult, enteredId: string) {
     const name = result.name || result.guest_name || "";
     const shift = result.shift_name || "";
-    if (result.ok && result.guest_name) {
-      return `${t("mess.checker.accepted")}\n${t("mess.checker.guestAccepted", { name })}`;
-    }
-    if (result.ok) {
-      return `${t("mess.checker.accepted")}\n${t("mess.checker.acceptedBody", { name, shift })}`;
-    }
-    if (result.code === "has_rfid") return t("mess.checker.hasRfid", { name });
-    if (result.code === "not_ms") return t("mess.checker.notMs", { name });
-    if (result.code === "duplicate") return t("mess.checker.duplicate", { name, shift });
-    if (result.code === "no_shift") return t("mess.checker.noShiftNow");
-    return t("mess.checker.notFound");
+    const title = result.ok
+      ? t("mess.checker.accepted")
+      : result.code === "duplicate"
+        ? t("mess.checker.duplicate", { name, shift })
+        : result.code === "has_rfid"
+          ? t("mess.checker.hasRfid", { name })
+          : result.code === "not_ms"
+            ? t("mess.checker.notMs", { name })
+            : result.code === "no_shift"
+              ? t("mess.checker.noShiftNow")
+              : t("mess.checker.notFound");
+    let body = t("mess.checker.notFound");
+    if (result.ok && result.guest_name) body = t("mess.checker.guestAccepted", { name });
+    else if (result.ok) body = t("mess.checker.acceptedBody", { name, shift });
+    else if (result.code === "has_rfid") body = t("mess.checker.hasRfid", { name });
+    else if (result.code === "not_ms") body = t("mess.checker.notMs", { name });
+    else if (result.code === "duplicate") body = t("mess.checker.duplicate", { name, shift });
+    else if (result.code === "no_shift") body = t("mess.checker.noShiftNow");
+    setNotice({
+      ok: result.ok,
+      code: result.code,
+      title,
+      body,
+      name,
+      shift,
+      srbId: enteredId,
+    });
   }
+
+  const closeNotice = useCallback(() => {
+    setNotice(null);
+    srbRef.current?.focus();
+  }, []);
 
   async function submitMeal() {
     const id = srbId.trim();
@@ -103,11 +140,19 @@ export default function MessCheckPage() {
     setBusy(true);
     try {
       const result = await checkInMeal(id);
-      window.alert(explain(result));
+      showResult(result, id);
       if (result.ok) setSrbId("");
       await load();
     } catch (err) {
-      window.alert(err instanceof ApiClientError ? err.detail : t("mess.checker.notFound"));
+      setNotice({
+        ok: false,
+        code: "not_found",
+        title: t("mess.checker.notFound"),
+        body: err instanceof ApiClientError ? err.detail : t("mess.checker.notFound"),
+        name: "",
+        shift: "",
+        srbId: id,
+      });
     } finally {
       setBusy(false);
     }
@@ -122,7 +167,7 @@ export default function MessCheckPage() {
         guest_info: guestInfo.trim(),
         ref_info: guestRef.trim(),
       });
-      window.alert(explain(result));
+      showResult(result, "");
       if (result.ok) {
         setGuestOpen(false);
         setGuestName("");
@@ -131,13 +176,25 @@ export default function MessCheckPage() {
       }
       await load();
     } catch (err) {
-      window.alert(err instanceof ApiClientError ? err.detail : t("mess.checker.notFound"));
+      setNotice({
+        ok: false,
+        code: "not_found",
+        title: t("mess.checker.notFound"),
+        body: err instanceof ApiClientError ? err.detail : t("mess.checker.notFound"),
+        name: guestName.trim(),
+        shift: "",
+        srbId: "",
+      });
     } finally {
       setBusy(false);
     }
   }
 
-  const shiftName = board?.shift?.name || t("mess.checker.noShift");
+  const shiftName = board?.shift?.name || board?.next_shift?.name || t("mess.checker.noShift");
+  const branchName =
+    board?.branch_label ||
+    (session?.desk === "haji" ? "Haji Camp" : session?.desk === "hq" ? "SRB HQ" : "");
+  const counting = Boolean(board?.shift || board?.next_shift);
   const stats = board?.stats;
 
   return (
@@ -159,21 +216,28 @@ export default function MessCheckPage() {
                 {t("mess.checker.manager")}: {board?.manager || "—"}
               </p>
             </div>
-            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-              {t("mess.checker.online")}
-            </span>
+            <div className="flex flex-col items-end gap-1.5">
+              {branchName ? (
+                <span className="rounded-full bg-neutral-950 px-3 py-1 text-xs font-semibold text-white">
+                  {branchName}
+                </span>
+              ) : null}
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                {t("mess.checker.online")}
+              </span>
+            </div>
           </div>
           <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-sky-100 px-4 py-3 text-neutral-950 dark:bg-sky-950/40 dark:text-sky-50">
             <div>
               <p className="text-sm font-semibold">{t("mess.checker.currentShift")}</p>
               <p
                 className={
-                  board?.shift
-                    ? "mt-0.5 font-mono text-2xl font-semibold tabular-nums text-red-600 dark:text-red-400"
-                    : "mt-0.5 font-mono text-2xl font-semibold tabular-nums"
+                  counting
+                    ? "mt-0.5 font-mono text-3xl font-semibold tabular-nums tracking-tight text-red-600 dark:text-red-400"
+                    : "mt-0.5 font-mono text-3xl font-semibold tabular-nums tracking-tight"
                 }
               >
-                {board?.shift ? clock(left) : board?.next_shift?.start_time || "—"}
+                {counting ? clock(left) : "—"}
               </p>
               <p className="text-xs text-neutral-500 dark:text-sky-200/70">
                 {board?.shift
@@ -209,6 +273,7 @@ export default function MessCheckPage() {
           <Label htmlFor="checker-srb">{t("mess.checker.srbId")}</Label>
           <Input
             id="checker-srb"
+            ref={srbRef}
             value={srbId}
             autoFocus
             placeholder={t("mess.checker.srbPlaceholder")}
@@ -253,7 +318,126 @@ export default function MessCheckPage() {
           </div>
         </div>
       </ConfirmDialog>
+      <CheckNoticeDialog
+        notice={notice}
+        closeLabel={t("common.done")}
+        onClose={closeNotice}
+        srbLabel={t("mess.checker.srbId")}
+        shiftLabel={t("mess.checker.colShift")}
+      />
     </PagePane>
+  );
+}
+
+type CheckNotice = {
+  ok: boolean;
+  code: CheckerResult["code"];
+  title: string;
+  body: string;
+  name: string;
+  shift: string;
+  srbId: string;
+};
+
+function CheckNoticeDialog({
+  notice,
+  closeLabel,
+  onClose,
+  srbLabel,
+  shiftLabel,
+}: {
+  notice: CheckNotice | null;
+  closeLabel: string;
+  onClose: () => void;
+  srbLabel: string;
+  shiftLabel: string;
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const tone = notice?.ok
+    ? "success"
+    : notice?.code === "duplicate"
+      ? "warn"
+      : "danger";
+
+  useEffect(() => {
+    if (!notice) return;
+    closeRef.current?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" || event.key === "Enter") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [notice, onClose]);
+
+  if (!notice || typeof document === "undefined") return null;
+
+  const Icon = tone === "success" ? IconCheck : tone === "warn" ? IconAlertCircle : IconX;
+  const chip =
+    tone === "success"
+      ? "bg-emerald-600 text-white"
+      : tone === "warn"
+        ? "bg-amber-500 text-white"
+        : "bg-red-600 text-white";
+  const bar =
+    tone === "success"
+      ? "from-emerald-600 to-emerald-400"
+      : tone === "warn"
+        ? "from-amber-500 to-orange-400"
+        : "from-red-600 to-rose-500";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" role="presentation">
+      <button
+        type="button"
+        className="absolute inset-0 bg-neutral-950/55 backdrop-blur-sm"
+        aria-label={closeLabel}
+        onClick={onClose}
+      />
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="checker-notice-title"
+        className="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl bg-white text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)] dark:bg-neutral-950"
+      >
+        <div className={`h-1.5 w-full bg-gradient-to-r ${bar}`} />
+        <div className="px-6 pb-6 pt-7">
+          <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${chip}`}>
+            <Icon className="h-7 w-7" stroke={2.25} />
+          </span>
+          <h2 id="checker-notice-title" className="mt-4 text-xl font-semibold text-neutral-950 dark:text-white">
+            {notice.title}
+          </h2>
+          {notice.body !== notice.title ? (
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">{notice.body}</p>
+          ) : null}
+          {notice.srbId || notice.shift ? (
+            <dl className="mt-4 space-y-2 rounded-xl bg-neutral-50 px-4 py-3 text-left text-sm dark:bg-neutral-900">
+              {notice.srbId ? (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-neutral-500">{srbLabel}</dt>
+                  <dd className="font-mono font-semibold text-neutral-950 dark:text-white">{notice.srbId}</dd>
+                </div>
+              ) : null}
+              {notice.shift ? (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-neutral-500">{shiftLabel}</dt>
+                  <dd className="font-semibold text-neutral-950 dark:text-white">{notice.shift}</dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
+          <Button ref={closeRef} type="button" className="mt-5 h-11 w-full rounded-xl" onClick={onClose}>
+            {closeLabel}
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

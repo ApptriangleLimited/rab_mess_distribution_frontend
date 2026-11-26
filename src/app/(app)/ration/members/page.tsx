@@ -31,7 +31,7 @@ import {
 import { usePagination } from "@/hooks/use-pagination";
 import { useStore } from "@/hooks/use-store";
 import { isCcApiEnabled } from "@/lib/api/mode";
-import { listMembers, memberToUser } from "@/lib/api/members";
+import { listAllApprovedMembers, memberToUser } from "@/lib/api/members";
 import { compareUsersNewestFirst } from "@/lib/store/users";
 
 import {
@@ -66,9 +66,9 @@ export default function RationMembersPage() {
       return;
     }
     let cancelled = false;
-    listMembers({ approval: "approved", page: 1, page_size: 500 })
-      .then((res) => {
-        if (!cancelled) setApiUsers(res.items.map(memberToUser));
+    listAllApprovedMembers({ status: "all" })
+      .then((items) => {
+        if (!cancelled) setApiUsers(items.map(memberToUser));
       })
       .catch(() => {
         if (!cancelled) setApiUsers([]);
