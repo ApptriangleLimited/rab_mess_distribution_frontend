@@ -1694,6 +1694,14 @@ function isCurrentSeed(state: AppState | null): boolean {
   return !!state && (state.version ?? 0) >= SEED_VERSION;
 }
 
+/** Keep the saved tag routes in this browser without writing Settings back. */
+export function rememberTagRequestRoutes(routes: AppState["tag_request_routes"]) {
+  const next = ensureTagRequestRoutes(routes);
+  memory = { ...getState(), tag_request_routes: next };
+  writeStorage(memory);
+  listeners.forEach((l) => l());
+}
+
 export function getState(): AppState {
   if (typeof window !== "undefined" && isCcApiEnabled()) {
     apiBacked = true;

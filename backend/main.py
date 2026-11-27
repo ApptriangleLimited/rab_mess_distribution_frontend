@@ -56,7 +56,7 @@ from daily import (
     router as daily_router,
     sync_due_jl,
     sync_member_jl,
-    upsert_assignment,
+    assign_tag_span,
 )
 from wings import wing_family_names
 from extra import router as extra_router, seed_catalog
@@ -129,16 +129,24 @@ def tag_request_routes(db: Session) -> dict[str, str]:
     return routes
 
 
+def saved_tag_route(tag: str, db: Session | None = None) -> str:
+    """Saved Settings map. Apply now is `none`. A tag with no saved row stays Consume."""
+    name = (tag or "").strip().upper()
+    routes = tag_request_routes(db) if db is not None else dict(DEFAULT_TAG_REQUEST_ROUTES)
+    dest = routes.get(name) or ("consume" if name else "none")
+    if dest in ("consume", "ration", "mess", "none"):
+        return dest
+    return "consume"
+
+
 def duty_tag_queue(
     tag: str,
     trg_tone: str | None = None,
     db: Session | None = None,
 ) -> str:
-    """Admin settings choose Consume / Ration / Mess. `none` stays on Daily."""
+    """Desk for a request. Apply now is not a desk; callers must not open a request."""
     del trg_tone
-    name = (tag or "").upper()
-    routes = tag_request_routes(db) if db is not None else dict(DEFAULT_TAG_REQUEST_ROUTES)
-    dest = routes.get(name) or ("consume" if name else "none")
+    dest = saved_tag_route(tag, db)
     if dest in ("consume", "ration", "mess"):
         return dest
     return "daily"
@@ -1196,7 +1204,15 @@ def create_tag_request(
     end = body.to_date or start
     if end < start:
         start, end = end, start
-    queue = duty_tag_queue(to_tag, body.trg_tone, db)
+    # The browser queue is ignored. Settings decide the desk, and Apply now
+    # writes the day on Daily with no request row.
+    route = saved_tag_route(to_tag, db)
+    if route == "none":
+        raise HTTPException(
+            status_code=409,
+            detail="This tag applies immediately. No request is sent.",
+        )
+    queue = route
     stored = (
         db.query(Assignment)
         .filter(Assignment.user_id == member.id, Assignment.date == start)
@@ -1324,16 +1340,14 @@ def accept_tag_request(
     end = row.to_date or start
     if end < start:
         start, end = end, start
-    wrote = 0
-    for day in each_date(start, end):
-        if not daily_day_writable(day):
-            continue
-        if not can_assign(row.member, day):
-            continue
-        assigned = upsert_assignment(
-            db, row.member, day, row.to_tag, staff, row.trg_tone, row.wr_code
-        )
-        wrote += 1
+    days = [
+        day
+        for day in each_date(start, end)
+        if daily_day_writable(day) and can_assign(row.member, day)
+    ]
+    wrote = assign_tag_span(
+        db, row.member, days, row.to_tag, staff, row.trg_tone, row.wr_code
+    )
     if wrote == 0:
         raise HTTPException(status_code=409, detail="No assignable days in this request")
     if (row.to_tag or "").upper() == "JL":

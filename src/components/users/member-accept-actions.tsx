@@ -15,7 +15,11 @@ import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { acceptMember, rejectMember } from "@/lib/api/members";
 import { isCcApiEnabled } from "@/lib/api/mode";
-import { createTagRequestApi, requestToTagRequest } from "@/lib/api/tag-requests";
+import {
+  createTagRequestApi,
+  pullSavedTagRequestRoutes,
+  requestToTagRequest,
+} from "@/lib/api/tag-requests";
 import { approveUser, rejectUser } from "@/lib/store/daily";
 import { setTag } from "@/lib/store/assignments";
 import { updateUser } from "@/lib/store/users";
@@ -112,6 +116,13 @@ export function MemberAcceptActions({
           const trgTone = isTrgTag(actionTag)
             ? resolveTrgTone(user.force, trainingChecked, sardaChecked)
             : undefined;
+          if (needsTag && actionTag) {
+            try {
+              await pullSavedTagRequestRoutes();
+            } catch {
+              /* Use the routes already loaded with this session. */
+            }
+          }
           const queue =
             needsTag && actionTag ? dutyTagQueue(actionTag, trgTone) : "immediate";
           try {

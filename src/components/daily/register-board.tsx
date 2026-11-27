@@ -81,7 +81,12 @@ import { useToast } from "@/components/shared/toast-provider";
 import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { isCcApiEnabled } from "@/lib/api/mode";
-import { createTagRequestApi, requestToTagRequest } from "@/lib/api/tag-requests";
+import {
+  createTagRequestApi,
+  isApplyNowRefusal,
+  pullSavedTagRequestRoutes,
+  requestToTagRequest,
+} from "@/lib/api/tag-requests";
 import {
   createDutyTagRequest,
   dutyTagQueue,
@@ -465,12 +470,24 @@ export function RegisterBoard({
     return date >= lo && date <= hi;
   }
 
+  async function savedQueue(tag: DailyTag, trgTone?: TrgTone) {
+    if (isCcApiEnabled()) {
+      try {
+        await pullSavedTagRequestRoutes();
+      } catch {
+        /* Use the routes already loaded with this session. */
+      }
+    }
+    return dutyTagQueue(tag, trgTone);
+  }
+
   async function queuePaint(
     userId: string,
     tag: DailyTag,
     fromDate: string,
     toDate: string,
     opts?: { sarda?: boolean; training?: boolean; wr_code?: WrCode },
+    onApply?: () => void,
   ) {
     const user = users.find((u) => u.id === userId);
     const force = user?.force ?? "";
@@ -478,8 +495,11 @@ export function RegisterBoard({
       ? resolveTrgTone(force, Boolean(opts?.training), Boolean(opts?.sarda))
       : undefined;
     const wr_code = normalizeWrCode(tag, opts?.wr_code);
-    const queue = dutyTagQueue(tag, trg_tone);
-    if (queue === "immediate") return false;
+    const queue = await savedQueue(tag, trg_tone);
+    if (queue === "immediate") {
+      onApply?.();
+      return false;
+    }
     const trg_sarda =
       isTrgTag(tag) && needsTrgSardaPrompt(force)
         ? Boolean(opts?.sarda)
@@ -507,6 +527,10 @@ export function RegisterBoard({
           "success",
         );
       } catch (err) {
+        if (isApplyNowRefusal(err)) {
+          onApply?.();
+          return false;
+        }
         toast(
           err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
           "error",
@@ -538,7 +562,7 @@ export function RegisterBoard({
     return true;
   }
 
-  function applyRangeTag(tag: DailyTag | "") {
+  async function applyRangeTag(tag: DailyTag | "") {
     if (!rangeMenu) return;
     const user = users.find((u) => u.id === rangeMenu.userId);
     const from = rangeMenu.fromDate || rangeMenu.anchorDate;
@@ -576,8 +600,15 @@ export function RegisterBoard({
     }
     const trgTone =
       isTrgTag(tag) && user ? resolveTrgTone(user.force) : undefined;
-    if (tag && dutyTagQueue(tag, trgTone) !== "immediate") {
-      void queuePaint(rangeMenu.userId, tag, fromDate, toDate);
+    if (tag && (await savedQueue(tag, trgTone)) !== "immediate") {
+      const applied = () => {
+        if (dates.length === 1) {
+          onTagChange(rangeMenu.userId, dates[0]!, tag, trgTone);
+        } else {
+          onPaintRange(rangeMenu.userId, dates, tag, trgTone);
+        }
+      };
+      void queuePaint(rangeMenu.userId, tag, fromDate, toDate, undefined, applied);
       closeRangeMenu();
       return;
     }
@@ -609,7 +640,7 @@ export function RegisterBoard({
     }
   }
 
-  function applyWr(userId: string, fromDate: string, toDate: string, wrCode: WrCode) {
+  async function applyWr(userId: string, fromDate: string, toDate: string, wrCode: WrCode) {
     const user = users.find((u) => u.id === userId);
     const dates = eachISODate(fromDate, toDate).filter(
       (date) =>
@@ -617,8 +648,15 @@ export function RegisterBoard({
         (!user || canAssignOnDate(user, date)),
     );
     if (dates.length === 0) return;
-    if (dutyTagQueue("WR") !== "immediate") {
-      void queuePaint(userId, "WR", fromDate, toDate, { wr_code: wrCode });
+    const writeWr = () => {
+      if (dates.length === 1) {
+        onTagChange(userId, dates[0]!, "WR", undefined, wrCode);
+      } else {
+        onPaintRange(userId, dates, "WR", undefined, wrCode);
+      }
+    };
+    if ((await savedQueue("WR")) !== "immediate") {
+      void queuePaint(userId, "WR", fromDate, toDate, { wr_code: wrCode }, writeWr);
       return;
     }
     if (dates.length === 1) {
@@ -1302,27 +1340,28 @@ export function RegisterBoard({
           ) {
             return;
           }
-          const trgTone = resolveTrgTone(
-            sardaPrompt.force,
+          const prompt = sardaPrompt;
+          const tone = resolveTrgTone(
+            prompt.force,
             trainingChecked,
             sardaChecked,
           );
-          if (dutyTagQueue("TRG", trgTone) === "immediate") {
-            applyImmediateTrg(
-              sardaPrompt.userId,
-              sardaPrompt.fromDate,
-              sardaPrompt.toDate,
-              trgTone,
-            );
-          } else {
-            void queuePaint(
-              sardaPrompt.userId,
-              "TRG",
-              sardaPrompt.fromDate,
-              sardaPrompt.toDate,
-              { sarda: sardaChecked, training: trainingChecked },
-            );
-          }
+          const writeTrg = () =>
+            applyImmediateTrg(prompt.userId, prompt.fromDate, prompt.toDate, tone);
+          void (async () => {
+            if ((await savedQueue("TRG", tone)) === "immediate") {
+              writeTrg();
+            } else {
+              void queuePaint(
+                prompt.userId,
+                "TRG",
+                prompt.fromDate,
+                prompt.toDate,
+                { sarda: sardaChecked, training: trainingChecked },
+                writeTrg,
+              );
+            }
+          })();
           setSardaPrompt(null);
           setSardaChecked(false);
           setTrainingChecked(false);
@@ -1335,7 +1374,7 @@ export function RegisterBoard({
         onCancel={() => setWrPrompt(null)}
         onPick={(code) => {
           if (!wrPrompt) return;
-          applyWr(wrPrompt.userId, wrPrompt.fromDate, wrPrompt.toDate, code);
+          void applyWr(wrPrompt.userId, wrPrompt.fromDate, wrPrompt.toDate, code);
           setWrPrompt(null);
         }}
       />

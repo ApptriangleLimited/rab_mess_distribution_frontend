@@ -748,6 +748,62 @@ def upsert_assignment(
     return row
 
 
+def assign_tag_span(
+    db: Session,
+    member: Member,
+    days: list[date],
+    tag: str,
+    staff: Staff,
+    trg_tone: str | None = None,
+    wr_code: str | None = None,
+) -> int:
+    """Write one tag across many days with a single read, not one query per day."""
+    if not days:
+        return 0
+    start, end = min(days), max(days)
+    existing = {
+        row.date: row
+        for row in db.query(Assignment)
+        .filter(
+            Assignment.user_id == member.id,
+            Assignment.date >= start,
+            Assignment.date <= end,
+        )
+        .all()
+    }
+    db.query(SuppressedCarry).filter(
+        SuppressedCarry.user_id == member.id,
+        SuppressedCarry.date.in_(days),
+    ).delete(synchronize_session=False)
+    db.query(DayLock).filter(DayLock.date.in_(days)).delete(synchronize_session=False)
+    now = utcnow()
+    tone = infer_trg_tone(member.force, trg_tone) if tag == "TRG" else None
+    code = normalize_wr_code(tag, wr_code)
+    for day in days:
+        row = existing.get(day)
+        if row:
+            row.tag = tag
+            row.trg_tone = tone
+            row.wr_code = code
+            row.updated_by = staff.id
+            row.updated_at = now
+            continue
+        db.add(
+            Assignment(
+                id=new_id("a"),
+                user_id=member.id,
+                date=day,
+                tag=tag,
+                trg_tone=tone,
+                wr_code=code,
+                updated_by=staff.id,
+                updated_at=now,
+            )
+        )
+    member.updated_at = now
+    return len(days)
+
+
 class AssignmentIn(BaseModel):
     member_id: str
     date: str

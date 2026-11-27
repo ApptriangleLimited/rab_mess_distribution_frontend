@@ -1,4 +1,6 @@
-import { apiJson } from "@/lib/api/client";
+import { ApiClientError, apiJson } from "@/lib/api/client";
+import { rememberTagRequestRoutes } from "@/lib/store";
+import { ensureTagRequestRoutes } from "@/lib/tag-request-routes";
 import {
   isApiFeatureMissing,
   isLegacyLiveApi,
@@ -205,6 +207,22 @@ export async function tagRequestCounts() {
     }
     throw err;
   }
+}
+
+export function isApplyNowRefusal(err: unknown) {
+  return (
+    err instanceof ApiClientError &&
+    err.status === 409 &&
+    /applies immediately/i.test(err.detail)
+  );
+}
+
+/** Load the saved Settings routes into this browser. Does not write them back. */
+export async function pullSavedTagRequestRoutes() {
+  const data = await apiJson<Record<string, unknown>>("/api/v1/catalog");
+  const routes = ensureTagRequestRoutes(data.tag_request_routes);
+  rememberTagRequestRoutes(routes);
+  return routes;
 }
 
 export function createTagRequestApi(input: {

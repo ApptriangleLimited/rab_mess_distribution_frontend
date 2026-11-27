@@ -567,6 +567,18 @@ def upsert_tag_request(db: Session, raw: dict) -> None:
     row.updated_at = parse_dt(raw.get("updated_at"))
 
 
+def _merge_tag_request_routes(existing, incoming) -> dict:
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    if not isinstance(incoming, dict):
+        return merged
+    for key, value in incoming.items():
+        tag = str(key or "").strip().upper()
+        dest = str(value or "").strip().lower()
+        if tag and dest in ("consume", "ration", "mess", "none"):
+            merged[tag] = dest
+    return merged
+
+
 def apply_catalog(db: Session, body: dict) -> None:
     row = db.get(CatalogState, "default")
     if row is None:
@@ -579,6 +591,11 @@ def apply_catalog(db: Session, body: dict) -> None:
         incoming = body[key]
         existing = payload.get(key)
         if incoming in ([], {}, None) and existing not in ([], {}, None, None):
+            continue
+        if key == "tag_request_routes":
+            # Keep routes already saved. A stale screen can only change a tag
+            # it actually sends, so Apply now is not replaced by the Consume default.
+            payload[key] = _merge_tag_request_routes(existing, incoming)
             continue
         payload[key] = incoming
     row.payload = payload

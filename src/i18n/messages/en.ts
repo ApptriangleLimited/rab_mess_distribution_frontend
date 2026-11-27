@@ -1891,6 +1891,7 @@ export const en = {
     updateToast: "Cockpit tag updated",
     sameTag: "Pick a different tag than the current one",
     cannotRequest: "This member cannot be tagged today",
+    appliesNow: "This tag applies on Daily. No request is sent.",
     requestedAt: "Requested",
     days: "Days",
     updatedAt: "Updated",

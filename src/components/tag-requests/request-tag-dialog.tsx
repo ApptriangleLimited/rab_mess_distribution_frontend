@@ -14,10 +14,16 @@ import { useStore } from "@/hooks/use-store";
 import { ApiClientError } from "@/lib/api/client";
 import { notifyCcDataChange } from "@/lib/api/cc-events";
 import { isCcApiEnabled } from "@/lib/api/mode";
-import { createTagRequestApi, requestToTagRequest } from "@/lib/api/tag-requests";
+import {
+  createTagRequestApi,
+  isApplyNowRefusal,
+  pullSavedTagRequestRoutes,
+  requestToTagRequest,
+} from "@/lib/api/tag-requests";
 import {
   canRequestTag,
   createTagRequest,
+  dutyTagQueue,
   getCockpitTagOnDate,
   getPendingTagRequest,
   requestQueueForTag,
@@ -89,6 +95,18 @@ export function RequestTagButton({
       return;
     }
     const trgTone = isTrgTag(tag) ? resolveTrgTone(user.force) : undefined;
+    if (apiOn) {
+      try {
+        await pullSavedTagRequestRoutes();
+      } catch {
+        /* Use the routes already loaded with this session. */
+      }
+    }
+    if (dutyTagQueue(tag, trgTone) === "immediate") {
+      toast(t("tagRequest.appliesNow"), "success");
+      setOpen(false);
+      return;
+    }
     const queue = requestQueueForTag(tag, trgTone);
     function queuedToast() {
       if (queue === "ration") {
@@ -121,6 +139,11 @@ export function RequestTagButton({
         queuedToast();
         setOpen(false);
       } catch (err) {
+        if (isApplyNowRefusal(err)) {
+          toast(t("tagRequest.appliesNow"), "success");
+          setOpen(false);
+          return;
+        }
         toast(
           err instanceof ApiClientError ? err.detail : t("tagRequest.cannotRequest"),
           "error",
